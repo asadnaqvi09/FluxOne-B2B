@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useMemo } from 'react'
 import { SurfaceCard } from '@/components/shared/SurfaceCard'
 import { PageHeader } from '@/components/shared/PageHeader'
 import { MotionHeader, MotionReveal } from '@/components/shared/MotionReveal'
@@ -6,6 +6,16 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Badge } from '@/components/ui/badge'
+import { NativeSelect } from '@/components/ui/select'
+import {
+  Table,
+  TableHeader,
+  TableBody,
+  TableHead,
+  TableRow,
+  TableCell,
+  TablePagination,
+} from '@/components/ui/table'
 import {
   Dialog,
   DialogContent,
@@ -16,27 +26,26 @@ import {
 } from '@/components/ui/dialog'
 import { BRAND } from '@/lib/constants'
 import { toastSuccess, toastError } from '@/lib/toast'
-import { INITIAL_SYSTEM_ACCESS_DATA } from '@/data/adminSettingsMock'
+import { getSystemsForTenant } from '@/data/adminSettingsMock'
+import { useAuthSession } from '@/hooks/useAuthSession'
 import {
   KeyRound,
   Shield,
   Monitor,
   Ban,
   CheckCircle2,
-  HardDrive,
   Cpu,
-  Laptop,
-  Smartphone,
   Lock,
   Eye,
   EyeOff,
-  Radio,
   Clock,
   ShieldCheck,
-  AlertTriangle,
+  Search,
 } from 'lucide-react'
 
 export function SettingsPage() {
+  const { user } = useAuthSession()
+  const tenantSlug = user?.tenantSlug || 'company-a'
   const [activeTab, setActiveTab] = useState('security') // 'security' | 'systems'
 
   // Change Password Form State
@@ -47,7 +56,12 @@ export function SettingsPage() {
   const [twoFactorEnabled, setTwoFactorEnabled] = useState(true)
 
   // System Access State
-  const [systems, setSystems] = useState(INITIAL_SYSTEM_ACCESS_DATA)
+  const [systems, setSystems] = useState(() => getSystemsForTenant(tenantSlug))
+  const [searchQuery, setSearchQuery] = useState('')
+  const [statusFilter, setStatusFilter] = useState('all') // 'all' | 'active' | 'blocked'
+  const [page, setPage] = useState(1)
+  const pageSize = 6
+
   const [confirmDialogOpen, setConfirmDialogOpen] = useState(false)
   const [targetSystem, setTargetSystem] = useState(null)
 
@@ -102,6 +116,24 @@ export function SettingsPage() {
   const activeCount = systems.filter((s) => s.status === 'active').length
   const blockedCount = systems.filter((s) => s.status === 'blocked').length
 
+  const filteredSystems = useMemo(() => {
+    return systems.filter((sys) => {
+      const matchesStatus = statusFilter === 'all' || sys.status === statusFilter
+      const q = searchQuery.toLowerCase().trim()
+      const matchesSearch =
+        !q ||
+        sys.deviceName.toLowerCase().includes(q) ||
+        sys.branch.toLowerCase().includes(q) ||
+        sys.userName.toLowerCase().includes(q) ||
+        sys.hardwareSignature.toLowerCase().includes(q) ||
+        sys.ipAddress.toLowerCase().includes(q)
+      return matchesStatus && matchesSearch
+    })
+  }, [systems, statusFilter, searchQuery])
+
+  const totalPages = Math.max(1, Math.ceil(filteredSystems.length / pageSize))
+  const paginatedSystems = filteredSystems.slice((page - 1) * pageSize, page * pageSize)
+
   return (
     <div className="space-y-6 pb-8">
       <MotionHeader>
@@ -148,76 +180,82 @@ export function SettingsPage() {
           <div className="grid grid-cols-1 gap-6 lg:grid-cols-12 items-start">
             {/* Change Password Form */}
             <div className="lg:col-span-7">
-              <SurfaceCard
-                title="Change Admin Password"
-                description="Update your B2B master account password and manage authentication security"
-              >
+              <SurfaceCard className="p-6">
+                <div className="flex items-center gap-3 border-b border-border pb-4 mb-5">
+                  <div
+                    className="flex size-10 shrink-0 items-center justify-center rounded-xl text-white"
+                    style={{ background: BRAND.purple }}
+                  >
+                    <Lock className="size-5" />
+                  </div>
+                  <div>
+                    <h3 className="font-bold text-base text-slate-900">
+                      Update Administrator Password
+                    </h3>
+                    <p className="text-xs text-slate-500">
+                      Ensure your account uses a long, unique password
+                    </p>
+                  </div>
+                </div>
+
                 <form onSubmit={handleChangePassword} className="space-y-4">
                   <div className="space-y-1.5">
-                    <Label htmlFor="currPass" className="text-xs font-semibold">
-                      Current Password *
+                    <Label className="text-xs font-bold text-slate-700">
+                      Current Password
+                    </Label>
+                    <Input
+                      type="password"
+                      placeholder="Enter current password"
+                      value={currentPassword}
+                      onChange={(e) => setCurrentPassword(e.target.value)}
+                      className="h-10 text-sm"
+                    />
+                  </div>
+
+                  <div className="space-y-1.5">
+                    <Label className="text-xs font-bold text-slate-700">
+                      New Password
                     </Label>
                     <div className="relative">
                       <Input
-                        id="currPass"
                         type={showPassword ? 'text' : 'password'}
-                        value={currentPassword}
-                        onChange={(e) => setCurrentPassword(e.target.value)}
-                        placeholder="Enter current password (e.g. password123)"
-                        required
+                        placeholder="Enter new password (min 6 characters)"
+                        value={newPassword}
+                        onChange={(e) => setNewPassword(e.target.value)}
+                        className="h-10 text-sm pr-10"
                       />
                       <button
                         type="button"
                         onClick={() => setShowPassword(!showPassword)}
-                        className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
+                        className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 cursor-pointer"
                       >
-                        {showPassword ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
+                        {showPassword ? (
+                          <EyeOff className="size-4" />
+                        ) : (
+                          <Eye className="size-4" />
+                        )}
                       </button>
                     </div>
                   </div>
 
-                  <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                    <div className="space-y-1.5">
-                      <Label htmlFor="newPass" className="text-xs font-semibold">
-                        New Password *
-                      </Label>
-                      <Input
-                        id="newPass"
-                        type={showPassword ? 'text' : 'password'}
-                        value={newPassword}
-                        onChange={(e) => setNewPassword(e.target.value)}
-                        placeholder="At least 6 characters"
-                        required
-                      />
-                    </div>
-
-                    <div className="space-y-1.5">
-                      <Label htmlFor="confPass" className="text-xs font-semibold">
-                        Confirm New Password *
-                      </Label>
-                      <Input
-                        id="confPass"
-                        type={showPassword ? 'text' : 'password'}
-                        value={confirmPassword}
-                        onChange={(e) => setConfirmPassword(e.target.value)}
-                        placeholder="Repeat new password"
-                        required
-                      />
-                    </div>
+                  <div className="space-y-1.5">
+                    <Label className="text-xs font-bold text-slate-700">
+                      Confirm New Password
+                    </Label>
+                    <Input
+                      type={showPassword ? 'text' : 'password'}
+                      placeholder="Re-enter new password"
+                      value={confirmPassword}
+                      onChange={(e) => setConfirmPassword(e.target.value)}
+                      className="h-10 text-sm"
+                    />
                   </div>
 
-                  <div className="rounded-xl bg-slate-50 p-3 text-xs text-slate-500 border border-slate-100 flex items-center gap-2">
-                    <Lock className="size-4 text-purple-700 shrink-0" />
-                    <span>
-                      Changing your password will automatically re-verify hardware signatures on all branch POS terminals.
-                    </span>
-                  </div>
-
-                  <div className="pt-2 flex justify-end">
+                  <div className="pt-2">
                     <Button
                       type="submit"
-                      className="text-white font-semibold cursor-pointer shadow-sm"
-                      style={{ background: `linear-gradient(90deg, ${BRAND.purple}, ${BRAND.deep})` }}
+                      className="w-full text-white font-semibold cursor-pointer shadow-sm"
+                      style={{ background: BRAND.purple }}
                     >
                       Update Password
                     </Button>
@@ -226,20 +264,22 @@ export function SettingsPage() {
               </SurfaceCard>
             </div>
 
-            {/* 2FA & Security Testing Overview */}
+            {/* Quick Security Status Side Panel */}
             <div className="lg:col-span-5 space-y-4">
-              <SurfaceCard
-                title="Security Protocol & 2FA"
-                description="Enhanced authentication safeguards"
-              >
-                <div className="space-y-3.5">
+              <SurfaceCard className="p-5">
+                <h4 className="font-bold text-sm text-slate-900 mb-3 flex items-center gap-2">
+                  <ShieldCheck className="size-4 text-purple-700" />
+                  Security Protocols
+                </h4>
+
+                <div className="space-y-3">
                   <div className="flex items-center justify-between p-3 rounded-xl border border-slate-100 bg-slate-50/70">
                     <div className="space-y-0.5">
                       <p className="font-bold text-xs text-slate-900">
-                        Two-Factor Authentication (2FA)
+                        Two-Factor Authentication
                       </p>
                       <p className="text-[11px] text-slate-500">
-                        SMS & Email OTP for critical price changes
+                        Email OTP verification for new terminals
                       </p>
                     </div>
                     <Button
@@ -296,133 +336,234 @@ export function SettingsPage() {
         </MotionReveal>
       )}
 
-      {/* TAB 2: ALL SYSTEM ACCESS (HARDWARE TERMINALS) */}
+      {/* TAB 2: ALL SYSTEM ACCESS (STANDARD DESIGN SYSTEM TABLE) */}
       {activeTab === 'systems' && (
         <MotionReveal delay={0.1}>
-          <div className="space-y-4">
-            {/* Systems Status Header Chips */}
-            <div className="flex flex-wrap items-center gap-3">
-              <div className="flex items-center gap-2 rounded-xl bg-white border border-border px-3.5 py-2 text-xs font-semibold text-slate-800 shadow-2xs">
-                <Monitor className="size-4 text-purple-600" />
-                <span>Total Registered Systems: <strong>{systems.length}</strong></span>
-              </div>
-              <div className="flex items-center gap-2 rounded-xl bg-emerald-50 border border-emerald-100 px-3.5 py-2 text-xs font-semibold text-emerald-900">
-                <CheckCircle2 className="size-4 text-emerald-600" />
-                <span>Active & Authorized: <strong>{activeCount}</strong></span>
-              </div>
-              {blockedCount > 0 && (
-                <div className="flex items-center gap-2 rounded-xl bg-rose-50 border border-rose-100 px-3.5 py-2 text-xs font-semibold text-rose-900">
-                  <Ban className="size-4 text-rose-600" />
-                  <span>Blocked Systems: <strong>{blockedCount}</strong></span>
+          <div className="space-y-5">
+            {/* KPI Overview Summary Cards */}
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+              <div className="flex items-center gap-3 rounded-2xl border border-border bg-white p-3.5 shadow-2xs">
+                <div
+                  className="flex size-10 shrink-0 items-center justify-center rounded-xl text-white"
+                  style={{ background: BRAND.purple }}
+                >
+                  <Monitor className="size-5" />
                 </div>
-              )}
+                <div className="min-w-0">
+                  <p className="text-[11px] font-medium text-slate-500 uppercase tracking-wider">Registered Systems</p>
+                  <p className="text-lg font-bold text-slate-900 leading-tight">{systems.length}</p>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-3 rounded-2xl border border-border bg-white p-3.5 shadow-2xs">
+                <div className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-emerald-50 text-emerald-600 border border-emerald-200">
+                  <CheckCircle2 className="size-5" />
+                </div>
+                <div className="min-w-0">
+                  <p className="text-[11px] font-medium text-slate-500 uppercase tracking-wider">Active & Authorized</p>
+                  <p className="text-lg font-bold text-emerald-700 leading-tight">{activeCount}</p>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-3 rounded-2xl border border-border bg-white p-3.5 shadow-2xs">
+                <div className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-slate-100 text-slate-600 border border-slate-200">
+                  <Ban className="size-5" />
+                </div>
+                <div className="min-w-0">
+                  <p className="text-[11px] font-medium text-slate-500 uppercase tracking-wider">Blocked Systems</p>
+                  <p className="text-lg font-bold text-slate-700 leading-tight">{blockedCount}</p>
+                </div>
+              </div>
             </div>
 
-            {/* List of System Devices */}
-            <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
-              {systems.map((sys) => {
-                const isActive = sys.status === 'active'
+            {/* Filter & Search Bar */}
+            <div className="flex flex-col gap-3 rounded-2xl border border-border bg-white p-3.5 shadow-2xs sm:flex-row sm:items-center sm:justify-between">
+              <div className="relative flex-1">
+                <Search className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-slate-400" />
+                <input
+                  type="text"
+                  placeholder="Search by Device Name, UUID, Branch, or User..."
+                  value={searchQuery}
+                  onChange={(e) => {
+                    setSearchQuery(e.target.value)
+                    setPage(1)
+                  }}
+                  className="w-full rounded-xl border border-border bg-slate-50/70 py-2 pl-9 pr-4 text-xs sm:text-sm text-slate-900 outline-none focus:border-purple-300 focus:bg-white focus:ring-1 focus:ring-purple-300"
+                />
+              </div>
 
-                return (
-                  <div
-                    key={sys.id}
-                    className={`rounded-2xl border bg-white p-5 shadow-xs transition-all flex flex-col justify-between space-y-3.5 ${
-                      isActive ? 'border-border hover:border-purple-200' : 'border-rose-200 bg-rose-50/20'
+              <div className="flex items-center gap-2">
+                <span className="text-xs text-slate-500 font-semibold shrink-0">Status:</span>
+                <div className="flex rounded-xl bg-slate-100 p-0.5 border border-slate-200">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setStatusFilter('all')
+                      setPage(1)
+                    }}
+                    className={`rounded-lg px-3 py-1 text-xs font-semibold transition-all cursor-pointer ${
+                      statusFilter === 'all'
+                        ? 'bg-white text-purple-900 shadow-xs font-bold'
+                        : 'text-slate-600 hover:text-slate-900'
                     }`}
                   >
-                    <div>
-                      <div className="flex items-start justify-between gap-2">
-                        <div className="flex items-center gap-2.5">
-                          <div
-                            className={`flex size-9 items-center justify-center rounded-xl text-white ${
-                              isActive ? 'bg-purple-900' : 'bg-rose-600'
-                            }`}
-                          >
-                            <Cpu className="size-4" />
-                          </div>
-                          <div>
-                            <h4 className="font-bold text-slate-900 text-sm">{sys.deviceName}</h4>
-                            <span className="text-[11px] text-slate-500 font-medium">
-                              Branch: {sys.branch}
-                            </span>
-                          </div>
-                        </div>
-
-                        <Badge
-                          variant="outline"
-                          className={
-                            isActive
-                              ? 'bg-emerald-50 text-emerald-700 border-emerald-200 font-bold text-[11px]'
-                              : 'bg-rose-50 text-rose-700 border-rose-200 font-bold text-[11px]'
-                          }
-                        >
-                          {isActive ? 'Active' : 'Blocked'}
-                        </Badge>
-                      </div>
-
-                      {/* Hardware Signature Details */}
-                      <div className="mt-3 rounded-xl border border-slate-100 bg-slate-50/70 p-3 space-y-1.5 text-xs">
-                        <div className="flex items-center justify-between">
-                          <span className="text-slate-400 text-[10px] uppercase font-bold">
-                            Hardware Signature (UUID)
-                          </span>
-                          <span className="font-mono text-purple-950 font-bold text-[11px]">
-                            {sys.hardwareSignature}
-                          </span>
-                        </div>
-
-                        <div className="flex items-center justify-between text-slate-600 text-[11px]">
-                          <span><strong>User ID / Name:</strong></span>
-                          <span>{sys.userName}</span>
-                        </div>
-
-                        <div className="flex items-center justify-between text-slate-600 text-[11px]">
-                          <span><strong>IP & MAC Address:</strong></span>
-                          <span className="font-mono text-slate-800">
-                            {sys.ipAddress} · {sys.macAddress}
-                          </span>
-                        </div>
-
-                        <div className="flex items-center justify-between text-slate-400 text-[10px] pt-1 border-t border-slate-200/50">
-                          <span>Last Activity:</span>
-                          <span className="font-medium text-slate-700 flex items-center gap-1">
-                            <Clock className="size-3" />
-                            {sys.lastActive}
-                          </span>
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* Action Block Button */}
-                    <div className="flex items-center justify-between pt-2 border-t border-slate-100">
-                      <span className="text-[11px] text-slate-400">
-                        {isActive ? 'Authorized workstation terminal' : 'Terminal access revoked'}
-                      </span>
-
-                      <Button
-                        type="button"
-                        size="sm"
-                        onClick={() => handlePromptBlockSystem(sys)}
-                        className="h-8 text-xs font-semibold cursor-pointer text-white shadow-xs"
-                        style={{ background: isActive ? BRAND.deep : BRAND.purple }}
-                      >
-                        {isActive ? (
-                          <>
-                            <Ban className="mr-1 size-3.5" />
-                            Block System
-                          </>
-                        ) : (
-                          <>
-                            <CheckCircle2 className="mr-1 size-3.5" />
-                            Unblock & Authorize
-                          </>
-                        )}
-                      </Button>
-                    </div>
-                  </div>
-                )
-              })}
+                    All ({systems.length})
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setStatusFilter('active')
+                      setPage(1)
+                    }}
+                    className={`rounded-lg px-3 py-1 text-xs font-semibold transition-all cursor-pointer ${
+                      statusFilter === 'active'
+                        ? 'bg-white text-purple-900 shadow-xs font-bold'
+                        : 'text-slate-600 hover:text-slate-900'
+                    }`}
+                  >
+                    Active ({activeCount})
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setStatusFilter('blocked')
+                      setPage(1)
+                    }}
+                    className={`rounded-lg px-3 py-1 text-xs font-semibold transition-all cursor-pointer ${
+                      statusFilter === 'blocked'
+                        ? 'bg-white text-purple-900 shadow-xs font-bold'
+                        : 'text-slate-600 hover:text-slate-900'
+                    }`}
+                  >
+                    Blocked ({blockedCount})
+                  </button>
+                </div>
+              </div>
             </div>
+
+            {/* List of System Access Terminals Table in SurfaceCard */}
+            <SurfaceCard
+              title="List of System Access Terminals"
+              description="Hardware signature access, MAC/IP bindings & authorization statuses"
+              actions={
+                <span className="text-xs font-medium text-slate-400">
+                  {filteredSystems.length} records · {pageSize} / page
+                </span>
+              }
+            >
+              <div className="overflow-x-auto">
+                <Table className="w-full text-left text-sm">
+                  <TableHeader>
+                    <TableRow className="text-xs text-slate-500 uppercase">
+                      <TableHead className="px-4 py-3 font-medium">Device & Branch</TableHead>
+                      <TableHead className="px-4 py-3 font-medium">Hardware Signature & Network</TableHead>
+                      <TableHead className="px-4 py-3 font-medium">Assigned User</TableHead>
+                      <TableHead className="px-4 py-3 font-medium">Status & Activity</TableHead>
+                      <TableHead className="px-4 py-3 text-right font-medium">Action</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {filteredSystems.length === 0 ? (
+                      <TableRow>
+                        <TableCell colSpan={5} className="py-8 text-center text-xs text-slate-400">
+                          No registered systems match the filter criteria.
+                        </TableCell>
+                      </TableRow>
+                    ) : (
+                      paginatedSystems.map((sys) => {
+                        const isActive = sys.status === 'active'
+                        return (
+                          <TableRow key={sys.id} className="hover:bg-slate-50/70 transition-colors">
+                            <TableCell className="px-4 py-3.5">
+                              <div className="flex items-center gap-3">
+                                <div
+                                  className={`flex size-9 shrink-0 items-center justify-center rounded-xl text-white ${
+                                    isActive ? 'bg-purple-900' : 'bg-rose-600'
+                                  }`}
+                                >
+                                  <Cpu className="size-4" />
+                                </div>
+                                <div className="min-w-0">
+                                  <p className="font-semibold text-xs text-slate-900 leading-tight">{sys.deviceName}</p>
+                                  <p className="text-[11px] text-slate-500 font-medium mt-0.5">Branch: {sys.branch}</p>
+                                </div>
+                              </div>
+                            </TableCell>
+
+                            <TableCell className="px-4 py-3.5">
+                              <div>
+                                <span className="font-mono text-xs font-semibold px-2 py-0.5 rounded-md bg-purple-50 text-purple-900 border border-purple-100 whitespace-nowrap inline-block tracking-wide">
+                                  {sys.hardwareSignature}
+                                </span>
+                                <p className="font-mono text-[11px] text-slate-500 mt-1">
+                                  IP: {sys.ipAddress} · MAC: {sys.macAddress}
+                                </p>
+                              </div>
+                            </TableCell>
+
+                            <TableCell className="px-4 py-3.5 text-xs text-slate-700">
+                              <p className="font-semibold text-slate-900">{sys.userName}</p>
+                              <p className="text-[11px] text-slate-500 font-mono mt-0.5">{sys.userId}</p>
+                            </TableCell>
+
+                            <TableCell className="px-4 py-3.5 whitespace-nowrap">
+                              <div className="flex items-center gap-2">
+                                <Badge
+                                  variant="outline"
+                                  className={
+                                    isActive
+                                      ? 'bg-emerald-50 text-emerald-700 border-emerald-200 font-bold text-[11px]'
+                                      : 'bg-rose-50 text-rose-700 border-rose-200 font-bold text-[11px]'
+                                  }
+                                >
+                                  {isActive ? 'Active' : 'Blocked'}
+                                </Badge>
+                                <span className="inline-flex items-center gap-1 text-[11px] text-slate-500 font-medium">
+                                  <Clock className="size-3 text-slate-400" />
+                                  {sys.lastActive}
+                                </span>
+                              </div>
+                            </TableCell>
+
+                            <TableCell className="px-4 py-3.5 text-right whitespace-nowrap">
+                              <Button
+                                type="button"
+                                size="sm"
+                                onClick={() => handlePromptBlockSystem(sys)}
+                                className="h-8 px-3.5 text-xs font-semibold cursor-pointer text-white shadow-xs"
+                                style={{ background: isActive ? BRAND.deep : BRAND.purple }}
+                              >
+                                {isActive ? (
+                                  <>
+                                    <Ban className="mr-1.5 size-3.5" />
+                                    Block System
+                                  </>
+                                ) : (
+                                  <>
+                                    <CheckCircle2 className="mr-1.5 size-3.5" />
+                                    Authorize
+                                  </>
+                                )}
+                              </Button>
+                            </TableCell>
+                          </TableRow>
+                        )
+                      })
+                    )}
+                  </TableBody>
+                </Table>
+              </div>
+
+              {totalPages > 1 && (
+                <div className="mt-4 border-t border-border pt-3">
+                  <TablePagination
+                    currentPage={page}
+                    totalPages={totalPages}
+                    onPageChange={setPage}
+                  />
+                </div>
+              )}
+            </SurfaceCard>
           </div>
         </MotionReveal>
       )}

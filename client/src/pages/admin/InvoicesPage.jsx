@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useMemo } from 'react'
 import { SurfaceCard } from '@/components/shared/SurfaceCard'
 import { PageHeader } from '@/components/shared/PageHeader'
 import { MotionHeader, MotionReveal } from '@/components/shared/MotionReveal'
@@ -6,6 +6,16 @@ import { StatCard } from '@/components/shared/StatsCards'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { NativeSelect } from '@/components/ui/select'
+import {
+  Table,
+  TableHeader,
+  TableBody,
+  TableFooter,
+  TableHead,
+  TableRow,
+  TableCell,
+  TablePagination,
+} from '@/components/ui/table'
 import {
   Dialog,
   DialogContent,
@@ -46,6 +56,8 @@ const MONTHS_OPTIONS = [
   { value: '12', label: 'December' },
 ]
 
+const PAGE_SIZE = 8
+
 export function InvoicesPage() {
   const [invoices] = useState(INITIAL_INVOICES_DATA)
   const [selectedMonth, setSelectedMonth] = useState('all')
@@ -53,6 +65,7 @@ export function InvoicesPage() {
   const [searchQuery, setSearchQuery] = useState('')
   const [selectedInvoice, setSelectedInvoice] = useState(null)
   const [previewOpen, setPreviewOpen] = useState(false)
+  const [page, setPage] = useState(1)
 
   // Filter logic
   const filteredInvoices = invoices.filter((inv) => {
@@ -291,85 +304,99 @@ export function InvoicesPage() {
         <SurfaceCard
           title="Invoices & Payment History"
           description={`Showing ${filteredInvoices.length} billing records with official receipt downloads`}
+          actions={
+            <span className="text-xs font-medium text-slate-400">
+              {filteredInvoices.length} records · {PAGE_SIZE} / page
+            </span>
+          }
         >
           <div className="overflow-x-auto">
-            <table className="w-full min-w-[42rem] text-left text-sm">
-              <thead>
-                <tr className="border-b border-border text-xs text-slate-500 uppercase">
-                  <th className="px-4 py-3 font-medium">Tracking ID</th>
-                  <th className="px-4 py-3 font-medium">Date & Time</th>
-                  <th className="px-4 py-3 font-medium">Name of Source / Plan</th>
-                  <th className="px-4 py-3 font-medium">Price</th>
-                  <th className="px-4 py-3 font-medium">Status</th>
-                  <th className="px-4 py-3 text-right font-medium">Actions</th>
-                </tr>
-              </thead>
-              <tbody>
+            <Table className="min-w-[42rem] text-left text-sm">
+              <TableHeader>
+                <TableRow className="text-xs text-slate-500 uppercase">
+                  <TableHead className="px-4 py-3 font-medium">Tracking ID</TableHead>
+                  <TableHead className="px-4 py-3 font-medium">Date & Time</TableHead>
+                  <TableHead className="px-4 py-3 font-medium">Name of Source / Plan</TableHead>
+                  <TableHead className="px-4 py-3 font-medium">Price</TableHead>
+                  <TableHead className="px-4 py-3 font-medium">Status</TableHead>
+                  <TableHead className="px-4 py-3 text-right font-medium">Actions</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
                 {filteredInvoices.length === 0 ? (
-                  <tr>
-                    <td colSpan={6} className="py-8 text-center text-xs text-slate-400">
+                  <TableRow>
+                    <TableCell colSpan={6} className="py-8 text-center text-xs text-slate-400">
                       No invoices found matching the selected month and year.
-                    </td>
-                  </tr>
+                    </TableCell>
+                  </TableRow>
                 ) : (
-                  filteredInvoices.map((inv) => (
-                    <tr
-                      key={inv.trackingId}
-                      className="border-b border-border/60 hover:bg-slate-50/50 transition-colors"
-                    >
-                      <td className="px-4 py-3.5 font-bold text-slate-900">
-                        <span className="rounded-md bg-purple-50 px-2 py-1 text-xs text-purple-700 border border-purple-100 font-mono font-bold">
-                          {inv.trackingId}
-                        </span>
-                      </td>
-                      <td className="px-4 py-3.5 text-xs text-slate-600 font-medium">
-                        {inv.dateTime}
-                      </td>
-                      <td className="px-4 py-3.5 text-xs font-semibold text-slate-800">
-                        {inv.source}
-                      </td>
-                      <td className="px-4 py-3.5 font-extrabold text-slate-900">
-                        {inv.formattedPrice}
-                      </td>
-                      <td className="px-4 py-3.5">
-                        <Badge
-                          variant="outline"
-                          className="bg-emerald-50 text-emerald-700 border-emerald-200 font-semibold"
-                        >
-                          <CheckCircle2 className="mr-1 size-3" />
-                          {inv.status}
-                        </Badge>
-                      </td>
-                      <td className="px-4 py-3.5 text-right">
-                        <div className="flex items-center justify-end gap-1.5">
-                          <Button
-                            type="button"
+                  filteredInvoices
+                    .slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE)
+                    .map((inv) => (
+                      <TableRow
+                        key={inv.trackingId}
+                        className="hover:bg-slate-50/50 transition-colors"
+                      >
+                        <TableCell className="px-4 py-3.5 font-bold text-slate-900">
+                          <span className="rounded-md bg-purple-50 px-2 py-1 text-xs text-purple-700 border border-purple-100 font-mono font-bold">
+                            {inv.trackingId}
+                          </span>
+                        </TableCell>
+                        <TableCell className="px-4 py-3.5 text-xs text-slate-600 font-medium">
+                          {inv.dateTime}
+                        </TableCell>
+                        <TableCell className="px-4 py-3.5 text-xs font-semibold text-slate-800">
+                          {inv.source}
+                        </TableCell>
+                        <TableCell className="px-4 py-3.5 font-extrabold text-slate-900">
+                          {inv.formattedPrice}
+                        </TableCell>
+                        <TableCell className="px-4 py-3.5">
+                          <Badge
                             variant="outline"
-                            size="sm"
-                            onClick={() => handlePreviewInvoice(inv)}
-                            className="h-8 text-xs cursor-pointer"
+                            className="bg-emerald-50 text-emerald-700 border-emerald-200 font-semibold"
                           >
-                            <FileText className="mr-1 size-3.5" />
-                            View
-                          </Button>
-                          <Button
-                            type="button"
-                            size="sm"
-                            onClick={() => handleDownloadPDF(inv)}
-                            className="h-8 text-xs text-white cursor-pointer font-semibold"
-                            style={{ background: BRAND.purple }}
-                          >
-                            <Download className="mr-1 size-3.5" />
-                            Download PDF
-                          </Button>
-                        </div>
-                      </td>
-                    </tr>
-                  ))
+                            <CheckCircle2 className="mr-1 size-3" />
+                            {inv.status}
+                          </Badge>
+                        </TableCell>
+                        <TableCell className="px-4 py-3.5 text-right">
+                          <div className="flex items-center justify-end gap-1.5">
+                            <Button
+                              type="button"
+                              variant="outline"
+                              size="sm"
+                              onClick={() => handlePreviewInvoice(inv)}
+                              className="h-8 text-xs cursor-pointer"
+                            >
+                              <FileText className="mr-1 size-3.5" />
+                              View
+                            </Button>
+                            <Button
+                              type="button"
+                              size="sm"
+                              onClick={() => handleDownloadPDF(inv)}
+                              className="h-8 text-xs text-white cursor-pointer font-semibold"
+                              style={{ background: BRAND.purple }}
+                            >
+                              <Download className="mr-1 size-3.5" />
+                              Download PDF
+                            </Button>
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    ))
                 )}
-              </tbody>
-            </table>
+              </TableBody>
+            </Table>
           </div>
+
+          <TablePagination
+            page={page}
+            pageCount={Math.max(1, Math.ceil(filteredInvoices.length / PAGE_SIZE))}
+            totalItems={filteredInvoices.length}
+            onPageChange={setPage}
+          />
         </SurfaceCard>
       </MotionReveal>
 
@@ -422,32 +449,32 @@ export function InvoicesPage() {
 
               {/* Line Items */}
               <div className="border-t border-slate-200 pt-2">
-                <table className="w-full text-left">
-                  <thead>
-                    <tr className="border-b border-slate-200 text-slate-400 uppercase text-[10px]">
-                      <th className="py-1">Description</th>
-                      <th className="py-1 text-right">Amount</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-slate-100">
+                <Table className="w-full text-left">
+                  <TableHeader>
+                    <TableRow className="border-b border-slate-200 text-slate-400 uppercase text-[10px]">
+                      <TableHead className="py-1">Description</TableHead>
+                      <TableHead className="py-1 text-right">Amount</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
                     {selectedInvoice.items?.map((item, i) => (
-                      <tr key={i}>
-                        <td className="py-2 text-slate-700">{item.description}</td>
-                        <td className="py-2 text-right font-semibold text-slate-900">
+                      <TableRow key={i}>
+                        <TableCell className="py-2 text-slate-700">{item.description}</TableCell>
+                        <TableCell className="py-2 text-right font-semibold text-slate-900">
                           Rs. {item.amount.toLocaleString()}
-                        </td>
-                      </tr>
+                        </TableCell>
+                      </TableRow>
                     ))}
-                  </tbody>
-                  <tfoot>
-                    <tr className="border-t-2 border-slate-900 font-extrabold text-sm text-slate-900">
-                      <td className="py-2">Total Paid:</td>
-                      <td className="py-2 text-right text-purple-900">
+                  </TableBody>
+                  <TableFooter>
+                    <TableRow className="border-t-2 border-slate-900 font-extrabold text-sm text-slate-900">
+                      <TableCell className="py-2">Total Paid:</TableCell>
+                      <TableCell className="py-2 text-right text-purple-900">
                         {selectedInvoice.formattedPrice}
-                      </td>
-                    </tr>
-                  </tfoot>
-                </table>
+                      </TableCell>
+                    </TableRow>
+                  </TableFooter>
+                </Table>
               </div>
             </div>
 

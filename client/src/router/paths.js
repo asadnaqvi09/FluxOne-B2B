@@ -47,8 +47,8 @@ export const PATHS = {
   },
 }
 
-export const ADMIN_ROLES = ['b2b_owner']
-export const INVENTORY_ROLES = ['inventory_manager', 'b2b_admin']
+export const ADMIN_ROLES = ['b2b_admin', 'b2b_owner']
+export const INVENTORY_ROLES = ['inventory_manager']
 export const BRANCH_ROLES = ['branch_manager']
 export const PHASE2_ROLES = ['production_staff', 'delivery_staff']
 

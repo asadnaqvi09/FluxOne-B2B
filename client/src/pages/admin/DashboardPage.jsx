@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useMemo } from 'react'
 import { MotionHeader, MotionReveal } from '@/components/shared/MotionReveal'
 import { PageHeader } from '@/components/shared/PageHeader'
 import { AdminWelcomeBanner } from '@/components/feature/admin/dashboard/AdminWelcomeBanner'
@@ -6,20 +6,23 @@ import { AdminKpiCards } from '@/components/feature/admin/dashboard/AdminKpiCard
 import { BranchProfitOverviewChart } from '@/components/feature/admin/dashboard/BranchProfitOverviewChart'
 import { BranchInventoryStatusChart } from '@/components/feature/admin/dashboard/BranchInventoryStatusChart'
 import { AiBusinessInsights } from '@/components/feature/admin/dashboard/AiBusinessInsights'
-import { ADMIN_DASHBOARD_DATA } from '@/data/adminDashboardMock'
+import { getAdminDashboardDataForTenant } from '@/data/adminDashboardMock'
 import { BRAND } from '@/lib/constants'
 import { NativeSelect } from '@/components/ui/select'
+import { useAuthSession } from '@/hooks/useAuthSession'
 
 export function DashboardPage() {
+  const { user } = useAuthSession()
+  const tenantSlug = user?.tenantSlug || 'company-a'
   const [date, setDate] = useState(new Date().toISOString().split('T')[0])
   const [selectedBranch, setSelectedBranch] = useState('all')
-  const [data] = useState(ADMIN_DASHBOARD_DATA)
+  const data = useMemo(() => getAdminDashboardDataForTenant(tenantSlug), [tenantSlug])
 
   return (
     <div className="space-y-5 pb-8 sm:space-y-6">
       <MotionHeader>
         <PageHeader
-          eyebrow="B2B Admin Overview"
+          eyebrow={user?.tenantName ? `${user.tenantName} · B2B Admin` : 'B2B Admin Overview'}
           title="Admin Dashboard"
           description="Consolidated sales, profit, branch inventory & business insights"
           actions={
@@ -31,11 +34,11 @@ export function DashboardPage() {
                   onChange={(e) => setSelectedBranch(e.target.value)}
                   className="h-7 border-0 bg-transparent py-0 text-xs font-semibold text-slate-800 shadow-none focus:ring-0"
                 >
-                  <option value="all">All Branches</option>
-                  <option value="wah">Wah Cantt</option>
-                  <option value="haripur">Haripur</option>
-                  <option value="taxilla">Taxilla</option>
-                  <option value="islamabad">Islamabad</option>
+                  {data.branchProfitOverview.branches.map((b) => (
+                    <option key={b.id} value={b.id}>
+                      {b.name}
+                    </option>
+                  ))}
                 </NativeSelect>
               </label>
 

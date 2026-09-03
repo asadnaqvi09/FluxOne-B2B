@@ -1,19 +1,31 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useMemo } from 'react'
 import { ArrowLeft, ArrowRight, Calendar, Users } from 'lucide-react'
 import { SurfaceCard } from '@/components/shared/SurfaceCard'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { NativeSelect } from '@/components/ui/select'
+import {
+  Table,
+  TableHeader,
+  TableBody,
+  TableHead,
+  TableRow,
+  TableCell,
+  TablePagination,
+} from '@/components/ui/table'
 import { apiClient } from '@/api/api'
 import { BRAND } from '@/lib/constants'
 import { toastError, toastSuccess } from '@/lib/toast'
+
+const PAGE_SIZE = 8
 
 export function StaffLeavesTab({ designations = [], staff = [] }) {
   const [leaves, setLeaves] = useState([])
   const [loading, setLoading] = useState(false)
   const [mutating, setMutating] = useState(false)
   const [step, setStep] = useState(1)
+  const [page, setPage] = useState(1)
 
   // Leave Form State
   const [startDate, setStartDate] = useState('')
@@ -113,62 +125,76 @@ export function StaffLeavesTab({ designations = [], staff = [] }) {
         <SurfaceCard
           title="Active Leave Roster"
           description="Recorded leave records for branch employees"
+          actions={
+            <span className="text-xs font-medium text-slate-400">
+              {leaves.length} records · {PAGE_SIZE} / page
+            </span>
+          }
         >
           <div className="overflow-x-auto">
-            <table className="w-full text-left text-sm">
-              <thead>
-                <tr className="border-b border-border text-xs text-slate-500 uppercase">
-                  <th className="px-3 py-2 font-medium">Employee</th>
-                  <th className="px-3 py-2 font-medium">Leave Dates</th>
-                  <th className="px-3 py-2 font-medium">Reason</th>
-                  <th className="px-3 py-2 font-medium">Status</th>
-                </tr>
-              </thead>
-              <tbody>
+            <Table className="w-full text-left text-sm">
+              <TableHeader>
+                <TableRow className="text-xs text-slate-500 uppercase">
+                  <TableHead className="px-3 py-2 font-medium">Employee</TableHead>
+                  <TableHead className="px-3 py-2 font-medium">Leave Dates</TableHead>
+                  <TableHead className="px-3 py-2 font-medium">Reason</TableHead>
+                  <TableHead className="px-3 py-2 font-medium">Status</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
                 {loading ? (
-                  <tr>
-                    <td colSpan={4} className="py-8 text-center text-slate-400">
+                  <TableRow>
+                    <TableCell colSpan={4} className="py-8 text-center text-slate-400">
                       Loading...
-                    </td>
-                  </tr>
+                    </TableCell>
+                  </TableRow>
                 ) : leaves.length === 0 ? (
-                  <tr>
-                    <td colSpan={4} className="py-8 text-center text-slate-400">
+                  <TableRow>
+                    <TableCell colSpan={4} className="py-8 text-center text-slate-400">
                       No active leave records found
-                    </td>
-                  </tr>
+                    </TableCell>
+                  </TableRow>
                 ) : (
-                  leaves.map((l) => (
-                    <tr key={l.id} className="border-b border-border/60 hover:bg-slate-50/50">
-                      <td className="px-3 py-3">
-                        <div className="font-semibold text-slate-900">{l.fullName || 'Employee'}</div>
-                      </td>
-                      <td className="px-3 py-3 text-slate-600">
-                        {new Date(l.startDate).toLocaleDateString('en-GB', {
-                          day: '2-digit',
-                          month: 'short',
-                        })}{' '}
-                        —{' '}
-                        {new Date(l.endDate).toLocaleDateString('en-GB', {
-                          day: '2-digit',
-                          month: 'short',
-                          year: 'numeric',
-                        })}
-                      </td>
-                      <td className="px-3 py-3 text-slate-700 italic max-w-xs truncate">
-                        {l.reason || 'Leave'}
-                      </td>
-                      <td className="px-3 py-3">
-                        <span className="inline-flex items-center rounded-full bg-emerald-50 px-2 py-0.5 text-xs font-semibold text-emerald-700 ring-1 ring-inset ring-emerald-200">
-                          {l.status}
-                        </span>
-                      </td>
-                    </tr>
-                  ))
+                  leaves
+                    .slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE)
+                    .map((l) => (
+                      <TableRow key={l.id} className="hover:bg-slate-50/50">
+                        <TableCell className="px-3 py-3">
+                          <div className="font-semibold text-slate-900">{l.fullName || 'Employee'}</div>
+                        </TableCell>
+                        <TableCell className="px-3 py-3 text-slate-600">
+                          {new Date(l.startDate).toLocaleDateString('en-GB', {
+                            day: '2-digit',
+                            month: 'short',
+                          })}{' '}
+                          —{' '}
+                          {new Date(l.endDate).toLocaleDateString('en-GB', {
+                            day: '2-digit',
+                            month: 'short',
+                            year: 'numeric',
+                          })}
+                        </TableCell>
+                        <TableCell className="px-3 py-3 text-slate-700 italic max-w-xs truncate">
+                          {l.reason || 'Leave'}
+                        </TableCell>
+                        <TableCell className="px-3 py-3">
+                          <span className="inline-flex items-center rounded-full bg-emerald-50 px-2 py-0.5 text-xs font-semibold text-emerald-700 ring-1 ring-inset ring-emerald-200">
+                            {l.status}
+                          </span>
+                        </TableCell>
+                      </TableRow>
+                    ))
                 )}
-              </tbody>
-            </table>
+              </TableBody>
+            </Table>
           </div>
+
+          <TablePagination
+            page={page}
+            pageCount={Math.max(1, Math.ceil(leaves.length / PAGE_SIZE))}
+            totalItems={leaves.length}
+            onPageChange={setPage}
+          />
         </SurfaceCard>
       </div>
 

@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useMemo } from 'react'
 import { Award, Settings, ShieldAlert, Star, Sliders, Pencil, Trash2 } from 'lucide-react'
 import { SurfaceCard } from '@/components/shared/SurfaceCard'
 import { ConfirmDialog } from '@/components/shared/ConfirmDialog'
@@ -14,11 +14,14 @@ import {
   TableHead,
   TableRow,
   TableCell,
+  TablePagination,
 } from '@/components/ui/table'
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogCancelButton } from '@/components/ui/dialog'
 import { apiClient } from '@/api/api'
 import { BRAND } from '@/lib/constants'
 import { toastError, toastSuccess } from '@/lib/toast'
+
+const PAGE_SIZE = 8
 
 export function StaffPerformanceTab({ designations = [] }) {
   const [activeSubTab, setActiveSubTab] = useState('roster') // 'roster' | 'scales'
@@ -28,6 +31,8 @@ export function StaffPerformanceTab({ designations = [] }) {
   const [loadingRoster, setLoadingRoster] = useState(false)
   const [searchQuery, setSearchQuery] = useState('')
   const [filterDesignation, setFilterDesignation] = useState('')
+  const [rosterPage, setRosterPage] = useState(1)
+  const [scalesPage, setScalesPage] = useState(1)
 
   // Scoring Modal States
   const [scoringEmployee, setScoringEmployee] = useState(null)
@@ -202,7 +207,14 @@ export function StaffPerformanceTab({ designations = [] }) {
       </div>
 
       {activeSubTab === 'roster' ? (
-        <SurfaceCard title="Staff Scores & Performance Evaluation">
+        <SurfaceCard
+          title="Staff Scores & Performance Evaluation"
+          actions={
+            <span className="text-xs font-medium text-slate-400">
+              {filteredRoster.length} records · {PAGE_SIZE} / page
+            </span>
+          }
+        >
           {/* Filters */}
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-3 mb-4">
             <div className="space-y-1.5">
@@ -243,37 +255,54 @@ export function StaffPerformanceTab({ designations = [] }) {
                   <TableCell colSpan={4} className="py-8 text-center text-slate-400">No records found</TableCell>
                 </TableRow>
               ) : (
-                filteredRoster.map((emp) => (
-                  <TableRow key={emp.staffId}>
-                    <TableCell className="font-semibold text-slate-900">{emp.fullName}</TableCell>
-                    <TableCell className="text-slate-600">{emp.designation || '—'}</TableCell>
-                    <TableCell className="text-center">
-                      <Badge variant="outline" className={getRatingBadgeStyle(emp.rating)}>
-                        <Star className="size-3.5 fill-current mr-1" />
-                        {emp.rating}%
-                      </Badge>
-                    </TableCell>
-                    <TableCell className="text-right">
-                      <Button
-                        size="sm"
-                        style={{ backgroundColor: BRAND.purple }}
-                        className="text-white text-xs h-8"
-                        onClick={() => openScoringModal(emp)}
-                      >
-                        Score Employee
-                      </Button>
-                    </TableCell>
-                  </TableRow>
-                ))
+                filteredRoster
+                  .slice((rosterPage - 1) * PAGE_SIZE, rosterPage * PAGE_SIZE)
+                  .map((emp) => (
+                    <TableRow key={emp.staffId}>
+                      <TableCell className="font-semibold text-slate-900">{emp.fullName}</TableCell>
+                      <TableCell className="text-slate-600">{emp.designation || '—'}</TableCell>
+                      <TableCell className="text-center">
+                        <Badge variant="outline" className={getRatingBadgeStyle(emp.rating)}>
+                          <Star className="size-3.5 fill-current mr-1" />
+                          {emp.rating}%
+                        </Badge>
+                      </TableCell>
+                      <TableCell className="text-right">
+                        <Button
+                          size="sm"
+                          style={{ backgroundColor: BRAND.purple }}
+                          className="text-white text-xs h-8"
+                          onClick={() => openScoringModal(emp)}
+                        >
+                          Score Employee
+                        </Button>
+                      </TableCell>
+                    </TableRow>
+                  ))
               )}
             </TableBody>
           </Table>
+
+          <TablePagination
+            page={rosterPage}
+            pageCount={Math.max(1, Math.ceil(filteredRoster.length / PAGE_SIZE))}
+            totalItems={filteredRoster.length}
+            onPageChange={setRosterPage}
+          />
         </SurfaceCard>
       ) : (
         /* Scales configurations using Shadcn Table component */
         <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
           <div className="lg:col-span-2">
-            <SurfaceCard title="Configured Scoring Criteria" description="Standardized criteria weights used to score shifts">
+            <SurfaceCard
+              title="Configured Scoring Criteria"
+              description="Standardized criteria weights used to score shifts"
+              actions={
+                <span className="text-xs font-medium text-slate-400">
+                  {scales.length} records · {PAGE_SIZE} / page
+                </span>
+              }
+            >
               <Table>
                 <TableHeader>
                   <TableRow className="text-slate-500 text-xs uppercase">
@@ -292,31 +321,40 @@ export function StaffPerformanceTab({ designations = [] }) {
                       <TableCell colSpan={3} className="py-8 text-center text-slate-400">No scales configured</TableCell>
                     </TableRow>
                   ) : (
-                    scales.map((s) => (
-                      <TableRow key={s.id}>
-                        <TableCell className="font-semibold text-slate-900">{s.name}</TableCell>
-                        <TableCell className="text-slate-700 font-mono">{s.maxPoints} pts</TableCell>
-                        <TableCell className="text-right space-x-3.5">
-                          <button
-                            type="button"
-                            className="text-slate-500 hover:text-slate-800 transition-colors inline-block align-middle"
-                            onClick={() => setEditingScale(s)}
-                          >
-                            <Pencil className="size-4" />
-                          </button>
-                          <button
-                            type="button"
-                            className="text-slate-500 hover:text-slate-800 transition-colors inline-block align-middle"
-                            onClick={() => setDeleteTargetScale(s)}
-                          >
-                            <Trash2 className="size-4" />
-                          </button>
-                        </TableCell>
-                      </TableRow>
-                    ))
+                    scales
+                      .slice((scalesPage - 1) * PAGE_SIZE, scalesPage * PAGE_SIZE)
+                      .map((s) => (
+                        <TableRow key={s.id}>
+                          <TableCell className="font-semibold text-slate-900">{s.name}</TableCell>
+                          <TableCell className="text-slate-700 font-mono">{s.maxPoints} pts</TableCell>
+                          <TableCell className="text-right space-x-3.5">
+                            <button
+                              type="button"
+                              className="text-slate-500 hover:text-slate-800 transition-colors inline-block align-middle"
+                              onClick={() => setEditingScale(s)}
+                            >
+                              <Pencil className="size-4" />
+                            </button>
+                            <button
+                              type="button"
+                              className="text-slate-500 hover:text-slate-800 transition-colors inline-block align-middle"
+                              onClick={() => setDeleteTargetScale(s)}
+                            >
+                              <Trash2 className="size-4" />
+                            </button>
+                          </TableCell>
+                        </TableRow>
+                      ))
                   )}
                 </TableBody>
               </Table>
+
+              <TablePagination
+                page={scalesPage}
+                pageCount={Math.max(1, Math.ceil(scales.length / PAGE_SIZE))}
+                totalItems={scales.length}
+                onPageChange={setScalesPage}
+              />
             </SurfaceCard>
           </div>
 

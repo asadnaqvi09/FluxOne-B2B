@@ -4,9 +4,17 @@ import { PricingColumns } from '@/components/feature/products/PricingColumns'
 import { ProductImageCell, ProductStatusToggle } from '@/components/feature/products/ProductStatusToggle'
 import { PromotionColumns } from '@/components/feature/products/PromotionColumns'
 import { EmptyState } from '@/components/shared/EmptyState'
-import { Pagination } from '@/components/shared/Pagination'
 import { SurfaceCard } from '@/components/shared/SurfaceCard'
 import { Button } from '@/components/ui/button'
+import {
+  Table,
+  TableHeader,
+  TableBody,
+  TableHead,
+  TableRow,
+  TableCell,
+  TablePagination,
+} from '@/components/ui/table'
 import { TableRowsSkeleton } from '@/components/ui/skeleton'
 import { money } from '@/lib/mapProduct'
 
@@ -35,7 +43,7 @@ export function ProductTable({
       description="Single items & bundles for this company"
       actions={
         <span className="text-xs font-medium text-slate-400">
-          {total} item{total === 1 ? '' : 's'} · 8 / page
+          {total} records · 8 / page
         </span>
       }
     >
@@ -113,31 +121,30 @@ export function ProductTable({
               </article>
             ))}
           </div>
-
           {/* Desktop table */}
           <div className="hidden overflow-x-auto md:block">
-            <table className="w-full min-w-[1100px] border-collapse text-left text-sm">
-              <thead>
-                <tr className="border-b border-border text-[11px] tracking-wide text-slate-500 uppercase">
-                  <th className="px-2 py-3 font-semibold">Image</th>
-                  <th className="px-2 py-3 font-semibold">Scale</th>
-                  <th className="px-2 py-3 font-semibold">Item code</th>
-                  <th className="px-2 py-3 font-semibold">Barcode</th>
-                  <th className="px-2 py-3 font-semibold">Prices</th>
-                  <th className="px-2 py-3 font-semibold">Discount & offers</th>
-                  <th className="px-2 py-3 font-semibold">Purchase vendors</th>
-                  <th className="px-2 py-3 font-semibold">Selling</th>
-                  <th className="px-2 py-3 font-semibold">Status</th>
-                  <th className="px-2 py-3 font-semibold">Action</th>
-                </tr>
-              </thead>
-              <tbody>
+            <Table className="min-w-[1100px] text-left text-sm">
+              <TableHeader>
+                <TableRow className="text-[11px] tracking-wide text-slate-500 uppercase">
+                  <TableHead className="px-2 py-3 font-semibold">Image</TableHead>
+                  <TableHead className="px-2 py-3 font-semibold">Scale</TableHead>
+                  <TableHead className="px-2 py-3 font-semibold">Item code</TableHead>
+                  <TableHead className="px-2 py-3 font-semibold">Barcode</TableHead>
+                  <TableHead className="px-2 py-3 font-semibold">Prices</TableHead>
+                  <TableHead className="px-2 py-3 font-semibold">Discount & offers</TableHead>
+                  <TableHead className="px-2 py-3 font-semibold">Purchase vendors</TableHead>
+                  <TableHead className="px-2 py-3 font-semibold">Selling</TableHead>
+                  <TableHead className="px-2 py-3 font-semibold">Status</TableHead>
+                  <TableHead className="px-2 py-3 font-semibold">Action</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
                 {list.map((row) => (
-                  <tr
+                  <TableRow
                     key={row.id}
-                    className="border-b border-border/70 last:border-0 hover:bg-slate-50/80"
+                    className="hover:bg-slate-50/80"
                   >
-                    <td className="px-2 py-3">
+                    <TableCell className="px-2 py-3">
                       <div className="flex items-center gap-2">
                         <ProductImageCell src={row.imageUrl} name={row.name} />
                         <div className="min-w-0">
@@ -147,54 +154,47 @@ export function ProductTable({
                           <p className="text-[11px] capitalize text-slate-400">{row.type}</p>
                         </div>
                       </div>
-                    </td>
-                    <td className="px-2 py-3 text-slate-700">{row.scale}</td>
-                    <td className="px-2 py-3 font-mono text-xs text-slate-600">{row.itemCode}</td>
-                    <td className="max-w-[120px] px-2 py-3">
+                    </TableCell>
+                    <TableCell className="px-2 py-3 text-slate-700">{row.scale}</TableCell>
+                    <TableCell className="px-2 py-3 font-mono text-xs text-slate-600">{row.itemCode}</TableCell>
+                    <TableCell className="max-w-[120px] px-2 py-3">
                       <BarcodeCell value={row.barcode} />
-                    </td>
-                    <td className="px-2 py-3">
+                    </TableCell>
+                    <TableCell className="px-2 py-3">
                       <PricingColumns row={row} />
-                    </td>
-                    <td className="px-2 py-3">
+                    </TableCell>
+                    <TableCell className="px-2 py-3">
                       <PromotionColumns row={row} />
-                    </td>
-                    <td className="px-2 py-3 text-xs leading-snug">
+                    </TableCell>
+                    <TableCell className="px-2 py-3 text-xs leading-snug">
                       <p>
                         <span className="text-slate-400">Last</span>{' '}
                         <span className="font-medium">{money(row.lastPurchasePrice)}</span>
-                        {row.lastPurchaseVendorName ? (
-                          <span className="block text-slate-400">{row.lastPurchaseVendorName}</span>
-                        ) : null}
                       </p>
-                      <p className="mt-1">
-                        <span className="text-slate-400">Current</span>{' '}
-                        <span className="font-medium">{money(row.purchasePrice)}</span>
-                        {row.currentPurchaseVendorName ? (
-                          <span className="block text-slate-400">
-                            {row.currentPurchaseVendorName}
-                          </span>
-                        ) : null}
+                      <p className="truncate text-slate-600" title={row.lastSupplierName}>
+                        {row.lastSupplierName || '—'}
                       </p>
-                    </td>
-                    <td className="px-2 py-3 text-xs leading-snug">
+                      <p className="text-[11px] text-slate-400">
+                        {row.lastPurchaseDate ? String(row.lastPurchaseDate).slice(0, 10) : ''}
+                      </p>
+                    </TableCell>
+                    <TableCell className="px-2 py-3 text-xs text-slate-600">
                       <p>
-                        <span className="text-slate-400">Last</span>{' '}
-                        <span className="font-medium">{money(row.lastSellingPrice)}</span>
+                        <span className="text-slate-400">Rate</span> {row.effectiveTaxRate ?? 0}%
                       </p>
-                      <p className="mt-1">
-                        <span className="text-slate-400">Current</span>{' '}
-                        <span className="font-semibold">{money(row.sellingPrice)}</span>
+                      <p>
+                        <span className="text-slate-400">Tax</span>{' '}
+                        {money(row.sellingPriceWithTax - row.sellingPriceWithoutTax)}
                       </p>
-                    </td>
-                    <td className="px-2 py-3">
+                    </TableCell>
+                    <TableCell className="px-2 py-3">
                       <ProductStatusToggle
-                        status={row.status}
+                        product={row}
                         loading={statusUpdatingId === row.id}
-                        onChange={(status) => onStatusChange?.(row, status)}
+                        onChange={onStatusChange}
                       />
-                    </td>
-                    <td className="px-2 py-3">
+                    </TableCell>
+                    <TableCell className="px-2 py-3">
                       <div className="flex items-center gap-1">
                         <Button
                           type="button"
@@ -227,16 +227,17 @@ export function ProductTable({
                           <Trash2 className="size-4" />
                         </Button>
                       </div>
-                    </td>
-                  </tr>
+                    </TableCell>
+                  </TableRow>
                 ))}
-              </tbody>
-            </table>
+              </TableBody>
+            </Table>
           </div>
 
-          <Pagination
+          <TablePagination
             page={page}
             pageCount={pageCount}
+            totalItems={total}
             loading={loading}
             onPageChange={onPageChange}
           />

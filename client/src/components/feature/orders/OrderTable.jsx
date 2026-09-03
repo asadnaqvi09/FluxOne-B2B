@@ -1,8 +1,16 @@
 import { ClipboardList, Eye, History, Printer } from 'lucide-react'
 import { EmptyState } from '@/components/shared/EmptyState'
-import { Pagination } from '@/components/shared/Pagination'
 import { SurfaceCard } from '@/components/shared/SurfaceCard'
 import { Button } from '@/components/ui/button'
+import {
+  Table,
+  TableHeader,
+  TableBody,
+  TableHead,
+  TableRow,
+  TableCell,
+  TablePagination,
+} from '@/components/ui/table'
 import { TableRowsSkeleton } from '@/components/ui/skeleton'
 
 function statusClass(status) {
@@ -38,7 +46,7 @@ export function OrderTable({
       description="Orders placed with suppliers"
       actions={
         <span className="text-xs font-medium text-slate-400">
-          {total} order{total === 1 ? '' : 's'} · 8 / page
+          {total} records · 8 / page
         </span>
       }
     >
@@ -52,23 +60,23 @@ export function OrderTable({
         />
       ) : (
         <div className="overflow-x-auto">
-          <table className="w-full min-w-[720px] border-collapse text-left text-sm">
-            <thead>
-              <tr className="border-b border-border text-xs uppercase tracking-wide text-slate-400">
-                <th className="px-2 py-3 font-semibold">Order id</th>
-                <th className="px-2 py-3 font-semibold">Company</th>
-                <th className="px-2 py-3 font-semibold">Items</th>
-                <th className="px-2 py-3 font-semibold">Status</th>
-                <th className="px-2 py-3 font-semibold">Actions</th>
-              </tr>
-            </thead>
-            <tbody>
+          <Table className="min-w-[720px] text-left text-sm">
+            <TableHeader>
+              <TableRow className="text-xs uppercase tracking-wide text-slate-400">
+                <TableHead className="px-2 py-3 font-semibold">Order id</TableHead>
+                <TableHead className="px-2 py-3 font-semibold">Company</TableHead>
+                <TableHead className="px-2 py-3 font-semibold">Items</TableHead>
+                <TableHead className="px-2 py-3 font-semibold">Status</TableHead>
+                <TableHead className="px-2 py-3 font-semibold">Actions</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
               {list.map((row) => (
-                <tr key={row.id} className="border-b border-border/70">
-                  <td className="px-2 py-3 font-mono text-xs text-slate-700">
+                <TableRow key={row.id} className="hover:bg-slate-50/80">
+                  <TableCell className="px-2 py-3 font-mono text-xs text-slate-700">
                     {row.orderNumber || row.id?.slice(0, 8)}
-                  </td>
-                  <td className="px-2 py-3">
+                  </TableCell>
+                  <TableCell className="px-2 py-3">
                     <span className="font-medium text-slate-800">{row.companyName}</span>
                     {row.representativeName ? (
                       <span className="mt-0.5 block text-xs text-slate-400">
@@ -76,16 +84,16 @@ export function OrderTable({
                         {row.representativePhone ? ` · ${row.representativePhone}` : ''}
                       </span>
                     ) : null}
-                  </td>
-                  <td className="px-2 py-3 text-slate-600">{row.itemsNumber}</td>
-                  <td className="px-2 py-3">
+                  </TableCell>
+                  <TableCell className="px-2 py-3 text-slate-600">{row.itemsNumber}</TableCell>
+                  <TableCell className="px-2 py-3">
                     <span
                       className={`rounded-full px-2 py-0.5 text-xs font-medium capitalize ${statusClass(row.status)}`}
                     >
                       {row.status}
                     </span>
-                  </td>
-                  <td className="px-2 py-3">
+                  </TableCell>
+                  <TableCell className="px-2 py-3">
                     <div className="flex flex-wrap gap-1">
                       <Button
                         type="button"
@@ -118,18 +126,19 @@ export function OrderTable({
                         PDF
                       </Button>
                     </div>
-                  </td>
-                </tr>
+                  </TableCell>
+                </TableRow>
               ))}
-            </tbody>
-          </table>
+            </TableBody>
+          </Table>
         </div>
       )}
 
       {!isEmpty ? (
-        <Pagination
+        <TablePagination
           page={page}
           pageCount={pageCount}
+          totalItems={total}
           loading={loading}
           onPageChange={onPageChange}
         />

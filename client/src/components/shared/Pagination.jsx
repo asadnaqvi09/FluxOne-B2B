@@ -20,13 +20,10 @@ export function Pagination({
   return (
     <div
       className={cn(
-        'mt-4 flex items-center justify-between gap-2 border-t border-border pt-3',
+        'mt-4 flex items-center justify-end gap-2 border-t border-border pt-3',
         className,
       )}
     >
-      <p className="text-xs text-slate-400">
-        Page {safePage} of {safeCount}
-      </p>
       <div className="flex items-center gap-1">
         <Button
           type="button"

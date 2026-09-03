@@ -1,18 +1,30 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useMemo } from 'react'
 import { Calendar, Users, ArrowRight, ArrowLeft, Check, CheckSquare } from 'lucide-react'
 import { SurfaceCard } from '@/components/shared/SurfaceCard'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { NativeSelect } from '@/components/ui/select'
+import {
+  Table,
+  TableHeader,
+  TableBody,
+  TableHead,
+  TableRow,
+  TableCell,
+  TablePagination,
+} from '@/components/ui/table'
 import { apiClient } from '@/api/api'
 import { BRAND } from '@/lib/constants'
 import { toastError, toastSuccess } from '@/lib/toast'
+
+const PAGE_SIZE = 8
 
 export function StaffHolidaysTab({ designations = [], staff = [] }) {
   const [holidays, setHolidays] = useState([])
   const [loading, setLoading] = useState(false)
   const [mutating, setMutating] = useState(false)
+  const [page, setPage] = useState(1)
 
   // 2-step form state
   const [step, setStep] = useState(1)
@@ -114,33 +126,50 @@ export function StaffHolidaysTab({ designations = [], staff = [] }) {
     <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
       {/* List of holidays */}
       <div className="lg:col-span-2">
-        <SurfaceCard title="Branch Holiday Schedule" description="Scheduled store closures and holidays">
+        <SurfaceCard
+          title="Branch Holiday Schedule"
+          description="Scheduled store closures and holidays"
+          actions={
+            <span className="text-xs font-medium text-slate-400">
+              {holidays.length} records · {PAGE_SIZE} / page
+            </span>
+          }
+        >
           <div className="overflow-x-auto">
-            <table className="w-full text-left text-sm">
-              <thead>
-                <tr className="border-b border-border text-xs text-slate-500 uppercase">
-                  <th className="px-3 py-2 font-medium">Holiday Date</th>
-                  <th className="px-3 py-2 font-medium">Holiday Name</th>
-                </tr>
-              </thead>
-              <tbody>
+            <Table className="w-full text-left text-sm">
+              <TableHeader>
+                <TableRow className="text-xs text-slate-500 uppercase">
+                  <TableHead className="px-3 py-2 font-medium">Holiday Date</TableHead>
+                  <TableHead className="px-3 py-2 font-medium">Holiday Name</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
                 {loading ? (
-                  <tr><td colSpan={2} className="py-8 text-center text-slate-400">Loading...</td></tr>
+                  <TableRow><TableCell colSpan={2} className="py-8 text-center text-slate-400">Loading...</TableCell></TableRow>
                 ) : holidays.length === 0 ? (
-                  <tr><td colSpan={2} className="py-8 text-center text-slate-400">No holidays scheduled</td></tr>
+                  <TableRow><TableCell colSpan={2} className="py-8 text-center text-slate-400">No holidays scheduled</TableCell></TableRow>
                 ) : (
-                  holidays.map((h) => (
-                    <tr key={h.id} className="border-b border-border/60 hover:bg-slate-50/50">
-                      <td className="px-3 py-3 font-semibold text-slate-900">
-                        {new Date(h.holidayDate).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })}
-                      </td>
-                      <td className="px-3 py-3 text-slate-700">{h.name}</td>
-                    </tr>
-                  ))
+                  holidays
+                    .slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE)
+                    .map((h) => (
+                      <TableRow key={h.id} className="hover:bg-slate-50/50">
+                        <TableCell className="px-3 py-3 font-semibold text-slate-900">
+                          {new Date(h.holidayDate).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })}
+                        </TableCell>
+                        <TableCell className="px-3 py-3 text-slate-700">{h.name}</TableCell>
+                      </TableRow>
+                    ))
                 )}
-              </tbody>
-            </table>
+              </TableBody>
+            </Table>
           </div>
+
+          <TablePagination
+            page={page}
+            pageCount={Math.max(1, Math.ceil(holidays.length / PAGE_SIZE))}
+            totalItems={holidays.length}
+            onPageChange={setPage}
+          />
         </SurfaceCard>
       </div>
 

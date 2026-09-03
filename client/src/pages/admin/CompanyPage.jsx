@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useMemo } from 'react'
 import { SurfaceCard } from '@/components/shared/SurfaceCard'
 import { PageHeader } from '@/components/shared/PageHeader'
 import { MotionHeader, MotionReveal } from '@/components/shared/MotionReveal'
@@ -41,7 +41,43 @@ import {
   Save,
   CheckCircle2,
   FileText,
+  Store,
 } from 'lucide-react'
+
+const CATEGORIES = [
+  'all',
+  'Retail Operations',
+  'Finance & Billing',
+  'Inventory & Procurement',
+  'Security & Compliance',
+]
+
+const CATEGORY_CONFIG = {
+  'Retail Operations': {
+    icon: Store,
+    accentBorder: 'border-l-purple-600',
+    badgeClass: 'bg-purple-50 text-purple-700 border-purple-200',
+    iconBg: 'bg-purple-50 text-purple-700',
+  },
+  'Finance & Billing': {
+    icon: FileText,
+    accentBorder: 'border-l-emerald-600',
+    badgeClass: 'bg-emerald-50 text-emerald-700 border-emerald-200',
+    iconBg: 'bg-emerald-50 text-emerald-700',
+  },
+  'Inventory & Procurement': {
+    icon: Building2,
+    accentBorder: 'border-l-blue-600',
+    badgeClass: 'bg-blue-50 text-blue-700 border-blue-200',
+    iconBg: 'bg-blue-50 text-blue-700',
+  },
+  'Security & Compliance': {
+    icon: ShieldAlert,
+    accentBorder: 'border-l-amber-600',
+    badgeClass: 'bg-amber-50 text-amber-700 border-amber-200',
+    iconBg: 'bg-amber-50 text-amber-700',
+  },
+}
 
 export function CompanyPage() {
   const [activeTab, setActiveTab] = useState('details') // 'details' | 'policies'
@@ -52,9 +88,10 @@ export function CompanyPage() {
   // Policies State
   const [policies, setPolicies] = useState(INITIAL_POLICIES_DATA)
   const [policySearch, setPolicySearch] = useState('')
+  const [selectedCategory, setSelectedCategory] = useState('all')
   const [policyDialogOpen, setPolicyDialogOpen] = useState(false)
   const [editingPolicy, setEditingPolicy] = useState(null)
-  const [policyForm, setPolicyForm] = useState({ name: '', detail: '', category: 'General' })
+  const [policyForm, setPolicyForm] = useState({ name: '', detail: '', category: 'Retail Operations' })
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false)
   const [deleteTargetPolicy, setDeleteTargetPolicy] = useState(null)
 
@@ -183,10 +220,20 @@ export function CompanyPage() {
   }
 
   // Filtered Policies
-  const filteredPolicies = policies.filter((p) =>
-    p.name.toLowerCase().includes(policySearch.toLowerCase()) ||
-    p.detail.toLowerCase().includes(policySearch.toLowerCase()),
-  )
+  const filteredPolicies = useMemo(() => {
+    return policies.filter((p) => {
+      const matchesCategory =
+        selectedCategory === 'all' || p.category === selectedCategory
+      const q = policySearch.toLowerCase().trim()
+      const matchesSearch =
+        !q ||
+        p.name.toLowerCase().includes(q) ||
+        p.detail.toLowerCase().includes(q) ||
+        p.id.toLowerCase().includes(q) ||
+        p.category.toLowerCase().includes(q)
+      return matchesCategory && matchesSearch
+    })
+  }, [policies, selectedCategory, policySearch])
 
   return (
     <div className="space-y-6 pb-8">
@@ -375,89 +422,156 @@ export function CompanyPage() {
         </MotionReveal>
       )}
 
-      {/* TAB 2: POLICIES */}
+      {/* TAB 2: POLICIES (EXECUTIVE FULL-WIDTH DOCUMENT CARDS) */}
       {activeTab === 'policies' && (
         <MotionReveal delay={0.1}>
-          <div className="space-y-4">
+          <div className="space-y-5">
             {/* Action & Search Bar */}
             <div className="flex flex-col gap-3 rounded-2xl border border-border bg-white p-4 shadow-2xs sm:flex-row sm:items-center sm:justify-between">
               <div className="relative flex-1">
                 <Search className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-slate-400" />
                 <input
                   type="text"
-                  placeholder="Search policies by name or keywords (e.g. Return, Credit, Expiry)..."
+                  placeholder="Search policies by name, clause, ID, or category..."
                   value={policySearch}
                   onChange={(e) => setPolicySearch(e.target.value)}
                   className="w-full rounded-xl border border-border bg-slate-50/70 py-2 pl-9 pr-4 text-xs sm:text-sm text-slate-900 outline-none focus:border-purple-300 focus:bg-white focus:ring-1 focus:ring-purple-300"
                 />
               </div>
 
-              <Button
-                type="button"
-                onClick={handleOpenAddPolicy}
-                className="text-white font-semibold cursor-pointer"
-                style={{ background: BRAND.purple }}
-              >
-                <Plus className="mr-1.5 size-4" />
-                Add Policy
-              </Button>
+              <div className="flex items-center gap-2">
+                <Button
+                  type="button"
+                  onClick={handleOpenAddPolicy}
+                  className="text-white font-semibold cursor-pointer shadow-xs"
+                  style={{ background: `linear-gradient(90deg, ${BRAND.purple}, ${BRAND.deep})` }}
+                >
+                  <Plus className="mr-1.5 size-4" />
+                  Add New Policy
+                </Button>
+              </div>
             </div>
 
-            {/* List of Policies */}
-            <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
-              {filteredPolicies.map((p) => (
-                <div
-                  key={p.id}
-                  className="rounded-2xl border border-border bg-white p-5 shadow-xs hover:border-purple-200 transition-all flex flex-col justify-between space-y-3"
-                >
-                  <div>
-                    <div className="flex items-start justify-between gap-2">
-                      <div className="flex items-center gap-2">
-                        <span className="font-mono text-[11px] font-bold text-purple-700 bg-purple-50 px-2 py-0.5 rounded border border-purple-100">
-                          {p.id}
-                        </span>
-                        <Badge variant="outline" className="text-[10px] text-slate-500 bg-slate-50 font-semibold">
-                          {p.category}
-                        </Badge>
-                      </div>
-                      <span className="text-[11px] text-slate-400 font-medium">
-                        {p.createdAt}
-                      </span>
-                    </div>
+            {/* Category Filter Pills */}
+            <div className="flex flex-wrap items-center gap-1.5 p-1 rounded-2xl bg-white border border-border shadow-2xs">
+              {CATEGORIES.map((cat) => {
+                const isSelected = selectedCategory === cat
+                const count =
+                  cat === 'all'
+                    ? policies.length
+                    : policies.filter((p) => p.category === cat).length
 
-                    <h4 className="font-bold text-slate-900 text-base mt-2">
-                      {p.name}
-                    </h4>
-
-                    <p className="text-xs text-slate-600 leading-relaxed mt-1.5 bg-slate-50/60 p-3 rounded-xl border border-slate-100">
-                      {p.detail}
-                    </p>
-                  </div>
-
-                  <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-100">
-                    <Button
-                      type="button"
-                      variant="outline"
-                      size="sm"
-                      onClick={() => handleOpenEditPolicy(p)}
-                      className="h-8 text-xs cursor-pointer border-purple-200 text-purple-900 hover:bg-purple-50"
+                return (
+                  <button
+                    key={cat}
+                    type="button"
+                    onClick={() => setSelectedCategory(cat)}
+                    className={`rounded-xl px-3.5 py-1.5 text-xs font-semibold transition-all cursor-pointer flex items-center gap-1.5 ${
+                      isSelected
+                        ? 'bg-purple-900 text-white shadow-xs font-bold'
+                        : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
+                    }`}
+                  >
+                    <span>{cat === 'all' ? 'All Policies' : cat}</span>
+                    <span
+                      className={`text-[10px] px-1.5 py-0.2 rounded-full font-bold ${
+                        isSelected ? 'bg-white/20 text-white' : 'bg-slate-200 text-slate-700'
+                      }`}
                     >
-                      <Edit2 className="mr-1 size-3.5" />
-                      Edit
-                    </Button>
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => handlePromptDelete(p)}
-                      className="h-8 text-xs text-purple-700 hover:bg-purple-50 hover:text-purple-950 cursor-pointer"
-                    >
-                      <Trash2 className="mr-1 size-3.5 text-purple-600" />
-                      Delete
-                    </Button>
-                  </div>
+                      {count}
+                    </span>
+                  </button>
+                )
+              })}
+            </div>
+
+            {/* List of Policies (Full-Width Document Cards) */}
+            <div className="space-y-4">
+              {filteredPolicies.length === 0 ? (
+                <div className="rounded-2xl border border-border bg-white p-12 text-center text-slate-400">
+                  <FileText className="mx-auto size-8 text-slate-300 mb-2" />
+                  <p className="text-sm font-semibold text-slate-700">No corporate policies found</p>
+                  <p className="text-xs text-slate-500 mt-0.5">Try searching with a different keyword or create a new policy.</p>
                 </div>
-              ))}
+              ) : (
+                filteredPolicies.map((p) => {
+                  const cfg = CATEGORY_CONFIG[p.category] || CATEGORY_CONFIG['Retail Operations']
+                  const CategoryIcon = cfg.icon
+
+                  return (
+                    <div
+                      key={p.id}
+                      className={`rounded-2xl border border-border bg-white p-5 sm:p-6 shadow-2xs hover:shadow-sm border-l-4 ${cfg.accentBorder} transition-all duration-200 space-y-4`}
+                    >
+                      {/* Top Header Row */}
+                      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                        <div className="flex flex-wrap items-center gap-2.5">
+                          <div className={`flex size-8 shrink-0 items-center justify-center rounded-lg ${cfg.iconBg} border border-slate-200/60`}>
+                            <CategoryIcon className="size-4" />
+                          </div>
+
+                          <span className="font-mono text-xs font-bold text-purple-700 bg-purple-50 px-2.5 py-0.5 rounded-md border border-purple-100 whitespace-nowrap">
+                            {p.id}
+                          </span>
+
+                          <Badge variant="outline" className={`text-xs font-semibold ${cfg.badgeClass}`}>
+                            {p.category}
+                          </Badge>
+
+                          <h4 className="font-bold text-slate-900 text-base sm:text-lg">
+                            {p.name}
+                          </h4>
+                        </div>
+
+                        {/* Actions & Timestamp */}
+                        <div className="flex items-center gap-2 self-end sm:self-center">
+                          <span className="text-xs text-slate-400 font-medium whitespace-nowrap mr-1">
+                            {p.createdAt}
+                          </span>
+
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            onClick={() => handleOpenEditPolicy(p)}
+                            className="h-8 px-3 text-xs font-semibold cursor-pointer border-purple-200 text-purple-900 hover:bg-purple-50"
+                          >
+                            <Edit2 className="mr-1.5 size-3.5" />
+                            Edit
+                          </Button>
+
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => handlePromptDelete(p)}
+                            className="h-8 px-3 text-xs font-semibold text-rose-600 hover:bg-rose-50 hover:text-rose-700 cursor-pointer"
+                          >
+                            <Trash2 className="mr-1.5 size-3.5" />
+                            Delete
+                          </Button>
+                        </div>
+                      </div>
+
+                      {/* Policy Detail Clause Box */}
+                      <div className="rounded-xl border border-slate-100 bg-slate-50/80 p-4 text-xs sm:text-sm text-slate-700 leading-relaxed">
+                        <p className="whitespace-pre-line font-normal">{p.detail}</p>
+                      </div>
+
+                      {/* Footer Policy Governance Status */}
+                      <div className="flex items-center justify-between text-[11px] text-slate-400 pt-1 border-t border-slate-100">
+                        <span className="flex items-center gap-1.5 text-emerald-700 font-semibold">
+                          <CheckCircle2 className="size-3.5 text-emerald-600" />
+                          Active Governance Policy · Enforced across all branches
+                        </span>
+                        <span className="font-medium text-slate-400">
+                          Corporate Protocol
+                        </span>
+                      </div>
+                    </div>
+                  )
+                })
+              )}
             </div>
           </div>
         </MotionReveal>

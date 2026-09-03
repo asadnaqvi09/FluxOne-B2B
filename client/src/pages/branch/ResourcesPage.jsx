@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useMemo } from 'react'
 import { Laptop, Scale, Plus, Trash2, Edit3, Monitor } from 'lucide-react'
 import { PageHeader } from '@/components/shared/PageHeader'
 import { MotionHeader, MotionReveal } from '@/components/shared/MotionReveal'
@@ -16,11 +16,14 @@ import {
   TableHead,
   TableRow,
   TableCell,
+  TablePagination,
 } from '@/components/ui/table'
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogCancelButton } from '@/components/ui/dialog'
 import { apiClient } from '@/api/api'
 import { BRAND } from '@/lib/constants'
 import { toastError, toastSuccess } from '@/lib/toast'
+
+const PAGE_SIZE = 8
 
 export function ResourcesPage() {
   const [activeTab, setActiveTab] = useState('hardware') // 'hardware' | 'scales'
@@ -29,6 +32,8 @@ export function ResourcesPage() {
   const [staff, setStaff] = useState([])
   const [hardwareList, setHardwareList] = useState([])
   const [scalesList, setScalesList] = useState([])
+  const [hwPage, setHwPage] = useState(1)
+  const [scalesPage, setScalesPage] = useState(1)
 
   // Hardware Filter
   const [filterHardware, setFilterHardware] = useState('')
@@ -319,7 +324,14 @@ export function ResourcesPage() {
 
           {/* Hardware List using Shadcn Table component */}
           <MotionReveal delay={0.04}>
-            <SurfaceCard title="Hardware Assets Registry">
+            <SurfaceCard
+              title="Hardware Assets Registry"
+              actions={
+                <span className="text-xs font-medium text-slate-400">
+                  {filteredHardware.length} records · {PAGE_SIZE} / page
+                </span>
+              }
+            >
               <Table>
                 <TableHeader>
                   <TableRow className="text-slate-500 text-xs uppercase">
@@ -338,62 +350,71 @@ export function ResourcesPage() {
                       <TableCell colSpan={7} className="py-8 text-center text-slate-400">No hardware assets found</TableCell>
                     </TableRow>
                   ) : (
-                    filteredHardware.map((hw) => {
-                      const assignedEmployee = staff.find((s) => s.hardwareDeviceId === hw.id)
-                      return (
-                        <TableRow key={hw.id}>
-                          <TableCell>
-                            {hw.image ? (
-                              <img src={hw.image} alt={hw.name} className="size-10 rounded-lg object-cover" />
-                            ) : (
-                              <div className="size-10 bg-slate-100 border border-slate-200 rounded-lg flex items-center justify-center text-[10px] text-slate-400 font-bold uppercase">HW</div>
-                            )}
-                          </TableCell>
-                          <TableCell>
-                            <div className="font-bold text-slate-900 font-mono">{hw.id}</div>
-                            <div className="text-[10px] text-slate-400">{new Date(hw.createdAt).toLocaleDateString()}</div>
-                          </TableCell>
-                          <TableCell>
-                            <div className="font-semibold text-slate-900">{hw.name}</div>
-                            <div className="text-[10px] text-slate-400 font-medium">{hw.type}</div>
-                          </TableCell>
-                          <TableCell className="text-slate-600">{hw.companyName}</TableCell>
-                          <TableCell className="text-center">
-                            <Badge variant="outline" className={getStatusBadge(hw.status)}>
-                              {hw.status}
-                            </Badge>
-                          </TableCell>
-                          <TableCell className="text-center text-slate-600">
-                            {assignedEmployee ? (
-                              <Badge variant="secondary" className="bg-purple-50 text-purple-700 hover:bg-purple-100 border-none font-semibold rounded">
-                                {assignedEmployee.fullName}
+                    filteredHardware
+                      .slice((hwPage - 1) * PAGE_SIZE, hwPage * PAGE_SIZE)
+                      .map((hw) => {
+                        const assignedEmployee = staff.find((s) => s.hardwareDeviceId === hw.id)
+                        return (
+                          <TableRow key={hw.id}>
+                            <TableCell>
+                              {hw.image ? (
+                                <img src={hw.image} alt={hw.name} className="size-10 rounded-lg object-cover" />
+                              ) : (
+                                <div className="size-10 bg-slate-100 border border-slate-200 rounded-lg flex items-center justify-center text-[10px] text-slate-400 font-bold uppercase">HW</div>
+                              )}
+                            </TableCell>
+                            <TableCell>
+                              <div className="font-bold text-slate-900 font-mono">{hw.id}</div>
+                              <div className="text-[10px] text-slate-400">{new Date(hw.createdAt).toLocaleDateString()}</div>
+                            </TableCell>
+                            <TableCell>
+                              <div className="font-semibold text-slate-900">{hw.name}</div>
+                              <div className="text-[10px] text-slate-400 font-medium">{hw.type}</div>
+                            </TableCell>
+                            <TableCell className="text-slate-600">{hw.companyName}</TableCell>
+                            <TableCell className="text-center">
+                              <Badge variant="outline" className={getStatusBadge(hw.status)}>
+                                {hw.status}
                               </Badge>
-                            ) : (
-                              <span className="text-xs text-slate-400 italic">Unassigned</span>
-                            )}
-                          </TableCell>
-                          <TableCell className="text-right space-x-3.5">
-                            <button
-                              type="button"
-                              className="text-slate-500 hover:text-slate-800 transition-colors inline-block align-middle"
-                              onClick={() => handleOpenHardwareEdit(hw)}
-                            >
-                              <Edit3 className="size-4" />
-                            </button>
-                            <button
-                              type="button"
-                              className="text-slate-500 hover:text-slate-800 transition-colors inline-block align-middle"
-                              onClick={() => handleDeleteHardware(hw.id)}
-                            >
-                              <Trash2 className="size-4" />
-                            </button>
-                          </TableCell>
-                        </TableRow>
-                      )
-                    })
+                            </TableCell>
+                            <TableCell className="text-center text-slate-600">
+                              {assignedEmployee ? (
+                                <Badge variant="secondary" className="bg-purple-50 text-purple-700 hover:bg-purple-100 border-none font-semibold rounded">
+                                  {assignedEmployee.fullName}
+                                </Badge>
+                              ) : (
+                                <span className="text-xs text-slate-400 italic">Unassigned</span>
+                              )}
+                            </TableCell>
+                            <TableCell className="text-right space-x-3.5">
+                              <button
+                                type="button"
+                                className="text-slate-500 hover:text-slate-800 transition-colors inline-block align-middle"
+                                onClick={() => handleOpenHardwareEdit(hw)}
+                              >
+                                <Edit3 className="size-4" />
+                              </button>
+                              <button
+                                type="button"
+                                className="text-slate-500 hover:text-slate-800 transition-colors inline-block align-middle"
+                                onClick={() => handleDeleteHardware(hw.id)}
+                              >
+                                <Trash2 className="size-4" />
+                              </button>
+                            </TableCell>
+                          </TableRow>
+                        )
+                      })
                   )}
                 </TableBody>
               </Table>
+
+              <TablePagination
+                page={hwPage}
+                pageCount={Math.max(1, Math.ceil(filteredHardware.length / PAGE_SIZE))}
+                totalItems={filteredHardware.length}
+                onPageChange={setHwPage}
+              />
             </SurfaceCard>
           </MotionReveal>
         </>
@@ -402,7 +423,14 @@ export function ResourcesPage() {
         <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
           <div className="lg:col-span-2">
             <MotionReveal delay={0.02}>
-              <SurfaceCard title="Packaging Weighing Scales">
+              <SurfaceCard
+                title="Packaging Weighing Scales"
+                actions={
+                  <span className="text-xs font-medium text-slate-400">
+                    {scalesList.length} records · {PAGE_SIZE} / page
+                  </span>
+                }
+              >
                 <Table>
                   <TableHeader>
                     <TableRow className="text-slate-500 text-xs uppercase">
@@ -413,31 +441,46 @@ export function ResourcesPage() {
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {scalesList.map((sc) => (
-                      <TableRow key={sc.id}>
-                        <TableCell className="font-mono font-bold text-slate-900">{sc.id}</TableCell>
-                        <TableCell className="text-slate-500">{new Date(sc.createdAt).toLocaleDateString()}</TableCell>
-                        <TableCell className="font-semibold text-slate-800">{sc.name}</TableCell>
-                        <TableCell className="text-right space-x-3.5">
-                          <button
-                            type="button"
-                            className="text-slate-500 hover:text-slate-800 transition-colors inline-block align-middle"
-                            onClick={() => handleOpenScaleEdit(sc)}
-                          >
-                            <Edit3 className="size-4" />
-                          </button>
-                          <button
-                            type="button"
-                            className="text-slate-500 hover:text-slate-800 transition-colors inline-block align-middle"
-                            onClick={() => handleDeleteScale(sc.id)}
-                          >
-                            <Trash2 className="size-4" />
-                          </button>
-                        </TableCell>
+                    {scalesList.length === 0 ? (
+                      <TableRow>
+                        <TableCell colSpan={4} className="py-8 text-center text-slate-400">No scales found</TableCell>
                       </TableRow>
-                    ))}
+                    ) : (
+                      scalesList
+                        .slice((scalesPage - 1) * PAGE_SIZE, scalesPage * PAGE_SIZE)
+                        .map((sc) => (
+                          <TableRow key={sc.id}>
+                            <TableCell className="font-mono font-bold text-slate-900">{sc.id}</TableCell>
+                            <TableCell className="text-slate-500">{new Date(sc.createdAt).toLocaleDateString()}</TableCell>
+                            <TableCell className="font-semibold text-slate-800">{sc.name}</TableCell>
+                            <TableCell className="text-right space-x-3.5">
+                              <button
+                                type="button"
+                                className="text-slate-500 hover:text-slate-800 transition-colors inline-block align-middle"
+                                onClick={() => handleOpenScaleEdit(sc)}
+                              >
+                                <Edit3 className="size-4" />
+                              </button>
+                              <button
+                                type="button"
+                                className="text-slate-500 hover:text-slate-800 transition-colors inline-block align-middle"
+                                onClick={() => handleDeleteScale(sc.id)}
+                              >
+                                <Trash2 className="size-4" />
+                              </button>
+                            </TableCell>
+                          </TableRow>
+                        ))
+                    )}
                   </TableBody>
                 </Table>
+
+                <TablePagination
+                  page={scalesPage}
+                  pageCount={Math.max(1, Math.ceil(scalesList.length / PAGE_SIZE))}
+                  totalItems={scalesList.length}
+                  onPageChange={setScalesPage}
+                />
               </SurfaceCard>
             </MotionReveal>
           </div>

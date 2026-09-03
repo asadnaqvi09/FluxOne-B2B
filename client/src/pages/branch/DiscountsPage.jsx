@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useMemo } from 'react'
 import { Plus, Tag, Pencil, Trash2 } from 'lucide-react'
 import { PageHeader } from '@/components/shared/PageHeader'
 import { MotionHeader, MotionReveal } from '@/components/shared/MotionReveal'
@@ -16,6 +16,7 @@ import {
   TableHead,
   TableRow,
   TableCell,
+  TablePagination,
 } from '@/components/ui/table'
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogCancelButton } from '@/components/ui/dialog'
 import { apiClient } from '@/api/api'
@@ -23,11 +24,14 @@ import { endpoints } from '@/api/endpoints'
 import { BRAND } from '@/lib/constants'
 import { toastError, toastSuccess } from '@/lib/toast'
 
+const PAGE_SIZE = 8
+
 export function DiscountsPage() {
   const [discounts, setDiscounts] = useState([])
   const [loading, setLoading] = useState(false)
   const [categories, setCategories] = useState([])
   const [filterCategory, setFilterCategory] = useState('')
+  const [page, setPage] = useState(1)
 
   // Form states
   const [open, setOpen] = useState(false)
@@ -168,7 +172,15 @@ export function DiscountsPage() {
 
       {/* Listing Grid using Shadcn Table component */}
       <MotionReveal delay={0.04}>
-        <SurfaceCard title="Active Discount Campaigns" description="Standard discount templates that can be applied to products.">
+        <SurfaceCard
+          title="Active Discount Campaigns"
+          description="Standard discount templates that can be applied to products."
+          actions={
+            <span className="text-xs font-medium text-slate-400">
+              {filteredDiscounts.length} records · {PAGE_SIZE} / page
+            </span>
+          }
+        >
           <div className="overflow-x-auto">
             <Table>
               <TableHeader>
@@ -189,38 +201,47 @@ export function DiscountsPage() {
                     <TableCell colSpan={4} className="py-8 text-center text-slate-400">No campaigns found</TableCell>
                   </TableRow>
                 ) : (
-                  filteredDiscounts.map((disc) => (
-                    <TableRow key={disc.id}>
-                      <TableCell className="font-mono font-bold text-slate-900">{disc.id}</TableCell>
-                      <TableCell className="text-slate-800 font-semibold">{disc.name}</TableCell>
-                      <TableCell className="text-center">
-                        <Badge variant="success" className="inline-flex items-center gap-1 font-bold text-xs bg-emerald-50 text-emerald-800 hover:bg-emerald-100 border-none rounded px-2.5 py-1">
-                          <Tag className="size-3" />
-                          {parseFloat(disc.percent)}% OFF
-                        </Badge>
-                      </TableCell>
-                      <TableCell className="text-right space-x-3.5">
-                        <button
-                          type="button"
-                          className="text-slate-500 hover:text-slate-800 transition-colors inline-block align-middle"
-                          onClick={() => handleOpenEdit(disc)}
-                        >
-                          <Pencil className="size-4" />
-                        </button>
-                        <button
-                          type="button"
-                          className="text-slate-500 hover:text-slate-800 transition-colors inline-block align-middle"
-                          onClick={() => handleDeleteDiscount(disc.id)}
-                        >
-                          <Trash2 className="size-4" />
-                        </button>
-                      </TableCell>
-                    </TableRow>
-                  ))
+                  filteredDiscounts
+                    .slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE)
+                    .map((disc) => (
+                      <TableRow key={disc.id}>
+                        <TableCell className="font-mono font-bold text-slate-900">{disc.id}</TableCell>
+                        <TableCell className="text-slate-800 font-semibold">{disc.name}</TableCell>
+                        <TableCell className="text-center">
+                          <Badge variant="success" className="inline-flex items-center gap-1 font-bold text-xs bg-emerald-50 text-emerald-800 hover:bg-emerald-100 border-none rounded px-2.5 py-1">
+                            <Tag className="size-3" />
+                            {parseFloat(disc.percent)}% OFF
+                          </Badge>
+                        </TableCell>
+                        <TableCell className="text-right space-x-3.5">
+                          <button
+                            type="button"
+                            className="text-slate-500 hover:text-slate-800 transition-colors inline-block align-middle"
+                            onClick={() => handleOpenEdit(disc)}
+                          >
+                            <Pencil className="size-4" />
+                          </button>
+                          <button
+                            type="button"
+                            className="text-slate-500 hover:text-slate-800 transition-colors inline-block align-middle"
+                            onClick={() => handleDeleteDiscount(disc.id)}
+                          >
+                            <Trash2 className="size-4" />
+                          </button>
+                        </TableCell>
+                      </TableRow>
+                    ))
                 )}
               </TableBody>
             </Table>
           </div>
+
+          <TablePagination
+            page={page}
+            pageCount={Math.max(1, Math.ceil(filteredDiscounts.length / PAGE_SIZE))}
+            totalItems={filteredDiscounts.length}
+            onPageChange={setPage}
+          />
         </SurfaceCard>
       </MotionReveal>
 

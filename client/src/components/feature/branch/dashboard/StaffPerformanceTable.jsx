@@ -1,11 +1,18 @@
 import { useMemo, useState } from 'react'
-import { ChevronLeft, ChevronRight, Users } from 'lucide-react'
+import { Users } from 'lucide-react'
 import { SurfaceCard } from '@/components/shared/SurfaceCard'
+import {
+  Table,
+  TableHeader,
+  TableBody,
+  TableHead,
+  TableRow,
+  TableCell,
+  TablePagination,
+} from '@/components/ui/table'
 import { BRAND } from '@/lib/constants'
 import { staffInitials } from '@/lib/mapBranchDashboard'
 import { cn } from '@/lib/utils'
-
-const PAGE_SIZE = 5
 
 const STATUS_STYLES = {
   active: 'bg-emerald-50 text-emerald-700 ring-emerald-200',
@@ -21,33 +28,35 @@ function statusLabel(status) {
   return 'Active'
 }
 
+const PAGE_SIZE = 8
+
 export function StaffPerformanceTable({ staff = [], className }) {
-  const [page, setPage] = useState(0)
+  const [page, setPage] = useState(1)
   const list = Array.isArray(staff) ? staff : []
   const totalPages = Math.max(1, Math.ceil(list.length / PAGE_SIZE))
-  const safePage = Math.min(page, totalPages - 1)
+  const safePage = Math.min(page, totalPages)
 
   const rows = useMemo(() => {
-    const start = safePage * PAGE_SIZE
+    const start = (safePage - 1) * PAGE_SIZE
     return list.slice(start, start + PAGE_SIZE)
   }, [list, safePage])
 
-  const showPager = list.length > PAGE_SIZE
   const isEmpty = list.length === 0
 
   return (
     <SurfaceCard
-      className={className}
+      className={cn('h-full flex flex-col justify-between', className)}
+      bodyClassName="flex-1 flex flex-col justify-between"
       title="Staff List"
       description="Name, ID, status & points"
       actions={
         <span className="text-xs font-medium text-slate-400">
-          {list.length} team member{list.length === 1 ? '' : 's'}
+          {list.length} records · {PAGE_SIZE} / page
         </span>
       }
     >
       {isEmpty ? (
-        <div className="flex flex-col items-center justify-center gap-2 rounded-xl border border-dashed border-border bg-slate-50/80 px-4 py-12 text-center">
+        <div className="flex flex-1 flex-col items-center justify-center gap-2 rounded-xl border border-dashed border-border bg-slate-50/80 px-4 py-12 text-center">
           <div
             className="flex size-12 items-center justify-center rounded-full"
             style={{ background: 'rgba(142, 35, 143, 0.1)', color: BRAND.purple }}
@@ -60,24 +69,24 @@ export function StaffPerformanceTable({ staff = [], className }) {
           </p>
         </div>
       ) : (
-        <>
+        <div className="flex-1 flex flex-col justify-between">
           <div className="overflow-x-auto">
-            <table className="w-full min-w-[32rem] border-collapse text-left text-sm">
-              <thead>
-                <tr className="border-b border-border text-xs tracking-wide text-slate-500 uppercase">
-                  <th className="px-2 py-2.5 font-medium">Employee</th>
-                  <th className="px-2 py-2.5 font-medium">ID</th>
-                  <th className="px-2 py-2.5 font-medium">Status</th>
-                  <th className="px-2 py-2.5 text-right font-medium">Points</th>
-                </tr>
-              </thead>
-              <tbody>
+            <Table className="min-w-[32rem] text-left text-sm">
+              <TableHeader>
+                <TableRow className="text-xs tracking-wide text-slate-500 uppercase">
+                  <TableHead className="px-2 py-2.5 font-medium">Employee</TableHead>
+                  <TableHead className="px-2 py-2.5 font-medium">ID</TableHead>
+                  <TableHead className="px-2 py-2.5 font-medium">Status</TableHead>
+                  <TableHead className="px-2 py-2.5 text-right font-medium">Points</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
                 {rows.map((person) => (
-                  <tr
+                  <TableRow
                     key={person.id}
-                    className="border-b border-border/70 transition-colors last:border-0 hover:bg-slate-50/80"
+                    className="hover:bg-slate-50/80"
                   >
-                    <td className="px-2 py-3">
+                    <TableCell className="px-2 py-3">
                       <div className="flex items-center gap-3">
                         {person.image ? (
                           <img
@@ -98,9 +107,16 @@ export function StaffPerformanceTable({ staff = [], className }) {
                           <p className="truncate text-xs text-slate-500">{person.role || 'Staff'}</p>
                         </div>
                       </div>
-                    </td>
-                    <td className="px-2 py-3 font-mono text-xs text-slate-600">{person.id}</td>
-                    <td className="px-2 py-3">
+                    </TableCell>
+                    <TableCell className="px-2 py-3">
+                      <span
+                        className="inline-block font-mono text-[11px] font-semibold text-purple-800 bg-purple-50 px-2 py-0.5 rounded border border-purple-100 whitespace-nowrap"
+                        title={person.id}
+                      >
+                        {person.id?.length > 12 ? `${person.id.slice(0, 8)}...` : person.id}
+                      </span>
+                    </TableCell>
+                    <TableCell className="px-2 py-3">
                       <span
                         className={cn(
                           'inline-flex rounded-full px-2.5 py-0.5 text-xs font-semibold ring-1 ring-inset',
@@ -109,44 +125,23 @@ export function StaffPerformanceTable({ staff = [], className }) {
                       >
                         {statusLabel(person.status)}
                       </span>
-                    </td>
-                    <td className="px-2 py-3 text-right font-semibold text-slate-900">
+                    </TableCell>
+                    <TableCell className="px-2 py-3 text-right font-semibold text-slate-900">
                       {Number(person.points || 0).toLocaleString()}
-                    </td>
-                  </tr>
+                    </TableCell>
+                  </TableRow>
                 ))}
-              </tbody>
-            </table>
+              </TableBody>
+            </Table>
           </div>
 
-          {showPager ? (
-            <div className="mt-4 flex items-center justify-between gap-3">
-              <p className="text-xs text-slate-500">
-                Page {safePage + 1} of {totalPages}
-              </p>
-              <div className="flex items-center gap-1.5">
-                <button
-                  type="button"
-                  aria-label="Previous page"
-                  disabled={safePage === 0}
-                  onClick={() => setPage((p) => Math.max(0, p - 1))}
-                  className="flex size-8 items-center justify-center rounded-lg border border-border text-slate-600 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-40"
-                >
-                  <ChevronLeft className="size-4" />
-                </button>
-                <button
-                  type="button"
-                  aria-label="Next page"
-                  disabled={safePage >= totalPages - 1}
-                  onClick={() => setPage((p) => Math.min(totalPages - 1, p + 1))}
-                  className="flex size-8 items-center justify-center rounded-lg border border-border text-slate-600 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-40"
-                >
-                  <ChevronRight className="size-4" />
-                </button>
-              </div>
-            </div>
-          ) : null}
-        </>
+          <TablePagination
+            page={safePage}
+            pageCount={totalPages}
+            totalItems={list.length}
+            onPageChange={setPage}
+          />
+        </div>
       )}
     </SurfaceCard>
   )

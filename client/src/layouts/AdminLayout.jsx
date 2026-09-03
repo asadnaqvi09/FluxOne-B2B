@@ -1,12 +1,14 @@
 import { useState } from 'react'
 import { Outlet, useNavigate, NavLink } from 'react-router-dom'
-import { ChevronDown, LogOut, Menu, UserRound, X } from 'lucide-react'
+import { ChevronDown, LogOut, Menu, Settings, UserRound, X } from 'lucide-react'
 import { AnimatePresence, motion } from 'motion/react'
 import { BrandLogo } from '@/components/shared/BrandLogo'
 import { BRAND } from '@/lib/constants'
-import { clearAdminSession, getAdminSession } from '@/config/adminAuth.config'
+import { clearAdminSession } from '@/config/adminAuth.config'
 import { toastSuccess } from '@/lib/toast'
 import { PATHS } from '@/router/paths'
+import { useAuthSession } from '@/hooks/useAuthSession'
+import { getInitials } from '@/lib/nav'
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -16,7 +18,7 @@ import {
 } from '@/components/ui/dropdown-menu'
 import { cn } from '@/lib/utils'
 
-function UserAvatar({ initials = 'AS', className }) {
+function UserAvatar({ initials = 'AD', className }) {
   return (
     <div
       className={cn(
@@ -37,23 +39,21 @@ const ADMIN_NAV_LINKS = [
   { to: '/admin/invoices', label: 'Invoices' },
   { to: '/admin/tax-profit', label: 'Tax & Profit' },
   { to: '/admin/company', label: 'Company & Policies' },
-  { to: '/admin/settings', label: 'Settings' },
 ]
 
 export function AdminLayout() {
   const navigate = useNavigate()
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
-  const session = getAdminSession() || {
-    name: 'Asad',
-    role: 'b2b_admin',
-    tenantName: 'FluxOne Enterprise Solutions',
-  }
+  const { user, logout } = useAuthSession()
 
-  const name = 'Asad'
-  const roleLabel = 'B2B Admin'
-  const adminId = 'ADM-HQ01'
+  const name = user?.name || 'Admin'
+  const initials = getInitials(name, user?.email)
+  const tenantName = user?.tenantName || (user?.tenantSlug === 'company-b' ? 'Company B' : 'Company A')
+  const roleLabel = `${tenantName} · B2B Admin`
+  const adminId = user?.email || user?.id || (user?.tenantSlug === 'company-b' ? 'admin@companyb.local' : 'admin@companya.local')
 
   function handleLogout() {
+    if (logout) logout()
     clearAdminSession()
     toastSuccess('Logged out successfully')
     navigate(PATHS.login, { replace: true })
@@ -113,7 +113,7 @@ export function AdminLayout() {
               className="hidden max-w-[14rem] truncate rounded-full px-2.5 py-1 text-xs font-semibold text-white md:inline-block lg:max-w-xs"
               style={{ background: BRAND.deep }}
             >
-              B2B Enterprise Admin
+              {tenantName} · B2B Admin
             </span>
 
             {/* Dropdown User Menu */}
@@ -121,7 +121,7 @@ export function AdminLayout() {
               <DropdownMenu>
                 <DropdownMenuTrigger className="cursor-pointer rounded-lg outline-none focus-visible:ring-2 focus-visible:ring-[#8E238F]/40">
                   <div className="flex items-center gap-2 py-1">
-                    <UserAvatar initials="AS" />
+                    <UserAvatar initials={initials} />
                     <div className="hidden min-w-0 text-left sm:block">
                       <p className="truncate text-sm leading-tight font-semibold text-slate-900">{name}</p>
                       <p className="truncate text-xs leading-tight text-slate-500">{roleLabel}</p>
@@ -136,7 +136,7 @@ export function AdminLayout() {
                 >
                   {/* Top user profile details card */}
                   <div className="flex items-center gap-3 px-4 py-3">
-                    <UserAvatar initials="AS" className="size-11 text-sm" />
+                    <UserAvatar initials={initials} className="size-11 text-sm" />
                     <div className="min-w-0">
                       <p className="truncate text-sm font-semibold text-slate-800">{name}</p>
                       <p className="truncate text-xs text-slate-500">{roleLabel}</p>
@@ -156,6 +156,14 @@ export function AdminLayout() {
                     >
                       <UserRound className="size-4" />
                       Profile
+                    </DropdownMenuItem>
+
+                    <DropdownMenuItem
+                      className="flex items-center gap-2.5 rounded-xl px-3 py-2.5 text-slate-700 cursor-pointer text-sm"
+                      onClick={() => navigate('/admin/settings')}
+                    >
+                      <Settings className="size-4" />
+                      Settings
                     </DropdownMenuItem>
 
                     <DropdownMenuItem

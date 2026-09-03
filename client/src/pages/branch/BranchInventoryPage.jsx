@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useMemo } from 'react'
 import { Search, Send } from 'lucide-react'
 import { PageHeader } from '@/components/shared/PageHeader'
 import { MotionHeader, MotionReveal } from '@/components/shared/MotionReveal'
@@ -15,16 +15,20 @@ import {
   TableHead,
   TableRow,
   TableCell,
+  TablePagination,
 } from '@/components/ui/table'
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogCancelButton } from '@/components/ui/dialog'
 import { apiClient } from '@/api/api'
 import { BRAND } from '@/lib/constants'
 import { toastError, toastSuccess } from '@/lib/toast'
 
+const PAGE_SIZE = 8
+
 export function BranchInventoryPage() {
   const [products, setProducts] = useState([])
   const [categories, setCategories] = useState([])
   const [loading, setLoading] = useState(false)
+  const [page, setPage] = useState(1)
 
   // Filters
   const [searchQuery, setSearchQuery] = useState('')
@@ -190,7 +194,15 @@ export function BranchInventoryPage() {
 
       {/* Grid List using Shadcn Table component */}
       <MotionReveal delay={0.04}>
-        <SurfaceCard title="Shelf Stock Levels" className="min-h-[400px]">
+        <SurfaceCard
+          title="Shelf Stock Levels"
+          className="min-h-[400px]"
+          actions={
+            <span className="text-xs font-medium text-slate-400">
+              {products.length} records · {PAGE_SIZE} / page
+            </span>
+          }
+        >
           <div className="overflow-x-auto">
             <Table className="table-fixed">
               <colgroup>
@@ -223,52 +235,62 @@ export function BranchInventoryPage() {
                     <TableCell colSpan={7} className="py-8 text-center text-slate-400">No stock products found</TableCell>
                   </TableRow>
                 ) : (
-                  products.map((prod) => {
-                    const status = getStockStatus(prod.quantity, prod.reorderPoint)
-                    const cat = categories.find((c) => c.id === prod.categoryId)?.name || '—'
-                    const subcat = subcategories.find((s) => s.id === prod.subcategoryId)?.name || '—'
+                  products
+                    .slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE)
+                    .map((prod) => {
+                      const status = getStockStatus(prod.quantity, prod.reorderPoint)
+                      const cat = categories.find((c) => c.id === prod.categoryId)?.name || '—'
+                      const subcat = subcategories.find((s) => s.id === prod.subcategoryId)?.name || '—'
 
-                    return (
-                      <TableRow key={prod.id}>
-                        <TableCell>
-                          {prod.imageUrl ? (
-                            <img src={prod.imageUrl} alt={prod.name} className="size-10 rounded-lg object-cover border border-slate-100" />
-                          ) : (
-                            <div className="size-10 bg-slate-100 border border-slate-200 rounded-lg flex items-center justify-center text-[10px] text-slate-400 font-bold uppercase">No Image</div>
-                          )}
-                        </TableCell>
-                        <TableCell>
-                          <div className="font-bold text-slate-900">{prod.name}</div>
-                          <div className="text-[10px] text-slate-400 font-mono">SKU: {prod.itemCode}</div>
-                        </TableCell>
-                        <TableCell className="text-slate-600">{cat}</TableCell>
-                        <TableCell className="text-slate-600">{subcat}</TableCell>
-                        <TableCell className="text-right font-bold text-slate-900 font-mono">
-                          {parseFloat(prod.quantity || 0).toLocaleString()} <span className="text-[10px] text-slate-400 font-normal">{prod.scale || 'pcs'}</span>
-                        </TableCell>
-                        <TableCell className="text-center">
-                          <Badge variant={status.variant} className={status.className}>
-                            {status.label}
-                          </Badge>
-                        </TableCell>
-                        <TableCell className="text-right">
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            onClick={() => handleOpenRequest(prod)}
-                            className="text-xs h-8"
-                          >
-                            <Send className="size-3 mr-1.5" />
-                            Stock Request
-                          </Button>
-                        </TableCell>
-                      </TableRow>
-                    )
-                  })
+                      return (
+                        <TableRow key={prod.id}>
+                          <TableCell>
+                            {prod.imageUrl ? (
+                              <img src={prod.imageUrl} alt={prod.name} className="size-10 rounded-lg object-cover border border-slate-100" />
+                            ) : (
+                              <div className="size-10 bg-slate-100 border border-slate-200 rounded-lg flex items-center justify-center text-[10px] text-slate-400 font-bold uppercase">No Image</div>
+                            )}
+                          </TableCell>
+                          <TableCell>
+                            <div className="font-bold text-slate-900">{prod.name}</div>
+                            <div className="text-[10px] text-slate-400 font-mono">SKU: {prod.itemCode}</div>
+                          </TableCell>
+                          <TableCell className="text-slate-600">{cat}</TableCell>
+                          <TableCell className="text-slate-600">{subcat}</TableCell>
+                          <TableCell className="text-right font-bold text-slate-900 font-mono">
+                            {parseFloat(prod.quantity || 0).toLocaleString()} <span className="text-[10px] text-slate-400 font-normal">{prod.scale || 'pcs'}</span>
+                          </TableCell>
+                          <TableCell className="text-center">
+                            <Badge variant={status.variant} className={status.className}>
+                              {status.label}
+                            </Badge>
+                          </TableCell>
+                          <TableCell className="text-right">
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={() => handleOpenRequest(prod)}
+                              className="text-xs h-8"
+                            >
+                              <Send className="size-3 mr-1.5" />
+                              Stock Request
+                            </Button>
+                          </TableCell>
+                        </TableRow>
+                      )
+                    })
                 )}
               </TableBody>
             </Table>
           </div>
+
+          <TablePagination
+            page={page}
+            pageCount={Math.max(1, Math.ceil(products.length / PAGE_SIZE))}
+            totalItems={products.length}
+            onPageChange={setPage}
+          />
+
           <div className="mt-4 flex gap-4 text-xs text-slate-500 border-t border-border pt-3">
             <span className="flex items-center gap-1.5"><span className="size-2 rounded-full bg-rose-500" /> Empty: Out of stock (0 items)</span>
             <span className="flex items-center gap-1.5"><span className="size-2 rounded-full bg-amber-500" /> Limited: Under reorder point threshold</span>

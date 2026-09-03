@@ -11,6 +11,7 @@ import {
 import { SurfaceCard } from '@/components/shared/SurfaceCard'
 import { BRANCH_DASHBOARD_DUMMY } from '@/data/branchDashboard'
 import { BRAND } from '@/lib/constants'
+import { cn } from '@/lib/utils'
 
 const CHART_H = 280
 
@@ -46,7 +47,8 @@ export function InventoryStatusChart({ inventory, className }) {
 
   return (
     <SurfaceCard
-      className={className}
+      className={cn('h-full flex flex-col justify-between', className)}
+      bodyClassName="flex-1 flex flex-col justify-center"
       title="Inventory Status"
       description="How much stock remains per item"
       actions={

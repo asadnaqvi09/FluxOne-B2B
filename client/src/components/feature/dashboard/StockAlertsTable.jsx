@@ -3,8 +3,16 @@ import { Bell } from 'lucide-react'
 import { StockLegend } from '@/components/feature/dashboard/StockLegend'
 import { StockStatusDot } from '@/components/feature/dashboard/StockStatusDot'
 import { EmptyState } from '@/components/shared/EmptyState'
-import { Pagination } from '@/components/shared/Pagination'
 import { SurfaceCard } from '@/components/shared/SurfaceCard'
+import {
+  Table,
+  TableHeader,
+  TableBody,
+  TableHead,
+  TableRow,
+  TableCell,
+  TablePagination,
+} from '@/components/ui/table'
 import { TableRowsSkeleton } from '@/components/ui/skeleton'
 import { sourceLabel, STOCK_STATUS_META } from '@/lib/mapInventoryDashboard'
 import { cn } from '@/lib/utils'
@@ -56,7 +64,7 @@ function StockAlertsTableComponent({
       description="Low stock, branch alerts, and replenishment requests"
       actions={
         <span className="text-xs font-medium text-slate-400">
-          {total} item{total === 1 ? '' : 's'} · 8 / page
+          {total} records · 8 / page
         </span>
       }
     >
@@ -96,47 +104,48 @@ function StockAlertsTableComponent({
           </div>
 
           <div className="hidden overflow-hidden md:block">
-            <table className="w-full table-fixed border-collapse text-left text-sm">
-              <thead>
-                <tr className="border-b border-border text-xs tracking-wide text-slate-500 uppercase">
-                  <th className="w-[18%] px-2 py-3 font-semibold">Id</th>
-                  <th className="w-[28%] px-2 py-3 font-semibold">Name</th>
-                  <th className="w-[14%] px-2 py-3 font-semibold">Remaining</th>
-                  <th className="w-[18%] px-2 py-3 font-semibold">Status</th>
-                  <th className="w-[22%] px-2 py-3 font-semibold">Source</th>
-                </tr>
-              </thead>
-              <tbody>
+            <Table className="w-full table-fixed text-left text-sm">
+              <TableHeader>
+                <TableRow className="text-xs tracking-wide text-slate-500 uppercase">
+                  <TableHead className="w-[18%] px-2 py-3 font-semibold">Id</TableHead>
+                  <TableHead className="w-[28%] px-2 py-3 font-semibold">Name</TableHead>
+                  <TableHead className="w-[14%] px-2 py-3 font-semibold">Remaining</TableHead>
+                  <TableHead className="w-[18%] px-2 py-3 font-semibold">Status</TableHead>
+                  <TableHead className="w-[22%] px-2 py-3 font-semibold">Source</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
                 {list.map((row) => (
-                  <tr
+                  <TableRow
                     key={row.id}
-                    className="cursor-pointer border-b border-border/70 last:border-0 transition-colors hover:bg-slate-50/80"
+                    className="cursor-pointer hover:bg-slate-50/80"
                   >
-                    <td
+                    <TableCell
                       className="truncate px-2 py-3 font-mono text-xs text-slate-500"
                       title={String(row.id)}
                     >
                       {shortId(row.id)}
-                    </td>
-                    <td className="truncate px-2 py-3 font-medium text-slate-900" title={row.name}>
+                    </TableCell>
+                    <TableCell className="truncate px-2 py-3 font-medium text-slate-900" title={row.name}>
                       {row.name}
-                    </td>
-                    <td className="px-2 py-3 tabular-nums text-slate-800">{row.remainingNumber}</td>
-                    <td className="px-2 py-3">
+                    </TableCell>
+                    <TableCell className="px-2 py-3 tabular-nums text-slate-800">{row.remainingNumber}</TableCell>
+                    <TableCell className="px-2 py-3">
                       <StatusBadge status={row.status} />
-                    </td>
-                    <td className="truncate px-2 py-3 text-slate-600" title={sourceLabel(row.source)}>
+                    </TableCell>
+                    <TableCell className="truncate px-2 py-3 text-slate-600" title={sourceLabel(row.source)}>
                       {sourceLabel(row.source)}
-                    </td>
-                  </tr>
+                    </TableCell>
+                  </TableRow>
                 ))}
-              </tbody>
-            </table>
+              </TableBody>
+            </Table>
           </div>
 
-          <Pagination
+          <TablePagination
             page={page}
             pageCount={pageCount}
+            totalItems={total}
             loading={loading}
             onPageChange={onPageChange}
           />

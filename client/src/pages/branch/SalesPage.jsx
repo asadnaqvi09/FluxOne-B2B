@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useMemo } from 'react'
 import {
   Search,
   Printer,
@@ -25,6 +25,7 @@ import {
   TableHead,
   TableRow,
   TableCell,
+  TablePagination,
 } from '@/components/ui/table'
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogCancelButton } from '@/components/ui/dialog'
 import { apiClient } from '@/api/api'
@@ -32,11 +33,14 @@ import { endpoints } from '@/api/endpoints'
 import { BRAND } from '@/lib/constants'
 import { toastError, toastSuccess } from '@/lib/toast'
 
+const PAGE_SIZE = 8
+
 export function SalesPage() {
   const [sales, setSales] = useState([])
   const [kpis, setKpis] = useState({ totalSales: 0, totalRefunds: 0, transactionCount: 0, totalPaid: 0, totalReturns: 0 })
   const [loading, setLoading] = useState(false)
   const [categories, setCategories] = useState([])
+  const [page, setPage] = useState(1)
 
   // Filters
   const [searchQuery, setSearchQuery] = useState('')
@@ -209,7 +213,16 @@ export function SalesPage() {
 
       {/* Table grid matching exactly to image, using Shadcn Table component */}
       <MotionReveal delay={0.06}>
-        <SurfaceCard className="min-h-[400px]">
+        <SurfaceCard
+          title="Sales Transactions"
+          description="POS and register transactions history"
+          className="min-h-[400px]"
+          actions={
+            <span className="text-xs font-medium text-slate-400">
+              {sales.length} records · {PAGE_SIZE} / page
+            </span>
+          }
+        >
           <div className="overflow-x-auto">
             <Table>
               <TableHeader>
@@ -236,76 +249,85 @@ export function SalesPage() {
                     <TableCell colSpan={10} className="py-8 text-center text-slate-400">No transactions found</TableCell>
                   </TableRow>
                 ) : (
-                  sales.map((sale) => {
-                    const soldItems = (sale.items || []).filter((i) => !i.isExchange)
-                    const exchangeItems = (sale.items || []).filter((i) => i.isExchange)
-                    
-                    // Simple SAL ID backfill logic to match design (e.g. SAL-1001)
-                    const indexStr = String(sale.saleNumber || sale.id.slice(0, 4))
-                    const salId = `SAL-${indexStr}`
-                    const trkId = `TRK-${indexStr}`
+                  sales
+                    .slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE)
+                    .map((sale) => {
+                      const soldItems = (sale.items || []).filter((i) => !i.isExchange)
+                      const exchangeItems = (sale.items || []).filter((i) => i.isExchange)
+                      
+                      // Simple SAL ID backfill logic to match design (e.g. SAL-1001)
+                      const indexStr = String(sale.saleNumber || sale.id.slice(0, 4))
+                      const salId = `SAL-${indexStr}`
+                      const trkId = `TRK-${indexStr}`
 
-                    return (
-                      <TableRow key={sale.id}>
-                        <TableCell className="py-4">
-                          <Badge variant="secondary" className="bg-purple-50 text-purple-700 font-semibold rounded hover:bg-purple-100 border-none">
-                            {salId}
-                          </Badge>
-                          <div className="text-[10px] text-slate-400 font-mono mt-0.5">{trkId}</div>
-                        </TableCell>
-                        <TableCell className="text-slate-600">
-                          {new Date(sale.soldAt).toLocaleString('en-GB', {
-                            day: 'numeric',
-                            month: 'short',
-                            year: 'numeric',
-                            hour: 'numeric',
-                            minute: '2-digit',
-                            hour12: true
-                          })}
-                        </TableCell>
-                        <TableCell className="text-slate-700">
-                          <div className="max-w-[200px] truncate" title={soldItems.map((i) => i.name).join(', ')}>
-                            {soldItems.map((i) => `${i.name}`).join(', ') || '—'}
-                          </div>
-                        </TableCell>
-                        <TableCell className="text-slate-500">
-                          {exchangeItems.map((i) => i.name).join(', ') || '—'}
-                        </TableCell>
-                        <TableCell className="text-slate-600">Rs. {formatPrice(sale.tax_amount || sale.taxAmount)}</TableCell>
-                        <TableCell className="text-slate-600">Rs. {formatPrice(sale.discount_amount || sale.discountAmount)}</TableCell>
-                        <TableCell className="font-bold text-slate-900">Rs. {formatPrice(sale.finalAmount)}</TableCell>
-                        <TableCell className="text-slate-600">Rs. {formatPrice(sale.paidAmount)}</TableCell>
-                        <TableCell className="text-slate-600">
-                          {parseFloat(sale.returnAmount) > 0 ? `Rs. ${formatPrice(sale.returnAmount)}` : '—'}
-                        </TableCell>
-                        <TableCell className="text-right space-x-2.5">
-                          {sale.status !== 'refunded' ? (
-                            <Button
-                              size="xs"
-                              variant="outline"
-                              className="text-xs h-7 border-slate-200 text-slate-700 font-semibold px-2 hover:bg-slate-50 align-middle"
-                              onClick={() => setRefundTarget(sale)}
+                      return (
+                        <TableRow key={sale.id}>
+                          <TableCell className="py-4">
+                            <Badge variant="secondary" className="bg-purple-50 text-purple-700 font-semibold rounded hover:bg-purple-100 border-none">
+                              {salId}
+                            </Badge>
+                            <div className="text-[10px] text-slate-400 font-mono mt-0.5">{trkId}</div>
+                          </TableCell>
+                          <TableCell className="text-slate-600">
+                            {new Date(sale.soldAt).toLocaleString('en-GB', {
+                              day: 'numeric',
+                              month: 'short',
+                              year: 'numeric',
+                              hour: 'numeric',
+                              minute: '2-digit',
+                              hour12: true
+                            })}
+                          </TableCell>
+                          <TableCell className="text-slate-700">
+                            <div className="max-w-[200px] truncate" title={soldItems.map((i) => i.name).join(', ')}>
+                              {soldItems.map((i) => `${i.name}`).join(', ') || '—'}
+                            </div>
+                          </TableCell>
+                          <TableCell className="text-slate-500">
+                            {exchangeItems.map((i) => i.name).join(', ') || '—'}
+                          </TableCell>
+                          <TableCell className="text-slate-600">Rs. {formatPrice(sale.tax_amount || sale.taxAmount)}</TableCell>
+                          <TableCell className="text-slate-600">Rs. {formatPrice(sale.discount_amount || sale.discountAmount)}</TableCell>
+                          <TableCell className="font-bold text-slate-900">Rs. {formatPrice(sale.finalAmount)}</TableCell>
+                          <TableCell className="text-slate-600">Rs. {formatPrice(sale.paidAmount)}</TableCell>
+                          <TableCell className="text-slate-600">
+                            {parseFloat(sale.returnAmount) > 0 ? `Rs. ${formatPrice(sale.returnAmount)}` : '—'}
+                          </TableCell>
+                          <TableCell className="text-right space-x-2.5">
+                            {sale.status !== 'refunded' ? (
+                              <Button
+                                size="xs"
+                                variant="outline"
+                                className="text-xs h-7 border-slate-200 text-slate-700 font-semibold px-2 hover:bg-slate-50 align-middle"
+                                onClick={() => setRefundTarget(sale)}
+                              >
+                                Refund
+                              </Button>
+                            ) : (
+                              <Badge variant="destructive" className="bg-rose-50 text-rose-700 hover:bg-rose-100 border-none font-semibold rounded align-middle">Refunded</Badge>
+                            )}
+                            <button
+                              type="button"
+                              className="text-slate-500 hover:text-slate-800 transition-colors inline-block align-middle"
+                              onClick={() => handlePrint(sale)}
                             >
-                              Refund
-                            </Button>
-                          ) : (
-                            <Badge variant="destructive" className="bg-rose-50 text-rose-700 hover:bg-rose-100 border-none font-semibold rounded align-middle">Refunded</Badge>
-                          )}
-                          <button
-                            type="button"
-                            className="text-slate-500 hover:text-slate-800 transition-colors inline-block align-middle"
-                            onClick={() => handlePrint(sale)}
-                          >
-                            <Printer className="size-4" />
-                          </button>
-                        </TableCell>
-                      </TableRow>
-                    )
-                  })
+                              <Printer className="size-4" />
+                            </button>
+                          </TableCell>
+                        </TableRow>
+                      )
+                    })
                 )}
               </TableBody>
             </Table>
           </div>
+
+          <TablePagination
+            page={page}
+            pageCount={Math.max(1, Math.ceil(sales.length / PAGE_SIZE))}
+            totalItems={sales.length}
+            onPageChange={setPage}
+          />
         </SurfaceCard>
       </MotionReveal>
 

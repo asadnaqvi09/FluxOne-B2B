@@ -1,9 +1,17 @@
 import { Package, Pencil, Trash2 } from 'lucide-react'
 import { ProductImageCell } from '@/components/feature/products/ProductStatusToggle'
 import { EmptyState } from '@/components/shared/EmptyState'
-import { Pagination } from '@/components/shared/Pagination'
 import { SurfaceCard } from '@/components/shared/SurfaceCard'
 import { Button } from '@/components/ui/button'
+import {
+  Table,
+  TableHeader,
+  TableBody,
+  TableHead,
+  TableRow,
+  TableCell,
+  TablePagination,
+} from '@/components/ui/table'
 import { TableRowsSkeleton } from '@/components/ui/skeleton'
 import { formatMovementDateTime } from '@/lib/mapStockMovement'
 import { displayMovementRef } from '@/lib/formatDisplayId'
@@ -52,29 +60,29 @@ export function MovementHistoryTable({
       ) : (
         <>
           <div className="overflow-x-auto -mx-1 px-1 sm:mx-0 sm:px-0">
-            <table className="w-full min-w-[640px] border-collapse text-left text-sm md:min-w-[720px]">
-              <thead>
-                <tr className="border-b border-border text-xs tracking-wide text-slate-400 uppercase">
+            <Table className="min-w-[640px] text-left text-sm md:min-w-[720px]">
+              <TableHeader>
+                <TableRow className="text-xs tracking-wide text-slate-400 uppercase">
                   {columns.map((col) => (
-                    <th key={col.key} className={cn('px-2 py-2 font-semibold', col.className)}>
+                    <TableHead key={col.key} className={cn('px-2 py-2 font-semibold', col.className)}>
                       {col.label}
-                    </th>
+                    </TableHead>
                   ))}
                   {showActions ? (
-                    <th className="px-2 py-2 text-right font-semibold">Actions</th>
+                    <TableHead className="px-2 py-2 text-right font-semibold">Actions</TableHead>
                   ) : null}
-                </tr>
-              </thead>
-              <tbody>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
                 {list.map((row) => (
-                  <tr key={row.id} className="border-b border-border/70 last:border-0">
+                  <TableRow key={row.id} className="hover:bg-slate-50/80">
                     {columns.map((col) => (
-                      <td key={col.key} className={cn('px-2 py-3 align-middle', col.className)}>
+                      <TableCell key={col.key} className={cn('px-2 py-3 align-middle', col.className)}>
                         {col.render(row)}
-                      </td>
+                      </TableCell>
                     ))}
                     {showActions ? (
-                      <td className="px-2 py-3 text-right">
+                      <TableCell className="px-2 py-3 text-right">
                         <div className="inline-flex items-center gap-1">
                           {onEdit ? (
                             <Button
@@ -101,16 +109,17 @@ export function MovementHistoryTable({
                             </Button>
                           ) : null}
                         </div>
-                      </td>
+                      </TableCell>
                     ) : null}
-                  </tr>
+                  </TableRow>
                 ))}
-              </tbody>
-            </table>
+              </TableBody>
+            </Table>
           </div>
-          <Pagination
+          <TablePagination
             page={page}
             pageCount={pageCount}
+            totalItems={total}
             loading={loading}
             onPageChange={onPageChange}
           />

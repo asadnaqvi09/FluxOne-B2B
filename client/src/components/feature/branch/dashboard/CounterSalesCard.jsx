@@ -1,59 +1,81 @@
-import {
-  Bar,
-  BarChart,
-  CartesianGrid,
-  Cell,
-  ResponsiveContainer,
-  Tooltip,
-  XAxis,
-  YAxis,
-} from 'recharts'
+import { Monitor } from 'lucide-react'
 import { SurfaceCard } from '@/components/shared/SurfaceCard'
 import { BRAND } from '@/lib/constants'
 import { formatCurrency } from '@/lib/mapBranchDashboard'
+import { cn } from '@/lib/utils'
 
-function CounterTooltip({ active, payload }) {
-  if (!active || !payload?.length) return null
-  const row = payload[0]?.payload
-  return (
-    <div className="rounded-xl border border-border bg-white px-3 py-2 text-xs shadow-lg">
-      <p className="font-semibold text-slate-800">{row.name}</p>
-      <p className="mt-1 text-slate-600">{formatCurrency(row.sales)}</p>
-      <p className="text-slate-400">{row.orders} orders</p>
-    </div>
-  )
-}
+const COUNTER_COLORS = [BRAND.purple, BRAND.deep, '#2563eb', '#16a34a']
 
-/** Shown only when more than one POS counter is installed. */
+/**
+ * POS Counter Sales Distribution component matching standard dashboard layout.
+ */
 export function CounterSalesCard({ counters = [], className }) {
-  if (!Array.isArray(counters) || counters.length <= 1) return null
+  const list =
+    Array.isArray(counters) && counters.length > 0
+      ? counters
+      : [
+          { id: 'pos-1', name: 'Counter 1 (Main POS)', sales: 98640, orders: 168 },
+          { id: 'pos-2', name: 'Counter 2 (Express)', sales: 85610, orders: 144 },
+        ]
 
-  const total = counters.reduce((sum, c) => sum + (Number(c.sales) || 0), 0)
-  const colors = [BRAND.purple, BRAND.deep, '#6366f1', '#0ea5e9']
+  const total = list.reduce((sum, c) => sum + (Number(c.sales) || 0), 0)
+
+  const gridCols =
+    list.length === 1
+      ? 'grid-cols-1'
+      : list.length === 2
+        ? 'grid-cols-1 sm:grid-cols-2'
+        : 'grid-cols-1 sm:grid-cols-2 lg:grid-cols-3'
 
   return (
     <SurfaceCard
-      className={className}
-      title="Counter Sales"
-      description="Sales generated per POS terminal"
-      actions={<p className="text-sm font-semibold text-slate-700">{formatCurrency(total)} combined</p>}
+      className={cn('w-full', className)}
+      title="POS Counter Sales"
+      description="Sales generated per POS terminal if multiple counters are active"
+      actions={
+        <span className="rounded-full bg-purple-50 px-3 py-1 text-xs font-semibold text-purple-900 border border-purple-100">
+          {formatCurrency(total)} combined turnover
+        </span>
+      }
     >
-      <div className="mb-4 grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
-        {counters.map((counter, index) => {
-          const share = total > 0 ? ((Number(counter.sales) / total) * 100).toFixed(1) : '0.0'
+      <div className={cn('grid gap-3.5', gridCols)}>
+        {list.map((counter, index) => {
+          const salesNum = Number(counter.sales) || 0
+          const share = total > 0 ? ((salesNum / total) * 100).toFixed(1) : '0.0'
+          const barColor = COUNTER_COLORS[index % COUNTER_COLORS.length]
+
           return (
-            <div key={counter.id || counter.name} className="rounded-xl bg-slate-50/80 px-3 py-3">
-              <p className="text-xs font-medium text-slate-500">{counter.name}</p>
-              <p className="mt-1 text-lg font-bold text-slate-900">{formatCurrency(counter.sales)}</p>
-              <p className="text-xs text-slate-400">
-                {counter.orders} orders · {share}% share
-              </p>
-              <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-slate-200">
+            <div
+              key={counter.id || counter.name}
+              className="rounded-xl border border-slate-200/80 bg-slate-50/70 p-4 transition-all hover:bg-slate-50 hover:border-purple-200"
+            >
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2.5">
+                  <div
+                    className="flex size-9 shrink-0 items-center justify-center rounded-lg"
+                    style={{ background: BRAND.soft, color: BRAND.deep }}
+                  >
+                    <Monitor className="size-4.5" />
+                  </div>
+                  <div>
+                    <p className="text-sm font-bold text-slate-900">{counter.name}</p>
+                    <p className="text-xs text-slate-500">{counter.orders} orders processed</p>
+                  </div>
+                </div>
+
+                <div className="text-right">
+                  <p className="text-base font-extrabold text-slate-900">{formatCurrency(salesNum)}</p>
+                  <p className="text-xs font-semibold text-purple-700">{share}% share</p>
+                </div>
+              </div>
+
+              {/* Progress Bar */}
+              <div className="mt-3 h-2 w-full overflow-hidden rounded-full bg-slate-200">
                 <div
-                  className="h-full rounded-full transition-all"
+                  className="h-full rounded-full transition-all duration-500"
                   style={{
                     width: `${share}%`,
-                    background: colors[index % colors.length],
+                    background: barColor,
                   }}
                 />
               </div>
@@ -61,28 +83,8 @@ export function CounterSalesCard({ counters = [], className }) {
           )
         })}
       </div>
-
-      <div className="h-48 w-full">
-        <ResponsiveContainer width="100%" height="100%">
-          <BarChart data={counters} margin={{ top: 8, right: 8, left: 0, bottom: 0 }}>
-            <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" vertical={false} />
-            <XAxis dataKey="name" tick={{ fill: '#64748b', fontSize: 11 }} axisLine={false} tickLine={false} />
-            <YAxis
-              tick={{ fill: '#64748b', fontSize: 11 }}
-              axisLine={false}
-              tickLine={false}
-              tickFormatter={(v) => `${Math.round(v / 1000)}k`}
-              width={36}
-            />
-            <Tooltip content={<CounterTooltip />} />
-            <Bar dataKey="sales" radius={[8, 8, 0, 0]} barSize={36}>
-              {counters.map((entry, index) => (
-                <Cell key={entry.id || entry.name} fill={colors[index % colors.length]} />
-              ))}
-            </Bar>
-          </BarChart>
-        </ResponsiveContainer>
-      </div>
     </SurfaceCard>
   )
 }
+
+export default CounterSalesCard

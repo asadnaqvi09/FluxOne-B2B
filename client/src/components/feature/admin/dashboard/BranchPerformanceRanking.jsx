@@ -1,6 +1,15 @@
-import { useState } from 'react'
+import { useState, useMemo } from 'react'
 import { SurfaceCard } from '@/components/shared/SurfaceCard'
 import { Badge } from '@/components/ui/badge'
+import {
+  Table,
+  TableHeader,
+  TableBody,
+  TableHead,
+  TableRow,
+  TableCell,
+  TablePagination,
+} from '@/components/ui/table'
 import { Trophy, TrendingUp, ShieldCheck, MapPin } from 'lucide-react'
 
 const BRANCH_RANKINGS = [
@@ -54,31 +63,46 @@ const BRANCH_RANKINGS = [
   },
 ]
 
+const PAGE_SIZE = 8
+
 export function BranchPerformanceRanking() {
+  const [page, setPage] = useState(1)
+  const totalPages = Math.max(1, Math.ceil(BRANCH_RANKINGS.length / PAGE_SIZE))
+
+  const pagedRankings = useMemo(() => {
+    const start = (page - 1) * PAGE_SIZE
+    return BRANCH_RANKINGS.slice(start, start + PAGE_SIZE)
+  }, [page])
+
   return (
     <SurfaceCard
       title="Branch Performance Ranking (YTD 2026)"
       description="Consolidated financial leaderboard ranking branches by revenue, profit generation & operational efficiency"
+      actions={
+        <span className="text-xs font-medium text-slate-400">
+          {BRANCH_RANKINGS.length} records · {PAGE_SIZE} / page
+        </span>
+      }
     >
       <div className="overflow-x-auto">
-        <table className="w-full min-w-[36rem] text-left text-sm">
-          <thead>
-            <tr className="border-b border-border text-xs text-slate-500 uppercase tracking-wide">
-              <th className="px-3 py-2.5 font-medium">Rank</th>
-              <th className="px-3 py-2.5 font-medium">Branch Details</th>
-              <th className="px-3 py-2.5 font-medium">YTD Revenue</th>
-              <th className="px-3 py-2.5 font-medium">YTD Net Profit</th>
-              <th className="px-3 py-2.5 font-medium">Profit Margin</th>
-              <th className="px-3 py-2.5 text-right font-medium">Status</th>
-            </tr>
-          </thead>
-          <tbody>
-            {BRANCH_RANKINGS.map((b) => (
-              <tr
+        <Table className="min-w-[36rem] text-left text-sm">
+          <TableHeader>
+            <TableRow className="text-xs text-slate-500 uppercase tracking-wide">
+              <TableHead className="px-3 py-2.5 font-medium">Rank</TableHead>
+              <TableHead className="px-3 py-2.5 font-medium">Branch Details</TableHead>
+              <TableHead className="px-3 py-2.5 font-medium">YTD Revenue</TableHead>
+              <TableHead className="px-3 py-2.5 font-medium">YTD Net Profit</TableHead>
+              <TableHead className="px-3 py-2.5 font-medium">Profit Margin</TableHead>
+              <TableHead className="px-3 py-2.5 text-right font-medium">Status</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {pagedRankings.map((b) => (
+              <TableRow
                 key={b.rank}
-                className="border-b border-border/70 hover:bg-slate-50/80 transition-colors"
+                className="hover:bg-slate-50/80 transition-colors"
               >
-                <td className="px-3 py-3">
+                <TableCell className="px-3 py-3">
                   <span
                     className={`flex size-6 items-center justify-center rounded-full text-xs font-bold ${
                       b.rank === 1
@@ -92,26 +116,33 @@ export function BranchPerformanceRanking() {
                   >
                     {b.rank === 1 ? <Trophy className="size-3 text-amber-600" /> : b.rank}
                   </span>
-                </td>
-                <td className="px-3 py-3">
+                </TableCell>
+                <TableCell className="px-3 py-3">
                   <div className="font-bold text-slate-900">{b.name}</div>
                   <div className="text-xs text-slate-500 flex items-center gap-1">
                     <MapPin className="size-3 text-slate-400" /> {b.location} · Mgr: {b.manager}
                   </div>
-                </td>
-                <td className="px-3 py-3 font-semibold text-slate-900">{b.ytdRevenue}</td>
-                <td className="px-3 py-3 font-bold text-purple-900">{b.ytdProfit}</td>
-                <td className="px-3 py-3 text-emerald-700 font-semibold">{b.profitMargin}</td>
-                <td className="px-3 py-3 text-right">
+                </TableCell>
+                <TableCell className="px-3 py-3 font-semibold text-slate-900">{b.ytdRevenue}</TableCell>
+                <TableCell className="px-3 py-3 font-bold text-purple-900">{b.ytdProfit}</TableCell>
+                <TableCell className="px-3 py-3 text-emerald-700 font-semibold">{b.profitMargin}</TableCell>
+                <TableCell className="px-3 py-3 text-right">
                   <Badge variant="outline" className={b.statusBadge}>
                     {b.status}
                   </Badge>
-                </td>
-              </tr>
+                </TableCell>
+              </TableRow>
             ))}
-          </tbody>
-        </table>
+          </TableBody>
+        </Table>
       </div>
+
+      <TablePagination
+        page={page}
+        pageCount={totalPages}
+        totalItems={BRANCH_RANKINGS.length}
+        onPageChange={setPage}
+      />
     </SurfaceCard>
   )
 }

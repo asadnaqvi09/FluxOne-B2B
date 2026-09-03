@@ -1,10 +1,18 @@
 import { Pencil, Trash2, Users } from 'lucide-react'
 import { EmptyState } from '@/components/shared/EmptyState'
 import { EntityStatusToggle } from '@/components/shared/EntityStatusToggle'
-import { Pagination } from '@/components/shared/Pagination'
 import { SurfaceCard } from '@/components/shared/SurfaceCard'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { Button } from '@/components/ui/button'
+import {
+  Table,
+  TableHeader,
+  TableBody,
+  TableHead,
+  TableRow,
+  TableCell,
+  TablePagination,
+} from '@/components/ui/table'
 import { TableRowsSkeleton } from '@/components/ui/skeleton'
 import { staffInitials } from '@/lib/mapBranchDashboard'
 import { BRAND } from '@/lib/constants'
@@ -63,8 +71,7 @@ export function StaffTable({
       description="Branch staff roles for this location"
       actions={
         <span className="text-xs font-medium text-slate-400">
-          {pagination?.total ?? list.length} member
-          {(pagination?.total ?? list.length) === 1 ? '' : 's'}
+          {pagination?.total ?? list.length} records · {pagination?.limit || 8} / page
         </span>
       }
     >
@@ -80,27 +87,27 @@ export function StaffTable({
       ) : (
         <>
           <div className="overflow-x-auto">
-            <table className="w-full min-w-[56rem] border-collapse text-left text-sm">
-              <thead>
-                <tr className="border-b border-border text-xs tracking-wide text-slate-500 uppercase">
-                  <th className="px-2 py-2.5 font-medium">ID</th>
-                  <th className="px-2 py-2.5 font-medium">Name</th>
-                  <th className="px-2 py-2.5 font-medium">Joined</th>
-                  <th className="px-2 py-2.5 font-medium">Designation</th>
-                  <th className="px-2 py-2.5 font-medium">Schedule</th>
-                  <th className="px-2 py-2.5 font-medium">Hardware</th>
-                  <th className="px-2 py-2.5 font-medium">Status</th>
-                  <th className="px-2 py-2.5 text-right font-medium">Actions</th>
-                </tr>
-              </thead>
-              <tbody>
+            <Table className="min-w-[56rem] text-left text-sm">
+              <TableHeader>
+                <TableRow className="text-xs tracking-wide text-slate-500 uppercase">
+                  <TableHead className="px-2 py-2.5 font-medium">ID</TableHead>
+                  <TableHead className="px-2 py-2.5 font-medium">Name</TableHead>
+                  <TableHead className="px-2 py-2.5 font-medium">Joined</TableHead>
+                  <TableHead className="px-2 py-2.5 font-medium">Designation</TableHead>
+                  <TableHead className="px-2 py-2.5 font-medium">Schedule</TableHead>
+                  <TableHead className="px-2 py-2.5 font-medium">Hardware</TableHead>
+                  <TableHead className="px-2 py-2.5 font-medium">Status</TableHead>
+                  <TableHead className="px-2 py-2.5 text-right font-medium">Actions</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
                 {list.map((row) => (
-                  <tr
+                  <TableRow
                     key={row.id}
-                    className="border-b border-border/70 transition-colors last:border-0 hover:bg-slate-50/80"
+                    className="hover:bg-slate-50/80"
                   >
-                    <td className="px-2 py-3 font-mono text-xs text-slate-600">{row.email || '—'}</td>
-                    <td className="px-2 py-3">
+                    <TableCell className="px-2 py-3 font-mono text-xs text-slate-600">{row.email || '—'}</TableCell>
+                    <TableCell className="px-2 py-3">
                       <div className="flex items-center gap-3">
                         <Avatar className="size-9">
                           {row.imageUrl ? (
@@ -116,12 +123,12 @@ export function StaffTable({
                         </Avatar>
                         <p className="truncate font-semibold text-slate-900">{row.fullName || '—'}</p>
                       </div>
-                    </td>
-                    <td className="px-2 py-3 text-slate-600">
+                    </TableCell>
+                    <TableCell className="px-2 py-3 text-slate-600">
                       {formatJoined(row.joiningDate || row.createdAt)}
-                    </td>
-                    <td className="px-2 py-3 text-slate-700">{designationLabel(row)}</td>
-                    <td className="px-2 py-3 text-xs text-slate-600">
+                    </TableCell>
+                    <TableCell className="px-2 py-3 text-slate-700">{designationLabel(row)}</TableCell>
+                    <TableCell className="px-2 py-3 text-xs text-slate-600">
                       <span className="whitespace-nowrap">
                         {formatTime(row.scheduleStart)} – {formatTime(row.scheduleEnd)}
                       </span>
@@ -131,16 +138,16 @@ export function StaffTable({
                           {row.scheduleBreakEnd ? ` – ${formatTime(row.scheduleBreakEnd)}` : ''}
                         </span>
                       ) : null}
-                    </td>
-                    <td className="px-2 py-3 text-slate-600">{row.hardwareDeviceId || '—'}</td>
-                    <td className="px-2 py-3">
+                    </TableCell>
+                    <TableCell className="px-2 py-3 text-slate-600">{row.hardwareDeviceId || '—'}</TableCell>
+                    <TableCell className="px-2 py-3">
                       <EntityStatusToggle
                         status={row.status}
                         loading={statusUpdatingId === row.id}
                         onChange={(nextActive) => onStatusChange?.(row, nextActive)}
                       />
-                    </td>
-                    <td className="px-2 py-3">
+                    </TableCell>
+                    <TableCell className="px-2 py-3">
                       <div className="flex items-center justify-end gap-1">
                         <Button
                           type="button"
@@ -162,16 +169,17 @@ export function StaffTable({
                           <Trash2 className="size-4" />
                         </Button>
                       </div>
-                    </td>
-                  </tr>
+                    </TableCell>
+                  </TableRow>
                 ))}
-              </tbody>
-            </table>
+              </TableBody>
+            </Table>
           </div>
 
-          <Pagination
+          <TablePagination
             page={page}
             pageCount={pageCount}
+            totalItems={pagination?.total ?? list.length}
             loading={loading}
             onPageChange={onPageChange}
             alwaysShow={(pagination?.total || 0) > (pagination?.limit || 8)}

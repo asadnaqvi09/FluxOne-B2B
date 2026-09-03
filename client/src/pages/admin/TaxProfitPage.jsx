@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useMemo } from 'react'
 import { SurfaceCard } from '@/components/shared/SurfaceCard'
 import { PageHeader } from '@/components/shared/PageHeader'
 import { MotionHeader, MotionReveal } from '@/components/shared/MotionReveal'
@@ -7,6 +7,15 @@ import { Badge } from '@/components/ui/badge'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { NativeSelect } from '@/components/ui/select'
+import {
+  Table,
+  TableHeader,
+  TableBody,
+  TableHead,
+  TableRow,
+  TableCell,
+  TablePagination,
+} from '@/components/ui/table'
 import {
   Dialog,
   DialogContent,
@@ -39,6 +48,8 @@ import {
   Sparkles,
 } from 'lucide-react'
 
+const PAGE_SIZE = 8
+
 export function TaxProfitPage() {
   const [products, setProducts] = useState(INITIAL_TAX_PROFIT_PRODUCTS)
   const [selectedIds, setSelectedIds] = useState([])
@@ -46,6 +57,7 @@ export function TaxProfitPage() {
   const [selectedCategory, setSelectedCategory] = useState('All Categories')
   const [selectedScale, setSelectedScale] = useState('All Scales')
   const [presetFilter, setPresetFilter] = useState('all') // 'all' | 'top_selling' | 'top_profit' | 'top_popular'
+  const [page, setPage] = useState(1)
 
   // Dialogs
   const [profitDialogOpen, setProfitDialogOpen] = useState(false)
@@ -389,132 +401,154 @@ export function TaxProfitPage() {
         <SurfaceCard
           title="Catalog Pricing & Profit Margins"
           description="Dynamic table calculating final retail prices from base wholesale cost, profit % and sales tax"
+          actions={
+            <span className="text-xs font-medium text-slate-400">
+              {filteredProducts.length} records · {PAGE_SIZE} / page
+            </span>
+          }
         >
           <div className="overflow-x-auto">
-            <table className="w-full min-w-[50rem] text-left text-sm">
-              <thead>
-                <tr className="border-b border-border text-xs text-slate-500 uppercase">
-                  <th className="w-10 px-3 py-3 text-center">
+            <Table className="min-w-[50rem] text-left text-sm">
+              <TableHeader>
+                <TableRow className="text-xs text-slate-500 uppercase">
+                  <TableHead className="w-10 px-3 py-3 text-center">
                     <input
                       type="checkbox"
                       checked={isAllSelected}
                       onChange={handleToggleSelectAll}
                       className="rounded text-purple-600 focus:ring-0"
                     />
-                  </th>
-                  {visibleColumns.id && <th className="px-3 py-3 font-medium">SKU ID</th>}
-                  {visibleColumns.image && <th className="px-3 py-3 font-medium">Image</th>}
-                  {visibleColumns.name && <th className="px-3 py-3 font-medium">Product Name</th>}
-                  {visibleColumns.barcode && <th className="px-3 py-3 font-medium">Barcode</th>}
-                  {visibleColumns.category && <th className="px-3 py-3 font-medium">Category / Scale</th>}
-                  {visibleColumns.baseCost && <th className="px-3 py-3 font-medium">Base Cost</th>}
-                  {visibleColumns.profitPct && <th className="px-3 py-3 font-medium">Profit %</th>}
-                  {visibleColumns.taxPct && <th className="px-3 py-3 font-medium">Tax %</th>}
+                  </TableHead>
+                  {visibleColumns.id && <TableHead className="px-3 py-3 font-medium">SKU ID</TableHead>}
+                  {visibleColumns.image && <TableHead className="px-3 py-3 font-medium">Image</TableHead>}
+                  {visibleColumns.name && <TableHead className="px-3 py-3 font-medium">Product Name</TableHead>}
+                  {visibleColumns.barcode && <TableHead className="px-3 py-3 font-medium">Barcode</TableHead>}
+                  {visibleColumns.category && <TableHead className="px-3 py-3 font-medium">Category / Scale</TableHead>}
+                  {visibleColumns.baseCost && <TableHead className="px-3 py-3 font-medium">Base Cost</TableHead>}
+                  {visibleColumns.profitPct && <TableHead className="px-3 py-3 font-medium">Profit %</TableHead>}
+                  {visibleColumns.taxPct && <TableHead className="px-3 py-3 font-medium">Tax %</TableHead>}
                   {visibleColumns.finalPrice && (
-                    <th className="px-3 py-3 text-right font-bold text-slate-900">
+                    <TableHead className="px-3 py-3 text-right font-bold text-slate-900">
                       Final Price
-                    </th>
+                    </TableHead>
                   )}
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-100">
-                {filteredProducts.map((p) => {
-                  const isChecked = selectedIds.includes(p.id)
-                  const finalPrice = calculateFinalPrice(
-                    p.baseCost,
-                    p.profitPct,
-                    p.taxPct,
-                  )
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {filteredProducts.length === 0 ? (
+                  <TableRow>
+                    <TableCell colSpan={10} className="py-8 text-center text-xs text-slate-400">
+                      No products found matching the criteria.
+                    </TableCell>
+                  </TableRow>
+                ) : (
+                  filteredProducts
+                    .slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE)
+                    .map((p) => {
+                      const isChecked = selectedIds.includes(p.id)
+                      const finalPrice = calculateFinalPrice(
+                        p.baseCost,
+                        p.profitPct,
+                        p.taxPct,
+                      )
 
-                  return (
-                    <tr
-                      key={p.id}
-                      className={`hover:bg-slate-50/70 transition-colors ${
-                        isChecked ? 'bg-purple-50/40' : ''
-                      }`}
-                    >
-                      <td className="w-10 px-3 py-3 text-center">
-                        <input
-                          type="checkbox"
-                          checked={isChecked}
-                          onChange={() => handleToggleRow(p.id)}
-                          className="rounded text-purple-600 focus:ring-0"
-                        />
-                      </td>
+                      return (
+                        <TableRow
+                          key={p.id}
+                          className={`hover:bg-slate-50/70 transition-colors ${
+                            isChecked ? 'bg-purple-50/40' : ''
+                          }`}
+                        >
+                          <TableCell className="w-10 px-3 py-3 text-center">
+                            <input
+                              type="checkbox"
+                              checked={isChecked}
+                              onChange={() => handleToggleRow(p.id)}
+                              className="rounded text-purple-600 focus:ring-0"
+                            />
+                          </TableCell>
 
-                      {visibleColumns.id && (
-                        <td className="px-3 py-3 font-mono text-xs font-bold text-slate-700">
-                          {p.id}
-                        </td>
-                      )}
+                          {visibleColumns.id && (
+                            <TableCell className="px-3 py-3 font-mono text-xs font-bold text-slate-700">
+                              {p.id}
+                            </TableCell>
+                          )}
 
-                      {visibleColumns.image && (
-                        <td className="px-3 py-3">
-                          <img
-                            src={p.image}
-                            alt={p.name}
-                            className="size-10 rounded-lg object-cover border border-slate-200 shadow-2xs"
-                          />
-                        </td>
-                      )}
+                          {visibleColumns.image && (
+                            <TableCell className="px-3 py-3">
+                              <img
+                                src={p.image}
+                                alt={p.name}
+                                className="size-10 rounded-lg object-cover border border-slate-200 shadow-2xs"
+                              />
+                            </TableCell>
+                          )}
 
-                      {visibleColumns.name && (
-                        <td className="px-3 py-3 font-bold text-slate-900 text-xs">
-                          {p.name}
-                        </td>
-                      )}
+                          {visibleColumns.name && (
+                            <TableCell className="px-3 py-3 font-bold text-slate-900 text-xs">
+                              {p.name}
+                            </TableCell>
+                          )}
 
-                      {visibleColumns.barcode && (
-                        <td className="px-3 py-3 font-mono text-xs text-slate-500">
-                          {p.barcode}
-                        </td>
-                      )}
+                          {visibleColumns.barcode && (
+                            <TableCell className="px-3 py-3 font-mono text-xs text-slate-500">
+                              {p.barcode}
+                            </TableCell>
+                          )}
 
-                      {visibleColumns.category && (
-                        <td className="px-3 py-3 text-xs text-slate-600">
-                          <span className="block font-medium">{p.category}</span>
-                          <span className="text-[10px] text-slate-400">{p.scaleLabel}</span>
-                        </td>
-                      )}
+                          {visibleColumns.category && (
+                            <TableCell className="px-3 py-3 text-xs text-slate-600">
+                              <span className="block font-medium">{p.category}</span>
+                              <span className="text-[10px] text-slate-400">{p.scaleLabel}</span>
+                            </TableCell>
+                          )}
 
-                      {visibleColumns.baseCost && (
-                        <td className="px-3 py-3 font-semibold text-slate-800 text-xs">
-                          Rs. {p.baseCost.toLocaleString()}
-                        </td>
-                      )}
+                          {visibleColumns.baseCost && (
+                            <TableCell className="px-3 py-3 font-semibold text-slate-800 text-xs">
+                              Rs. {p.baseCost.toLocaleString()}
+                            </TableCell>
+                          )}
 
-                      {visibleColumns.profitPct && (
-                        <td className="px-3 py-3">
-                          <span className="inline-flex items-center font-bold text-xs text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200">
-                            +{p.profitPct}%
-                          </span>
-                        </td>
-                      )}
+                          {visibleColumns.profitPct && (
+                            <TableCell className="px-3 py-3">
+                              <span className="inline-flex items-center font-bold text-xs text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200">
+                                +{p.profitPct}%
+                              </span>
+                            </TableCell>
+                          )}
 
-                      {visibleColumns.taxPct && (
-                        <td className="px-3 py-3">
-                          <span className="inline-flex items-center font-bold text-xs text-blue-700 bg-blue-50 px-2 py-0.5 rounded border border-blue-200">
-                            {p.taxPct > 0 ? `${p.taxPct}%` : '0% (Exempt)'}
-                          </span>
-                        </td>
-                      )}
+                          {visibleColumns.taxPct && (
+                            <TableCell className="px-3 py-3">
+                              <span className="inline-flex items-center font-bold text-xs text-blue-700 bg-blue-50 px-2 py-0.5 rounded border border-blue-200">
+                                {p.taxPct > 0 ? `${p.taxPct}%` : '0% (Exempt)'}
+                              </span>
+                            </TableCell>
+                          )}
 
-                      {visibleColumns.finalPrice && (
-                        <td className="px-3 py-3 text-right">
-                          <span className="font-extrabold text-sm text-purple-950 block">
-                            Rs. {finalPrice.toLocaleString()}
-                          </span>
-                          <span className="text-[10px] text-slate-400">
-                            Margin: Rs. {finalPrice - p.baseCost}
-                          </span>
-                        </td>
-                      )}
-                    </tr>
-                  )
-                })}
-              </tbody>
-            </table>
+                          {visibleColumns.finalPrice && (
+                            <TableCell className="px-3 py-3 text-right">
+                              <span className="font-extrabold text-sm text-purple-950 block">
+                                Rs. {finalPrice.toLocaleString()}
+                              </span>
+                              <span className="text-[10px] text-slate-400">
+                                Margin: Rs. {finalPrice - p.baseCost}
+                              </span>
+                            </TableCell>
+                          )}
+                        </TableRow>
+                      )
+                    })
+                )}
+              </TableBody>
+            </Table>
           </div>
+
+          <TablePagination
+            page={page}
+            pageCount={Math.max(1, Math.ceil(filteredProducts.length / PAGE_SIZE))}
+            totalItems={filteredProducts.length}
+            onPageChange={setPage}
+          />
         </SurfaceCard>
       </MotionReveal>
 

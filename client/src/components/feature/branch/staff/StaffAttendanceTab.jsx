@@ -1,14 +1,25 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useMemo } from 'react'
 import { Calendar as CalendarIcon, List, CheckSquare, ChevronLeft, ChevronRight } from 'lucide-react'
 import { SurfaceCard } from '@/components/shared/SurfaceCard'
 import { Button } from '@/components/ui/button'
 import { NativeSelect } from '@/components/ui/select'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import {
+  Table,
+  TableHeader,
+  TableBody,
+  TableHead,
+  TableRow,
+  TableCell,
+  TablePagination,
+} from '@/components/ui/table'
 import { apiClient } from '@/api/api'
 import { endpoints } from '@/api/endpoints'
 import { BRAND } from '@/lib/constants'
 import { toastError, toastSuccess } from '@/lib/toast'
+
+const PAGE_SIZE = 8
 
 export function StaffAttendanceTab({ designations = [], staff = [] }) {
   const [logs, setLogs] = useState([])
@@ -22,6 +33,7 @@ export function StaffAttendanceTab({ designations = [], staff = [] }) {
   const [filterDesignation, setFilterDesignation] = useState('')
   const [currentDate, setCurrentDate] = useState(new Date())
   const [localAttendance, setLocalAttendance] = useState({})
+  const [logPage, setLogPage] = useState(1)
 
   const fetchLogs = async () => {
     setLoading(true)
@@ -213,7 +225,14 @@ export function StaffAttendanceTab({ designations = [], staff = [] }) {
       {subTab === 'overview' ? (
         <>
           {viewMode === 'list' ? (
-            <SurfaceCard title="Daily Roster Logs">
+            <SurfaceCard
+              title="Daily Roster Logs"
+              actions={
+                <span className="text-xs font-medium text-slate-400">
+                  {filteredLogs.length} records · {PAGE_SIZE} / page
+                </span>
+              }
+            >
               <div className="mb-4 grid grid-cols-1 gap-3 sm:grid-cols-2 max-w-lg">
                 <div className="space-y-1.5">
                   <div className="flex items-center justify-between">
@@ -252,45 +271,54 @@ export function StaffAttendanceTab({ designations = [], staff = [] }) {
                 </div>
               </div>
               <div className="overflow-x-auto">
-                <table className="w-full min-w-[36rem] text-left text-sm">
-                  <thead>
-                    <tr className="border-b border-border text-xs text-slate-500 uppercase">
-                      <th className="px-3 py-2 font-medium">Employee</th>
-                      <th className="px-3 py-2 font-medium">Designation</th>
-                      <th className="px-3 py-2 font-medium">Date</th>
-                      <th className="px-3 py-2 font-medium">Status</th>
-                      <th className="px-3 py-2 font-medium">Note</th>
-                    </tr>
-                  </thead>
-                  <tbody>
+                <Table className="min-w-[36rem] text-left text-sm">
+                  <TableHeader>
+                    <TableRow className="text-xs text-slate-500 uppercase">
+                      <TableHead className="px-3 py-2 font-medium">Employee</TableHead>
+                      <TableHead className="px-3 py-2 font-medium">Designation</TableHead>
+                      <TableHead className="px-3 py-2 font-medium">Date</TableHead>
+                      <TableHead className="px-3 py-2 font-medium">Status</TableHead>
+                      <TableHead className="px-3 py-2 font-medium">Note</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
                     {loading ? (
-                      <tr><td colSpan={5} className="py-8 text-center text-slate-400">Loading...</td></tr>
+                      <TableRow><TableCell colSpan={5} className="py-8 text-center text-slate-400">Loading...</TableCell></TableRow>
                     ) : filteredLogs.length === 0 ? (
-                      <tr><td colSpan={5} className="py-8 text-center text-slate-400">No logs found for this date</td></tr>
+                      <TableRow><TableCell colSpan={5} className="py-8 text-center text-slate-400">No logs found for this date</TableCell></TableRow>
                     ) : (
-                      filteredLogs.map((log) => {
-                        const m = staff.find((s) => s.id === log.staffId)
-                        const logDateFormatted = new Date(log.workDate).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })
-                        return (
-                          <tr key={log.id} className="border-b border-border/60 hover:bg-slate-50/50">
-                            <td className="px-3 py-2.5 font-semibold text-slate-900">{m?.fullName || 'Employee'}</td>
-                            <td className="px-3 py-2.5 text-slate-600">{m?.designation || '—'}</td>
-                            <td className="px-3 py-2.5 text-slate-600 font-mono text-xs">
-                              {logDateFormatted}
-                            </td>
-                            <td className="px-3 py-2.5">
-                              <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-semibold ring-1 ring-inset ${getStatusBadge(log.status)}`}>
-                                {log.status}
-                              </span>
-                            </td>
-                            <td className="px-3 py-2.5 text-slate-400 italic">{log.note || '—'}</td>
-                          </tr>
-                        )
-                      })
+                      filteredLogs
+                        .slice((logPage - 1) * PAGE_SIZE, logPage * PAGE_SIZE)
+                        .map((log) => {
+                          const m = staff.find((s) => s.id === log.staffId)
+                          const logDateFormatted = new Date(log.workDate).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })
+                          return (
+                            <TableRow key={log.id} className="hover:bg-slate-50/50">
+                              <TableCell className="px-3 py-2.5 font-semibold text-slate-900">{m?.fullName || 'Employee'}</TableCell>
+                              <TableCell className="px-3 py-2.5 text-slate-600">{m?.designation || '—'}</TableCell>
+                              <TableCell className="px-3 py-2.5 text-slate-600 font-mono text-xs">
+                                {logDateFormatted}
+                              </TableCell>
+                              <TableCell className="px-3 py-2.5">
+                                <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-semibold ring-1 ring-inset ${getStatusBadge(log.status)}`}>
+                                  {log.status}
+                                </span>
+                              </TableCell>
+                              <TableCell className="px-3 py-2.5 text-slate-400 italic">{log.note || '—'}</TableCell>
+                            </TableRow>
+                          )
+                        })
                     )}
-                  </tbody>
-                </table>
+                  </TableBody>
+                </Table>
               </div>
+
+              <TablePagination
+                page={logPage}
+                pageCount={Math.max(1, Math.ceil(filteredLogs.length / PAGE_SIZE))}
+                totalItems={filteredLogs.length}
+                onPageChange={setLogPage}
+              />
             </SurfaceCard>
           ) : (
             <SurfaceCard
@@ -363,27 +391,27 @@ export function StaffAttendanceTab({ designations = [], staff = [] }) {
           }
         >
           <div className="overflow-x-auto">
-            <table className="w-full min-w-[38rem] text-left text-sm">
-              <thead>
-                <tr className="border-b border-border text-xs text-slate-500 uppercase">
-                  <th className="px-3 py-2 font-medium">Employee</th>
-                  <th className="px-3 py-2 font-medium">Designation</th>
-                  <th className="px-3 py-2 font-medium">Mark Attendance</th>
-                  <th className="px-3 py-2 font-medium">Shift Note</th>
-                  <th className="px-3 py-2 text-right font-medium">Action</th>
-                </tr>
-              </thead>
-              <tbody>
+            <Table className="min-w-[38rem] text-left text-sm">
+              <TableHeader>
+                <TableRow className="text-xs text-slate-500 uppercase">
+                  <TableHead className="px-3 py-2 font-medium">Employee</TableHead>
+                  <TableHead className="px-3 py-2 font-medium">Designation</TableHead>
+                  <TableHead className="px-3 py-2 font-medium">Mark Attendance</TableHead>
+                  <TableHead className="px-3 py-2 font-medium">Shift Note</TableHead>
+                  <TableHead className="px-3 py-2 text-right font-medium">Action</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
                 {staff.map((m) => {
                   const local = localAttendance[m.id] || { status: 'present', note: '', isSaved: false }
                   return (
-                    <tr key={m.id} className="border-b border-border/60 hover:bg-slate-50/50">
-                      <td className="px-3 py-2.5">
+                    <TableRow key={m.id} className="hover:bg-slate-50/50">
+                      <TableCell className="px-3 py-2.5">
                         <div className="font-semibold text-slate-900">{m.fullName}</div>
                         <div className="text-xs text-slate-400">{m.email}</div>
-                      </td>
-                      <td className="px-3 py-2.5 text-slate-600">{m.designation || '—'}</td>
-                      <td className="px-3 py-2.5">
+                      </TableCell>
+                      <TableCell className="px-3 py-2.5 text-slate-600">{m.designation || '—'}</TableCell>
+                      <TableCell className="px-3 py-2.5">
                         <NativeSelect value={local.status} onChange={(e) => handleStatusChange(m.id, e.target.value)} className="w-32 py-1 h-8">
                           <option value="present">Present</option>
                           <option value="absent">Absent</option>
@@ -391,16 +419,16 @@ export function StaffAttendanceTab({ designations = [], staff = [] }) {
                           <option value="leave">Leave</option>
                           <option value="holiday">Holiday</option>
                         </NativeSelect>
-                      </td>
-                      <td className="px-3 py-2.5">
+                      </TableCell>
+                      <TableCell className="px-3 py-2.5">
                         <Input
                           placeholder="e.g. Late by 10 mins"
                           value={local.note}
                           onChange={(e) => handleNoteChange(m.id, e.target.value)}
                           className="h-8 py-0.5 text-xs max-w-[160px]"
                         />
-                      </td>
-                      <td className="px-3 py-2.5 text-right">
+                      </TableCell>
+                      <TableCell className="px-3 py-2.5 text-right">
                         <Button
                           size="sm"
                           variant={local.isSaved ? 'outline' : 'default'}
@@ -411,12 +439,12 @@ export function StaffAttendanceTab({ designations = [], staff = [] }) {
                         >
                           {local.isSaved ? 'Update' : 'Save'}
                         </Button>
-                      </td>
-                    </tr>
+                      </TableCell>
+                    </TableRow>
                   )
                 })}
-              </tbody>
-            </table>
+              </TableBody>
+            </Table>
           </div>
         </SurfaceCard>
       )}

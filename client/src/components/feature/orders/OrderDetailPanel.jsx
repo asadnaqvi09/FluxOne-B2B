@@ -7,6 +7,14 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
+import {
+  Table,
+  TableHeader,
+  TableBody,
+  TableHead,
+  TableRow,
+  TableCell,
+} from '@/components/ui/table'
 import { BRAND } from '@/lib/constants'
 import { money } from '@/lib/mapProduct'
 
@@ -39,33 +47,33 @@ export function OrderDetailPanel({
         </DialogHeader>
 
         <div className="overflow-x-auto rounded-xl border border-border">
-          <table className="w-full min-w-[520px] text-left text-sm">
-            <thead>
-              <tr className="border-b border-border bg-slate-50 text-xs uppercase text-slate-400">
-                <th className="px-3 py-2">Name / Id</th>
-                <th className="px-3 py-2">Scale</th>
-                <th className="px-3 py-2">Qty</th>
-                <th className="px-3 py-2">Price</th>
-                <th className="px-3 py-2">Last purchase</th>
-              </tr>
-            </thead>
-            <tbody>
+          <Table className="min-w-[520px] text-left text-sm">
+            <TableHeader>
+              <TableRow className="bg-slate-50 text-xs uppercase text-slate-400">
+                <TableHead className="px-3 py-2">Name / Id</TableHead>
+                <TableHead className="px-3 py-2">Scale</TableHead>
+                <TableHead className="px-3 py-2">Qty</TableHead>
+                <TableHead className="px-3 py-2">Price</TableHead>
+                <TableHead className="px-3 py-2">Last purchase</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
               {(order.lines || []).map((line) => (
-                <tr key={line.id || line.productId} className="border-b border-border/60">
-                  <td className="px-3 py-2">
+                <TableRow key={line.id || line.productId}>
+                  <TableCell className="px-3 py-2">
                     <span className="font-medium">{line.name}</span>
                     <span className="mt-0.5 block font-mono text-[11px] text-slate-400">
                       {line.itemCode}
                     </span>
-                  </td>
-                  <td className="px-3 py-2 capitalize">{line.scale}</td>
-                  <td className="px-3 py-2">{line.quantity}</td>
-                  <td className="px-3 py-2">{money(line.unitCost)}</td>
-                  <td className="px-3 py-2 text-slate-500">{money(line.lastPurchasePrice)}</td>
-                </tr>
+                  </TableCell>
+                  <TableCell className="px-3 py-2 capitalize">{line.scale}</TableCell>
+                  <TableCell className="px-3 py-2">{line.quantity}</TableCell>
+                  <TableCell className="px-3 py-2">{money(line.unitCost)}</TableCell>
+                  <TableCell className="px-3 py-2 text-slate-500">{money(line.lastPurchasePrice)}</TableCell>
+                </TableRow>
               ))}
-            </tbody>
-          </table>
+            </TableBody>
+          </Table>
         </div>
 
         {order.explanation ? (

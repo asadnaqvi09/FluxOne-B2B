@@ -251,6 +251,8 @@ export async function api(path, options = {}) {
     const token = tokenStorage.getToken()
     const response = await fetch(url, {
       method,
+      // Avoid stale 304/ETag responses after mutations (categories delete looked “stuck”)
+      cache: 'no-store',
       headers: {
         ...(asForm ? {} : { 'Content-Type': 'application/json' }),
         ...(token ? { Authorization: `Bearer ${token}` } : {}),
@@ -259,6 +261,11 @@ export async function api(path, options = {}) {
       body:
         body === undefined ? undefined : asForm ? body : JSON.stringify(body),
     })
+
+    // 304 with empty body would otherwise look like success + null data
+    if (response.status === 304) {
+      return fail(`Stale cache for ${url}`)
+    }
 
     const payload = await parseJson(response)
 

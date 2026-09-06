@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react'
-import { FolderTree, Pencil, Plus } from 'lucide-react'
+import { FolderTree, Pencil, Plus, Trash2 } from 'lucide-react'
 import { CategoryDialog } from '@/components/feature/products/CategoryDialog'
 import { ProductStatusToggle } from '@/components/feature/products/ProductStatusToggle'
 import { ConfirmDialog } from '@/components/shared/ConfirmDialog'
@@ -52,10 +52,12 @@ export function CategoriesPage() {
     mutating,
     createCategory,
     updateCategory,
+    deleteCategory,
     setCategoryActive,
   } = useProducts({}, { skipList: true })
 
-  const [statusFilter, setStatusFilter] = useState('all')
+  // Default Active so soft-deleted categories disappear from the main list (like products)
+  const [statusFilter, setStatusFilter] = useState('active')
 
   const [dialogOpen, setDialogOpen] = useState(false)
   const [dialogMode, setDialogMode] = useState('create')
@@ -63,7 +65,9 @@ export function CategoriesPage() {
   const [editing, setEditing] = useState(null)
   const [parentForSub, setParentForSub] = useState(null)
   const [deactivateTarget, setDeactivateTarget] = useState(null)
+  const [deleteTarget, setDeleteTarget] = useState(null)
   const [statusUpdatingId, setStatusUpdatingId] = useState(null)
+  const [deleteLoading, setDeleteLoading] = useState(false)
 
   const rows = useMemo(() => filterCategoryRows(catalog, statusFilter), [catalog, statusFilter])
 
@@ -155,12 +159,32 @@ export function CategoriesPage() {
     }
   }
 
+  async function handleConfirmDelete() {
+    if (!deleteTarget?.id) return
+    setDeleteLoading(true)
+    try {
+      const result = await deleteCategory(deleteTarget.id)
+      setDeleteTarget(null)
+      if (result.success) {
+        toastSuccess(
+          deleteTarget.parentId
+            ? 'Sub category deleted'
+            : 'Category deleted — linked sub categories were deactivated',
+        )
+      } else {
+        toastError(result.error || 'Delete failed')
+      }
+    } finally {
+      setDeleteLoading(false)
+    }
+  }
+
   return (
     <div className="space-y-5 pb-8 sm:space-y-6">
       <MotionHeader>
         <PageHeader
           title="Categories"
-          description="Deactivate instead of delete — products stay active and show Category as N/A"
+          description="Manage parent and sub categories — delete or deactivate when unused"
           actions={
             <div className="flex flex-wrap items-end gap-2">
               <div className="space-y-1.5">
@@ -279,9 +303,21 @@ export function CategoriesPage() {
                         size="icon"
                         variant="ghost"
                         className="cursor-pointer"
+                        title="Edit"
                         onClick={() => openEdit(parent, 'category')}
                       >
                         <Pencil className="size-4" />
+                      </Button>
+                      <Button
+                        type="button"
+                        size="icon"
+                        variant="ghost"
+                        className="cursor-pointer text-red-600 hover:text-red-700"
+                        title="Delete"
+                        aria-label={`Delete ${parent.name || 'category'}`}
+                        onClick={() => setDeleteTarget(parent)}
+                      >
+                        <Trash2 className="size-4" />
                       </Button>
                     </div>
                   </div>
@@ -318,9 +354,21 @@ export function CategoriesPage() {
                               size="icon"
                               variant="ghost"
                               className="cursor-pointer"
+                              title="Edit"
                               onClick={() => openEdit(child, 'subcategory')}
                             >
                               <Pencil className="size-3.5" />
+                            </Button>
+                            <Button
+                              type="button"
+                              size="icon"
+                              variant="ghost"
+                              className="cursor-pointer text-red-600 hover:text-red-700"
+                              title="Delete"
+                              aria-label={`Delete ${child.name || 'sub category'}`}
+                              onClick={() => setDeleteTarget(child)}
+                            >
+                              <Trash2 className="size-3.5" />
                             </Button>
                           </div>
                         </li>
@@ -358,6 +406,22 @@ export function CategoriesPage() {
         confirmLabel="Deactivate"
         loading={mutating || Boolean(statusUpdatingId)}
         onConfirm={handleConfirmDeactivate}
+      />
+
+      <ConfirmDialog
+        open={Boolean(deleteTarget)}
+        onOpenChange={(open) => {
+          if (!open) setDeleteTarget(null)
+        }}
+        title={deleteTarget?.parentId ? 'Delete sub category?' : 'Delete category?'}
+        description={
+          deleteTarget?.parentId
+            ? `“${deleteTarget.name}” will be removed from the active catalog. Linked products keep Active with Subcategory N/A.`
+            : `“${deleteTarget?.name}” and its sub categories will be removed from the active catalog. Linked products stay Active with Category N/A.`
+        }
+        confirmLabel="Delete"
+        loading={deleteLoading || mutating}
+        onConfirm={handleConfirmDelete}
       />
     </div>
   )

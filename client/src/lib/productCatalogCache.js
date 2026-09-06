@@ -76,23 +76,38 @@ export async function getProductCatalog(options = {}) {
 
 /** After category/subcategory CRUD — refresh categories only; keep taxes/offers. */
 export async function refreshProductCategories() {
-  const catsRes = await apiClient.get(endpoints.products.categories)
-  const rows = catsRes.success && Array.isArray(catsRes.data) ? catsRes.data : []
-  if (!cache.data) {
-    return getProductCatalog({ force: true })
+  // Cache-bust query so intermediaries cannot serve a pre-delete list
+  const catsRes = await apiClient.get(endpoints.products.categories, {
+    _ts: Date.now(),
+  })
+  if (!catsRes.success || !Array.isArray(catsRes.data)) {
+    // Never wipe a good catalog with null/empty from a failed/stale response
+    if (!cache.data) return getProductCatalog({ force: true })
+    return cache.data
   }
-  return applyCategories(rows)
+  return applyCategories(catsRes.data)
 }
 
 export function peekProductCatalog() {
   return cache.data
 }
 
-/** Patch isActive on a cached category row without refetching the full catalog. */
+/** Patch isActive on a cached category row without refetching the full catalog.
+ * When a parent is deactivated, cascade to children (matches server behavior).
+ */
 export function patchCatalogCategoryActive(id, isActive) {
   if (!cache.data || !id) return
-  const patchRow = (row) => (row.id === id ? { ...row, isActive } : row)
-  cache.data.parents = (cache.data.parents || []).map(patchRow)
+  const parents = cache.data.parents || []
+  const isParent = parents.some((row) => row.id === id)
+
+  const shouldPatch = (row) => {
+    if (row.id === id) return true
+    if (!isActive && isParent && row.parentId === id) return true
+    return false
+  }
+  const patchRow = (row) => (shouldPatch(row) ? { ...row, isActive } : row)
+
+  cache.data.parents = parents.map(patchRow)
   if (cache.data.childrenByParent instanceof Map) {
     for (const [key, rows] of cache.data.childrenByParent.entries()) {
       cache.data.childrenByParent.set(key, (rows || []).map(patchRow))

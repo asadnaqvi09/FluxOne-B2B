@@ -35,7 +35,16 @@ const allowedOrigins = new Set(
 )
 
 app.set('trust proxy', 1)
+// Prevent browser/proxy 304 reuse of stale JSON after DELETE/PATCH (e.g. categories)
+app.set('etag', false)
 app.use(helmet())
+app.use((req, res, next) => {
+  if (req.path.startsWith('/api')) {
+    res.set('Cache-Control', 'no-store, no-cache, must-revalidate, private')
+    res.set('Pragma', 'no-cache')
+  }
+  next()
+})
 app.use(
   cors({
     origin(requestOrigin, callback) {

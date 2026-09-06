@@ -5,9 +5,36 @@ export async function getOverviewKpis(tenantId, { branchId = null } = {}) {
     tenantId,
     `
       SELECT
-        (SELECT count(*)::int FROM categories WHERE tenant_id = $1 AND parent_id IS NULL AND ($2::uuid IS NULL OR branch_id = $2)) AS "totalCategories",
-        (SELECT count(*)::int FROM categories WHERE tenant_id = $1 AND parent_id IS NOT NULL AND ($2::uuid IS NULL OR branch_id = $2)) AS "totalSubCategories",
-        (SELECT count(*)::int FROM products WHERE tenant_id = $1 AND ($2::uuid IS NULL OR branch_id = $2)) AS "totalItems"
+        (
+          SELECT count(*)::int
+          FROM categories
+          WHERE tenant_id = $1
+            AND parent_id IS NULL
+            AND is_active = true
+            AND ($2::uuid IS NULL OR branch_id = $2)
+        ) AS "totalCategories",
+        (
+          SELECT count(*)::int
+          FROM categories c
+          WHERE c.tenant_id = $1
+            AND c.parent_id IS NOT NULL
+            AND c.is_active = true
+            AND ($2::uuid IS NULL OR c.branch_id = $2)
+            AND EXISTS (
+              SELECT 1
+              FROM categories p
+              WHERE p.tenant_id = c.tenant_id
+                AND p.id = c.parent_id
+                AND p.is_active = true
+            )
+        ) AS "totalSubCategories",
+        (
+          SELECT count(*)::int
+          FROM products
+          WHERE tenant_id = $1
+            AND status = 'active'
+            AND ($2::uuid IS NULL OR branch_id = $2)
+        ) AS "totalItems"
     `,
     [branchId || null],
   )

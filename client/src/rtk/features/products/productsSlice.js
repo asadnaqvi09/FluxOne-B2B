@@ -11,7 +11,6 @@ import {
 import { productsToCsv } from '@/lib/productCsv'
 import {
   getProductCatalog,
-  patchCatalogCategoryActive,
   peekProductCatalog,
   refreshProductCategories,
 } from '@/lib/productCatalogCache'
@@ -332,17 +331,19 @@ export const deleteCategory = createAsyncThunk(
   async (id, { dispatch, rejectWithValue }) => {
     const result = await apiClient.delete(endpoints.products.category(id))
     if (!result.success) return rejectWithValue(result.error || 'Delete category failed')
+    // Soft-delete on server → force catalog reload (no-store + cache-bust)
     await dispatch(reloadProductCategories())
-    return result
+    return { ...(result.data || {}), id, isActive: false }
   },
 )
 
 export const setCategoryActive = createAsyncThunk(
   'products/setCategoryActive',
-  async ({ id, isActive }, { rejectWithValue }) => {
+  async ({ id, isActive }, { dispatch, rejectWithValue }) => {
     const result = await apiClient.patch(endpoints.products.category(id), { isActive })
     if (!result.success) return rejectWithValue(result.error || 'Status update failed')
-    patchCatalogCategoryActive(id, isActive)
+    // Reload so parent deactivate cascade (children) stays in sync with server
+    await dispatch(reloadProductCategories())
     return { id, isActive }
   },
 )
@@ -506,16 +507,8 @@ const productsSlice = createSlice({
       .addCase(setCategoryActive.pending, (state) => {
         state.mutating = true
       })
-      .addCase(setCategoryActive.fulfilled, (state, action) => {
+      .addCase(setCategoryActive.fulfilled, (state) => {
         state.mutating = false
-        const { id, isActive } = action.payload
-        const patchRow = (row) => (row.id === id ? { ...row, isActive } : row)
-        state.catalog.parents = (state.catalog.parents || []).map(patchRow)
-        const children = state.catalog.childrenByParent || {}
-        for (const parentId of Object.keys(children)) {
-          children[parentId] = (children[parentId] || []).map(patchRow)
-        }
-        state.catalog.all = (state.catalog.all || []).map(patchRow)
       })
       .addCase(setCategoryActive.rejected, (state) => {
         state.mutating = false

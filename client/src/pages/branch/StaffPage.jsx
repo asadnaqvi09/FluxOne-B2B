@@ -17,6 +17,7 @@ import { BRAND } from '@/lib/constants'
 import { toastError, toastSuccess } from '@/lib/toast'
 import { apiClient } from '@/api/api'
 import { endpoints } from '@/api/endpoints'
+import { cn } from '@/lib/utils'
 
 function useDebouncedSearch(updateFilters) {
   const [localQ, setLocalQ] = useState('')
@@ -170,8 +171,8 @@ export function StaffPage() {
         </p>
       ) : null}
 
-      {/* Sub tabs navigation */}
-      <div className="flex border-b border-slate-200 gap-8 pb-[1px] mb-6 overflow-x-auto whitespace-nowrap scrollbar-none">
+      {/* Capsule tabs navigation */}
+      <div className="flex flex-wrap items-center gap-2 mb-6">
         {[
           { id: 'list', label: 'Staff Roster' },
           { id: 'attendance', label: 'Attendance' },
@@ -183,17 +184,17 @@ export function StaffPage() {
           return (
             <button
               key={tab.id}
+              type="button"
               onClick={() => setActiveTab(tab.id)}
-              className={`pb-3 text-sm font-semibold transition-all relative ${
+              className={cn(
+                'cursor-pointer rounded-full border px-4 py-2 text-xs font-semibold transition-all duration-200 active:scale-[0.97] sm:px-5 sm:py-2.5 sm:text-sm',
                 active
-                  ? 'text-purple-700 font-bold'
-                  : 'text-slate-500 hover:text-slate-800'
-              }`}
+                  ? 'border-transparent text-white shadow-sm'
+                  : 'border-border bg-white text-slate-700 hover:border-slate-300 hover:bg-slate-50',
+              )}
+              style={active ? { background: BRAND.purple } : undefined}
             >
               {tab.label}
-              {active && (
-                <span className="absolute bottom-0 left-0 right-0 h-[2.5px] bg-purple-700 rounded-full" />
-              )}
             </button>
           )
         })}

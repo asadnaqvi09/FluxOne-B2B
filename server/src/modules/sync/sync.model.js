@@ -1,7 +1,11 @@
 import { tenantClientQuery, tenantQuery, withTransaction } from '../../config/db.js'
 import { MOVEMENT_TYPES, ROLES } from '../../config/constants.js'
 import { insertLedgerEventInTx } from '../inventory-manager/control/control.model.js'
-import { validateRefundPayload, validateSalePayload } from './sync.validator.js'
+import {
+  validateProductPricePayload,
+  validateRefundPayload,
+  validateSalePayload,
+} from './sync.validator.js'
 import { normalizeImageUrl } from '../../utils/uploadUrl.util.js'
 
 function httpError(status, message) {
@@ -41,7 +45,7 @@ async function insertSyncEventInTx(client, tenantId, event) {
     ],
   )
 
-  if (rows[0]) return rows[0]
+  if (rows[0]) return { ...rows[0], inserted: true }
 
   const { rows: existing } = await tenantClientQuery(
     client,
@@ -59,7 +63,7 @@ async function insertSyncEventInTx(client, tenantId, event) {
     `,
     [event.clientEventId],
   )
-  return existing[0] || null
+  return existing[0] ? { ...existing[0], inserted: false } : null
 }
 
 export async function insertSyncEvent(tenantId, event) {
@@ -290,6 +294,125 @@ export async function ingestRefundEvent(client, tenantId, syncEvent, userId) {
   }
 }
 
+/**
+ * POS Items Rate → cloud products.selling_price (Policy A: branch-scoped product row).
+ * Final Price is derived on read (selling × discount × offer × tax) — no stored final column.
+ */
+export async function ingestProductPriceUpdate(client, tenantId, syncEvent) {
+  const parsed = validateProductPricePayload(syncEvent.payload)
+  if (!parsed.success) {
+    throw httpError(422, 'product_price_update requires productId and sellingPrice')
+  }
+
+  const branchId = syncEvent.branchId
+  if (!branchId) {
+    throw httpError(422, 'product_price_update requires branchId on the sync token')
+  }
+
+  const payload = parsed.data
+  if (payload.branchId && payload.branchId !== branchId) {
+    throw httpError(403, 'Branch access denied for product price update')
+  }
+
+  // Idempotent replay of the same clientEventId
+  if (!syncEvent.inserted) {
+    return {
+      clientEventId: syncEvent.clientEventId,
+      skipped: true,
+      saleId: null,
+      productId: payload.productId,
+      sellingPrice: payload.sellingPrice,
+      reason: 'duplicate_client_event_id',
+    }
+  }
+
+  const { rows: existingRows } = await tenantClientQuery(
+    client,
+    tenantId,
+    `
+      SELECT
+        id,
+        selling_price AS "sellingPrice",
+        discount_percent AS "discountPercent",
+        branch_id AS "branchId",
+        updated_at AS "updatedAt"
+      FROM products
+      WHERE tenant_id = $1
+        AND id = $2
+        AND branch_id = $3
+      LIMIT 1
+    `,
+    [payload.productId, branchId],
+  )
+
+  const product = existingRows[0]
+  if (!product) {
+    throw httpError(404, 'Product not found for this branch')
+  }
+
+  // Optional stale guard: cloud newer than POS timestamp → skip overwrite
+  if (payload.updatedAt && product.updatedAt) {
+    const posTs = Date.parse(payload.updatedAt)
+    const cloudTs = new Date(product.updatedAt).getTime()
+    if (Number.isFinite(posTs) && Number.isFinite(cloudTs) && cloudTs > posTs) {
+      return {
+        clientEventId: syncEvent.clientEventId,
+        skipped: true,
+        saleId: null,
+        productId: product.id,
+        sellingPrice: Number(product.sellingPrice),
+        reason: 'stale_pos_updated_at',
+      }
+    }
+  }
+
+  const nextDiscount =
+    payload.discountPercent !== undefined ? payload.discountPercent : product.discountPercent
+
+  const { rows: updatedRows } = await tenantClientQuery(
+    client,
+    tenantId,
+    `
+      UPDATE products
+      SET
+        last_selling_price = CASE
+          WHEN selling_price IS DISTINCT FROM $4::numeric THEN selling_price
+          ELSE last_selling_price
+        END,
+        selling_price = $4::numeric,
+        discount_percent = $5::numeric,
+        updated_at = now()
+      WHERE tenant_id = $1
+        AND id = $2
+        AND branch_id = $3
+      RETURNING
+        id AS "productId",
+        selling_price AS "sellingPrice",
+        discount_percent AS "discountPercent",
+        updated_at AS "updatedAt"
+    `,
+    [payload.productId, branchId, payload.sellingPrice, nextDiscount],
+  )
+
+  const updated = updatedRows[0]
+  if (!updated) {
+    throw httpError(404, 'Product not found for this branch')
+  }
+
+  return {
+    clientEventId: syncEvent.clientEventId,
+    skipped: false,
+    saleId: null,
+    productId: updated.productId,
+    sellingPrice: Number(updated.sellingPrice),
+    discountPercent:
+      updated.discountPercent === null || updated.discountPercent === undefined
+        ? null
+        : Number(updated.discountPercent),
+    updatedAt: updated.updatedAt,
+  }
+}
+
 export async function ingestSyncEvent(tenantId, event, userId) {
   return withTransaction(async (client) => {
     const syncEvent = await insertSyncEventInTx(client, tenantId, event)
@@ -302,6 +425,9 @@ export async function ingestSyncEvent(tenantId, event, userId) {
     }
     if (event.eventType === 'refund') {
       return ingestRefundEvent(client, tenantId, syncEvent, userId)
+    }
+    if (event.eventType === 'product_price_update' || event.eventType === 'price_change') {
+      return ingestProductPriceUpdate(client, tenantId, syncEvent)
     }
 
     // cashier_log / attendance — pos_sync_events only (Phase 1)
@@ -409,11 +535,16 @@ async function fetchBootstrapProducts(tenantId, branchId, since = null) {
         p.category_id AS "categoryId",
         p.subcategory_id AS "subcategoryId",
         p.branch_id AS "branchId",
-        p.offer_id AS "offerId"
+        p.offer_id AS "offerId",
+        p.updated_at AS "updatedAt"
       FROM products p
       WHERE p.tenant_id = $1
         AND p.branch_id = $2
-        AND ($3::timestamptz IS NULL OR p.created_at > $3::timestamptz)
+        AND (
+          $3::timestamptz IS NULL
+          OR p.created_at > $3::timestamptz
+          OR p.updated_at > $3::timestamptz
+        )
         AND ($3::timestamptz IS NOT NULL OR p.status = 'active')
       ORDER BY p.name
     `,

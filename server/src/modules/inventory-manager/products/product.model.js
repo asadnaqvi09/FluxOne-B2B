@@ -800,6 +800,7 @@ export async function updateProduct(tenantId, id, payload, { branchId = null } =
     let product = null
 
     if (setClauses.length) {
+      setClauses.push('updated_at = now()')
       const { rows } = await tenantClientQuery(
         client,
         tenantId,

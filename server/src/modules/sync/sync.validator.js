@@ -41,9 +41,30 @@ export const salePayloadSchema = z.object({
   reason: z.string().optional(),
 })
 
+export const productPricePayloadSchema = z.object({
+  productId: idSchema,
+  sellingPrice: z.coerce.number().nonnegative(),
+  discountPercent: z.coerce.number().min(0).max(100).optional(),
+  branchId: idSchema.optional(),
+  currency: z.string().optional(),
+  updatedAt: z.string().optional(),
+  updatedByUserId: idSchema.optional(),
+  source: z.string().optional(),
+  deviceId: z.string().optional(),
+})
+
+export const SYNC_EVENT_TYPES = /** @type {const} */ ([
+  'sale',
+  'refund',
+  'cashier_log',
+  'attendance',
+  'product_price_update',
+  'price_change',
+])
+
 export const syncEventSchema = z.object({
   clientEventId: z.string().min(1),
-  eventType: z.enum(['sale', 'refund', 'cashier_log', 'attendance']),
+  eventType: z.enum(SYNC_EVENT_TYPES),
   payload: z.record(z.string(), z.any()),
   deviceId: z.string().optional(),
 })
@@ -110,9 +131,41 @@ export function normalizePosSalePayload(raw = {}) {
   return payload
 }
 
+/** Normalize POS Items Rate / price push aliases. */
+export function normalizePosPricePayload(raw = {}) {
+  const payload = { ...raw }
+
+  const productId = raw.productId ?? raw.product_id ?? raw.id
+  if (productId && !payload.productId) payload.productId = productId
+
+  const sellingPrice = raw.sellingPrice ?? raw.selling_price ?? raw.price
+  if (sellingPrice !== undefined && payload.sellingPrice === undefined) {
+    payload.sellingPrice = sellingPrice
+  }
+
+  const discountPercent = raw.discountPercent ?? raw.discount_percent ?? raw.discount
+  if (discountPercent !== undefined && payload.discountPercent === undefined) {
+    payload.discountPercent = discountPercent
+  }
+
+  const branchId = raw.branchId ?? raw.branch_id
+  if (branchId && !payload.branchId) payload.branchId = branchId
+
+  const updatedAt = raw.updatedAt ?? raw.updated_at
+  if (updatedAt && !payload.updatedAt) payload.updatedAt = updatedAt
+
+  const updatedByUserId = raw.updatedByUserId ?? raw.updated_by_user_id
+  if (updatedByUserId && !payload.updatedByUserId) payload.updatedByUserId = updatedByUserId
+
+  return payload
+}
+
 export function normalizeSyncEventPayload(eventType, payload) {
   if (eventType === 'sale' || eventType === 'refund') {
     return normalizePosSalePayload(payload)
+  }
+  if (eventType === 'product_price_update' || eventType === 'price_change') {
+    return normalizePosPricePayload(payload)
   }
   return payload || {}
 }
@@ -140,6 +193,11 @@ export function validateRefundPayload(payload) {
     }
   }
   return parsed
+}
+
+export function validateProductPricePayload(payload) {
+  const normalized = normalizePosPricePayload(payload)
+  return productPricePayloadSchema.safeParse(normalized)
 }
 
 export function parseSchemaOrThrow(schema, data, label = 'Request') {

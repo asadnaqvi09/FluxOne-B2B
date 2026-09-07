@@ -2,6 +2,7 @@ import {
   buildBootstrapSnapshot,
   buildDeltaSnapshot,
   ingestSyncEvent,
+  listSalesForPosPull,
   listSyncEvents,
 } from './sync.model.js'
 import {
@@ -10,10 +11,12 @@ import {
   normalizeSyncEventPayload,
   parseSchemaOrThrow,
   pushBodySchema,
+  salesPullQuerySchema,
 } from './sync.validator.js'
 import { resolveSyncPullBranchId, resolveSyncPushBranchId } from './sync.access.js'
 import { mapSnapshotForPos } from './sync.mapper.js'
 import { success } from '../../utils/response.util.js'
+import { paginatedResult } from '../../utils/pagination.util.js'
 
 export async function push(req, res) {
   const parsed = parseSchemaOrThrow(pushBodySchema, req.body, 'Push body')
@@ -74,6 +77,18 @@ export async function delta(req, res) {
   const resolvedBranchId = resolveSyncPullBranchId(req, branchId)
   const snapshot = await buildDeltaSnapshot(req.tenantId, resolvedBranchId, since)
   return success(res, mapSnapshotForPos(snapshot))
+}
+
+/** Cloud → POS invoice history (paginated, current state per saleNumber). */
+export async function sales(req, res) {
+  const query = parseSchemaOrThrow(salesPullQuerySchema, req.query, 'Sales pull query')
+  const branchId = resolveSyncPullBranchId(req, query.branchId)
+  const result = await listSalesForPosPull(req.tenantId, {
+    branchId,
+    page: query.page,
+    limit: query.limit,
+  })
+  return success(res, paginatedResult(result.items, result))
 }
 
 /** Cloud pos_sync_events audit log — not POS catalog. */

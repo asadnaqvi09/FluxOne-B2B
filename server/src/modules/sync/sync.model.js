@@ -1,5 +1,5 @@
 import { tenantClientQuery, tenantQuery, withTransaction } from '../../config/db.js'
-import { MOVEMENT_TYPES, ROLES } from '../../config/constants.js'
+import { INVOICE_TYPES, MOVEMENT_TYPES, ROLES, SALE_STATUS } from '../../config/constants.js'
 import { insertLedgerEventInTx } from '../inventory-manager/control/control.model.js'
 import {
   validateProductPricePayload,
@@ -120,6 +120,10 @@ async function resolveStaffId(client, tenantId, userId, branchId) {
 }
 
 async function insertSaleInTx(client, tenantId, { branchId, counterId, payload, staffId, posEventId }) {
+  const invoiceType =
+    payload.invoiceType ||
+    (payload.exchange ? INVOICE_TYPES.EXCHANGE : INVOICE_TYPES.SALE)
+
   const { rows } = await tenantClientQuery(
     client,
     tenantId,
@@ -127,9 +131,10 @@ async function insertSaleInTx(client, tenantId, { branchId, counterId, payload, 
       INSERT INTO sales (
         tenant_id, branch_id, counter_id, sale_number, sold_at,
         subtotal, tax_amount, discount_amount, final_amount,
-        paid_amount, return_amount, status, staff_id, pos_event_id
+        paid_amount, return_amount, status, invoice_type,
+        original_sale_number, staff_id, pos_event_id, updated_at
       )
-      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
+      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, now())
       RETURNING id
     `,
     [
@@ -143,7 +148,9 @@ async function insertSaleInTx(client, tenantId, { branchId, counterId, payload, 
       payload.finalAmount ?? 0,
       payload.paidAmount ?? 0,
       payload.returnAmount ?? 0,
-      payload.status || 'completed',
+      payload.status || SALE_STATUS.COMPLETED,
+      invoiceType,
+      payload.originalInvoiceId || null,
       staffId,
       posEventId,
     ],
@@ -159,9 +166,9 @@ async function insertSaleItemsInTx(client, tenantId, saleId, lines) {
       `
         INSERT INTO sale_items (
           tenant_id, sale_id, product_id, quantity, unit_price,
-          discount_amount, tax_amount, line_total, is_exchange
+          discount_amount, tax_amount, line_total, is_exchange, is_returned
         )
-        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
       `,
       [
         saleId,
@@ -172,9 +179,133 @@ async function insertSaleItemsInTx(client, tenantId, saleId, lines) {
         line.taxAmount ?? 0,
         line.lineTotal ?? 0,
         line.isExchange ?? false,
+        line.isReturned ?? false,
       ],
     )
   }
+}
+
+/** Prefer canonical live invoice when legacy duplicate sale_numbers exist. */
+async function findSaleByNumber(client, tenantId, branchId, saleNumber) {
+  if (!saleNumber) return null
+  const { rows } = await tenantClientQuery(
+    client,
+    tenantId,
+    `
+      SELECT
+        id,
+        sale_number AS "saleNumber",
+        status,
+        invoice_type AS "invoiceType",
+        original_sale_number AS "originalSaleNumber"
+      FROM sales
+      WHERE tenant_id = $1
+        AND branch_id = $2
+        AND sale_number = $3
+      ORDER BY
+        CASE status
+          WHEN 'completed' THEN 0
+          WHEN 'partial_refund' THEN 1
+          WHEN 'refunded' THEN 2
+          ELSE 3
+        END,
+        created_at ASC
+      LIMIT 1
+    `,
+    [branchId, saleNumber],
+  )
+  return rows[0] || null
+}
+
+async function updateSaleHeaderInTx(client, tenantId, saleId, fields) {
+  const { rows } = await tenantClientQuery(
+    client,
+    tenantId,
+    `
+      UPDATE sales
+      SET
+        subtotal = COALESCE($3::numeric, subtotal),
+        tax_amount = COALESCE($4::numeric, tax_amount),
+        discount_amount = COALESCE($5::numeric, discount_amount),
+        final_amount = COALESCE($6::numeric, final_amount),
+        paid_amount = COALESCE($7::numeric, paid_amount),
+        return_amount = COALESCE($8::numeric, return_amount),
+        status = COALESCE($9::text, status),
+        invoice_type = COALESCE($10::text, invoice_type),
+        original_sale_number = COALESCE($11::text, original_sale_number),
+        staff_id = COALESCE($12::uuid, staff_id),
+        counter_id = COALESCE($13::uuid, counter_id),
+        pos_event_id = COALESCE($14::uuid, pos_event_id),
+        updated_at = now()
+      WHERE tenant_id = $1 AND id = $2
+      RETURNING id
+    `,
+    [
+      saleId,
+      fields.subtotal,
+      fields.taxAmount,
+      fields.discountAmount,
+      fields.finalAmount,
+      fields.paidAmount,
+      fields.returnAmount,
+      fields.status,
+      fields.invoiceType,
+      fields.originalSaleNumber,
+      fields.staffId,
+      fields.counterId,
+      fields.posEventId,
+    ],
+  )
+  return rows[0]?.id || null
+}
+
+async function markSaleItemsReturnedInTx(client, tenantId, saleId, lines) {
+  for (const line of lines) {
+    await tenantClientQuery(
+      client,
+      tenantId,
+      `
+        UPDATE sale_items
+        SET is_returned = true
+        WHERE tenant_id = $1
+          AND sale_id = $2
+          AND product_id = $3
+          AND is_returned = false
+      `,
+      [saleId, line.productId],
+    )
+  }
+}
+
+async function deleteSaleItemsForProductsInTx(client, tenantId, saleId, lines) {
+  for (const line of lines) {
+    await tenantClientQuery(
+      client,
+      tenantId,
+      `
+        DELETE FROM sale_items
+        WHERE tenant_id = $1
+          AND sale_id = $2
+          AND product_id = $3
+          AND is_returned = false
+      `,
+      [saleId, line.productId],
+    )
+  }
+}
+
+async function countOpenSaleItems(client, tenantId, saleId) {
+  const { rows } = await tenantClientQuery(
+    client,
+    tenantId,
+    `
+      SELECT count(*)::int AS n
+      FROM sale_items
+      WHERE tenant_id = $1 AND sale_id = $2 AND is_returned = false
+    `,
+    [saleId],
+  )
+  return rows[0]?.n || 0
 }
 
 async function applyLedgerLines(client, tenantId, syncEvent, payload, movementType, userId) {
@@ -202,6 +333,18 @@ async function applyLedgerLines(client, tenantId, syncEvent, payload, movementTy
   return ledgerLines
 }
 
+function isExchangeSalePayload(payload) {
+  return Boolean(
+    payload.exchange ||
+      payload.lines?.some((line) => line.isExchange),
+  )
+}
+
+function isExchangeGivenRefund(payload) {
+  const reason = String(payload.reason || '').toLowerCase()
+  return reason === 'exchange_given' || reason.includes('exchange_given')
+}
+
 export async function ingestSaleEvent(client, tenantId, syncEvent, userId) {
   const parsed = validateSalePayload(syncEvent.payload)
   if (!parsed.success) {
@@ -224,10 +367,49 @@ export async function ingestSaleEvent(client, tenantId, syncEvent, userId) {
   const payload = parsed.data
   const counterId = await upsertPosCounter(client, tenantId, branchId, payload.counterCode)
   const staffId = await resolveStaffId(client, tenantId, payload.staffUserId, branchId)
+  const exchangeSale = isExchangeSalePayload(payload)
+  const existing = await findSaleByNumber(client, tenantId, branchId, payload.saleNumber)
 
+  // Duplicate sale_number (non-exchange): never insert a second cloud row
+  if (existing && !exchangeSale) {
+    return {
+      clientEventId: syncEvent.clientEventId,
+      skipped: true,
+      saleId: existing.id,
+      reason: 'sale_number_exists',
+    }
+  }
+
+  // Exchange received leg: mutate same invoice (POS does not create a new INV)
+  if (exchangeSale && existing) {
+    await insertSaleItemsInTx(client, tenantId, existing.id, payload.lines)
+    await updateSaleHeaderInTx(client, tenantId, existing.id, {
+      subtotal: payload.subtotal ?? 0,
+      taxAmount: payload.taxAmount ?? 0,
+      discountAmount: payload.discountAmount ?? 0,
+      finalAmount: payload.finalAmount ?? 0,
+      paidAmount: payload.paidAmount ?? 0,
+      returnAmount: payload.returnAmount ?? 0,
+      status: SALE_STATUS.COMPLETED,
+      invoiceType: INVOICE_TYPES.EXCHANGE,
+      originalSaleNumber: payload.originalInvoiceId || existing.originalSaleNumber || null,
+      staffId,
+      counterId,
+      posEventId: syncEvent.id,
+    })
+    await applyLedgerLines(client, tenantId, syncEvent, payload, MOVEMENT_TYPES.OUT, userId)
+    return {
+      clientEventId: syncEvent.clientEventId,
+      skipped: false,
+      saleId: existing.id,
+    }
+  }
+
+  // Normal first sale (or exchange without prior row — rare)
   const salePayload = {
     ...payload,
-    status: payload.status || 'completed',
+    status: payload.status || SALE_STATUS.COMPLETED,
+    invoiceType: exchangeSale ? INVOICE_TYPES.EXCHANGE : INVOICE_TYPES.SALE,
   }
 
   const saleId = await insertSaleInTx(client, tenantId, {
@@ -268,29 +450,121 @@ export async function ingestRefundEvent(client, tenantId, syncEvent, userId) {
   }
 
   const payload = parsed.data
-  const counterId = await upsertPosCounter(client, tenantId, branchId, payload.counterCode)
-  const staffId = await resolveStaffId(client, tenantId, payload.staffUserId, branchId)
-
-  const salePayload = {
-    ...payload,
-    status: payload.status || 'refunded',
+  if (!payload.saleNumber) {
+    throw httpError(422, 'Refund events require invoiceId / saleNumber')
   }
 
-  const saleId = await insertSaleInTx(client, tenantId, {
-    branchId,
-    counterId,
-    payload: salePayload,
-    staffId,
-    posEventId: syncEvent.id,
-  })
+  const counterId = await upsertPosCounter(client, tenantId, branchId, payload.counterCode)
+  const staffId = await resolveStaffId(client, tenantId, payload.staffUserId, branchId)
+  const exchangeGiven = isExchangeGivenRefund(payload)
+  let existing = await findSaleByNumber(client, tenantId, branchId, payload.saleNumber)
 
-  await insertSaleItemsInTx(client, tenantId, saleId, payload.lines)
+  // Forward path: UPDATE original invoice (POS-aligned). Do not insert a second refunded row.
+  if (!existing) {
+    // Sale not synced yet — create shell then apply return/exchange-given on it
+    const shellStatus = exchangeGiven ? SALE_STATUS.COMPLETED : SALE_STATUS.REFUNDED
+    const shellType = exchangeGiven ? INVOICE_TYPES.EXCHANGE : INVOICE_TYPES.RETURN
+    const saleId = await insertSaleInTx(client, tenantId, {
+      branchId,
+      counterId,
+      payload: {
+        ...payload,
+        status: shellStatus,
+        invoiceType: shellType,
+        subtotal: exchangeGiven ? payload.subtotal ?? 0 : 0,
+        taxAmount: exchangeGiven ? payload.taxAmount ?? 0 : 0,
+        discountAmount: exchangeGiven ? payload.discountAmount ?? 0 : 0,
+        finalAmount: exchangeGiven ? payload.finalAmount ?? 0 : 0,
+      },
+      staffId,
+      posEventId: syncEvent.id,
+    })
+    existing = {
+      id: saleId,
+      saleNumber: payload.saleNumber,
+      status: shellStatus,
+      invoiceType: shellType,
+      originalSaleNumber: payload.originalInvoiceId || null,
+    }
+    if (!exchangeGiven) {
+      await insertSaleItemsInTx(
+        client,
+        tenantId,
+        saleId,
+        payload.lines.map((line) => ({ ...line, isReturned: true })),
+      )
+    }
+  }
+
   await applyLedgerLines(client, tenantId, syncEvent, payload, MOVEMENT_TYPES.IN, userId)
+
+  if (exchangeGiven) {
+    await deleteSaleItemsForProductsInTx(client, tenantId, existing.id, payload.lines)
+    await updateSaleHeaderInTx(client, tenantId, existing.id, {
+      status: SALE_STATUS.COMPLETED,
+      invoiceType: INVOICE_TYPES.EXCHANGE,
+      originalSaleNumber: payload.originalInvoiceId || existing.originalSaleNumber || null,
+      staffId,
+      counterId,
+      posEventId: syncEvent.id,
+      // totals refreshed on exchange sale leg
+      subtotal: null,
+      taxAmount: null,
+      discountAmount: null,
+      finalAmount: null,
+      paidAmount: null,
+      returnAmount: null,
+    })
+    return {
+      clientEventId: syncEvent.clientEventId,
+      skipped: false,
+      saleId: existing.id,
+    }
+  }
+
+  await markSaleItemsReturnedInTx(client, tenantId, existing.id, payload.lines)
+  const openCount = await countOpenSaleItems(client, tenantId, existing.id)
+  const fullReturn =
+    openCount === 0 ||
+    payload.status === SALE_STATUS.REFUNDED ||
+    String(payload.status || '').toLowerCase() === 'return'
+
+  if (fullReturn) {
+    await updateSaleHeaderInTx(client, tenantId, existing.id, {
+      subtotal: 0,
+      taxAmount: 0,
+      discountAmount: 0,
+      finalAmount: 0,
+      paidAmount: payload.paidAmount ?? null,
+      returnAmount: payload.returnAmount ?? null,
+      status: SALE_STATUS.REFUNDED,
+      invoiceType: INVOICE_TYPES.RETURN,
+      originalSaleNumber: payload.originalInvoiceId || existing.originalSaleNumber || null,
+      staffId,
+      counterId,
+      posEventId: syncEvent.id,
+    })
+  } else {
+    await updateSaleHeaderInTx(client, tenantId, existing.id, {
+      subtotal: payload.subtotal ?? null,
+      taxAmount: payload.taxAmount ?? null,
+      discountAmount: payload.discountAmount ?? null,
+      finalAmount: payload.finalAmount ?? null,
+      paidAmount: payload.paidAmount ?? null,
+      returnAmount: payload.returnAmount ?? null,
+      status: SALE_STATUS.PARTIAL_REFUND,
+      invoiceType: existing.invoiceType === INVOICE_TYPES.EXCHANGE ? INVOICE_TYPES.EXCHANGE : INVOICE_TYPES.SALE,
+      originalSaleNumber: payload.originalInvoiceId || existing.originalSaleNumber || null,
+      staffId,
+      counterId,
+      posEventId: syncEvent.id,
+    })
+  }
 
   return {
     clientEventId: syncEvent.clientEventId,
     skipped: false,
-    saleId,
+    saleId: existing.id,
   }
 }
 
@@ -457,6 +731,195 @@ export async function listSyncEvents(tenantId, { since } = {}) {
     [since || null],
   )
   return rows
+}
+
+function mapPosInvoiceType(row) {
+  if (row.invoiceType === INVOICE_TYPES.RETURN || row.status === SALE_STATUS.REFUNDED) {
+    return 'Return'
+  }
+  if (row.invoiceType === INVOICE_TYPES.EXCHANGE) {
+    return 'Exchange'
+  }
+  return 'Sale'
+}
+
+function mapPosPaymentStatus(type) {
+  if (type === 'Return') return 'Return'
+  if (type === 'Exchange') return 'Adjust'
+  return 'Paid'
+}
+
+/**
+ * Cloud → POS sales history (current state, one row per saleNumber).
+ * Does NOT adjust stock — POS applies invoices only; stock from branch_inventory / push.
+ * Legacy: when duplicate sale_numbers exist, prefer completed/partial over orphan refund rows.
+ */
+export async function listSalesForPosPull(tenantId, { branchId, page = 1, limit = 100 } = {}) {
+  if (!branchId) throw httpError(422, 'branchId is required')
+
+  const safePage = Math.max(1, Number(page) || 1)
+  const safeLimit = Math.min(200, Math.max(1, Number(limit) || 100))
+  const offset = (safePage - 1) * safeLimit
+
+  const { rows: countRows } = await tenantQuery(
+    tenantId,
+    `
+      SELECT count(*)::int AS total
+      FROM (
+        SELECT s.sale_number
+        FROM sales s
+        WHERE s.tenant_id = $1
+          AND s.branch_id = $2
+          AND s.sale_number IS NOT NULL
+          AND NOT (
+            s.status = 'refunded'
+            AND EXISTS (
+              SELECT 1
+              FROM sales sibling
+              WHERE sibling.tenant_id = s.tenant_id
+                AND sibling.branch_id = s.branch_id
+                AND sibling.sale_number = s.sale_number
+                AND sibling.id <> s.id
+                AND sibling.status IN ('completed', 'partial_refund')
+            )
+          )
+        GROUP BY s.sale_number
+      ) t
+    `,
+    [branchId],
+  )
+  const total = countRows[0]?.total || 0
+
+  const { rows: saleRows } = await tenantQuery(
+    tenantId,
+    `
+      WITH ranked AS (
+        SELECT
+          s.id,
+          s.sale_number AS "saleNumber",
+          s.status,
+          s.invoice_type AS "invoiceType",
+          s.sold_at AS "soldAt",
+          s.subtotal,
+          s.tax_amount AS "taxAmount",
+          s.discount_amount AS "discountAmount",
+          s.final_amount AS "finalAmount",
+          s.paid_amount AS "paidAmount",
+          s.return_amount AS "returnAmount",
+          s.original_sale_number AS "originalSaleNumber",
+          st.user_id AS "cashierUserId",
+          ROW_NUMBER() OVER (
+            PARTITION BY s.sale_number
+            ORDER BY
+              CASE
+                WHEN s.status IN ('completed', 'partial_refund') THEN 0
+                WHEN s.invoice_type = 'exchange' THEN 0
+                WHEN s.status = 'refunded' THEN 1
+                ELSE 2
+              END,
+              s.updated_at DESC NULLS LAST,
+              s.created_at ASC
+          ) AS rn
+        FROM sales s
+        LEFT JOIN staff st ON st.id = s.staff_id AND st.tenant_id = s.tenant_id
+        WHERE s.tenant_id = $1
+          AND s.branch_id = $2
+          AND s.sale_number IS NOT NULL
+      ),
+      canonical AS (
+        SELECT *
+        FROM ranked
+        WHERE rn = 1
+          AND NOT (
+            status = 'refunded'
+            AND EXISTS (
+              SELECT 1
+              FROM sales sibling
+              WHERE sibling.tenant_id = $1
+                AND sibling.branch_id = $2
+                AND sibling.sale_number = ranked."saleNumber"
+                AND sibling.id <> ranked.id
+                AND sibling.status IN ('completed', 'partial_refund')
+            )
+          )
+      )
+      SELECT *
+      FROM canonical
+      ORDER BY "soldAt" ASC, id ASC
+      LIMIT $3 OFFSET $4
+    `,
+    [branchId, safeLimit, offset],
+  )
+
+  if (!saleRows.length) {
+    return { items: [], total, page: safePage, limit: safeLimit }
+  }
+
+  const saleIds = saleRows.map((row) => row.id)
+  const { rows: itemRows } = await tenantQuery(
+    tenantId,
+    `
+      SELECT
+        si.sale_id AS "saleId",
+        si.product_id AS "productId",
+        p.item_code AS sku,
+        p.name,
+        si.quantity,
+        si.unit_price AS "unitPrice",
+        si.discount_amount AS "discount",
+        si.tax_amount AS "tax",
+        si.line_total AS "lineTotal",
+        si.is_exchange AS "isExchange",
+        si.is_returned AS "isReturned"
+      FROM sale_items si
+      JOIN products p ON p.id = si.product_id AND p.tenant_id = si.tenant_id
+      WHERE si.tenant_id = $1
+        AND si.sale_id = ANY($2::uuid[])
+      ORDER BY si.created_at ASC
+    `,
+    [saleIds],
+  )
+
+  const itemsBySale = new Map()
+  for (const item of itemRows) {
+    const list = itemsBySale.get(item.saleId) || []
+    list.push({
+      productId: item.productId,
+      sku: item.sku || null,
+      name: item.name || null,
+      quantity: Number(item.quantity),
+      unitPrice: Number(item.unitPrice),
+      discount: Number(item.discount),
+      tax: Number(item.tax),
+      lineTotal: Number(item.lineTotal),
+      isExchange: Boolean(item.isExchange),
+      isReturned: Boolean(item.isReturned),
+    })
+    itemsBySale.set(item.saleId, list)
+  }
+
+  const items = saleRows.map((row) => {
+    const type = mapPosInvoiceType(row)
+    return {
+      saleId: row.id,
+      saleNumber: row.saleNumber,
+      status: row.status,
+      type,
+      paymentStatus: mapPosPaymentStatus(type),
+      soldAt: row.soldAt,
+      cashierUserId: row.cashierUserId || null,
+      subtotal: Number(row.subtotal),
+      tax: Number(row.taxAmount),
+      discount: Number(row.discountAmount),
+      total: Number(row.finalAmount),
+      paidAmount: Number(row.paidAmount),
+      returnAmount: Number(row.returnAmount),
+      originalSaleNumber: row.originalSaleNumber || null,
+      items: itemsBySale.get(row.id) || [],
+    }
+  })
+
+  return { items, total, page: safePage, limit: safeLimit }
 }
 
 // ---------------------------------------------------------------------------

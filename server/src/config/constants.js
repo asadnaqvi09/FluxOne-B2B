@@ -79,6 +79,13 @@ export const SALE_STATUS = {
   VOID: 'void',
 }
 
+/** POS invoice type (Sale / Return / Exchange) — stored on sales.invoice_type */
+export const INVOICE_TYPES = {
+  SALE: 'sale',
+  RETURN: 'return',
+  EXCHANGE: 'exchange',
+}
+
 export const PERMISSIONS = {
   'staff:read': [ROLES.BRANCH_MANAGER, ROLES.B2B_ADMIN],
   'staff:write': [ROLES.BRANCH_MANAGER, ROLES.B2B_ADMIN],

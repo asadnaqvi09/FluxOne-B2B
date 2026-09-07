@@ -13,6 +13,7 @@ export const saleLineSchema = z.object({
   taxAmount: z.coerce.number().nonnegative().optional(),
   lineTotal: z.coerce.number().nonnegative().optional(),
   isExchange: z.boolean().optional(),
+  isReturned: z.boolean().optional(),
 })
 
 export const salePayloadSchema = z.object({
@@ -29,6 +30,8 @@ export const salePayloadSchema = z.object({
   paidAmount: z.coerce.number().nonnegative().optional(),
   returnAmount: z.coerce.number().nonnegative().optional(),
   originalInvoiceId: z.string().optional(),
+  /** POS exchange sale leg: same invoiceId, received lines + stock OUT */
+  exchange: z.boolean().optional(),
   status: z
     .enum([
       SALE_STATUS.COMPLETED,
@@ -39,6 +42,12 @@ export const salePayloadSchema = z.object({
     .optional(),
   lines: z.array(saleLineSchema).min(1),
   reason: z.string().optional(),
+})
+
+export const salesPullQuerySchema = z.object({
+  branchId: idSchema,
+  page: z.coerce.number().int().positive().optional().default(1),
+  limit: z.coerce.number().int().positive().max(200).optional().default(100),
 })
 
 export const productPricePayloadSchema = z.object({
@@ -100,6 +109,17 @@ export function normalizePosSalePayload(raw = {}) {
     payload.saleNumber = raw.invoiceId
   }
 
+  if (raw.exchange === true || raw.isExchange === true) {
+    payload.exchange = true
+  }
+
+  if (raw.originalInvoiceId && !payload.originalInvoiceId) {
+    payload.originalInvoiceId = raw.originalInvoiceId
+  }
+  if (raw.originalSaleNumber && !payload.originalInvoiceId) {
+    payload.originalInvoiceId = raw.originalSaleNumber
+  }
+
   if (raw.discount !== undefined && payload.discountAmount === undefined) {
     payload.discountAmount = raw.discount
   }
@@ -123,8 +143,11 @@ export function normalizePosSalePayload(raw = {}) {
   if (Array.isArray(payload.lines)) {
     payload.lines = payload.lines.map((line) => ({
       ...line,
+      productId: line.productId ?? line.product_id,
       discountAmount: line.discountAmount ?? line.discount,
       taxAmount: line.taxAmount ?? line.tax,
+      isExchange: line.isExchange ?? line.is_exchange ?? false,
+      isReturned: line.isReturned ?? line.is_returned ?? false,
     }))
   }
 
@@ -179,6 +202,11 @@ export function validateRefundPayload(payload) {
   const normalized = normalizePosSalePayload(payload)
   const parsed = salePayloadSchema.safeParse(normalized)
   if (!parsed.success) return parsed
+
+  const reason = String(parsed.data.reason || '').toLowerCase()
+  const isExchangeGiven = reason === 'exchange_given' || reason.includes('exchange')
+  if (isExchangeGiven) return parsed
+
   const status = parsed.data.status
   if (status && status !== SALE_STATUS.REFUNDED && status !== SALE_STATUS.PARTIAL_REFUND) {
     return {

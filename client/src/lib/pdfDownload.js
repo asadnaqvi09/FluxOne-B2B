@@ -118,3 +118,101 @@ export function downloadPurchaseOrderPdf(order) {
   doc.save(filename)
   return { filename }
 }
+
+// SaaS billing invoice receipt PDF (Subscription & Invoices).
+export function downloadBillingInvoicePdf(invoice, company = {}) {
+  if (!invoice) throw new Error('Invoice is missing')
+
+  const doc = new jsPDF({ unit: 'mm', format: 'a4' })
+  const margin = 16
+  let y = 20
+
+  doc.setFont('helvetica', 'bold')
+  doc.setFontSize(16)
+  doc.text(company.name || 'FluxOne Enterprise Solutions', margin, y)
+  y += 6
+  doc.setFont('helvetica', 'normal')
+  doc.setFontSize(9)
+  doc.setTextColor(100)
+  if (company.supportEmail) doc.text(String(company.supportEmail), margin, y)
+  y += 5
+  if (company.registrationTaxId) {
+    doc.text(`Tax ID: ${company.registrationTaxId}`, margin, y)
+    y += 5
+  }
+  doc.setTextColor(0)
+
+  doc.setFont('helvetica', 'bold')
+  doc.setFontSize(12)
+  doc.text(`Invoice ${invoice.trackingId || ''}`, 196 - margin, 20, { align: 'right' })
+  doc.setFont('helvetica', 'normal')
+  doc.setFontSize(9)
+  doc.text(String(invoice.dateTime || ''), 196 - margin, 26, { align: 'right' })
+  doc.text(`Status: ${invoice.status || '—'}`, 196 - margin, 32, { align: 'right' })
+
+  y = Math.max(y, 40)
+  doc.setDrawColor(200)
+  doc.line(margin, y, 196 - margin, y)
+  y += 8
+
+  doc.setFont('helvetica', 'bold')
+  doc.setFontSize(10)
+  doc.text('Plan / Source', margin, y)
+  doc.setFont('helvetica', 'normal')
+  y += 5
+  doc.text(String(invoice.source || '—'), margin, y)
+  y += 7
+  if (invoice.billingCycle) {
+    doc.text(`Billing cycle: ${invoice.billingCycle}`, margin, y)
+    y += 5
+  }
+  if (invoice.paymentMethod) {
+    doc.text(`Payment: ${invoice.paymentMethod}`, margin, y)
+    y += 5
+  }
+
+  y += 4
+  doc.setFont('helvetica', 'bold')
+  doc.setFontSize(9)
+  doc.text('Description', margin, y)
+  doc.text('Amount', 196 - margin, y, { align: 'right' })
+  y += 2
+  doc.line(margin, y, 196 - margin, y)
+  y += 6
+
+  doc.setFont('helvetica', 'normal')
+  const items = Array.isArray(invoice.items) ? invoice.items : []
+  if (items.length === 0) {
+    doc.text(String(invoice.source || 'Subscription charge'), margin, y)
+    doc.text(String(invoice.formattedPrice || `Rs. ${Number(invoice.price || 0).toLocaleString()}`), 196 - margin, y, {
+      align: 'right',
+    })
+    y += 7
+  } else {
+    for (const item of items) {
+      if (y > 270) {
+        doc.addPage()
+        y = 20
+      }
+      const desc = doc.splitTextToSize(String(item.description || 'Line item'), 130)
+      doc.text(desc, margin, y)
+      doc.text(`Rs. ${Number(item.amount || 0).toLocaleString()}`, 196 - margin, y, { align: 'right' })
+      y += Math.max(desc.length * 5, 7)
+    }
+  }
+
+  y += 2
+  doc.setDrawColor(30)
+  doc.line(margin, y, 196 - margin, y)
+  y += 8
+  doc.setFont('helvetica', 'bold')
+  doc.setFontSize(12)
+  doc.text('Total', margin, y)
+  doc.text(String(invoice.formattedPrice || `Rs. ${Number(invoice.price || 0).toLocaleString()}`), 196 - margin, y, {
+    align: 'right',
+  })
+
+  const filename = `${safeFilename(invoice.trackingId || 'invoice')}.pdf`
+  doc.save(filename)
+  return { filename }
+}

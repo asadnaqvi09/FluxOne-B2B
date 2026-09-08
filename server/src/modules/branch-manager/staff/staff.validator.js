@@ -10,6 +10,14 @@ import {
 } from '../shared.validator.js'
 import { refineStaffSchedule } from './schedule.validation.js'
 
+const staffRoleEnum = z.enum([
+  'inventory_manager',
+  'cashier',
+  'production_staff',
+  'delivery_staff',
+  'website_manager',
+])
+
 const staffStatusEnum = z
   .enum([
     STAFF_STATUS.ACTIVE,
@@ -31,7 +39,7 @@ export const listStaffSchema = z.object({
     designationId: optionalUuid,
     status: staffStatusEnum.optional(),
     branchId: optionalUuid,
-    role: z.enum(['inventory_manager', 'cashier', 'production_staff', 'delivery_staff']).optional(),
+    role: staffRoleEnum.optional(),
   }),
 })
 
@@ -42,7 +50,7 @@ export const createStaffSchema = z
       /** Login ID (same field used by /auth/login as `id`). */
       email: z.string().min(3).max(190),
       password: z.string().min(8),
-      role: z.enum(['inventory_manager', 'cashier', 'production_staff', 'delivery_staff']),
+      role: staffRoleEnum,
       designationId: optionalUuid,
       designation: optionalString,
       branchId: optionalUuid,
@@ -59,16 +67,6 @@ export const createStaffSchema = z
     params: empty,
   })
   .superRefine(({ body }, ctx) => {
-    // Designation is optional when role maps to Inventory Manager / Cashier
-    const hasDesignation = Boolean(body.designationId || body.designation?.trim())
-    const hasRole = Boolean(body.role)
-    if (!hasDesignation && !hasRole) {
-      ctx.addIssue({
-        code: z.ZodIssueCode.custom,
-        message: 'role or designation is required',
-        path: ['body', 'role'],
-      })
-    }
     refineStaffSchedule(body, ctx)
   })
 
@@ -78,7 +76,7 @@ export const updateStaffSchema = z
       fullName: z.string().min(1).optional(),
       email: z.string().min(3).max(190).optional(),
       phone: optionalString,
-      role: z.enum(['inventory_manager', 'cashier', 'production_staff', 'delivery_staff']).optional(),
+      role: staffRoleEnum.optional(),
       designationId: optionalUuid,
       designation: optionalString,
       branchId: optionalUuid,

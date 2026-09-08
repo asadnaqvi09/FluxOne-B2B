@@ -17,7 +17,7 @@ const AUTH_USER_SELECT = `
     t.slug AS "tenantSlug",
     t.name AS "tenantName",
     b.name AS "branchName",
-    s.image_url AS "imageUrl"
+    COALESCE(u.image_url, s.image_url) AS "imageUrl"
   FROM users u
   JOIN roles r ON r.id = u.role_id
   JOIN tenants t ON t.id = u.tenant_id

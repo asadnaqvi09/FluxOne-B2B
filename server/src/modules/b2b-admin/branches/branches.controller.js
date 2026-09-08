@@ -1,15 +1,18 @@
 import bcrypt from 'bcryptjs'
 import {
   createBranchWithManager,
+  deleteBranch,
   generateTemporaryPassword,
   getBranchById,
   getTenantName,
   listBranches,
   resetBranchManagerPassword,
   setBranchStatus,
+  setManagerCredentialsEmailed,
   updateBranch,
 } from './branches.model.js'
 import { sendLoginCredentialsEmail } from '../../../mail/mail.service.js'
+import { resolveUploadUrl } from '../../../utils/uploadUrl.util.js'
 import { fail, success } from '../../../utils/response.util.js'
 import { paginatedResult } from '../../../utils/pagination.util.js'
 
@@ -23,7 +26,12 @@ function normalizeManager(body) {
     otherContact: body.managerOtherContact,
     gender: body.managerGender,
     address: body.managerAddress,
+    profileImage: body.profileImage || body.managerProfileImage || body.managerImageUrl,
   }
+}
+
+function uploadedFile(req, fieldName) {
+  return req.files?.[fieldName]?.[0] || (fieldName === 'image' ? req.file : null) || null
 }
 
 function loginAppUrl() {
@@ -31,7 +39,9 @@ function loginAppUrl() {
   return `${base.replace(/\/$/, '')}/login`
 }
 
-function maybeIncludeTempPassword(temporaryPassword) {
+function maybeIncludeTempPassword(temporaryPassword, emailSent) {
+  // Only expose temp password when email failed (admin recovery / Key flow).
+  if (emailSent) return undefined
   if (process.env.NODE_ENV === 'production') return undefined
   return temporaryPassword
 }
@@ -49,6 +59,14 @@ async function deliverCredentials({ branch, temporaryPassword, companyName, role
     loginUrl: loginAppUrl(),
     roleLabel,
   })
+}
+
+async function syncCredentialsEmailedFlag(tenantId, branch, mail) {
+  const managerId = branch?.manager?.id
+  if (!managerId) return branch
+  const emailed = Boolean(mail?.sent)
+  await setManagerCredentialsEmailed(tenantId, managerId, emailed)
+  return getBranchById(tenantId, branch.id)
 }
 
 export async function branchesList(req, res) {
@@ -74,12 +92,16 @@ export async function createBranch(req, res) {
 
   let created
   try {
+    const managerProfileImage = resolveUploadUrl(uploadedFile(req, 'profile_image'), req)
     created = await createBranchWithManager(req.tenantId, {
       name: body.name,
       location: body.location,
-      image: body.image || body.imageUrl,
+      image: resolveUploadUrl(uploadedFile(req, 'image'), req) || undefined,
       status: body.status,
-      manager,
+      manager: {
+        ...manager,
+        ...(managerProfileImage ? { profileImage: managerProfileImage } : {}),
+      },
       passwordHash,
     })
   } catch (err) {
@@ -95,15 +117,17 @@ export async function createBranch(req, res) {
     roleLabel: 'Branch Manager',
   })
 
+  const branch = await syncCredentialsEmailedFlag(req.tenantId, created, mail)
+
   return success(
     res,
     {
-      ...created,
+      ...branch,
       credentials: {
-        email: created.manager?.email,
+        email: branch.manager?.email,
         emailed: mail.sent,
         stubbed: mail.stubbed,
-        temporaryPassword: maybeIncludeTempPassword(temporaryPassword),
+        temporaryPassword: maybeIncludeTempPassword(temporaryPassword, mail.sent),
       },
     },
     201,
@@ -116,11 +140,22 @@ export async function patchBranch(req, res) {
 
   let row
   try {
+    const uploadedBranchImage = resolveUploadUrl(uploadedFile(req, 'image'), req)
+    const uploadedManagerImage = resolveUploadUrl(uploadedFile(req, 'profile_image'), req)
+    const managerPayload = manager
+      ? {
+          ...manager,
+          ...(uploadedManagerImage ? { profileImage: uploadedManagerImage } : {}),
+        }
+      : uploadedManagerImage
+        ? { profileImage: uploadedManagerImage }
+        : undefined
+
     row = await updateBranch(req.tenantId, req.validated.params.id, {
       name: body.name,
       location: body.location,
-      image: body.image || body.imageUrl,
-      manager: manager || undefined,
+      ...(uploadedBranchImage ? { image: uploadedBranchImage } : {}),
+      manager: managerPayload,
     })
   } catch (err) {
     if (err.status) return fail(res, err.message, err.status)
@@ -170,18 +205,25 @@ export async function resetPassword(req, res) {
     roleLabel: 'Branch Manager',
   })
 
+  branch = await syncCredentialsEmailedFlag(req.tenantId, branch, mail)
+
   return success(res, {
-    id: branch.id,
-    manager: {
-      id: branch.manager?.id,
-      email: branch.manager?.email,
-      name: branch.manager?.name,
-    },
+    ...branch,
     credentials: {
       email: branch.manager?.email,
       emailed: mail.sent,
       stubbed: mail.stubbed,
-      temporaryPassword: maybeIncludeTempPassword(temporaryPassword),
+      temporaryPassword: maybeIncludeTempPassword(temporaryPassword, mail.sent),
     },
   })
+}
+
+export async function removeBranch(req, res) {
+  try {
+    const result = await deleteBranch(req.tenantId, req.validated.params.id)
+    return success(res, result)
+  } catch (err) {
+    if (err.status) return fail(res, err.message, err.status)
+    throw err
+  }
 }

@@ -24,7 +24,6 @@ export function buildStaffPayload(fields) {
     fullName: String(fullName || '').trim(),
     email: String(email || '').trim(),
     role,
-    designationId: fields.designationId || undefined,
     hardwareDeviceId: hardwareDeviceId?.trim() || undefined,
     scheduleStart: scheduleStart || undefined,
     scheduleBreakStart: scheduleBreakStart || undefined,
@@ -82,7 +81,6 @@ export const fetchBranchStaff = createAsyncThunk(
       q: next.q || undefined,
       status: next.status || undefined,
       role: next.role || undefined,
-      designationId: next.designationId || undefined,
     })
     if (!result.success) {
       return rejectWithValue(result.error || 'Failed to load staff')

@@ -22,6 +22,7 @@ export const ROLES = {
   CASHIER: 'cashier',
   PRODUCTION_STAFF: 'production_staff',
   DELIVERY_STAFF: 'delivery_staff',
+  WEBSITE_MANAGER: 'website_manager',
 }
 
 //Seeded demo accounts.

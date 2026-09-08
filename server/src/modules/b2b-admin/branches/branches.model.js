@@ -41,7 +41,9 @@ const branchSelect = `
   u.other_phone AS "managerOtherContact",
   u.gender AS "managerGender",
   u.address AS "managerAddress",
+  u.image_url AS "managerImageUrl",
   u.is_active AS "managerIsActive",
+  COALESCE(u.credentials_emailed, false) AS "managerCredentialsEmailed",
   (
     SELECT count(*)::int
     FROM staff s
@@ -68,7 +70,9 @@ function mapBranchRow(row) {
           otherContact: row.managerOtherContact || '',
           gender: row.managerGender || '',
           address: row.managerAddress || '',
+          profileImage: normalizeImageUrl(row.managerImageUrl) || row.managerImageUrl || '',
           isActive: row.managerIsActive !== false,
+          credentialsEmailed: Boolean(row.managerCredentialsEmailed),
         }
       : null,
   }
@@ -144,7 +148,9 @@ export async function listBranches(tenantId, filters = {}) {
         u.other_phone AS "managerOtherContact",
         u.gender AS "managerGender",
         u.address AS "managerAddress",
+        u.image_url AS "managerImageUrl",
         u.is_active AS "managerIsActive",
+        COALESCE(u.credentials_emailed, false) AS "managerCredentialsEmailed",
         (
           SELECT count(*)::int
           FROM staff s
@@ -230,9 +236,9 @@ export async function createBranchWithManager(tenantId, payload) {
         `
           INSERT INTO users (
             tenant_id, branch_id, role_id, full_name, email, password_hash,
-            phone, other_phone, gender, address, is_active
+            phone, other_phone, gender, address, image_url, is_active, credentials_emailed
           )
-          VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, true)
+          VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, true, false)
         `,
         [
           branchId,
@@ -244,6 +250,7 @@ export async function createBranchWithManager(tenantId, payload) {
           payload.manager.otherContact?.trim() || null,
           payload.manager.gender?.trim() || null,
           payload.manager.address?.trim() || null,
+          payload.manager.profileImage || payload.manager.imageUrl || null,
         ],
       )
 
@@ -303,7 +310,8 @@ export async function updateBranch(tenantId, id, payload) {
               phone = CASE WHEN $5::boolean THEN $6 ELSE phone END,
               other_phone = CASE WHEN $7::boolean THEN $8 ELSE other_phone END,
               gender = CASE WHEN $9::boolean THEN $10 ELSE gender END,
-              address = CASE WHEN $11::boolean THEN $12 ELSE address END
+              address = CASE WHEN $11::boolean THEN $12 ELSE address END,
+              image_url = CASE WHEN $13::boolean THEN $14 ELSE image_url END
             WHERE tenant_id = $1
               AND id = $2
               AND role_id = ${ROLE_IDS[ROLES.BRANCH_MANAGER]}
@@ -320,6 +328,10 @@ export async function updateBranch(tenantId, id, payload) {
             m.gender !== undefined ? m.gender?.trim() || null : null,
             m.address !== undefined,
             m.address !== undefined ? m.address?.trim() || null : null,
+            m.profileImage !== undefined || m.imageUrl !== undefined,
+            m.profileImage !== undefined || m.imageUrl !== undefined
+              ? m.profileImage || m.imageUrl || null
+              : null,
           ],
         )
       } else if (payload.manager && !existing.manager?.id) {
@@ -378,13 +390,103 @@ export async function resetBranchManagerPassword(tenantId, id, passwordHash) {
       tenantId,
       `
         UPDATE users
-        SET password_hash = $3
+        SET
+          password_hash = $3,
+          credentials_emailed = false
         WHERE tenant_id = $1 AND id = $2
       `,
       [existing.manager.id, passwordHash],
     )
 
-    return existing
+    return getBranchByIdInTx(client, tenantId, id)
+  })
+}
+
+/** Persist whether BM credentials email was delivered (controls admin Key icon). */
+export async function setManagerCredentialsEmailed(tenantId, managerUserId, emailed) {
+  await tenantQuery(
+    tenantId,
+    `
+      UPDATE users
+      SET credentials_emailed = $3
+      WHERE tenant_id = $1 AND id = $2
+    `,
+    [managerUserId, Boolean(emailed)],
+  )
+}
+
+/**
+ * Hard-delete branch + its users when safe.
+ * Blocks (409) if inventory masters / ledger still reference the branch (RESTRICT FKs).
+ */
+export async function deleteBranch(tenantId, id) {
+  return withTransaction(async (client) => {
+    const existing = await getBranchByIdInTx(client, tenantId, id)
+    if (!existing) throw httpError(404, 'Branch not found')
+
+    const { rows: depRows } = await tenantClientQuery(
+      client,
+      tenantId,
+      `
+        SELECT
+          (SELECT count(*)::int FROM products p
+            WHERE p.tenant_id = $1 AND p.branch_id = $2) AS products,
+          (SELECT count(*)::int FROM categories c
+            WHERE c.tenant_id = $1 AND c.branch_id = $2) AS categories,
+          (SELECT count(*)::int FROM suppliers s
+            WHERE s.tenant_id = $1 AND s.branch_id = $2) AS suppliers,
+          (SELECT count(*)::int FROM purchase_orders po
+            WHERE po.tenant_id = $1 AND po.branch_id = $2) AS "purchaseOrders",
+          (SELECT count(*)::int FROM inventory_ledger il
+            WHERE il.tenant_id = $1
+              AND (il.from_branch_id = $2 OR il.to_branch_id = $2)
+          ) AS ledger,
+          (SELECT count(*)::int FROM pos_sync_events pse
+            WHERE pse.tenant_id = $1 AND pse.branch_id = $2) AS "posSync"
+      `,
+      [id],
+    )
+
+    const deps = depRows[0] || {}
+    const blockers = []
+    if (deps.products > 0) blockers.push(`${deps.products} product(s)`)
+    if (deps.categories > 0) blockers.push(`${deps.categories} categor(ies)`)
+    if (deps.suppliers > 0) blockers.push(`${deps.suppliers} supplier(s)`)
+    if (deps.purchaseOrders > 0) blockers.push(`${deps.purchaseOrders} purchase order(s)`)
+    if (deps.ledger > 0) blockers.push(`${deps.ledger} ledger movement(s)`)
+    if (deps.posSync > 0) blockers.push(`${deps.posSync} POS sync event(s)`)
+
+    if (blockers.length) {
+      throw httpError(
+        409,
+        `Cannot delete branch — linked data still exists (${blockers.join(', ')}). Block the branch instead, or remove that data first.`,
+      )
+    }
+
+    // Remove branch-scoped users (BM / IM / cashier); staff rows cascade from users.
+    await tenantClientQuery(
+      client,
+      tenantId,
+      `
+        DELETE FROM users
+        WHERE tenant_id = $1 AND branch_id = $2
+      `,
+      [id],
+    )
+
+    const { rows: deleted } = await tenantClientQuery(
+      client,
+      tenantId,
+      `
+        DELETE FROM branches
+        WHERE tenant_id = $1 AND id = $2
+        RETURNING id, name
+      `,
+      [id],
+    )
+
+    if (!deleted[0]) throw httpError(404, 'Branch not found')
+    return { id: deleted[0].id, name: deleted[0].name, deleted: true }
   })
 }
 

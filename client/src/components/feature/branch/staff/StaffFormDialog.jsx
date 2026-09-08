@@ -16,15 +16,12 @@ import { ImageUploadField } from '@/components/shared/ImageUploadField'
 import { BRAND } from '@/lib/constants'
 import { validateStaffForm } from '@/lib/validation/staffSchedule'
 import { useFormBaseline } from '@/hooks/useFormBaseline'
-import { apiClient } from '@/api/api'
-import { endpoints } from '@/api/endpoints'
 
 const EMPTY_FORM = {
   email: '',
   password: '',
   fullName: '',
   role: 'inventory_manager',
-  designationId: '',
   hardwareDeviceId: '',
   scheduleStart: '',
   scheduleBreakStart: '',
@@ -33,15 +30,35 @@ const EMPTY_FORM = {
   image: null,
 }
 
+const STAFF_ROLES = [
+  { value: 'inventory_manager', label: 'Inventory Manager' },
+  { value: 'cashier', label: 'Cashier' },
+  { value: 'website_manager', label: 'Website Manager' },
+  { value: 'production_staff', label: 'Production Staff' },
+  { value: 'delivery_staff', label: 'Delivery Staff' },
+]
+
 function timeInputValue(value) {
   if (!value) return ''
   const text = String(value)
   return text.length >= 5 ? text.slice(0, 5) : text
 }
 
+function resolveRole(initialStaff) {
+  const allowed = STAFF_ROLES.map((r) => r.value)
+  if (allowed.includes(initialStaff?.role)) return initialStaff.role
+  const designation = String(initialStaff?.designation || '').toLowerCase()
+  if (designation.includes('website')) return 'website_manager'
+  if (designation.includes('delivery')) return 'delivery_staff'
+  if (designation.includes('production')) return 'production_staff'
+  if (designation.includes('cashier')) return 'cashier'
+  return 'inventory_manager'
+}
+
 /**
  * Add / Edit staff modal for Branch Manager.
  * Does not send branchId — server scopes from JWT.
+ * System role drives designation automatically (no custom designation picker).
  */
 export function StaffFormDialog({
   open,
@@ -54,43 +71,18 @@ export function StaffFormDialog({
   const isEdit = mode === 'edit'
   const [form, setForm] = useState(EMPTY_FORM)
   const [error, setError] = useState(null)
-  const [designations, setDesignations] = useState([])
   const { captureBaseline, isDirty } = useFormBaseline(open)
 
   useEffect(() => {
     if (!open) return
     setError(null)
 
-    // Fetch designations
-    async function loadDesignations() {
-      const res = await apiClient.get(endpoints.branch.designations.list, { active: 'active', limit: 100 })
-      if (res.success && res.data) {
-        const list = res.data.items || res.data || []
-        setDesignations(list)
-      }
-    }
-    void loadDesignations()
-
     if (isEdit && initialStaff) {
       const nextForm = {
         email: initialStaff.email || '',
         password: '',
         fullName: initialStaff.fullName || '',
-        role: (() => {
-          const allowed = [
-            'inventory_manager',
-            'cashier',
-            'production_staff',
-            'delivery_staff',
-          ]
-          if (allowed.includes(initialStaff.role)) return initialStaff.role
-          const designation = String(initialStaff.designation || '').toLowerCase()
-          if (designation.includes('delivery')) return 'delivery_staff'
-          if (designation.includes('production')) return 'production_staff'
-          if (designation.includes('cashier')) return 'cashier'
-          return 'inventory_manager'
-        })(),
-        designationId: initialStaff.designationId || '',
+        role: resolveRole(initialStaff),
         hardwareDeviceId: initialStaff.hardwareDeviceId || '',
         scheduleStart: timeInputValue(initialStaff.scheduleStart),
         scheduleBreakStart: timeInputValue(initialStaff.scheduleBreakStart),
@@ -136,7 +128,7 @@ export function StaffFormDialog({
           <DialogDescription>
             {isEdit
               ? 'Update branch staff details. Leave password blank to keep the current one.'
-              : 'Create an Inventory Manager or Cashier for this branch only.'}
+              : 'Create branch staff for this location only (Inventory Manager, Cashier, Website Manager, and more).'}
           </DialogDescription>
         </DialogHeader>
 
@@ -185,24 +177,9 @@ export function StaffFormDialog({
                 value={form.role}
                 onChange={(e) => patch('role', e.target.value)}
               >
-                <option value="inventory_manager">Inventory Manager</option>
-                <option value="cashier">Cashier</option>
-                <option value="production_staff">Production Staff</option>
-                <option value="delivery_staff">Delivery Staff</option>
-              </NativeSelect>
-            </div>
-
-            <div className="space-y-1.5">
-              <Label htmlFor="staff-designation">Designation</Label>
-              <NativeSelect
-                id="staff-designation"
-                value={form.designationId}
-                onChange={(e) => patch('designationId', e.target.value)}
-              >
-                <option value="">No custom designation</option>
-                {designations.map((d) => (
-                  <option key={d.id} value={d.id}>
-                    {d.name}
+                {STAFF_ROLES.map((role) => (
+                  <option key={role.value} value={role.value}>
+                    {role.label}
                   </option>
                 ))}
               </NativeSelect>

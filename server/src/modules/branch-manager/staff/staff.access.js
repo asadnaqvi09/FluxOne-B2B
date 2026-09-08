@@ -6,12 +6,25 @@ function httpError(status, message) {
   return error
 }
 
-/** Fixed staff designations created by B2B Admin — BM only assigns these via role. */
+/** Roles BM can create via Staff API (excludes BM / B2B admin). */
+export const CREATABLE_STAFF_ROLES = [
+  ROLES.INVENTORY_MANAGER,
+  ROLES.CASHIER,
+  ROLES.PRODUCTION_STAFF,
+  ROLES.DELIVERY_STAFF,
+  ROLES.WEBSITE_MANAGER,
+]
+
+/** SQL `IN (...)` list for creatable staff role slugs. */
+export const CREATABLE_STAFF_ROLE_SQL = CREATABLE_STAFF_ROLES.map((slug) => `'${slug}'`).join(', ')
+
+/** Fixed staff designations auto-mapped from system role (no custom designation picker). */
 export const STAFF_ROLE_TO_DESIGNATION = {
   [ROLES.INVENTORY_MANAGER]: 'Inventory Manager',
   [ROLES.CASHIER]: 'Cashier',
   [ROLES.PRODUCTION_STAFF]: 'Production Staff',
   [ROLES.DELIVERY_STAFF]: 'Delivery Staff',
+  [ROLES.WEBSITE_MANAGER]: 'Website Manager',
 }
 
 /**

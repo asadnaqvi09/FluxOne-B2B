@@ -25,6 +25,8 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog'
+import { ConfirmDialog } from '@/components/shared/ConfirmDialog'
+import { ImageUploadField } from '@/components/shared/ImageUploadField'
 import { BRAND } from '@/lib/constants'
 import { toastSuccess, toastError } from '@/lib/toast'
 import {
@@ -40,13 +42,15 @@ import {
   MapPin,
   Mail,
   Phone,
-  Edit2,
   Ban,
   CheckCircle,
   Users,
   Store,
   KeyRound,
   Loader2,
+  Trash2,
+  Eye,
+  Pencil,
 } from 'lucide-react'
 
 const PAGE_SIZE = 8
@@ -76,8 +80,9 @@ function shortId(id) {
   return raw.length > 10 ? `${raw.slice(0, 8)}…` : raw
 }
 
-function managerAvatar(gender) {
-  return gender === 'Female' ? AVATAR_FEMALE : AVATAR_MALE
+function managerAvatar(manager) {
+  if (manager?.profileImage) return manager.profileImage
+  return manager?.gender === 'Female' ? AVATAR_FEMALE : AVATAR_MALE
 }
 
 function credentialsToast(prefix, credentials) {
@@ -85,18 +90,18 @@ function credentialsToast(prefix, credentials) {
     toastSuccess(prefix)
     return
   }
-  if (credentials.temporaryPassword) {
-    toastSuccess(
-      `${prefix} Temp password: ${credentials.temporaryPassword} (check email / server log). Change it from Profile after login.`,
-    )
-    return
-  }
   if (credentials.emailed) {
     toastSuccess(`${prefix} Login credentials emailed to ${credentials.email}.`)
     return
   }
+  if (credentials.temporaryPassword) {
+    toastSuccess(
+      `${prefix} Email failed — use the key icon to resend. Temp password: ${credentials.temporaryPassword}`,
+    )
+    return
+  }
   toastSuccess(
-    `${prefix} Credentials stubbed on server (SMTP not configured). Check server logs for the temp password.`,
+    `${prefix} Email failed — use the key icon on the row to reset & resend credentials.`,
   )
 }
 
@@ -105,7 +110,8 @@ const emptyForm = {
   createdAt: '',
   name: '',
   location: '',
-  image: '',
+  imageFile: null,
+  managerImageFile: null,
   managerName: '',
   managerEmail: '',
   managerContact: '',
@@ -125,10 +131,20 @@ export function BranchesPage() {
   const [targetBranch, setTargetBranch] = useState(null)
   const [resetDialogOpen, setResetDialogOpen] = useState(false)
   const [resetTarget, setResetTarget] = useState(null)
+  const [deleteTarget, setDeleteTarget] = useState(null)
   const [formData, setFormData] = useState(emptyForm)
 
-  const { items, loading, mutating, error, createBranch, updateBranch, setBranchStatus, resetManagerPassword } =
-    useAdminBranches({ limit: 100 })
+  const {
+    items,
+    loading,
+    mutating,
+    error,
+    createBranch,
+    updateBranch,
+    setBranchStatus,
+    resetManagerPassword,
+    deleteBranch,
+  } = useAdminBranches({ limit: 100 })
 
   const slowHint = useSlowLoadingHint(loading)
 
@@ -168,7 +184,6 @@ export function BranchesPage() {
       ...emptyForm,
       id: 'Assigned on save',
       createdAt: 'On save',
-      image: DEFAULT_BRANCH_IMAGE,
     })
     setEditingBranch(null)
     setAddDialogOpen(true)
@@ -181,7 +196,8 @@ export function BranchesPage() {
       createdAt: formatCreatedAt(b.createdAt),
       name: b.name || '',
       location: b.location || '',
-      image: b.image || '',
+      imageFile: null,
+      managerImageFile: null,
       managerName: b.manager?.name || '',
       managerEmail: b.manager?.email || '',
       managerContact: b.manager?.contact || '',
@@ -229,6 +245,17 @@ export function BranchesPage() {
     setResetDialogOpen(false)
   }
 
+  async function handleConfirmDelete() {
+    if (!deleteTarget) return
+    const result = await deleteBranch(deleteTarget.id)
+    if (!result.success) {
+      toastError(result.error || 'Failed to delete branch')
+      return
+    }
+    toastSuccess(`Branch "${deleteTarget.name}" deleted`)
+    setDeleteTarget(null)
+  }
+
   async function handleSubmitBranch(e) {
     e.preventDefault()
     if (!formData.name.trim() || !formData.location.trim()) {
@@ -266,7 +293,8 @@ export function BranchesPage() {
     const payload = {
       name: formData.name.trim(),
       location: formData.location.trim(),
-      image: formData.image.trim() || undefined,
+      image: formData.imageFile || undefined,
+      profileImage: formData.managerImageFile || undefined,
       managerName: formData.managerName.trim(),
       managerEmail: formData.managerEmail.trim(),
       managerContact: formData.managerContact.trim(),
@@ -374,8 +402,8 @@ export function BranchesPage() {
       </MotionReveal>
 
       <MotionReveal delay={0.06}>
-        <div className="flex flex-col gap-3 rounded-2xl border border-border bg-white p-3.5 shadow-2xs sm:flex-row sm:items-center sm:justify-between">
-          <div className="relative flex-1">
+        <div className="flex flex-col gap-3 rounded-2xl border border-border bg-white p-3.5 shadow-2xs lg:flex-row lg:items-center lg:justify-between">
+          <div className="relative w-full min-w-0 flex-1">
             <Search className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-slate-400" />
             <input
               type="text"
@@ -389,9 +417,9 @@ export function BranchesPage() {
             />
           </div>
 
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2">
             <span className="text-xs text-slate-500 font-semibold shrink-0">Status:</span>
-            <div className="flex rounded-xl bg-slate-100 p-0.5 border border-slate-200">
+            <div className="flex max-w-full overflow-x-auto rounded-xl bg-slate-100 p-0.5 border border-slate-200">
               {[
                 { key: 'all', label: `All (${stats.total})` },
                 { key: 'open', label: `Open (${stats.open})` },
@@ -404,7 +432,7 @@ export function BranchesPage() {
                     setStatusFilter(tab.key)
                     setPage(1)
                   }}
-                  className={`rounded-lg px-3 py-1 text-xs font-semibold transition-all cursor-pointer ${
+                  className={`rounded-lg px-3 py-1 text-xs font-semibold transition-all cursor-pointer whitespace-nowrap ${
                     statusFilter === tab.key
                       ? 'bg-white text-purple-900 shadow-xs font-bold'
                       : 'text-slate-600 hover:text-slate-900'
@@ -423,22 +451,28 @@ export function BranchesPage() {
           title="List of branches"
           description="Registered branch network, branch manager assignments, locations & access statuses"
           actions={
-            <span className="text-xs font-medium text-slate-400">
+            <span className="text-xs font-medium text-slate-400 whitespace-nowrap">
               {filteredBranches.length} records · {PAGE_SIZE} / page
             </span>
           }
         >
-          <div className="overflow-x-auto">
-            <Table className="min-w-[56rem] text-left text-sm">
+          <div className="-mx-1 overflow-x-auto sm:mx-0">
+            <Table className="min-w-[42rem] w-full text-left text-sm sm:min-w-[52rem]">
               <TableHeader>
                 <TableRow className="text-xs text-slate-500 uppercase">
-                  <TableHead className="px-3 py-3 font-medium whitespace-nowrap min-w-[7.5rem]">Id</TableHead>
-                  <TableHead className="px-3 py-3 font-medium whitespace-nowrap min-w-[5.5rem]">Branch Image</TableHead>
-                  <TableHead className="px-3 py-3 font-medium whitespace-nowrap min-w-[13rem]">Branch Name</TableHead>
-                  <TableHead className="px-3 py-3 font-medium whitespace-nowrap min-w-[11rem]">Location</TableHead>
-                  <TableHead className="px-3 py-3 font-medium whitespace-nowrap min-w-[15rem]">Branch Manager details</TableHead>
-                  <TableHead className="px-3 py-3 font-medium whitespace-nowrap min-w-[6.5rem]">Status</TableHead>
-                  <TableHead className="px-3 py-3 text-right font-medium whitespace-nowrap min-w-[12rem]">Action</TableHead>
+                  <TableHead className="px-2 py-3 font-medium whitespace-nowrap sm:px-3">Id</TableHead>
+                  <TableHead className="px-2 py-3 font-medium whitespace-nowrap sm:px-3">Image</TableHead>
+                  <TableHead className="px-2 py-3 font-medium whitespace-nowrap sm:px-3 min-w-[10rem]">Branch</TableHead>
+                  <TableHead className="hidden px-2 py-3 font-medium whitespace-nowrap sm:table-cell sm:px-3 min-w-[9rem]">
+                    Location
+                  </TableHead>
+                  <TableHead className="px-2 py-3 font-medium whitespace-nowrap sm:px-3 min-w-[12rem]">
+                    Manager
+                  </TableHead>
+                  <TableHead className="px-2 py-3 font-medium whitespace-nowrap sm:px-3">Status</TableHead>
+                  <TableHead className="sticky right-0 z-[1] bg-white px-2 py-3 text-right font-medium whitespace-nowrap sm:px-3">
+                    Action
+                  </TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -462,40 +496,44 @@ export function BranchesPage() {
                     const isOpen = b.status === 'open'
                     const imageSrc = b.image || DEFAULT_BRANCH_IMAGE
                     return (
-                      <TableRow key={b.id} className="hover:bg-slate-50/80">
-                        <TableCell className="px-3 py-3 whitespace-nowrap">
+                      <TableRow key={b.id} className="group hover:bg-slate-50/80">
+                        <TableCell className="px-2 py-3 whitespace-nowrap sm:px-3">
                           <span
                             title={b.id}
-                            className="inline-block whitespace-nowrap text-xs font-bold font-mono text-purple-700 bg-purple-50 px-2.5 py-1 rounded-md border border-purple-100 shadow-2xs tracking-wide"
+                            className="inline-block whitespace-nowrap text-[10px] sm:text-xs font-bold font-mono text-purple-700 bg-purple-50 px-2 py-1 rounded-md border border-purple-100 shadow-2xs tracking-wide"
                           >
                             {shortId(b.id)}
                           </span>
                         </TableCell>
-                        <TableCell className="px-3 py-3 whitespace-nowrap">
+                        <TableCell className="px-2 py-3 whitespace-nowrap sm:px-3">
                           <img
                             src={imageSrc}
                             alt={b.name}
-                            className="size-11 rounded-xl object-cover border border-slate-200 shrink-0 shadow-2xs"
+                            className="size-9 sm:size-11 rounded-xl object-cover border border-slate-200 shrink-0 shadow-2xs"
                           />
                         </TableCell>
-                        <TableCell className="px-3 py-3">
-                          <p className="font-bold text-slate-900 text-sm">{b.name}</p>
-                          <span className="text-[11px] text-slate-400 whitespace-nowrap">
+                        <TableCell className="px-2 py-3 sm:px-3">
+                          <p className="font-bold text-slate-900 text-xs sm:text-sm">{b.name}</p>
+                          <span className="text-[10px] sm:text-[11px] text-slate-400 whitespace-nowrap">
                             Est. {formatCreatedAt(b.createdAt)}
                           </span>
+                          <p className="mt-1 flex items-start gap-1 text-[10px] text-slate-500 sm:hidden">
+                            <MapPin className="mt-0.5 size-3 shrink-0 text-slate-400" />
+                            <span className="line-clamp-2">{b.location || '—'}</span>
+                          </p>
                         </TableCell>
-                        <TableCell className="px-3 py-3 text-xs text-slate-600">
-                          <div className="flex items-center gap-1">
-                            <MapPin className="size-3.5 text-slate-400 shrink-0" />
-                            <span>{b.location || '—'}</span>
+                        <TableCell className="hidden px-2 py-3 text-xs text-slate-600 sm:table-cell sm:px-3">
+                          <div className="flex items-start gap-1">
+                            <MapPin className="mt-0.5 size-3.5 text-slate-400 shrink-0" />
+                            <span className="line-clamp-2">{b.location || '—'}</span>
                           </div>
                         </TableCell>
-                        <TableCell className="px-3 py-3">
-                          <div className="flex items-center gap-2.5">
+                        <TableCell className="px-2 py-3 sm:px-3">
+                          <div className="flex items-center gap-2 sm:gap-2.5">
                             <img
-                              src={managerAvatar(b.manager?.gender)}
+                              src={managerAvatar(b.manager)}
                               alt={b.manager?.name || 'Manager'}
-                              className="size-9 rounded-full object-cover border border-slate-200 shrink-0"
+                              className="size-8 sm:size-9 rounded-full object-cover border border-slate-200 shrink-0"
                             />
                             <div className="min-w-0">
                               <div className="flex items-center gap-1.5">
@@ -503,23 +541,23 @@ export function BranchesPage() {
                                   {b.manager?.name || '—'}
                                 </p>
                                 {b.manager?.gender ? (
-                                  <span className="text-[9px] bg-slate-100 text-slate-600 px-1.5 py-0.2 rounded font-medium shrink-0">
+                                  <span className="hidden text-[9px] bg-slate-100 text-slate-600 px-1.5 py-0.2 rounded font-medium shrink-0 sm:inline">
                                     {b.manager.gender}
                                   </span>
                                 ) : null}
                               </div>
-                              <p className="text-[11px] text-slate-500 truncate flex items-center gap-1 mt-0.5">
+                              <p className="text-[10px] sm:text-[11px] text-slate-500 truncate flex items-center gap-1 mt-0.5">
                                 <Mail className="size-3 text-slate-400 shrink-0" />
                                 <span className="truncate">{b.manager?.email || '—'}</span>
                               </p>
-                              <p className="text-[11px] text-slate-400 truncate flex items-center gap-1">
+                              <p className="hidden text-[11px] text-slate-400 truncate sm:flex items-center gap-1">
                                 <Phone className="size-3 text-slate-400 shrink-0" />
                                 <span className="whitespace-nowrap">{b.manager?.contact || '—'}</span>
                               </p>
                             </div>
                           </div>
                         </TableCell>
-                        <TableCell className="px-3 py-3 whitespace-nowrap">
+                        <TableCell className="px-2 py-3 whitespace-nowrap sm:px-3">
                           <Badge
                             variant="outline"
                             className={
@@ -536,49 +574,61 @@ export function BranchesPage() {
                             {isOpen ? 'Open' : 'Block'}
                           </Badge>
                         </TableCell>
-                        <TableCell className="px-3 py-3 text-right whitespace-nowrap">
-                          <div className="inline-flex items-center gap-1.5">
+                        <TableCell className="sticky right-0 z-[1] bg-white px-1.5 py-3 text-right whitespace-nowrap sm:px-3 group-hover:bg-slate-50/80">
+                          <div className="inline-flex items-center justify-end gap-0.5 sm:gap-1">
                             <Button
                               type="button"
-                              variant="outline"
-                              size="sm"
+                              variant="ghost"
+                              size="icon"
                               onClick={() => handleOpenEdit(b)}
                               disabled={mutating}
-                              className="h-8 text-xs cursor-pointer border-purple-200 text-purple-900 hover:bg-purple-50"
+                              title="Edit branch"
+                              aria-label={`Edit ${b.name}`}
+                              className="size-8 text-purple-800 hover:bg-purple-50 hover:text-purple-950"
                             >
-                              <Edit2 className="mr-1 size-3.5" />
-                              Edit
+                              <Pencil className="size-4" />
+                            </Button>
+                            {b.manager?.id && !b.manager?.credentialsEmailed ? (
+                              <Button
+                                type="button"
+                                variant="ghost"
+                                size="icon"
+                                onClick={() => handlePromptResetPassword(b)}
+                                disabled={mutating}
+                                title="Email failed — reset & resend credentials"
+                                aria-label={`Resend credentials for ${b.name}`}
+                                className="size-8 text-amber-700 hover:bg-amber-50 hover:text-amber-900"
+                              >
+                                <KeyRound className="size-4" />
+                              </Button>
+                            ) : null}
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="icon"
+                              onClick={() => setDeleteTarget(b)}
+                              disabled={mutating}
+                              title="Delete branch"
+                              aria-label={`Delete ${b.name}`}
+                              className="size-8 text-slate-500 hover:bg-slate-100 hover:text-slate-900"
+                            >
+                              <Trash2 className="size-4" />
                             </Button>
                             <Button
                               type="button"
-                              variant="outline"
-                              size="sm"
-                              onClick={() => handlePromptResetPassword(b)}
-                              disabled={mutating || !b.manager?.id}
-                              title="Reset manager password & resend credentials"
-                              className="h-8 text-xs cursor-pointer border-slate-200 text-slate-700 hover:bg-slate-50"
-                            >
-                              <KeyRound className="size-3.5" />
-                            </Button>
-                            <Button
-                              type="button"
-                              size="sm"
+                              variant="ghost"
+                              size="icon"
                               onClick={() => handlePromptToggleStatus(b)}
                               disabled={mutating}
-                              className="h-8 text-xs font-semibold cursor-pointer text-white shadow-xs"
-                              style={{ background: isOpen ? BRAND.deep : BRAND.purple }}
+                              title={isOpen ? 'Block branch' : 'Open branch'}
+                              aria-label={isOpen ? `Block ${b.name}` : `Open ${b.name}`}
+                              className={`size-8 ${
+                                isOpen
+                                  ? 'text-slate-600 hover:bg-slate-100 hover:text-slate-900'
+                                  : 'text-emerald-700 hover:bg-emerald-50 hover:text-emerald-900'
+                              }`}
                             >
-                              {isOpen ? (
-                                <>
-                                  <Ban className="mr-1 size-3.5" />
-                                  Block
-                                </>
-                              ) : (
-                                <>
-                                  <CheckCircle className="mr-1 size-3.5" />
-                                  Open
-                                </>
-                              )}
+                              {isOpen ? <Ban className="size-4" /> : <Eye className="size-4" />}
                             </Button>
                           </div>
                         </TableCell>
@@ -664,14 +714,13 @@ export function BranchesPage() {
                 </div>
 
                 <div className="space-y-1 sm:col-span-2">
-                  <Label htmlFor="branchImage" className="text-xs">
-                    Branch Image URL (Optional)
-                  </Label>
-                  <Input
+                  <ImageUploadField
                     id="branchImage"
-                    placeholder="https://images.unsplash.com/..."
-                    value={formData.image}
-                    onChange={(e) => setFormData({ ...formData, image: e.target.value })}
+                    label="Branch image"
+                    optionalLabel="(optional)"
+                    value={formData.imageFile}
+                    existingImageUrl={editingBranch?.image || null}
+                    onChange={(file) => setFormData({ ...formData, imageFile: file })}
                   />
                 </div>
               </div>
@@ -683,6 +732,17 @@ export function BranchesPage() {
               </h5>
 
               <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                <div className="space-y-1 sm:col-span-2">
+                  <ImageUploadField
+                    id="managerProfileImage"
+                    label="Branch manager image"
+                    optionalLabel="(optional)"
+                    value={formData.managerImageFile}
+                    existingImageUrl={editingBranch?.manager?.profileImage || null}
+                    onChange={(file) => setFormData({ ...formData, managerImageFile: file })}
+                  />
+                </div>
+
                 <div className="space-y-1">
                   <Label htmlFor="mgrName" className="text-xs">
                     Name of branch manager *
@@ -777,9 +837,8 @@ export function BranchesPage() {
               <div className="rounded-xl border border-purple-100 bg-purple-50/50 p-3 text-xs text-purple-900 flex items-start gap-2">
                 <KeyRound className="size-4 shrink-0 text-purple-700 mt-0.5" />
                 <span>
-                  Password is auto-generated. The manager receives login email + temporary password (or it is
-                  logged on the server if SMTP is not configured). Ask them to change it from Profile after first
-                  login.
+                  Password is auto-generated and emailed to the manager. If the email succeeds, you are done. If
+                  email fails, a key icon appears on the row so you can reset &amp; resend credentials.
                 </span>
               </div>
             ) : null}
@@ -873,9 +932,9 @@ export function BranchesPage() {
               Reset manager password
             </DialogTitle>
             <DialogDescription className="text-xs leading-relaxed pt-1">
-              Generate a new temporary password for{' '}
-              <strong>{resetTarget?.manager?.email || 'this branch manager'}</strong> and send credentials by
-              email (or stub to server logs if SMTP is unset).
+              Credentials email did not go through for{' '}
+              <strong>{resetTarget?.manager?.email || 'this branch manager'}</strong>. Generate a new temporary
+              password and try sending again. Their previous password will stop working immediately.
             </DialogDescription>
           </DialogHeader>
           <DialogFooter className="pt-3 gap-2">
@@ -899,6 +958,22 @@ export function BranchesPage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <ConfirmDialog
+        open={Boolean(deleteTarget)}
+        onOpenChange={(open) => {
+          if (!open) setDeleteTarget(null)
+        }}
+        title="Delete branch?"
+        description={
+          deleteTarget
+            ? `Permanently remove "${deleteTarget.name}" and its branch manager login? Prefer Block if you only want to disable access. This cannot be undone.`
+            : undefined
+        }
+        confirmLabel="Delete"
+        loading={mutating}
+        onConfirm={handleConfirmDelete}
+      />
     </div>
   )
 }

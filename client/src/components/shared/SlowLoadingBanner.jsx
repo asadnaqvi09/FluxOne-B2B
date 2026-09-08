@@ -1,10 +1,8 @@
 import { useEffect, useState } from 'react'
 import { cn } from '@/lib/utils'
 
-/**
- * Shows a cold-start hint after `delayMs` while `active` is true.
- * Useful on Render free tier (15–30s first request).
- */
+// Shows a cold-start hint after `delayMs` while `active` is true.
+// Useful on Render free tier (15–30s first request).
 export function useSlowLoadingHint(active, delayMs = 3000) {
   const [show, setShow] = useState(false)
 

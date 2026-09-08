@@ -50,7 +50,7 @@ export const PATHS = {
 export const ADMIN_ROLES = ['b2b_admin']
 export const INVENTORY_ROLES = ['inventory_manager']
 export const BRANCH_ROLES = ['branch_manager']
-export const PHASE2_ROLES = ['production_staff', 'delivery_staff']
+export const PHASE2_ROLES = ['production_staff', 'delivery_staff', 'website_manager']
 
 export function homePathForRole(role) {
   if (ADMIN_ROLES.includes(role)) return PATHS.admin.dashboard

@@ -5,6 +5,7 @@ export const endpoints = {
     me: '/auth/me',
     update: '/auth/me',
     logout: '/auth/logout',
+    changePassword: '/auth/change-password',
   },
   admin: {
     dashboard: '/admin/dashboard',
@@ -15,6 +16,33 @@ export const endpoints = {
       update: (id) => `/admin/branches/${id}`,
       status: (id) => `/admin/branches/${id}/status`,
       resetPassword: (id) => `/admin/branches/${id}/reset-password`,
+      remove: (id) => `/admin/branches/${id}`,
+    },
+    company: {
+      get: '/admin/company',
+      update: '/admin/company',
+    },
+    policies: {
+      list: '/admin/policies',
+      create: '/admin/policies',
+      detail: (id) => `/admin/policies/${id}`,
+      update: (id) => `/admin/policies/${id}`,
+      remove: (id) => `/admin/policies/${id}`,
+    },
+    taxProfit: {
+      meta: '/admin/tax-profit/meta',
+      products: '/admin/tax-profit/products',
+      bulkProfit: '/admin/tax-profit/bulk-profit',
+      bulkTax: '/admin/tax-profit/bulk-tax',
+    },
+    settings: {
+      devices: '/admin/settings/devices',
+      deviceStatus: (id) => `/admin/settings/devices/${id}/status`,
+    },
+    invoices: {
+      list: '/admin/invoices',
+      summary: '/admin/invoices/summary',
+      detail: (id) => `/admin/invoices/${id}`,
     },
   },
   dashboard: {

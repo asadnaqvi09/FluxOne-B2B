@@ -6,6 +6,7 @@ export const ROLES = {
   BRANCH_ADMIN: 'branch_admin',
   PRODUCTION_STAFF: 'production_staff',
   DELIVERY_STAFF: 'delivery_staff',
+  WEBSITE_MANAGER: 'website_manager',
 }
 
 export const ROLE_IDS = {
@@ -16,6 +17,7 @@ export const ROLE_IDS = {
   [ROLES.BRANCH_ADMIN]: 5,
   [ROLES.PRODUCTION_STAFF]: 6,
   [ROLES.DELIVERY_STAFF]: 7,
+  [ROLES.WEBSITE_MANAGER]: 8,
 }
 
 export const PRODUCT_TYPES = {
@@ -128,6 +130,8 @@ export const PERMISSIONS = {
   ],
   'admin:dashboard': [ROLES.B2B_ADMIN],
   'admin:branches': [ROLES.B2B_ADMIN],
+  'admin:company': [ROLES.B2B_ADMIN],
+  'admin:policies': [ROLES.B2B_ADMIN],
 }
 
 export function hasPermission(role, permission) {

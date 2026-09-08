@@ -6,7 +6,6 @@ import { ConfirmDialog } from '@/components/shared/ConfirmDialog'
 import { StaffFilters } from '@/components/feature/branch/staff/StaffFilters'
 import { StaffFormDialog } from '@/components/feature/branch/staff/StaffFormDialog'
 import { StaffTable } from '@/components/feature/branch/staff/StaffTable'
-import { DesignationFormDialog } from '@/components/feature/branch/designations/DesignationFormDialog'
 import { StaffAttendanceTab } from '@/components/feature/branch/staff/StaffAttendanceTab'
 import { StaffHolidaysTab } from '@/components/feature/branch/staff/StaffHolidaysTab'
 import { StaffLeavesTab } from '@/components/feature/branch/staff/StaffLeavesTab'
@@ -57,17 +56,19 @@ export function StaffPage() {
   const [statusTarget, setStatusTarget] = useState(null)
   const [statusUpdatingId, setStatusUpdatingId] = useState(null)
   const [designations, setDesignations] = useState([])
-  const [designationFormOpen, setDesignationFormOpen] = useState(false)
   const [activeTab, setActiveTab] = useState('list')
 
-  const loadDesignations = async () => {
-    const res = await apiClient.get(endpoints.branch.designations.list, { active: 'active', limit: 100 })
-    if (res.success && res.data) {
-      setDesignations(res.data.items || res.data || [])
-    }
-  }
-
   useEffect(() => {
+    // Attendance / leaves / performance tabs still list auto-mapped designation names.
+    async function loadDesignations() {
+      const res = await apiClient.get(endpoints.branch.designations.list, {
+        active: 'active',
+        limit: 100,
+      })
+      if (res.success && res.data) {
+        setDesignations(res.data.items || res.data || [])
+      }
+    }
     void loadDesignations()
   }, [])
 
@@ -139,28 +140,17 @@ export function StaffPage() {
         <PageHeader
           eyebrow="Branch Team"
           title="Staff Management"
-          description="Manage Inventory Managers and Cashiers for your branch only."
+          description="Manage branch staff roles for this location (Inventory Manager, Cashier, Website Manager, and more)."
           actions={
-            <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row sm:items-center">
-              {/* <Button
-                type="button"
-                variant="outline"
-                onClick={() => setDesignationFormOpen(true)}
-                style={{ color: BRAND.purple, borderColor: BRAND.purple }}
-                className="w-full bg-white hover:bg-purple-50/40 sm:w-auto"
-              >
-                + Create Designation
-              </Button> */}
-              <Button
-                type="button"
-                onClick={openCreate}
-                style={{ background: BRAND.purple }}
-                className="w-full text-white hover:opacity-90 sm:w-auto"
-              >
-                <Plus className="size-4" />
-                Add Staff
-              </Button>
-            </div>
+            <Button
+              type="button"
+              onClick={openCreate}
+              style={{ background: BRAND.purple }}
+              className="w-full text-white hover:opacity-90 sm:w-auto"
+            >
+              <Plus className="size-4" />
+              Add Staff
+            </Button>
           }
         />
       </MotionHeader>
@@ -171,7 +161,6 @@ export function StaffPage() {
         </p>
       ) : null}
 
-      {/* Capsule tabs navigation */}
       <div className="flex flex-wrap items-center gap-2 mb-6">
         {[
           { id: 'list', label: 'Staff Roster' },
@@ -206,12 +195,11 @@ export function StaffPage() {
             <StaffFilters
               q={localQ}
               status={filters.status || ''}
-              designationId={filters.designationId || ''}
-              designations={designations}
+              role={filters.role || ''}
               onChange={(patch) => {
                 if (patch.q !== undefined) onSearchChange(patch.q)
                 if (patch.status !== undefined) updateFilters({ status: patch.status })
-                if (patch.designationId !== undefined) updateFilters({ designationId: patch.designationId })
+                if (patch.role !== undefined) updateFilters({ role: patch.role })
               }}
             />
           </MotionReveal>
@@ -294,15 +282,6 @@ export function StaffPage() {
         confirmLabel="Delete"
         loading={mutating}
         onConfirm={handleConfirmDelete}
-      />
-
-      <DesignationFormDialog
-        open={designationFormOpen}
-        onOpenChange={setDesignationFormOpen}
-        onSubmitSuccess={(newDesignation) => {
-          toastSuccess('Designation created')
-          void loadDesignations()
-        }}
       />
     </div>
   )

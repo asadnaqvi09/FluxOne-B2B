@@ -5,13 +5,12 @@ import { NativeSelect } from '@/components/ui/select'
 import { Label } from '@/components/ui/label'
 
 /**
- * Light filters for BM staff list: search + status.
+ * Light filters for BM staff list: search + role + status.
  */
 export function StaffFilters({
   q = '',
   status = '',
-  designationId = '',
-  designations = [],
+  role = '',
   onChange,
   className,
 }) {
@@ -33,18 +32,18 @@ export function StaffFilters({
         </div>
 
         <div className="w-full space-y-1.5 sm:w-48">
-          <Label htmlFor="staff-designation-filter">Designation</Label>
+          <Label htmlFor="staff-role-filter">System Role</Label>
           <NativeSelect
-            id="staff-designation-filter"
-            value={designationId}
-            onChange={(event) => onChange?.({ designationId: event.target.value })}
+            id="staff-role-filter"
+            value={role}
+            onChange={(event) => onChange?.({ role: event.target.value })}
           >
-            <option value="">All designations</option>
-            {designations.map((d) => (
-              <option key={d.id} value={d.id}>
-                {d.name}
-              </option>
-            ))}
+            <option value="">All roles</option>
+            <option value="inventory_manager">Inventory Manager</option>
+            <option value="cashier">Cashier</option>
+            <option value="website_manager">Website Manager</option>
+            <option value="production_staff">Production Staff</option>
+            <option value="delivery_staff">Delivery Staff</option>
           </NativeSelect>
         </div>
 

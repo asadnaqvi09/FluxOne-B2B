@@ -1,7 +1,9 @@
-import { useState, useMemo } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { SurfaceCard } from '@/components/shared/SurfaceCard'
 import { PageHeader } from '@/components/shared/PageHeader'
 import { MotionHeader, MotionReveal } from '@/components/shared/MotionReveal'
+import { EmptyState } from '@/components/shared/EmptyState'
+import { SlowLoadingBanner, useSlowLoadingHint } from '@/components/shared/SlowLoadingBanner'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Input } from '@/components/ui/input'
@@ -24,48 +26,44 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog'
+import {
+  ADMIN_TAX_PROFIT_PAGE_SIZE,
+  useAdminTaxProfit,
+} from '@/hooks/useAdminTaxProfit'
 import { BRAND } from '@/lib/constants'
 import { toastSuccess, toastError } from '@/lib/toast'
 import { validatePercentage } from '@/lib/validation/formValidators'
 import {
-  INITIAL_TAX_PROFIT_PRODUCTS,
-  TAX_PROFIT_CATEGORIES,
-  TAX_PROFIT_SCALES,
-} from '@/data/adminTaxProfitMock'
-import {
   Percent,
   Calculator,
   Search,
-  SlidersHorizontal,
   CheckSquare,
   Square,
   TrendingUp,
   Award,
-  Zap,
-  Tag,
-  Check,
+  ArrowDownWideNarrow,
   Columns,
-  Sparkles,
+  Loader2,
+  PackageOpen,
 } from 'lucide-react'
 
-const PAGE_SIZE = 8
+const PAGE_SIZE = ADMIN_TAX_PROFIT_PAGE_SIZE
 
 export function TaxProfitPage() {
-  const [products, setProducts] = useState(INITIAL_TAX_PROFIT_PRODUCTS)
   const [selectedIds, setSelectedIds] = useState([])
   const [searchQuery, setSearchQuery] = useState('')
-  const [selectedCategory, setSelectedCategory] = useState('All Categories')
-  const [selectedScale, setSelectedScale] = useState('All Scales')
-  const [presetFilter, setPresetFilter] = useState('all') // 'all' | 'top_selling' | 'top_profit' | 'top_popular'
+  const [debouncedQ, setDebouncedQ] = useState('')
+  const [selectedCategoryId, setSelectedCategoryId] = useState('')
+  const [selectedSubcategoryId, setSelectedSubcategoryId] = useState('')
+  const [selectedScale, setSelectedScale] = useState('')
+  const [presetFilter, setPresetFilter] = useState('all')
   const [page, setPage] = useState(1)
 
-  // Dialogs
   const [profitDialogOpen, setProfitDialogOpen] = useState(false)
   const [taxDialogOpen, setTaxDialogOpen] = useState(false)
   const [bulkProfitValue, setBulkProfitValue] = useState('20')
   const [bulkTaxValue, setBulkTaxValue] = useState('5')
 
-  // Customizable Column Visibility
   const [visibleColumns, setVisibleColumns] = useState({
     id: true,
     name: true,
@@ -79,23 +77,59 @@ export function TaxProfitPage() {
   })
   const [colMenuOpen, setColMenuOpen] = useState(false)
 
-  // Calculate Final Price helper
-  function calculateFinalPrice(baseCost, profitPct, taxPct) {
-    const profitAmount = (baseCost * (profitPct || 0)) / 100
-    const taxAmount = (baseCost * (taxPct || 0)) / 100
-    return Math.round(baseCost + profitAmount + taxAmount)
-  }
+  useEffect(() => {
+    const timer = setTimeout(() => setDebouncedQ(searchQuery.trim()), 300)
+    return () => clearTimeout(timer)
+  }, [searchQuery])
 
-  // Select all checkbox
-  const isAllSelected =
-    products.length > 0 && selectedIds.length === products.length
+  useEffect(() => {
+    setPage(1)
+    setSelectedIds([])
+  }, [debouncedQ, selectedCategoryId, selectedSubcategoryId, selectedScale, presetFilter])
+
+  const {
+    items: products,
+    meta,
+    pagination,
+    loading,
+    mutating,
+    error,
+    bulkSetProfit,
+    bulkSetTax,
+  } = useAdminTaxProfit({
+    q: debouncedQ,
+    categoryId: selectedCategoryId,
+    subcategoryId: selectedSubcategoryId,
+    scale: selectedScale,
+    sort: presetFilter,
+    page,
+    limit: PAGE_SIZE,
+  })
+
+  const slowHint = useSlowLoadingHint(loading)
+  const totalCatalog = pagination.total || 0
+  const hasFilters =
+    Boolean(debouncedQ) ||
+    Boolean(selectedCategoryId) ||
+    Boolean(selectedSubcategoryId) ||
+    Boolean(selectedScale) ||
+    presetFilter !== 'all'
+
+  const subcategoryOptions = useMemo(() => {
+    if (!selectedCategoryId) return []
+    const parent = meta.categories.find((c) => c.id === selectedCategoryId)
+    return parent?.children || []
+  }, [meta.categories, selectedCategoryId])
+
+  const pageIds = products.map((p) => p.id)
+  const isAllSelected = pageIds.length > 0 && pageIds.every((id) => selectedIds.includes(id))
 
   function handleToggleSelectAll() {
     if (isAllSelected) {
-      setSelectedIds([])
-    } else {
-      setSelectedIds(products.map((p) => p.id))
+      setSelectedIds((prev) => prev.filter((id) => !pageIds.includes(id)))
+      return
     }
+    setSelectedIds((prev) => [...new Set([...prev, ...pageIds])])
   }
 
   function handleToggleRow(id) {
@@ -104,89 +138,78 @@ export function TaxProfitPage() {
     )
   }
 
-  // Apply Bulk Profit %
-  function handleApplyBulkProfit(e) {
+  async function handleApplyBulkProfit(e) {
     e.preventDefault()
-    const err = validatePercentage(bulkProfitValue, { min: 0, max: 100, fieldName: 'Profit percentage' })
+    const err = validatePercentage(bulkProfitValue, {
+      min: 0,
+      max: 100,
+      fieldName: 'Profit percentage',
+    })
     if (err) {
       toastError(err)
+      return
+    }
+    if (selectedIds.length === 0) {
+      toastError('Select at least one product')
       return
     }
 
     const profitNum = Number(bulkProfitValue)
-    setProducts((prev) =>
-      prev.map((p) => {
-        if (selectedIds.includes(p.id)) {
-          return { ...p, profitPct: profitNum }
-        }
-        return p
-      }),
-    )
+    const result = await bulkSetProfit(selectedIds, profitNum)
+    if (!result.success) {
+      toastError(result.error || 'Failed to update profit %')
+      return
+    }
 
     toastSuccess(
-      `Updated Profit to ${profitNum}% across ${selectedIds.length} selected items`,
+      `Updated Profit to ${profitNum}% across ${result.data?.updated ?? selectedIds.length} selected items`,
     )
+    setSelectedIds([])
     setProfitDialogOpen(false)
   }
 
-  // Apply Bulk Tax %
-  function handleApplyBulkTax(e) {
+  async function handleApplyBulkTax(e) {
     e.preventDefault()
-    const err = validatePercentage(bulkTaxValue, { min: 0, max: 100, fieldName: 'Tax percentage' })
+    const err = validatePercentage(bulkTaxValue, {
+      min: 0,
+      max: 100,
+      fieldName: 'Tax percentage',
+    })
     if (err) {
       toastError(err)
       return
     }
+    if (selectedIds.length === 0) {
+      toastError('Select at least one product')
+      return
+    }
 
     const taxNum = Number(bulkTaxValue)
-    setProducts((prev) =>
-      prev.map((p) => {
-        if (selectedIds.includes(p.id)) {
-          return { ...p, taxPct: taxNum }
-        }
-        return p
-      }),
-    )
+    const result = await bulkSetTax(selectedIds, taxNum)
+    if (!result.success) {
+      toastError(result.error || 'Failed to update tax %')
+      return
+    }
 
     toastSuccess(
-      `Updated Tax to ${taxNum}% across ${selectedIds.length} selected items`,
+      `Updated Tax to ${taxNum}% across ${result.data?.updated ?? selectedIds.length} selected items`,
     )
+    setSelectedIds([])
     setTaxDialogOpen(false)
   }
 
-  // Filtered & Sorted items
-  let filteredProducts = products.filter((p) => {
-    const matchesSearch =
-      p.id.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      p.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      p.barcode.includes(searchQuery)
-
-    const matchesCat =
-      selectedCategory === 'All Categories'
-        ? true
-        : p.category === selectedCategory
-
-    const matchesScale =
-      selectedScale === 'All Scales' ? true : p.scale === selectedScale
-
-    return matchesSearch && matchesCat && matchesScale
-  })
-
-  // Apply Quick Presets
-  if (presetFilter === 'top_selling') {
-    filteredProducts = [...filteredProducts].sort(
-      (a, b) => b.salesVolume30D - a.salesVolume30D,
-    )
-  } else if (presetFilter === 'top_profit') {
-    filteredProducts = [...filteredProducts].sort(
-      (a, b) => b.profitPct - a.profitPct,
-    )
-  } else if (presetFilter === 'top_popular') {
-    filteredProducts = [...filteredProducts].sort(
-      (a, b) =>
-        b.salesVolume30D * b.profitPct - a.salesVolume30D * a.profitPct,
-    )
+  function calculateFinalPrice(baseCost, profitPct, taxPct) {
+    const profitAmount = (baseCost * (profitPct || 0)) / 100
+    const taxAmount = (baseCost * (taxPct || 0)) / 100
+    return Math.round(baseCost + profitAmount + taxAmount)
   }
+
+  const presetClass = (active) =>
+    `rounded-xl px-3.5 py-1.5 text-xs font-semibold transition-all cursor-pointer border flex items-center gap-1.5 ${
+      active
+        ? 'bg-purple-900 text-white border-purple-900 shadow-xs'
+        : 'bg-white text-slate-700 border-slate-200 hover:border-purple-200'
+    }`
 
   return (
     <div className="space-y-6 pb-8">
@@ -198,99 +221,106 @@ export function TaxProfitPage() {
         />
       </MotionHeader>
 
-      {/* Preset Filter Pills */}
+      <SlowLoadingBanner show={slowHint} />
+
+      {error ? (
+        <div className="rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-800">
+          {error}
+        </div>
+      ) : null}
+
       <MotionReveal delay={0.05}>
         <div className="flex flex-wrap items-center gap-2">
           <button
             type="button"
             onClick={() => setPresetFilter('all')}
-            className={`rounded-xl px-3.5 py-1.5 text-xs font-semibold transition-all cursor-pointer border ${
-              presetFilter === 'all'
-                ? 'bg-purple-900 text-white border-purple-900 shadow-xs'
-                : 'bg-white text-slate-700 border-slate-200 hover:border-purple-200'
-            }`}
+            className={presetClass(presetFilter === 'all')}
           >
-            All Products ({products.length})
+            All Products ({totalCatalog})
           </button>
           <button
             type="button"
-            onClick={() => setPresetFilter('top_selling')}
-            className={`rounded-xl px-3.5 py-1.5 text-xs font-semibold transition-all cursor-pointer border flex items-center gap-1.5 ${
-              presetFilter === 'top_selling'
-                ? 'bg-purple-900 text-white border-purple-900 shadow-xs'
-                : 'bg-white text-slate-700 border-slate-200 hover:border-purple-200'
-            }`}
+            onClick={() => setPresetFilter('top_sales')}
+            className={presetClass(presetFilter === 'top_sales')}
           >
             <TrendingUp className="size-3.5 text-emerald-500" />
-            Most Selling Items (Top 50)
+            Most Selling (30d)
           </button>
           <button
             type="button"
             onClick={() => setPresetFilter('top_profit')}
-            className={`rounded-xl px-3.5 py-1.5 text-xs font-semibold transition-all cursor-pointer border flex items-center gap-1.5 ${
-              presetFilter === 'top_profit'
-                ? 'bg-purple-900 text-white border-purple-900 shadow-xs'
-                : 'bg-white text-slate-700 border-slate-200 hover:border-purple-200'
-            }`}
+            className={presetClass(presetFilter === 'top_profit')}
           >
             <Award className="size-3.5 text-amber-500" />
-            Highest Profit Margin (Top 50)
+            Highest Profit Margin
           </button>
           <button
             type="button"
-            onClick={() => setPresetFilter('top_popular')}
-            className={`rounded-xl px-3.5 py-1.5 text-xs font-semibold transition-all cursor-pointer border flex items-center gap-1.5 ${
-              presetFilter === 'top_popular'
-                ? 'bg-purple-900 text-white border-purple-900 shadow-xs'
-                : 'bg-white text-slate-700 border-slate-200 hover:border-purple-200'
-            }`}
+            onClick={() => setPresetFilter('slow_moving')}
+            className={presetClass(presetFilter === 'slow_moving')}
           >
-            <Zap className="size-3.5 text-purple-500" />
-            Most Popular & High Velocity (Top 50)
+            <ArrowDownWideNarrow className="size-3.5 text-slate-500" />
+            Slow Moving
           </button>
         </div>
       </MotionReveal>
 
-      {/* Main Filter & Action Bar */}
       <MotionReveal delay={0.1}>
         <div className="flex flex-col gap-3 rounded-2xl border border-border bg-white p-4 shadow-2xs">
-          {/* Unified Single Row Filters */}
           <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-12">
-            {/* Search Input */}
-            <div className="relative sm:col-span-6 lg:col-span-5">
+            <div className="relative sm:col-span-6 lg:col-span-4">
               <Search className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-slate-400" />
               <input
                 type="text"
-                placeholder="Search by SKU ID, Product Name, or Barcode..."
+                placeholder="Search by SKU, name, or barcode..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 className="h-10 w-full rounded-xl border border-border bg-slate-50/70 py-2 pl-9 pr-4 text-xs sm:text-sm text-slate-900 outline-none focus:border-purple-300 focus:bg-white focus:ring-1 focus:ring-purple-300"
               />
             </div>
 
-            {/* Category Selector */}
-            <div className="sm:col-span-3 lg:col-span-3">
+            <div className="sm:col-span-3 lg:col-span-2">
               <NativeSelect
-                value={selectedCategory}
-                onChange={(e) => setSelectedCategory(e.target.value)}
+                value={selectedCategoryId}
+                onChange={(e) => {
+                  setSelectedCategoryId(e.target.value)
+                  setSelectedSubcategoryId('')
+                }}
                 className="h-10 w-full rounded-xl border-border bg-slate-50 text-xs font-medium"
               >
-                {TAX_PROFIT_CATEGORIES.map((c) => (
-                  <option key={c} value={c}>
-                    {c}
+                <option value="">All Categories</option>
+                {meta.categories.map((c) => (
+                  <option key={c.id} value={c.id}>
+                    {c.name}
                   </option>
                 ))}
               </NativeSelect>
             </div>
 
-            {/* Scale Selector */}
+            <div className="sm:col-span-3 lg:col-span-2">
+              <NativeSelect
+                value={selectedSubcategoryId}
+                onChange={(e) => setSelectedSubcategoryId(e.target.value)}
+                disabled={!selectedCategoryId || subcategoryOptions.length === 0}
+                className="h-10 w-full rounded-xl border-border bg-slate-50 text-xs font-medium"
+              >
+                <option value="">All Subcategories</option>
+                {subcategoryOptions.map((s) => (
+                  <option key={s.id} value={s.id}>
+                    {s.name}
+                  </option>
+                ))}
+              </NativeSelect>
+            </div>
+
             <div className="sm:col-span-3 lg:col-span-2">
               <NativeSelect
                 value={selectedScale}
                 onChange={(e) => setSelectedScale(e.target.value)}
                 className="h-10 w-full rounded-xl border-border bg-slate-50 text-xs font-medium"
               >
-                {TAX_PROFIT_SCALES.map((s) => (
+                <option value="">All Scales</option>
+                {meta.scales.map((s) => (
                   <option key={s} value={s}>
                     Scale: {s}
                   </option>
@@ -298,7 +328,6 @@ export function TaxProfitPage() {
               </NativeSelect>
             </div>
 
-            {/* Column Customizer Button */}
             <div className="relative sm:col-span-12 lg:col-span-2">
               <Button
                 type="button"
@@ -342,20 +371,20 @@ export function TaxProfitPage() {
             </div>
           </div>
 
-          {/* Bulk Action Controls Bar */}
           <div className="flex flex-wrap items-center justify-between gap-3 pt-3 border-t border-slate-100 bg-slate-50/70 p-3 rounded-xl">
             <div className="flex items-center gap-3">
               <button
                 type="button"
                 onClick={handleToggleSelectAll}
-                className="flex items-center gap-2 text-xs font-semibold text-slate-800 cursor-pointer"
+                disabled={products.length === 0}
+                className="flex items-center gap-2 text-xs font-semibold text-slate-800 cursor-pointer disabled:opacity-40"
               >
                 {isAllSelected ? (
                   <CheckSquare className="size-4 text-purple-700" />
                 ) : (
                   <Square className="size-4 text-slate-400" />
                 )}
-                <span>Select All ({filteredProducts.length})</span>
+                <span>Select Page ({products.length})</span>
               </button>
               {selectedIds.length > 0 && (
                 <Badge
@@ -370,7 +399,7 @@ export function TaxProfitPage() {
             <div className="flex items-center gap-2">
               <Button
                 type="button"
-                disabled={selectedIds.length === 0}
+                disabled={selectedIds.length === 0 || mutating}
                 onClick={() => setProfitDialogOpen(true)}
                 size="sm"
                 className="h-9 px-4 text-xs font-bold cursor-pointer text-white disabled:opacity-40 rounded-xl shadow-xs"
@@ -382,7 +411,7 @@ export function TaxProfitPage() {
 
               <Button
                 type="button"
-                disabled={selectedIds.length === 0}
+                disabled={selectedIds.length === 0 || mutating}
                 onClick={() => setTaxDialogOpen(true)}
                 size="sm"
                 className="h-9 px-4 text-xs font-bold cursor-pointer text-white disabled:opacity-40 rounded-xl shadow-xs"
@@ -396,61 +425,87 @@ export function TaxProfitPage() {
         </div>
       </MotionReveal>
 
-      {/* Pricing & Tax Table */}
       <MotionReveal delay={0.15}>
         <SurfaceCard
           title="Catalog Pricing & Profit Margins"
-          description="Dynamic table calculating final retail prices from base wholesale cost, profit % and sales tax"
+          description="Final retail price = base cost + profit % + tax % (on cost)"
           actions={
             <span className="text-xs font-medium text-slate-400">
-              {filteredProducts.length} records · {PAGE_SIZE} / page
+              {totalCatalog} records · {PAGE_SIZE} / page
             </span>
           }
         >
-          <div className="overflow-x-auto">
-            <Table className="min-w-[50rem] text-left text-sm">
-              <TableHeader>
-                <TableRow className="text-xs text-slate-500 uppercase">
-                  <TableHead className="w-10 px-3 py-3 text-center">
-                    <input
-                      type="checkbox"
-                      checked={isAllSelected}
-                      onChange={handleToggleSelectAll}
-                      className="rounded text-purple-600 focus:ring-0"
-                    />
-                  </TableHead>
-                  {visibleColumns.id && <TableHead className="px-3 py-3 font-medium">SKU ID</TableHead>}
-                  {visibleColumns.image && <TableHead className="px-3 py-3 font-medium">Image</TableHead>}
-                  {visibleColumns.name && <TableHead className="px-3 py-3 font-medium">Product Name</TableHead>}
-                  {visibleColumns.barcode && <TableHead className="px-3 py-3 font-medium">Barcode</TableHead>}
-                  {visibleColumns.category && <TableHead className="px-3 py-3 font-medium">Category / Scale</TableHead>}
-                  {visibleColumns.baseCost && <TableHead className="px-3 py-3 font-medium">Base Cost</TableHead>}
-                  {visibleColumns.profitPct && <TableHead className="px-3 py-3 font-medium">Profit %</TableHead>}
-                  {visibleColumns.taxPct && <TableHead className="px-3 py-3 font-medium">Tax %</TableHead>}
-                  {visibleColumns.finalPrice && (
-                    <TableHead className="px-3 py-3 text-right font-bold text-slate-900">
-                      Final Price
-                    </TableHead>
-                  )}
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {filteredProducts.length === 0 ? (
-                  <TableRow>
-                    <TableCell colSpan={10} className="py-8 text-center text-xs text-slate-400">
-                      No products found matching the criteria.
-                    </TableCell>
-                  </TableRow>
-                ) : (
-                  filteredProducts
-                    .slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE)
-                    .map((p) => {
+          {loading && products.length === 0 ? (
+            <div className="flex items-center justify-center gap-2 py-16 text-sm text-slate-500">
+              <Loader2 className="size-4 animate-spin" />
+              Loading catalog…
+            </div>
+          ) : products.length === 0 ? (
+            <EmptyState
+              icon={PackageOpen}
+              title={
+                hasFilters
+                  ? 'No products match these filters'
+                  : 'No products in this company yet'
+              }
+              description={
+                hasFilters
+                  ? 'Clear search or filters to see more of the catalog.'
+                  : 'Create products from a branch Inventory Manager catalog first. Tax & Profit will list them here for bulk margin and tax updates.'
+              }
+              compact
+            />
+          ) : (
+            <>
+              <div className="overflow-x-auto">
+                <Table className="min-w-[50rem] text-left text-sm">
+                  <TableHeader>
+                    <TableRow className="text-xs text-slate-500 uppercase">
+                      <TableHead className="w-10 px-3 py-3 text-center">
+                        <input
+                          type="checkbox"
+                          checked={isAllSelected}
+                          onChange={handleToggleSelectAll}
+                          className="rounded text-purple-600 focus:ring-0"
+                        />
+                      </TableHead>
+                      {visibleColumns.id && (
+                        <TableHead className="px-3 py-3 font-medium">SKU ID</TableHead>
+                      )}
+                      {visibleColumns.image && (
+                        <TableHead className="px-3 py-3 font-medium">Image</TableHead>
+                      )}
+                      {visibleColumns.name && (
+                        <TableHead className="px-3 py-3 font-medium">Product Name</TableHead>
+                      )}
+                      {visibleColumns.barcode && (
+                        <TableHead className="px-3 py-3 font-medium">Barcode</TableHead>
+                      )}
+                      {visibleColumns.category && (
+                        <TableHead className="px-3 py-3 font-medium">Category / Scale</TableHead>
+                      )}
+                      {visibleColumns.baseCost && (
+                        <TableHead className="px-3 py-3 font-medium">Base Cost</TableHead>
+                      )}
+                      {visibleColumns.profitPct && (
+                        <TableHead className="px-3 py-3 font-medium">Profit %</TableHead>
+                      )}
+                      {visibleColumns.taxPct && (
+                        <TableHead className="px-3 py-3 font-medium">Tax %</TableHead>
+                      )}
+                      {visibleColumns.finalPrice && (
+                        <TableHead className="px-3 py-3 text-right font-bold text-slate-900">
+                          Final Price
+                        </TableHead>
+                      )}
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {products.map((p) => {
                       const isChecked = selectedIds.includes(p.id)
-                      const finalPrice = calculateFinalPrice(
-                        p.baseCost,
-                        p.profitPct,
-                        p.taxPct,
-                      )
+                      const finalPrice =
+                        p.finalPrice ??
+                        calculateFinalPrice(p.baseCost, p.profitPct, p.taxPct)
 
                       return (
                         <TableRow
@@ -470,17 +525,21 @@ export function TaxProfitPage() {
 
                           {visibleColumns.id && (
                             <TableCell className="px-3 py-3 font-mono text-xs font-bold text-slate-700">
-                              {p.id}
+                              {p.itemCode || p.id}
                             </TableCell>
                           )}
 
                           {visibleColumns.image && (
                             <TableCell className="px-3 py-3">
-                              <img
-                                src={p.image}
-                                alt={p.name}
-                                className="size-10 rounded-lg object-cover border border-slate-200 shadow-2xs"
-                              />
+                              {p.image ? (
+                                <img
+                                  src={p.image}
+                                  alt={p.name}
+                                  className="size-10 rounded-lg object-cover border border-slate-200 shadow-2xs"
+                                />
+                              ) : (
+                                <div className="size-10 rounded-lg border border-dashed border-slate-200 bg-slate-50" />
+                              )}
                             </TableCell>
                           )}
 
@@ -492,20 +551,25 @@ export function TaxProfitPage() {
 
                           {visibleColumns.barcode && (
                             <TableCell className="px-3 py-3 font-mono text-xs text-slate-500">
-                              {p.barcode}
+                              {p.barcode || '—'}
                             </TableCell>
                           )}
 
                           {visibleColumns.category && (
                             <TableCell className="px-3 py-3 text-xs text-slate-600">
-                              <span className="block font-medium">{p.category}</span>
-                              <span className="text-[10px] text-slate-400">{p.scaleLabel}</span>
+                              <span className="block font-medium">
+                                {p.category || 'Uncategorized'}
+                                {p.subcategory ? ` / ${p.subcategory}` : ''}
+                              </span>
+                              <span className="text-[10px] text-slate-400">
+                                {p.scaleLabel || p.scale || '—'}
+                              </span>
                             </TableCell>
                           )}
 
                           {visibleColumns.baseCost && (
                             <TableCell className="px-3 py-3 font-semibold text-slate-800 text-xs">
-                              Rs. {p.baseCost.toLocaleString()}
+                              Rs. {Number(p.baseCost || 0).toLocaleString()}
                             </TableCell>
                           )}
 
@@ -528,31 +592,32 @@ export function TaxProfitPage() {
                           {visibleColumns.finalPrice && (
                             <TableCell className="px-3 py-3 text-right">
                               <span className="font-extrabold text-sm text-purple-950 block">
-                                Rs. {finalPrice.toLocaleString()}
+                                Rs. {Number(finalPrice).toLocaleString()}
                               </span>
                               <span className="text-[10px] text-slate-400">
-                                Margin: Rs. {finalPrice - p.baseCost}
+                                Margin: Rs.{' '}
+                                {(Number(finalPrice) - Number(p.baseCost || 0)).toLocaleString()}
                               </span>
                             </TableCell>
                           )}
                         </TableRow>
                       )
-                    })
-                )}
-              </TableBody>
-            </Table>
-          </div>
+                    })}
+                  </TableBody>
+                </Table>
+              </div>
 
-          <TablePagination
-            page={page}
-            pageCount={Math.max(1, Math.ceil(filteredProducts.length / PAGE_SIZE))}
-            totalItems={filteredProducts.length}
-            onPageChange={setPage}
-          />
+              <TablePagination
+                page={pagination.page || page}
+                pageCount={pagination.pageCount || 1}
+                totalItems={pagination.total || 0}
+                onPageChange={setPage}
+              />
+            </>
+          )}
         </SurfaceCard>
       </MotionReveal>
 
-      {/* Set Bulk Profit Modal */}
       <Dialog open={profitDialogOpen} onOpenChange={setProfitDialogOpen}>
         <DialogContent className="max-w-md">
           <DialogHeader>
@@ -579,7 +644,7 @@ export function TaxProfitPage() {
                 required
               />
               <p className="text-[11px] text-slate-500">
-                Final retail price will dynamically adjust based on Base Cost + Profit % + Tax %.
+                Selling price is recalculated from base cost × (1 + profit %). Tax is applied on cost in this view.
               </p>
             </div>
 
@@ -588,22 +653,23 @@ export function TaxProfitPage() {
                 type="button"
                 variant="outline"
                 onClick={() => setProfitDialogOpen(false)}
+                disabled={mutating}
               >
                 Cancel
               </Button>
               <Button
                 type="submit"
+                disabled={mutating}
                 className="text-white font-semibold"
                 style={{ background: BRAND.purple }}
               >
-                Apply Profit %
+                {mutating ? 'Applying…' : 'Apply Profit %'}
               </Button>
             </DialogFooter>
           </form>
         </DialogContent>
       </Dialog>
 
-      {/* Set Bulk Tax Modal */}
       <Dialog open={taxDialogOpen} onOpenChange={setTaxDialogOpen}>
         <DialogContent className="max-w-md">
           <DialogHeader>
@@ -630,7 +696,7 @@ export function TaxProfitPage() {
                 required
               />
               <p className="text-[11px] text-slate-500">
-                Enter 0 for tax-exempt essentials (wheat, milk, sugar).
+                Enter 0 for tax-exempt essentials. Non-zero rates find or create a matching company tax.
               </p>
             </div>
 
@@ -639,15 +705,17 @@ export function TaxProfitPage() {
                 type="button"
                 variant="outline"
                 onClick={() => setTaxDialogOpen(false)}
+                disabled={mutating}
               >
                 Cancel
               </Button>
               <Button
                 type="submit"
+                disabled={mutating}
                 className="text-white font-semibold"
                 style={{ background: BRAND.deep }}
               >
-                Apply Tax %
+                {mutating ? 'Applying…' : 'Apply Tax %'}
               </Button>
             </DialogFooter>
           </form>

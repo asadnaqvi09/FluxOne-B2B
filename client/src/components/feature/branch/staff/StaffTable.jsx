@@ -40,6 +40,7 @@ function designationLabel(row) {
   if (row?.designation) return row.designation
   if (row?.role === 'inventory_manager') return 'Inventory Manager'
   if (row?.role === 'cashier') return 'Cashier'
+  if (row?.role === 'website_manager') return 'Website Manager'
   if (row?.role === 'production_staff') return 'Production Staff'
   if (row?.role === 'delivery_staff') return 'Delivery Staff'
   return '—'

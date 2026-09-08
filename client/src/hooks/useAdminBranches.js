@@ -4,10 +4,43 @@ import { endpoints } from '@/api/endpoints'
 
 const DEFAULT_PAGE_SIZE = 50
 
-/**
- * Live B2B Admin branches (`/api/admin/branches`).
- * Password is auto-generated on create / reset-password (email + stub log).
- */
+// JSON body, or multipart FormData when a new branch/manager image File is selected.
+export function buildAdminBranchPayload(fields) {
+  const base = {
+    name: String(fields.name || '').trim(),
+    location: String(fields.location || '').trim(),
+    managerName: String(fields.managerName || '').trim(),
+    managerEmail: String(fields.managerEmail || '').trim(),
+    managerContact: String(fields.managerContact || '').trim(),
+    managerOtherContact: fields.managerOtherContact?.trim() || undefined,
+    managerGender: fields.managerGender || undefined,
+    managerAddress: fields.managerAddress?.trim() || undefined,
+    status: fields.status || undefined,
+  }
+
+  const branchImage = fields.image instanceof File && fields.image.size > 0 ? fields.image : null
+  const managerImage =
+    fields.profileImage instanceof File && fields.profileImage.size > 0
+      ? fields.profileImage
+      : null
+
+  if (branchImage || managerImage) {
+    const form = new FormData()
+    Object.entries(base).forEach(([key, value]) => {
+      if (value !== undefined && value !== null && value !== '') {
+        form.append(key, String(value))
+      }
+    })
+    if (branchImage) form.append('image', branchImage)
+    if (managerImage) form.append('profile_image', managerImage)
+    return form
+  }
+
+  return base
+}
+
+// Live B2B Admin branches (`/api/admin/branches`).
+// Password is auto-generated on create / reset-password (email + stub log).
 export function useAdminBranches({ q = '', status = 'all', page = 1, limit = DEFAULT_PAGE_SIZE } = {}) {
   const [items, setItems] = useState([])
   const [pagination, setPagination] = useState({ page: 1, limit: DEFAULT_PAGE_SIZE, total: 0, pageCount: 1 })
@@ -51,7 +84,10 @@ export function useAdminBranches({ q = '', status = 'all', page = 1, limit = DEF
   const createBranch = useCallback(
     async (fields) => {
       setMutating(true)
-      const result = await apiClient.post(endpoints.admin.branches.create, fields)
+      const result = await apiClient.post(
+        endpoints.admin.branches.create,
+        buildAdminBranchPayload(fields),
+      )
       setMutating(false)
       if (result.success) await load()
       return result
@@ -62,7 +98,10 @@ export function useAdminBranches({ q = '', status = 'all', page = 1, limit = DEF
   const updateBranch = useCallback(
     async (id, fields) => {
       setMutating(true)
-      const result = await apiClient.patch(endpoints.admin.branches.update(id), fields)
+      const result = await apiClient.patch(
+        endpoints.admin.branches.update(id),
+        buildAdminBranchPayload(fields),
+      )
       setMutating(false)
       if (result.success) await load()
       return result
@@ -88,9 +127,21 @@ export function useAdminBranches({ q = '', status = 'all', page = 1, limit = DEF
       setMutating(true)
       const result = await apiClient.post(endpoints.admin.branches.resetPassword(id), {})
       setMutating(false)
+      if (result.success) await load()
       return result
     },
-    [],
+    [load],
+  )
+
+  const deleteBranch = useCallback(
+    async (id) => {
+      setMutating(true)
+      const result = await apiClient.delete(endpoints.admin.branches.remove(id))
+      setMutating(false)
+      if (result.success) await load()
+      return result
+    },
+    [load],
   )
 
   return {
@@ -104,6 +155,7 @@ export function useAdminBranches({ q = '', status = 'all', page = 1, limit = DEF
     updateBranch,
     setBranchStatus,
     resetManagerPassword,
+    deleteBranch,
   }
 }
 

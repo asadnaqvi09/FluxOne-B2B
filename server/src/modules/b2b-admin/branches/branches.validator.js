@@ -27,6 +27,8 @@ const managerCreateSchema = z.object({
   otherContact: optionalString,
   gender: genderSchema,
   address: optionalString,
+  profileImage: optionalString,
+  imageUrl: optionalString,
 })
 
 const managerUpdateSchema = z.object({
@@ -36,6 +38,8 @@ const managerUpdateSchema = z.object({
   otherContact: optionalString,
   gender: genderSchema,
   address: optionalString,
+  profileImage: optionalString,
+  imageUrl: optionalString,
 })
 
 export const listBranchesQuerySchema = z.object({
@@ -72,6 +76,8 @@ export const createBranchSchema = z.object({
     managerOtherContact: optionalString,
     managerGender: genderSchema,
     managerAddress: optionalString,
+    profileImage: optionalString,
+    managerProfileImage: optionalString,
   }),
   query: empty,
   params: empty,
@@ -90,6 +96,8 @@ export const updateBranchSchema = z.object({
     managerOtherContact: optionalString,
     managerGender: genderSchema,
     managerAddress: optionalString,
+    profileImage: optionalString,
+    managerProfileImage: optionalString,
   }),
   query: empty,
   params: z.object({

@@ -6,12 +6,12 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { useAuthSession } from '@/hooks/useAuthSession'
-import { BRAND, DEMO_ACCOUNTS } from '@/lib/constants'
+import { BRAND, DEMO_ACCOUNTS, ROLES } from '@/lib/constants'
 import { hydrateSession, clearAuthError } from '@/rtk/features/auth/authSlice'
 import { tokenStorage } from '@/api/tokenStorage'
 import { useAppDispatch } from '@/rtk/hooks'
 import { homePathForRole, PATHS } from '@/router/paths'
-import { setAdminSession } from '@/config/adminAuth.config'
+import { clearAdminSession } from '@/config/adminAuth.config'
 import { toastSuccess } from '@/lib/toast'
 import { cn } from '@/lib/utils'
 
@@ -65,6 +65,7 @@ export function LoginForm() {
     // Primary: Authenticate with real Express backend API
     try {
       const data = await login({ id: loginId, password })
+      clearAdminSession()
       toastSuccess(`Welcome, ${data?.user?.name || 'User'}`)
       navigate(homePathForRole(data?.user?.role), { replace: true })
       return
@@ -84,8 +85,18 @@ export function LoginForm() {
           tenantName:
             demoMatch.tenantSlug === 'company-a'
               ? 'Company A'
-              : 'Company B',
+              : demoMatch.tenantSlug === 'softwareflux'
+                ? 'SoftwareFlux'
+                : 'Company B',
           branchName: demoMatch.label,
+        }
+        // Offline demo tokens must not unlock /admin via mock localStorage.
+        // Real b2b_admin requires a live JWT from the API.
+        if (demoUser.role === ROLES.B2B_ADMIN || demoUser.role === 'b2b_owner') {
+          setLocalError(
+            'Admin login requires the live API. Start the server and use softwareflux@company.com / admin123.',
+          )
+          return
         }
         const demoToken = 'mock-demo-token-' + Date.now()
         tokenStorage.setSession({
@@ -94,7 +105,7 @@ export function LoginForm() {
           user: demoUser,
         })
         dispatch(hydrateSession({ user: demoUser, token: demoToken }))
-        setAdminSession(demoUser)
+        clearAdminSession()
         toastSuccess(`Welcome, ${demoUser.name}`)
         navigate(homePathForRole(demoUser.role), { replace: true })
         return
@@ -110,7 +121,7 @@ export function LoginForm() {
 
   return (
     <div className="flex w-full flex-col items-center">
-      <BrandLogo size="lg" className="mb-5" />
+      <BrandLogo size="xl"/>
       <h1 className="text-center text-xl font-bold tracking-tight text-foreground sm:text-2xl">
         FluxOne Login
       </h1>

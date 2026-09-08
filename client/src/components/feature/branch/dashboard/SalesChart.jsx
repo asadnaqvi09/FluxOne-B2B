@@ -8,7 +8,6 @@ import {
   YAxis,
 } from 'recharts'
 import { SurfaceCard } from '@/components/shared/SurfaceCard'
-import { BRANCH_DASHBOARD_DUMMY } from '@/data/branchDashboard'
 import { BRAND } from '@/lib/constants'
 
 const CHART_H = 260
@@ -26,8 +25,7 @@ function SalesTooltip({ active, payload, label }) {
 }
 
 export function SalesChart({ series, className }) {
-  const data =
-    Array.isArray(series) && series.length > 0 ? series : BRANCH_DASHBOARD_DUMMY.salesByHour
+  const data = Array.isArray(series) ? series : []
 
   return (
     <SurfaceCard

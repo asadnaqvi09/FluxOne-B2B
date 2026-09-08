@@ -2,8 +2,7 @@
 import { createAsyncThunk, createSlice } from '@reduxjs/toolkit'
 import { apiClient } from '@/api/api'
 import { endpoints } from '@/api/endpoints'
-import { BRANCH_DASHBOARD_DUMMY } from '@/data/branchDashboard'
-import { mergeBranchDashboard } from '@/lib/mapBranchDashboard'
+import { emptyBranchDashboard, mergeBranchDashboard } from '@/lib/mapBranchDashboard'
 
 function todayIso() {
   return new Date().toISOString().slice(0, 10)
@@ -11,9 +10,9 @@ function todayIso() {
 
 const initialState = {
   date: todayIso(),
-  data: structuredClone(BRANCH_DASHBOARD_DUMMY),
+  data: emptyBranchDashboard(),
   loading: false,
-  source: 'dummy',
+  source: 'live',
   error: null,
 }
 
@@ -33,8 +32,8 @@ export const fetchBranchDashboard = createAsyncThunk(
       }
       return {
         date,
-        data: mergeBranchDashboard({ date }),
-        source: 'dummy',
+        data: emptyBranchDashboard(date),
+        source: 'live',
         error: result.error || null,
       }
     } catch (err) {
@@ -71,8 +70,8 @@ const branchDashboardSlice = createSlice({
         state.loading = false
         const date = action.payload?.date || state.date
         state.date = date
-        state.data = mergeBranchDashboard({ date })
-        state.source = 'dummy'
+        state.data = emptyBranchDashboard(date)
+        state.source = 'live'
         state.error = action.payload?.message || action.error.message
       })
   },

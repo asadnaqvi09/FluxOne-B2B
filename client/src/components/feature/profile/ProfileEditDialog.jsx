@@ -15,7 +15,9 @@ import { BRAND } from '@/lib/constants'
 import { useFormBaseline } from '@/hooks/useFormBaseline'
 
 /**
- * Edit name + User ID (login) only.
+ * Shared edit profile modal (Admin / BM / IM / etc.).
+ * View card never shows password — only this dialog does.
+ * Fields: Name, User ID or Email, Password, Confirm Password.
  */
 export function ProfileEditDialog({
   open,
@@ -27,14 +29,23 @@ export function ProfileEditDialog({
 }) {
   const [name, setName] = useState('')
   const [loginId, setLoginId] = useState('')
+  const [password, setPassword] = useState('')
+  const [confirmPassword, setConfirmPassword] = useState('')
   const [error, setError] = useState(null)
   const { captureBaseline, isDirty } = useFormBaseline(open)
 
   useEffect(() => {
     if (!open) return
-    const snapshot = { name: initialName || '', loginId: initialLoginId || '' }
+    const snapshot = {
+      name: initialName || '',
+      loginId: initialLoginId || '',
+      password: '',
+      confirmPassword: '',
+    }
     setName(snapshot.name)
     setLoginId(snapshot.loginId)
+    setPassword('')
+    setConfirmPassword('')
     setError(null)
     captureBaseline(snapshot)
   }, [open, initialName, initialLoginId, captureBaseline])
@@ -45,16 +56,38 @@ export function ProfileEditDialog({
 
     const nextName = name.trim()
     const nextId = loginId.trim()
+    const nextPassword = password
+    const nextConfirm = confirmPassword
+
     if (!nextName) {
       setError('Name is required')
       return
     }
     if (!nextId || nextId.length < 3) {
-      setError('User ID must be at least 3 characters')
+      setError('User ID or Email must be at least 3 characters')
       return
     }
 
-    const result = await onSubmit?.({ name: nextName, id: nextId })
+    const changingPassword = Boolean(nextPassword || nextConfirm)
+    if (changingPassword) {
+      if (!nextPassword || nextPassword.length < 8) {
+        setError('Password must be at least 8 characters')
+        return
+      }
+      if (nextPassword.length > 72) {
+        setError('Password must be at most 72 characters')
+        return
+      }
+      if (nextPassword !== nextConfirm) {
+        setError('Password and Confirm Password do not match')
+        return
+      }
+    }
+
+    const payload = { name: nextName, id: nextId }
+    if (changingPassword) payload.password = nextPassword
+
+    const result = await onSubmit?.(payload)
     if (result && result.success === false) {
       setError(result.error || 'Update failed')
       return
@@ -62,13 +95,16 @@ export function ProfileEditDialog({
     onOpenChange?.(false)
   }
 
+  const dirty = isDirty({ name, loginId, password, confirmPassword })
+
   return (
-    <Dialog open={open} onOpenChange={onOpenChange} dirty={isDirty({ name, loginId })}>
+    <Dialog open={open} onOpenChange={onOpenChange} dirty={dirty}>
       <DialogContent className="max-w-md">
         <DialogHeader>
           <DialogTitle>Edit profile</DialogTitle>
           <DialogDescription>
-            Update your display name and login User ID. Role cannot be changed here.
+            Update your display name and login ID. Optionally set a new password (leave blank to keep the
+            current one). Role cannot be changed here.
           </DialogDescription>
         </DialogHeader>
 
@@ -84,15 +120,41 @@ export function ProfileEditDialog({
             />
           </div>
           <div className="space-y-1.5">
-            <Label htmlFor="profile-login-id">User ID</Label>
+            <Label htmlFor="profile-login-id">User ID or Email</Label>
             <Input
               id="profile-login-id"
               value={loginId}
               onChange={(e) => setLoginId(e.target.value)}
-              placeholder="Login ID"
+              placeholder="Login ID or email"
               autoComplete="username"
             />
             <p className="text-xs text-slate-500">Used with your password at login.</p>
+          </div>
+
+          <div className="space-y-1.5">
+            <Label htmlFor="profile-password">Password</Label>
+            <Input
+              id="profile-password"
+              type="password"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              placeholder="Leave blank to keep current"
+              autoComplete="new-password"
+            />
+          </div>
+          <div className="space-y-1.5">
+            <Label htmlFor="profile-confirm-password">Confirm Password</Label>
+            <Input
+              id="profile-confirm-password"
+              type="password"
+              value={confirmPassword}
+              onChange={(e) => setConfirmPassword(e.target.value)}
+              placeholder="Repeat new password"
+              autoComplete="new-password"
+            />
+            <p className="text-xs text-slate-500">
+              After a temporary password from email, set your own password here.
+            </p>
           </div>
 
           {error ? (
@@ -102,10 +164,7 @@ export function ProfileEditDialog({
           ) : null}
 
           <DialogFooter>
-            <DialogCancelButton
-              disabled={loading}
-              className="w-full sm:w-auto"
-            />
+            <DialogCancelButton disabled={loading} className="w-full sm:w-auto" />
             <Button
               type="submit"
               disabled={loading}

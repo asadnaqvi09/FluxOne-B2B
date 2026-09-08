@@ -24,8 +24,16 @@ export const ROLES = {
   DELIVERY_STAFF: 'delivery_staff',
 }
 
-//Seeded demo accounts (password for all: password).
+//Seeded demo accounts.
 export const DEMO_ACCOUNTS = [
+  {
+    tenantSlug: 'softwareflux',
+    id: 'softwareflux@company.com',
+    password: 'admin123',
+    role: ROLES.B2B_ADMIN,
+    name: 'SoftwareFlux Admin',
+    label: 'B2B Admin · SoftwareFlux',
+  },
   {
     tenantSlug: 'company-a',
     id: 'admin@companya.local',

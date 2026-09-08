@@ -1,12 +1,12 @@
 import { useState, useEffect } from 'react'
-import { X, Building2, TrendingUp } from 'lucide-react'
+import { X } from 'lucide-react'
 import { BRAND } from '@/lib/constants'
-import { getAdminSession } from '@/config/adminAuth.config'
+import { useAuthSession } from '@/hooks/useAuthSession'
 
 const STORAGE_KEY = 'fluxone.admin.welcomeSeen'
 
 export function AdminWelcomeBanner({ className }) {
-  const session = getAdminSession()
+  const { user } = useAuthSession()
   const [visible, setVisible] = useState(false)
 
   useEffect(() => {
@@ -21,10 +21,12 @@ export function AdminWelcomeBanner({ className }) {
     setVisible(false)
   }
 
-  const company = session?.tenantName || 'FluxOne Enterprise Solutions'
+  const company = user?.tenantName || 'SoftwareFlux'
 
   return (
-    <div className="relative overflow-hidden rounded-2xl border border-border bg-white px-4 py-4 shadow-sm sm:px-5 sm:py-5">
+    <div
+      className={`relative overflow-hidden rounded-2xl border border-border bg-white px-4 py-4 shadow-sm sm:px-5 sm:py-5 ${className || ''}`}
+    >
       <div
         className="pointer-events-none absolute inset-x-0 top-0 h-1"
         style={{ background: `linear-gradient(90deg, ${BRAND.purple}, ${BRAND.deep})` }}
@@ -38,7 +40,8 @@ export function AdminWelcomeBanner({ className }) {
             Welcome to &ldquo;{company}&rdquo; Admin Dashboard
           </h2>
           <p className="text-sm text-slate-600">
-            Consolidated multi-branch financial metrics, live inventory monitoring, and AI predictive insights across all branches.
+            Consolidated multi-branch financial metrics, live inventory monitoring, and AI
+            predictive insights across all branches.
           </p>
         </div>
         <button

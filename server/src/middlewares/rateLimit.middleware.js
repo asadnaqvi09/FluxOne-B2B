@@ -41,3 +41,9 @@ export const syncLimiter = createLimiter(
   Number(process.env.RATE_LIMIT_SYNC_MAX || 400),
   'Too many sync requests. Please try again later.',
 )
+
+// B2B Admin APIs
+export const adminLimiter = createLimiter(
+  Number(process.env.RATE_LIMIT_ADMIN_MAX || 150),
+  'Too many admin requests. Please try again later.',
+)

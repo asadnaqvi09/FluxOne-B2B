@@ -1,9 +1,12 @@
 /**
- * Admin Authentication Configuration (Frontend-Only for Testing Phase 1)
+ * Legacy mock Admin session helpers.
  *
- * Dummy credentials for the Admin (B2B Owner) Dashboard.
- * These credentials allow logging in as the B2B Owner / Enterprise Admin
- * without requiring any backend modifications.
+ * DISABLED for real B2B Admin auth: Admin routes require a live JWT with
+ * role `b2b_admin` from `/api/auth/login`. localStorage mock sessions no
+ * longer unlock `/admin/*`.
+ *
+ * File kept so older imports do not break; clearAdminSession still removes
+ * any leftover `fluxone_admin_session` key from earlier test builds.
  */
 
 export const ADMIN_CREDENTIALS = {
@@ -19,33 +22,19 @@ export const ADMIN_CREDENTIALS = {
 
 const STORAGE_KEY = 'fluxone_admin_session'
 
+/** @deprecated Mock admin localStorage auth is disabled. */
 export function getAdminSession() {
-  try {
-    const raw = localStorage.getItem(STORAGE_KEY)
-    if (!raw) return null
-    return JSON.parse(raw)
-  } catch {
-    return null
-  }
+  return null
 }
 
+/** Always false — use real JWT `b2b_admin` via AuthContext / tokenStorage. */
 export function isAdminLoggedIn() {
-  const session = getAdminSession()
-  return Boolean(session && session.role === ADMIN_CREDENTIALS.role)
+  return false
 }
 
-export function setAdminSession(user = ADMIN_CREDENTIALS) {
-  try {
-    const session = {
-      ...user,
-      loggedInAt: new Date().toISOString(),
-      token: 'mock-admin-token-' + Date.now(),
-    }
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(session))
-    return session
-  } catch {
-    return null
-  }
+/** No-op: do not write mock admin sessions. */
+export function setAdminSession() {
+  return null
 }
 
 export function clearAdminSession() {
@@ -56,23 +45,10 @@ export function clearAdminSession() {
   }
 }
 
-export function validateAdminLogin(id, password) {
-  const normalizedId = String(id || '').trim().toLowerCase()
-  const expectedId = ADMIN_CREDENTIALS.id.toLowerCase()
-  const expectedAltEmail = 'owner@fluxone.b2b'
-
-  if (
-    (normalizedId === expectedId || normalizedId === expectedAltEmail) &&
-    (password === ADMIN_CREDENTIALS.password || password === 'password')
-  ) {
-    return {
-      success: true,
-      user: ADMIN_CREDENTIALS,
-    }
-  }
-
+/** Mock credential check disabled — always fail. */
+export function validateAdminLogin() {
   return {
     success: false,
-    error: 'Invalid Admin credentials. Use admin@fluxone.b2b / password123',
+    error: 'Use softwareflux@company.com with the live API login.',
   }
 }

@@ -6,6 +6,17 @@ export const endpoints = {
     update: '/auth/me',
     logout: '/auth/logout',
   },
+  admin: {
+    dashboard: '/admin/dashboard',
+    branches: {
+      list: '/admin/branches',
+      create: '/admin/branches',
+      detail: (id) => `/admin/branches/${id}`,
+      update: (id) => `/admin/branches/${id}`,
+      status: (id) => `/admin/branches/${id}/status`,
+      resetPassword: (id) => `/admin/branches/${id}/reset-password`,
+    },
+  },
   dashboard: {
     overview: '/inventory/dashboard/overview',
     alerts: '/inventory/dashboard/alerts',

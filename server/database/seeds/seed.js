@@ -8,16 +8,21 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url))
 
 async function seed() {
   const passwordHash = await bcrypt.hash('password', 10)
+  const admin123Hash = await bcrypt.hash('admin123', 10)
   const sql = fs
     .readFileSync(path.join(__dirname, 'dummy_data.sql'), 'utf8')
     .replaceAll('{{PASSWORD_HASH}}', passwordHash)
+    .replaceAll('{{ADMIN123_HASH}}', admin123Hash)
 
   await query(sql)
   await pool.end()
 
-  console.log('Seed complete. Demo password (B2B Admin + Branch Manager only): password')
+  console.log('Seed complete.')
   console.log('')
-  console.log('Login: pick company CTA → send tenantSlug + id + password')
+  console.log('SoftwareFlux (upward flow B2B Admin)')
+  console.log('  softwareflux@company.com        [b2b_admin]  password: admin123')
+  console.log('')
+  console.log('Demo tenants (password for all: password)')
   console.log('')
   console.log('Company A  (tenantSlug: company-a)')
   console.log('  admin@companya.local            [b2b_admin]')

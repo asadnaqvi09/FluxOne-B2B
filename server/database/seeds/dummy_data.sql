@@ -5,7 +5,8 @@
 
 INSERT INTO tenants (id, name, slug) VALUES
   ('11111111-1111-1111-1111-111111111111', 'Company A', 'company-a'),
-  ('22222222-2222-2222-2222-222222222222', 'Company B', 'company-b')
+  ('22222222-2222-2222-2222-222222222222', 'Company B', 'company-b'),
+  ('33333333-3333-3333-3333-333333333333', 'SoftwareFlux', 'softwareflux')
 ON CONFLICT (slug) DO NOTHING;
 
 INSERT INTO branches (id, tenant_id, name) VALUES
@@ -47,7 +48,9 @@ INSERT INTO users (id, tenant_id, branch_id, role_id, full_name, email, password
   -- Company B: B2B Admin
   ('b1111111-1111-1111-1111-111111111111', '22222222-2222-2222-2222-222222222222', NULL, 3, 'Hassan Raza', 'admin@companyb.local', '{{PASSWORD_HASH}}'),
   -- Company B: 1 Branch Manager (Taxilla)
-  ('b2222222-2222-2222-2222-222222222222', '22222222-2222-2222-2222-222222222222', 'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbb1', 2, 'Omar Sheikh', 'branch@companyb.local', '{{PASSWORD_HASH}}')
+  ('b2222222-2222-2222-2222-222222222222', '22222222-2222-2222-2222-222222222222', 'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbb1', 2, 'Omar Sheikh', 'branch@companyb.local', '{{PASSWORD_HASH}}'),
+  -- SoftwareFlux: B2B Admin (upward product flow — password: admin123)
+  ('c1111111-1111-1111-1111-111111111111', '33333333-3333-3333-3333-333333333333', NULL, 3, 'SoftwareFlux Admin', 'softwareflux@company.com', '{{ADMIN123_HASH}}')
 ON CONFLICT (id) DO UPDATE
 SET
   tenant_id = EXCLUDED.tenant_id,
@@ -70,7 +73,10 @@ INSERT INTO scoring_scales (tenant_id, code, name, max_points) VALUES
   ('11111111-1111-1111-1111-111111111111', 'customer_service', 'Customer service', 15),
   ('22222222-2222-2222-2222-222222222222', 'punctuality', 'Punctuality', 10),
   ('22222222-2222-2222-2222-222222222222', 'sales_target', 'Sales target', 20),
-  ('22222222-2222-2222-2222-222222222222', 'customer_service', 'Customer service', 15)
+  ('22222222-2222-2222-2222-222222222222', 'customer_service', 'Customer service', 15),
+  ('33333333-3333-3333-3333-333333333333', 'punctuality', 'Punctuality', 10),
+  ('33333333-3333-3333-3333-333333333333', 'sales_target', 'Sales target', 20),
+  ('33333333-3333-3333-3333-333333333333', 'customer_service', 'Customer service', 15)
 ON CONFLICT (tenant_id, code) DO NOTHING;
 
 INSERT INTO taxes (id, tenant_id, name, rate_percent) VALUES
@@ -94,5 +100,10 @@ INSERT INTO designations (tenant_id, name) VALUES
   ('22222222-2222-2222-2222-222222222222', 'Inventory Manager'),
   ('22222222-2222-2222-2222-222222222222', 'Cashier'),
   ('22222222-2222-2222-2222-222222222222', 'Production Staff'),
-  ('22222222-2222-2222-2222-222222222222', 'Delivery Staff')
+  ('22222222-2222-2222-2222-222222222222', 'Delivery Staff'),
+  ('33333333-3333-3333-3333-333333333333', 'Inventory Manager'),
+  ('33333333-3333-3333-3333-333333333333', 'Cashier'),
+  ('33333333-3333-3333-3333-333333333333', 'Production Staff'),
+  ('33333333-3333-3333-3333-333333333333', 'Delivery Staff'),
+  ('33333333-3333-3333-3333-333333333333', 'Branch Manager')
 ON CONFLICT (tenant_id, name) DO NOTHING;

@@ -96,13 +96,21 @@ export async function updateMe(req, res) {
   const body = req.validated.body
   const fullName = body.name?.trim() || undefined
   const loginId = body.id?.trim() || undefined
+  const newPassword = body.password || undefined
 
   try {
-    const updated = await updateAuthProfile(req.user.id, req.tenantId, {
-      fullName,
-      email: loginId,
-    })
-    if (!updated) return fail(res, 'User not found', 404)
+    if (fullName || loginId) {
+      const updated = await updateAuthProfile(req.user.id, req.tenantId, {
+        fullName,
+        email: loginId,
+      })
+      if (!updated) return fail(res, 'User not found', 404)
+    }
+
+    if (newPassword) {
+      const nextHash = await bcrypt.hash(newPassword, 10)
+      await updatePasswordHash(req.user.id, req.tenantId, nextHash)
+    }
   } catch (err) {
     if (err.status === 409) return fail(res, err.message, 409)
     throw err
@@ -110,7 +118,10 @@ export async function updateMe(req, res) {
 
   const user = await findAuthUserById(req.user.id, req.tenantId)
   if (!user) return fail(res, 'User not found', 404)
-  return success(res, publicUser(user))
+  return success(res, {
+    ...publicUser(user),
+    passwordUpdated: Boolean(newPassword),
+  })
 }
 
 export async function refresh(req, res) {

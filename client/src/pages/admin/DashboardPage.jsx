@@ -1,22 +1,32 @@
-import { useState, useMemo } from 'react'
+import { useState } from 'react'
 import { MotionHeader, MotionReveal } from '@/components/shared/MotionReveal'
 import { PageHeader } from '@/components/shared/PageHeader'
+import { SlowLoadingBanner, useSlowLoadingHint } from '@/components/shared/SlowLoadingBanner'
 import { AdminWelcomeBanner } from '@/components/feature/admin/dashboard/AdminWelcomeBanner'
 import { AdminKpiCards } from '@/components/feature/admin/dashboard/AdminKpiCards'
 import { BranchProfitOverviewChart } from '@/components/feature/admin/dashboard/BranchProfitOverviewChart'
 import { BranchInventoryStatusChart } from '@/components/feature/admin/dashboard/BranchInventoryStatusChart'
 import { AiBusinessInsights } from '@/components/feature/admin/dashboard/AiBusinessInsights'
-import { getAdminDashboardDataForTenant } from '@/data/adminDashboardMock'
+import { useAdminDashboard } from '@/hooks/useAdminDashboard'
 import { BRAND } from '@/lib/constants'
 import { NativeSelect } from '@/components/ui/select'
 import { useAuthSession } from '@/hooks/useAuthSession'
 
 export function DashboardPage() {
   const { user } = useAuthSession()
-  const tenantSlug = user?.tenantSlug || 'company-a'
   const [date, setDate] = useState(new Date().toISOString().split('T')[0])
   const [selectedBranch, setSelectedBranch] = useState('all')
-  const data = useMemo(() => getAdminDashboardDataForTenant(tenantSlug), [tenantSlug])
+
+  const {
+    loading,
+    error,
+    branches,
+    kpis,
+    branchProfitOverview,
+    branchInventoryStatus,
+  } = useAdminDashboard({ date, branchId: selectedBranch })
+
+  const slowHint = useSlowLoadingHint(loading)
 
   return (
     <div className="space-y-5 pb-8 sm:space-y-6">
@@ -34,7 +44,7 @@ export function DashboardPage() {
                   onChange={(e) => setSelectedBranch(e.target.value)}
                   className="h-7 border-0 bg-transparent py-0 text-xs font-semibold text-slate-800 shadow-none focus:ring-0"
                 >
-                  {data.branchProfitOverview.branches.map((b) => (
+                  {branches.map((b) => (
                     <option key={b.id} value={b.id}>
                       {b.name}
                     </option>
@@ -57,24 +67,46 @@ export function DashboardPage() {
       </MotionHeader>
 
       <AdminWelcomeBanner />
+      <SlowLoadingBanner show={slowHint} />
+
+      {error ? (
+        <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800">
+          {error}
+        </div>
+      ) : null}
 
       <div className="space-y-5 sm:space-y-6">
-        {/* 1. KPIs (Today Earning, Last month Earning, This year Earning, Total Sale) */}
-        <AdminKpiCards kpis={data.kpis} />
+        {loading && !kpis ? (
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+            {[0, 1, 2, 3].map((i) => (
+              <div
+                key={i}
+                className="h-36 animate-pulse rounded-2xl border border-slate-200 bg-white"
+              />
+            ))}
+          </div>
+        ) : (
+          <AdminKpiCards kpis={kpis || {}} />
+        )}
 
-        {/* 2. Branch Overview (Graphical representation based on month and profit for current year) */}
         <MotionReveal delay={0.05}>
-          <BranchProfitOverviewChart data={data.branchProfitOverview} />
+          {loading && !branchProfitOverview ? (
+            <div className="h-96 animate-pulse rounded-2xl border border-slate-200 bg-white" />
+          ) : (
+            <BranchProfitOverviewChart data={branchProfitOverview || {}} />
+          )}
         </MotionReveal>
 
-        {/* 3. Branch Inventory Status (Graphical representation today each branch status) */}
         <MotionReveal delay={0.1}>
-          <BranchInventoryStatusChart data={data.branchInventoryStatus} />
+          {loading && !branchInventoryStatus ? (
+            <div className="h-80 animate-pulse rounded-2xl border border-slate-200 bg-white" />
+          ) : (
+            <BranchInventoryStatusChart data={branchInventoryStatus || {}} />
+          )}
         </MotionReveal>
 
-        {/* 4. AI Business Insights (Tomorrow sales aspect, best products based on 7 days, why sales rise/drop) */}
         <MotionReveal delay={0.15}>
-          <AiBusinessInsights insights={data.aiBusinessInsights} />
+          <AiBusinessInsights />
         </MotionReveal>
       </div>
 

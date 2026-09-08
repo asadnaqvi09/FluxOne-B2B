@@ -19,7 +19,7 @@ import { toastSuccess } from '@/lib/toast'
 import { cn } from '@/lib/utils'
 
 export function DashboardPage() {
-  const { data, date, setDate, loading, source } = useBranchDashboard()
+  const { data, date, setDate, loading } = useBranchDashboard()
   const { user } = useAuthSession()
 
   function handleDownloadPDF() {
@@ -259,12 +259,6 @@ export function DashboardPage() {
           description="Sales, profit, staff & inventory for the selected date"
           actions={
             <div className="flex flex-wrap items-center gap-2.5">
-              {source === 'dummy' ? (
-                <span className="rounded-full bg-amber-50 px-2.5 py-1 text-xs font-medium text-amber-700 ring-1 ring-amber-200">
-                  Demo data
-                </span>
-              ) : null}
-
               <label className="flex items-center gap-2 rounded-xl border border-border bg-white px-3 py-2 text-xs sm:text-sm shadow-2xs">
                 <Calendar className="size-4 text-purple-700 shrink-0" />
                 <span className="shrink-0 text-slate-500 font-medium">Date</span>

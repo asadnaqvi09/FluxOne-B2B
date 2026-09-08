@@ -14,11 +14,13 @@ import {
   globalLimiter,
   inventoryLimiter,
   syncLimiter,
+  adminLimiter,
 } from './middlewares/rateLimit.middleware.js'
 import authRoutes from './modules/auth/auth.routes.js'
 import inventoryRoutes from './modules/inventory-manager/inventory.routes.js'
 import branchRoutes from './modules/branch-manager/branch.routes.js'
 import syncRoutes from './modules/sync/sync.routes.js'
+import adminRoutes from './modules/b2b-admin/admin.routes.js'
 
 export const app = express()
 
@@ -77,6 +79,7 @@ app.use('/api/auth', authLimiter, authRoutes)
 app.use('/api/inventory', inventoryLimiter, authMiddleware, inventoryRoutes)
 app.use('/api/branch', branchLimiter, authMiddleware, branchRoutes)
 app.use('/api/sync', syncLimiter, authMiddleware, syncRoutes)
+app.use('/api/admin', adminLimiter, authMiddleware, adminRoutes)
 
 app.use(notFoundMiddleware)
 app.use(errorMiddleware)

@@ -1,17 +1,43 @@
-import { BRANCH_DASHBOARD_DUMMY } from '@/data/branchDashboard'
-
 function isPlainObject(value) {
   return value !== null && typeof value === 'object' && !Array.isArray(value)
 }
 
-/** Keys where an empty array from the API is intentional (do not fall back to dummy). */
-const EMPTY_ARRAY_OK = new Set(['staff'])
+/** Empty dashboard shape when API has not returned data yet. */
+export function emptyBranchDashboard(date = new Date().toISOString().slice(0, 10)) {
+  return {
+    branchName: '',
+    date,
+    kpis: {
+      totalSales: 0,
+      profit: 0,
+      saleCount: 0,
+      profitChangePct: 0,
+      salesChangePct: 0,
+      avgTicket: 0,
+    },
+    dailySummary: {
+      revenue: 0,
+      itemsSold: 0,
+      orders: 0,
+      peakHour: '—',
+      peakHourSales: 0,
+    },
+    salesByHour: [],
+    productMix: [],
+    topProducts: [],
+    lowProducts: [],
+    counters: [],
+    staff: [],
+    inventory: [],
+  }
+}
 
-/** Deep-ish merge: arrays from API replace dummy when non-empty; staff empty list is kept. */
+/** Normalize API payload onto the empty dashboard shape (live data only). */
 export function mergeBranchDashboard(apiData) {
-  if (!isPlainObject(apiData)) return structuredClone(BRANCH_DASHBOARD_DUMMY)
+  const date = apiData?.date || new Date().toISOString().slice(0, 10)
+  if (!isPlainObject(apiData)) return emptyBranchDashboard(date)
 
-  const base = structuredClone(BRANCH_DASHBOARD_DUMMY)
+  const base = emptyBranchDashboard(date)
   const merged = { ...base }
 
   for (const key of Object.keys(apiData)) {
@@ -19,9 +45,7 @@ export function mergeBranchDashboard(apiData) {
     if (value == null) continue
 
     if (Array.isArray(value)) {
-      if (value.length > 0 || EMPTY_ARRAY_OK.has(key)) {
-        merged[key] = value
-      }
+      merged[key] = value
       continue
     }
 

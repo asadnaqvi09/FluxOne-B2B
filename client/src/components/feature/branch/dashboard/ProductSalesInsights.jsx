@@ -11,7 +11,6 @@ import {
 } from 'recharts'
 import { TrendingUp, TrendingDown, Layers, ArrowUpRight, ArrowDownRight } from 'lucide-react'
 import { SurfaceCard } from '@/components/shared/SurfaceCard'
-import { BRANCH_DASHBOARD_DUMMY } from '@/data/branchDashboard'
 import { formatCurrency, formatPct } from '@/lib/mapBranchDashboard'
 import { Badge } from '@/components/ui/badge'
 
@@ -51,12 +50,7 @@ function buildMixRows(productMix, topProducts, lowProducts) {
     }))
     .sort((a, b) => b.units - a.units)
 
-  if (fromParts.length > 0) return fromParts
-
-  return BRANCH_DASHBOARD_DUMMY.productMix.map((item) => ({
-    name: item.name,
-    units: Number(item.units) || 0,
-  }))
+  return fromParts
 }
 
 export function ProductSalesInsights({
@@ -72,15 +66,8 @@ export function ProductSalesInsights({
     [productMix, topProducts, lowProducts],
   )
 
-  const tops =
-    Array.isArray(topProducts) && topProducts.length > 0
-      ? topProducts
-      : BRANCH_DASHBOARD_DUMMY.topProducts
-
-  const lows =
-    Array.isArray(lowProducts) && lowProducts.length > 0
-      ? lowProducts
-      : BRANCH_DASHBOARD_DUMMY.lowProducts
+  const tops = Array.isArray(topProducts) ? topProducts : []
+  const lows = Array.isArray(lowProducts) ? lowProducts : []
 
   return (
     <SurfaceCard

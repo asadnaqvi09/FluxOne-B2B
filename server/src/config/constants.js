@@ -72,6 +72,11 @@ export const STAFF_STATUS = {
   BLOCKED: 'inactive',
 }
 
+export const BRANCH_STATUS = {
+  OPEN: 'open',
+  BLOCKED: 'blocked',
+}
+
 export const SALE_STATUS = {
   COMPLETED: 'completed',
   REFUNDED: 'refunded',
@@ -79,7 +84,7 @@ export const SALE_STATUS = {
   VOID: 'void',
 }
 
-/** POS invoice type (Sale / Return / Exchange) — stored on sales.invoice_type */
+//POS invoice type (Sale / Return / Exchange) — stored on sales.invoice_type
 export const INVOICE_TYPES = {
   SALE: 'sale',
   RETURN: 'return',
@@ -121,6 +126,8 @@ export const PERMISSIONS = {
     ROLES.INVENTORY_MANAGER,
     ROLES.B2B_ADMIN,
   ],
+  'admin:dashboard': [ROLES.B2B_ADMIN],
+  'admin:branches': [ROLES.B2B_ADMIN],
 }
 
 export function hasPermission(role, permission) {

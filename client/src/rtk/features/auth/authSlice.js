@@ -42,10 +42,13 @@ export const logoutUser = createAsyncThunk('auth/logout', async () => {
 export const updateProfile = createAsyncThunk(
   'auth/updateProfile',
   async (payload, { rejectWithValue }) => {
-    const result = await apiClient.patch(endpoints.auth.update, {
+    const body = {
       name: payload.name,
       id: payload.id,
-    })
+    }
+    if (payload.password) body.password = payload.password
+
+    const result = await apiClient.patch(endpoints.auth.update, body)
     if (!result?.success) {
       return rejectWithValue(result?.error || 'Profile update failed')
     }
@@ -131,9 +134,11 @@ const authSlice = createSlice({
         clearSessionState(state)
       })
       .addCase(updateProfile.fulfilled, (state, action) => {
-        state.user = action.payload
-        state.role = action.payload?.role || state.role
-        tokenStorage.setUser(action.payload)
+        const payload = action.payload || {}
+        const { passwordUpdated: _passwordUpdated, ...user } = payload
+        state.user = user
+        state.role = user?.role || state.role
+        tokenStorage.setUser(user)
       })
       .addCase(fetchCurrentUser.fulfilled, (state, action) => {
         if (!action.payload) return

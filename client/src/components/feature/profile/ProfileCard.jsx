@@ -15,8 +15,8 @@ function DetailRow({ label, value }) {
 }
 
 /**
- * Reusable profile card for BM / IM (and any signed-in role).
- * No email row — User ID is the login id.
+ * Reusable profile card for BM / IM / Admin (and any signed-in role).
+ * No password on the view card — password is only editable in ProfileEditDialog.
  */
 export function ProfileCard({
   name,

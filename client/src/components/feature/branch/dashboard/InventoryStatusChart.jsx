@@ -9,7 +9,6 @@ import {
   YAxis,
 } from 'recharts'
 import { SurfaceCard } from '@/components/shared/SurfaceCard'
-import { BRANCH_DASHBOARD_DUMMY } from '@/data/branchDashboard'
 import { BRAND } from '@/lib/constants'
 import { cn } from '@/lib/utils'
 
@@ -37,8 +36,7 @@ function InventoryTooltip({ active, payload }) {
 }
 
 export function InventoryStatusChart({ inventory, className }) {
-  const source =
-    Array.isArray(inventory) && inventory.length > 0 ? inventory : BRANCH_DASHBOARD_DUMMY.inventory
+  const source = Array.isArray(inventory) ? inventory : []
 
   const chartData = source.map((item) => ({
     ...item,

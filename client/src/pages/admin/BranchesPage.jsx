@@ -1,7 +1,8 @@
-import { useState, useMemo } from 'react'
+import { useMemo, useState } from 'react'
 import { SurfaceCard } from '@/components/shared/SurfaceCard'
 import { PageHeader } from '@/components/shared/PageHeader'
 import { MotionHeader, MotionReveal } from '@/components/shared/MotionReveal'
+import { SlowLoadingBanner, useSlowLoadingHint } from '@/components/shared/SlowLoadingBanner'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Input } from '@/components/ui/input'
@@ -31,7 +32,7 @@ import {
   validatePhone,
   validateEmail,
 } from '@/lib/validation/formValidators'
-import { getBranchesForTenant } from '@/data/adminBranchesMock'
+import { useAdminBranches } from '@/hooks/useAdminBranches'
 import { useAuthSession } from '@/hooks/useAuthSession'
 import {
   Plus,
@@ -45,77 +46,141 @@ import {
   Users,
   Store,
   KeyRound,
+  Loader2,
 } from 'lucide-react'
+
+const PAGE_SIZE = 8
+const DEFAULT_BRANCH_IMAGE =
+  'https://images.unsplash.com/photo-1578916171728-46686eac8d58?w=500&auto=format&fit=crop&q=60'
+const AVATAR_MALE =
+  'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&auto=format&fit=crop&q=80'
+const AVATAR_FEMALE =
+  'https://images.unsplash.com/photo-1580489944761-15a19d654956?w=150&auto=format&fit=crop&q=80'
+
+function formatCreatedAt(value) {
+  if (!value) return '—'
+  const date = new Date(value)
+  if (Number.isNaN(date.getTime())) return String(value)
+  return date.toLocaleString(undefined, {
+    year: 'numeric',
+    month: 'short',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+  })
+}
+
+function shortId(id) {
+  if (!id) return '—'
+  const raw = String(id)
+  return raw.length > 10 ? `${raw.slice(0, 8)}…` : raw
+}
+
+function managerAvatar(gender) {
+  return gender === 'Female' ? AVATAR_FEMALE : AVATAR_MALE
+}
+
+function credentialsToast(prefix, credentials) {
+  if (!credentials) {
+    toastSuccess(prefix)
+    return
+  }
+  if (credentials.temporaryPassword) {
+    toastSuccess(
+      `${prefix} Temp password: ${credentials.temporaryPassword} (check email / server log). Change it from Profile after login.`,
+    )
+    return
+  }
+  if (credentials.emailed) {
+    toastSuccess(`${prefix} Login credentials emailed to ${credentials.email}.`)
+    return
+  }
+  toastSuccess(
+    `${prefix} Credentials stubbed on server (SMTP not configured). Check server logs for the temp password.`,
+  )
+}
+
+const emptyForm = {
+  id: '',
+  createdAt: '',
+  name: '',
+  location: '',
+  image: '',
+  managerName: '',
+  managerEmail: '',
+  managerContact: '',
+  managerOtherContact: '',
+  managerGender: 'Male',
+  managerAddress: '',
+}
 
 export function BranchesPage() {
   const { user } = useAuthSession()
-  const tenantSlug = user?.tenantSlug || 'company-a'
-  const [branches, setBranches] = useState(() => getBranchesForTenant(tenantSlug))
   const [searchQuery, setSearchQuery] = useState('')
-  const [statusFilter, setStatusFilter] = useState('all') // 'all' | 'open' | 'blocked'
+  const [statusFilter, setStatusFilter] = useState('all')
+  const [page, setPage] = useState(1)
   const [addDialogOpen, setAddDialogOpen] = useState(false)
   const [editingBranch, setEditingBranch] = useState(null)
-  const [page, setPage] = useState(1)
-
   const [confirmStatusOpen, setConfirmStatusOpen] = useState(false)
   const [targetBranch, setTargetBranch] = useState(null)
+  const [resetDialogOpen, setResetDialogOpen] = useState(false)
+  const [resetTarget, setResetTarget] = useState(null)
+  const [formData, setFormData] = useState(emptyForm)
 
-  // KPI Metrics calculations
+  const { items, loading, mutating, error, createBranch, updateBranch, setBranchStatus, resetManagerPassword } =
+    useAdminBranches({ limit: 100 })
+
+  const slowHint = useSlowLoadingHint(loading)
+
   const stats = useMemo(() => {
-    const total = branches.length
-    const open = branches.filter((b) => b.status === 'open').length
-    const blocked = branches.filter((b) => b.status === 'blocked').length
-    const totalStaff = branches.reduce((acc, b) => acc + (Number(b.totalStaff) || 0), 0)
-    const totalPos = branches.reduce((acc, b) => acc + (Number(b.activeTerminals) || 0), 0)
-    return { total, open, blocked, totalStaff, totalPos }
-  }, [branches])
+    const total = items.length
+    const open = items.filter((b) => b.status === 'open').length
+    const blocked = items.filter((b) => b.status === 'blocked').length
+    const totalStaff = items.reduce((acc, b) => acc + (Number(b.totalStaff) || 0), 0)
+    return { total, open, blocked, totalStaff }
+  }, [items])
 
-  // Form State for Add / Edit Branch
-  const [formData, setFormData] = useState({
-    id: '',
-    createdAt: '',
-    name: '',
-    location: '',
-    image: '',
-    managerName: '',
-    managerEmail: '',
-    managerContact: '',
-    managerOtherContact: '',
-    managerGender: 'Male',
-    managerAddress: '',
-  })
+  const filteredBranches = useMemo(() => {
+    const q = searchQuery.trim().toLowerCase()
+    return items.filter((b) => {
+      const matchesSearch =
+        !q ||
+        b.name?.toLowerCase().includes(q) ||
+        b.location?.toLowerCase().includes(q) ||
+        String(b.id).toLowerCase().includes(q) ||
+        b.manager?.name?.toLowerCase().includes(q) ||
+        b.manager?.email?.toLowerCase().includes(q)
 
-  // Open Add Modal
+      const matchesStatus = statusFilter === 'all' ? true : b.status === statusFilter
+      return matchesSearch && matchesStatus
+    })
+  }, [items, searchQuery, statusFilter])
+
+  const totalPages = Math.max(1, Math.ceil(filteredBranches.length / PAGE_SIZE))
+
+  const pagedBranches = useMemo(() => {
+    const start = (page - 1) * PAGE_SIZE
+    return filteredBranches.slice(start, start + PAGE_SIZE)
+  }, [filteredBranches, page])
+
   function handleOpenAdd() {
-    const nextId = `BR-00${branches.length + 1}`
-    const now = new Date()
-    const formattedDate = `${now.toISOString().split('T')[0]} ${now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`
-
     setFormData({
-      id: nextId,
-      createdAt: formattedDate,
-      name: '',
-      location: '',
-      image: 'https://images.unsplash.com/photo-1578916171728-46686eac8d58?w=500&auto=format&fit=crop&q=60',
-      managerName: '',
-      managerEmail: '',
-      managerContact: '',
-      managerOtherContact: '',
-      managerGender: 'Male',
-      managerAddress: '',
+      ...emptyForm,
+      id: 'Assigned on save',
+      createdAt: 'On save',
+      image: DEFAULT_BRANCH_IMAGE,
     })
     setEditingBranch(null)
     setAddDialogOpen(true)
   }
 
-  // Open Edit Modal
   function handleOpenEdit(b) {
     setEditingBranch(b)
     setFormData({
       id: b.id,
-      createdAt: b.createdAt || '2025-05-10 11:45 AM',
-      name: b.name,
-      location: b.location,
+      createdAt: formatCreatedAt(b.createdAt),
+      name: b.name || '',
+      location: b.location || '',
       image: b.image || '',
       managerName: b.manager?.name || '',
       managerEmail: b.manager?.email || '',
@@ -127,31 +192,19 @@ export function BranchesPage() {
     setAddDialogOpen(true)
   }
 
-  // Open Prompt for Branch Block / Open Status
   function handlePromptToggleStatus(branch) {
     setTargetBranch(branch)
     setConfirmStatusOpen(true)
   }
 
-  // Confirm Branch Block / Open Status
-  function handleConfirmToggleStatus() {
+  async function handleConfirmToggleStatus() {
     if (!targetBranch) return
-    const isCurrentlyOpen = targetBranch.status === 'open'
-    const nextStatus = isCurrentlyOpen ? 'blocked' : 'open'
-
-    setBranches((prev) =>
-      prev.map((b) => {
-        if (b.id === targetBranch.id) {
-          return {
-            ...b,
-            status: nextStatus,
-            monthlySales: nextStatus === 'blocked' ? 'Rs. 0 (Blocked)' : 'Rs. 3.20 M',
-          }
-        }
-        return b
-      }),
-    )
-
+    const nextStatus = targetBranch.status === 'open' ? 'blocked' : 'open'
+    const result = await setBranchStatus(targetBranch.id, nextStatus)
+    if (!result.success) {
+      toastError(result.error || 'Failed to update branch status')
+      return
+    }
     toastSuccess(
       `Branch ${targetBranch.name} is now ${nextStatus === 'blocked' ? 'BLOCKED' : 'OPEN & Active'}`,
     )
@@ -159,8 +212,24 @@ export function BranchesPage() {
     setConfirmStatusOpen(false)
   }
 
-  // Submit Add / Edit Form
-  function handleSubmitBranch(e) {
+  function handlePromptResetPassword(branch) {
+    setResetTarget(branch)
+    setResetDialogOpen(true)
+  }
+
+  async function handleConfirmResetPassword() {
+    if (!resetTarget) return
+    const result = await resetManagerPassword(resetTarget.id)
+    if (!result.success) {
+      toastError(result.error || 'Failed to reset password')
+      return
+    }
+    credentialsToast(`Password reset for ${resetTarget.manager?.email || 'manager'}.`, result.data?.credentials)
+    setResetTarget(null)
+    setResetDialogOpen(false)
+  }
+
+  async function handleSubmitBranch(e) {
     e.preventDefault()
     if (!formData.name.trim() || !formData.location.trim()) {
       toastError('Please fill in Branch Name and Location')
@@ -171,116 +240,73 @@ export function BranchesPage() {
       return
     }
 
-    // Email validation
     const emailErr = validateEmail(formData.managerEmail, { fieldName: 'Manager Email' })
     if (emailErr) {
       toastError(emailErr)
       return
     }
 
-    // Phone validation
     const phoneErr = validatePhone(formData.managerContact, { fieldName: 'Manager Contact Phone' })
     if (phoneErr) {
       toastError(phoneErr)
       return
     }
 
+    if (formData.managerOtherContact.trim()) {
+      const otherErr = validatePhone(formData.managerOtherContact, {
+        fieldName: 'Other contact number',
+        required: false,
+      })
+      if (otherErr) {
+        toastError(otherErr)
+        return
+      }
+    }
+
+    const payload = {
+      name: formData.name.trim(),
+      location: formData.location.trim(),
+      image: formData.image.trim() || undefined,
+      managerName: formData.managerName.trim(),
+      managerEmail: formData.managerEmail.trim(),
+      managerContact: formData.managerContact.trim(),
+      managerOtherContact: formData.managerOtherContact.trim() || undefined,
+      managerGender: formData.managerGender,
+      managerAddress: formData.managerAddress.trim() || undefined,
+    }
+
     if (editingBranch) {
-      // Update existing branch
-      setBranches((prev) =>
-        prev.map((b) => {
-          if (b.id === editingBranch.id) {
-            return {
-              ...b,
-              name: formData.name.trim(),
-              location: formData.location.trim(),
-              image: formData.image || b.image,
-              manager: {
-                ...b.manager,
-                name: formData.managerName.trim(),
-                email: formData.managerEmail.trim(),
-                contact: formData.managerContact.trim(),
-                otherContact: formData.managerOtherContact.trim(),
-                gender: formData.managerGender,
-                address: formData.managerAddress.trim(),
-              },
-            }
-          }
-          return b
-        }),
-      )
+      const result = await updateBranch(editingBranch.id, payload)
+      if (!result.success) {
+        toastError(result.error || 'Failed to update branch')
+        return
+      }
       toastSuccess(`Branch details updated for "${formData.name}"`)
     } else {
-      // Create new branch
-      const newId = `BR-00${branches.length + 1}`
-      const newBranch = {
-        id: newId,
-        name: formData.name.trim(),
-        location: formData.location.trim(),
-        status: 'open',
-        image:
-          formData.image ||
-          'https://images.unsplash.com/photo-1578916171728-46686eac8d58?w=500&auto=format&fit=crop&q=60',
-        totalStaff: 4,
-        activeTerminals: 1,
-        monthlySales: 'Rs. 0 (New)',
-        createdAt: 'Just now',
-        manager: {
-          name: formData.managerName.trim(),
-          email: formData.managerEmail.trim(),
-          contact: formData.managerContact.trim(),
-          otherContact: formData.managerOtherContact.trim(),
-          gender: formData.managerGender,
-          address: formData.managerAddress.trim(),
-          image:
-            formData.managerGender === 'Female'
-              ? 'https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?w=150&auto=format&fit=crop&q=60'
-              : 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&auto=format&fit=crop&q=60',
-        },
+      const result = await createBranch(payload)
+      if (!result.success) {
+        toastError(result.error || 'Failed to create branch')
+        return
       }
-      setBranches((prev) => [newBranch, ...prev])
-      toastSuccess(`Branch "${formData.name}" added successfully!`)
+      credentialsToast(`Branch "${formData.name}" created.`, result.data?.credentials)
     }
 
     setAddDialogOpen(false)
+    setEditingBranch(null)
   }
-
-  const PAGE_SIZE = 8
-
-  // Filtered branches
-  const filteredBranches = useMemo(() => {
-    return branches.filter((b) => {
-      const matchesSearch =
-        b.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        b.location.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        b.id.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        b.manager?.name?.toLowerCase().includes(searchQuery.toLowerCase())
-
-      const matchesStatus =
-        statusFilter === 'all' ? true : b.status === statusFilter
-
-      return matchesSearch && matchesStatus
-    })
-  }, [branches, searchQuery, statusFilter])
-
-  const totalPages = Math.max(1, Math.ceil(filteredBranches.length / PAGE_SIZE))
-
-  const pagedBranches = useMemo(() => {
-    const start = (page - 1) * PAGE_SIZE
-    return filteredBranches.slice(start, start + PAGE_SIZE)
-  }, [filteredBranches, page])
 
   return (
     <div className="space-y-6 pb-8">
       <MotionHeader>
         <PageHeader
-          eyebrow="Network Infrastructure"
+          eyebrow={user?.tenantName ? `${user.tenantName} · Network` : 'Network Infrastructure'}
           title="Manage Branches"
           description="Consolidated branch network, branch manager assignments, locations & access statuses"
           actions={
             <Button
               type="button"
               onClick={handleOpenAdd}
+              disabled={loading}
               className="text-white shadow-xs cursor-pointer font-semibold"
               style={{ background: `linear-gradient(90deg, ${BRAND.purple}, ${BRAND.deep})` }}
             >
@@ -291,7 +317,12 @@ export function BranchesPage() {
         />
       </MotionHeader>
 
-      {/* KPI Overview Summary Banner */}
+      <SlowLoadingBanner show={slowHint} />
+
+      {error ? (
+        <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800">{error}</div>
+      ) : null}
+
       <MotionReveal delay={0.03}>
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
           <div className="flex items-center gap-3 rounded-2xl border border-border bg-white p-3.5 shadow-2xs">
@@ -303,7 +334,7 @@ export function BranchesPage() {
             </div>
             <div className="min-w-0">
               <p className="text-[11px] font-medium text-slate-500 uppercase tracking-wider">Total Outlets</p>
-              <p className="text-lg font-bold text-slate-900 leading-tight">{stats.total}</p>
+              <p className="text-lg font-bold text-slate-900 leading-tight">{loading ? '—' : stats.total}</p>
             </div>
           </div>
 
@@ -313,7 +344,7 @@ export function BranchesPage() {
             </div>
             <div className="min-w-0">
               <p className="text-[11px] font-medium text-slate-500 uppercase tracking-wider">Active & Open</p>
-              <p className="text-lg font-bold text-emerald-700 leading-tight">{stats.open}</p>
+              <p className="text-lg font-bold text-emerald-700 leading-tight">{loading ? '—' : stats.open}</p>
             </div>
           </div>
 
@@ -323,7 +354,7 @@ export function BranchesPage() {
             </div>
             <div className="min-w-0">
               <p className="text-[11px] font-medium text-slate-500 uppercase tracking-wider">Blocked Outlets</p>
-              <p className="text-lg font-bold text-slate-700 leading-tight">{stats.blocked}</p>
+              <p className="text-lg font-bold text-slate-700 leading-tight">{loading ? '—' : stats.blocked}</p>
             </div>
           </div>
 
@@ -335,16 +366,13 @@ export function BranchesPage() {
               <Users className="size-5" />
             </div>
             <div className="min-w-0">
-              <p className="text-[11px] font-medium text-slate-500 uppercase tracking-wider">Staff / POS</p>
-              <p className="text-lg font-bold text-slate-900 leading-tight">
-                {stats.totalStaff} <span className="text-xs font-normal text-slate-400">/ {stats.totalPos} POS</span>
-              </p>
+              <p className="text-[11px] font-medium text-slate-500 uppercase tracking-wider">Branch Staff</p>
+              <p className="text-lg font-bold text-slate-900 leading-tight">{loading ? '—' : stats.totalStaff}</p>
             </div>
           </div>
         </div>
       </MotionReveal>
 
-      {/* Filter & Search Bar */}
       <MotionReveal delay={0.06}>
         <div className="flex flex-col gap-3 rounded-2xl border border-border bg-white p-3.5 shadow-2xs sm:flex-row sm:items-center sm:justify-between">
           <div className="relative flex-1">
@@ -364,54 +392,32 @@ export function BranchesPage() {
           <div className="flex items-center gap-2">
             <span className="text-xs text-slate-500 font-semibold shrink-0">Status:</span>
             <div className="flex rounded-xl bg-slate-100 p-0.5 border border-slate-200">
-              <button
-                type="button"
-                onClick={() => {
-                  setStatusFilter('all')
-                  setPage(1)
-                }}
-                className={`rounded-lg px-3 py-1 text-xs font-semibold transition-all cursor-pointer ${
-                  statusFilter === 'all'
-                    ? 'bg-white text-purple-900 shadow-xs font-bold'
-                    : 'text-slate-600 hover:text-slate-900'
-                }`}
-              >
-                All ({branches.length})
-              </button>
-              <button
-                type="button"
-                onClick={() => {
-                  setStatusFilter('open')
-                  setPage(1)
-                }}
-                className={`rounded-lg px-3 py-1 text-xs font-semibold transition-all cursor-pointer ${
-                  statusFilter === 'open'
-                    ? 'bg-white text-purple-900 shadow-xs font-bold'
-                    : 'text-slate-600 hover:text-slate-900'
-                }`}
-              >
-                Open ({branches.filter((b) => b.status === 'open').length})
-              </button>
-              <button
-                type="button"
-                onClick={() => {
-                  setStatusFilter('blocked')
-                  setPage(1)
-                }}
-                className={`rounded-lg px-3 py-1 text-xs font-semibold transition-all cursor-pointer ${
-                  statusFilter === 'blocked'
-                    ? 'bg-white text-purple-900 shadow-xs font-bold'
-                    : 'text-slate-600 hover:text-slate-900'
-                }`}
-              >
-                Blocked ({branches.filter((b) => b.status === 'blocked').length})
-              </button>
+              {[
+                { key: 'all', label: `All (${stats.total})` },
+                { key: 'open', label: `Open (${stats.open})` },
+                { key: 'blocked', label: `Blocked (${stats.blocked})` },
+              ].map((tab) => (
+                <button
+                  key={tab.key}
+                  type="button"
+                  onClick={() => {
+                    setStatusFilter(tab.key)
+                    setPage(1)
+                  }}
+                  className={`rounded-lg px-3 py-1 text-xs font-semibold transition-all cursor-pointer ${
+                    statusFilter === tab.key
+                      ? 'bg-white text-purple-900 shadow-xs font-bold'
+                      : 'text-slate-600 hover:text-slate-900'
+                  }`}
+                >
+                  {tab.label}
+                </button>
+              ))}
             </div>
           </div>
         </div>
       </MotionReveal>
 
-      {/* List of branches Table */}
       <MotionReveal delay={0.09}>
         <SurfaceCard
           title="List of branches"
@@ -432,64 +438,83 @@ export function BranchesPage() {
                   <TableHead className="px-3 py-3 font-medium whitespace-nowrap min-w-[11rem]">Location</TableHead>
                   <TableHead className="px-3 py-3 font-medium whitespace-nowrap min-w-[15rem]">Branch Manager details</TableHead>
                   <TableHead className="px-3 py-3 font-medium whitespace-nowrap min-w-[6.5rem]">Status</TableHead>
-                  <TableHead className="px-3 py-3 text-right font-medium whitespace-nowrap min-w-[9.5rem]">Action</TableHead>
+                  <TableHead className="px-3 py-3 text-right font-medium whitespace-nowrap min-w-[12rem]">Action</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {filteredBranches.length === 0 ? (
+                {loading && items.length === 0 ? (
+                  <TableRow>
+                    <TableCell colSpan={7} className="py-10 text-center text-xs text-slate-400">
+                      <span className="inline-flex items-center gap-2">
+                        <Loader2 className="size-4 animate-spin" />
+                        Loading branches…
+                      </span>
+                    </TableCell>
+                  </TableRow>
+                ) : filteredBranches.length === 0 ? (
                   <TableRow>
                     <TableCell colSpan={7} className="py-8 text-center text-xs text-slate-400">
-                      No branches match the filter criteria.
+                      No branches match the filter criteria. Add a branch to start the SoftFlux upward flow.
                     </TableCell>
                   </TableRow>
                 ) : (
                   pagedBranches.map((b) => {
                     const isOpen = b.status === 'open'
+                    const imageSrc = b.image || DEFAULT_BRANCH_IMAGE
                     return (
                       <TableRow key={b.id} className="hover:bg-slate-50/80">
                         <TableCell className="px-3 py-3 whitespace-nowrap">
-                          <span className="inline-block whitespace-nowrap text-xs font-bold font-mono text-purple-700 bg-purple-50 px-2.5 py-1 rounded-md border border-purple-100 shadow-2xs tracking-wide">
-                            {b.id}
+                          <span
+                            title={b.id}
+                            className="inline-block whitespace-nowrap text-xs font-bold font-mono text-purple-700 bg-purple-50 px-2.5 py-1 rounded-md border border-purple-100 shadow-2xs tracking-wide"
+                          >
+                            {shortId(b.id)}
                           </span>
                         </TableCell>
                         <TableCell className="px-3 py-3 whitespace-nowrap">
                           <img
-                            src={b.image}
+                            src={imageSrc}
                             alt={b.name}
                             className="size-11 rounded-xl object-cover border border-slate-200 shrink-0 shadow-2xs"
                           />
                         </TableCell>
                         <TableCell className="px-3 py-3">
                           <p className="font-bold text-slate-900 text-sm">{b.name}</p>
-                          <span className="text-[11px] text-slate-400 whitespace-nowrap">Est. {b.createdAt}</span>
+                          <span className="text-[11px] text-slate-400 whitespace-nowrap">
+                            Est. {formatCreatedAt(b.createdAt)}
+                          </span>
                         </TableCell>
                         <TableCell className="px-3 py-3 text-xs text-slate-600">
                           <div className="flex items-center gap-1">
                             <MapPin className="size-3.5 text-slate-400 shrink-0" />
-                            <span>{b.location}</span>
+                            <span>{b.location || '—'}</span>
                           </div>
                         </TableCell>
                         <TableCell className="px-3 py-3">
                           <div className="flex items-center gap-2.5">
                             <img
-                              src={b.manager?.image}
-                              alt={b.manager?.name}
+                              src={managerAvatar(b.manager?.gender)}
+                              alt={b.manager?.name || 'Manager'}
                               className="size-9 rounded-full object-cover border border-slate-200 shrink-0"
                             />
                             <div className="min-w-0">
                               <div className="flex items-center gap-1.5">
-                                <p className="font-bold text-slate-900 text-xs truncate">{b.manager?.name}</p>
-                                <span className="text-[9px] bg-slate-100 text-slate-600 px-1.5 py-0.2 rounded font-medium shrink-0">
-                                  {b.manager?.gender}
-                                </span>
+                                <p className="font-bold text-slate-900 text-xs truncate">
+                                  {b.manager?.name || '—'}
+                                </p>
+                                {b.manager?.gender ? (
+                                  <span className="text-[9px] bg-slate-100 text-slate-600 px-1.5 py-0.2 rounded font-medium shrink-0">
+                                    {b.manager.gender}
+                                  </span>
+                                ) : null}
                               </div>
                               <p className="text-[11px] text-slate-500 truncate flex items-center gap-1 mt-0.5">
                                 <Mail className="size-3 text-slate-400 shrink-0" />
-                                <span className="truncate">{b.manager?.email}</span>
+                                <span className="truncate">{b.manager?.email || '—'}</span>
                               </p>
                               <p className="text-[11px] text-slate-400 truncate flex items-center gap-1">
                                 <Phone className="size-3 text-slate-400 shrink-0" />
-                                <span className="whitespace-nowrap">{b.manager?.contact}</span>
+                                <span className="whitespace-nowrap">{b.manager?.contact || '—'}</span>
                               </p>
                             </div>
                           </div>
@@ -518,6 +543,7 @@ export function BranchesPage() {
                               variant="outline"
                               size="sm"
                               onClick={() => handleOpenEdit(b)}
+                              disabled={mutating}
                               className="h-8 text-xs cursor-pointer border-purple-200 text-purple-900 hover:bg-purple-50"
                             >
                               <Edit2 className="mr-1 size-3.5" />
@@ -525,8 +551,20 @@ export function BranchesPage() {
                             </Button>
                             <Button
                               type="button"
+                              variant="outline"
+                              size="sm"
+                              onClick={() => handlePromptResetPassword(b)}
+                              disabled={mutating || !b.manager?.id}
+                              title="Reset manager password & resend credentials"
+                              className="h-8 text-xs cursor-pointer border-slate-200 text-slate-700 hover:bg-slate-50"
+                            >
+                              <KeyRound className="size-3.5" />
+                            </Button>
+                            <Button
+                              type="button"
                               size="sm"
                               onClick={() => handlePromptToggleStatus(b)}
+                              disabled={mutating}
                               className="h-8 text-xs font-semibold cursor-pointer text-white shadow-xs"
                               style={{ background: isOpen ? BRAND.deep : BRAND.purple }}
                             >
@@ -552,30 +590,22 @@ export function BranchesPage() {
             </Table>
           </div>
 
-          <TablePagination
-            page={page}
-            pageCount={totalPages}
-            onPageChange={setPage}
-          />
+          <TablePagination page={page} pageCount={totalPages} onPageChange={setPage} />
         </SurfaceCard>
       </MotionReveal>
 
-      {/* Add / Edit Branch Dialog */}
       <Dialog open={addDialogOpen} onOpenChange={setAddDialogOpen}>
         <DialogContent className="max-w-xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle>
-              {editingBranch ? 'Edit Branch Details' : 'Add New Branch'}
-            </DialogTitle>
+            <DialogTitle>{editingBranch ? 'Edit Branch Details' : 'Add New Branch'}</DialogTitle>
             <DialogDescription>
               {editingBranch
-                ? 'Update branch location, manager contacts and details.'
-                : 'Register a new branch. The manager will automatically receive their login credentials via email.'}
+                ? 'Update branch location and manager profile. Use the key icon on the row to reset password.'
+                : 'Register a new branch. An auto-generated temporary password is emailed to the manager (or logged if SMTP is unset).'}
             </DialogDescription>
           </DialogHeader>
 
           <form onSubmit={handleSubmitBranch} className="space-y-4 pt-2">
-            {/* Branch Details Section */}
             <div className="space-y-3">
               <h5 className="text-xs font-bold uppercase tracking-wider text-purple-900 border-b border-slate-100 pb-1">
                 Branch Details
@@ -583,17 +613,22 @@ export function BranchesPage() {
 
               <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                 <div className="space-y-1">
-                  <Label htmlFor="branchId" className="text-xs">Branch ID</Label>
+                  <Label htmlFor="branchId" className="text-xs">
+                    Branch ID
+                  </Label>
                   <Input
                     id="branchId"
                     value={formData.id}
                     disabled
-                    className="bg-slate-50 font-bold text-purple-900"
+                    title={editingBranch ? formData.id : undefined}
+                    className="bg-slate-50 font-bold text-purple-900 text-xs"
                   />
                 </div>
 
                 <div className="space-y-1">
-                  <Label htmlFor="createdAt" className="text-xs">Created Date / Time</Label>
+                  <Label htmlFor="createdAt" className="text-xs">
+                    Created Date / Time
+                  </Label>
                   <Input
                     id="createdAt"
                     value={formData.createdAt}
@@ -603,10 +638,12 @@ export function BranchesPage() {
                 </div>
 
                 <div className="space-y-1">
-                  <Label htmlFor="branchName" className="text-xs">Name of branch *</Label>
+                  <Label htmlFor="branchName" className="text-xs">
+                    Name of branch *
+                  </Label>
                   <Input
                     id="branchName"
-                    placeholder="e.g. Abbottabad Supply Branch"
+                    placeholder="e.g. Wah Cantt SoftFlux"
                     value={formData.name}
                     onChange={(e) => setFormData({ ...formData, name: e.target.value })}
                     required
@@ -614,10 +651,12 @@ export function BranchesPage() {
                 </div>
 
                 <div className="space-y-1">
-                  <Label htmlFor="branchLocation" className="text-xs">Location *</Label>
+                  <Label htmlFor="branchLocation" className="text-xs">
+                    Location *
+                  </Label>
                   <Input
                     id="branchLocation"
-                    placeholder="e.g. Mansehra Road, Abbottabad"
+                    placeholder="e.g. Main GT Road, Wah Cantt"
                     value={formData.location}
                     onChange={(e) => setFormData({ ...formData, location: e.target.value })}
                     required
@@ -625,7 +664,9 @@ export function BranchesPage() {
                 </div>
 
                 <div className="space-y-1 sm:col-span-2">
-                  <Label htmlFor="branchImage" className="text-xs">Branch Image URL (Optional)</Label>
+                  <Label htmlFor="branchImage" className="text-xs">
+                    Branch Image URL (Optional)
+                  </Label>
                   <Input
                     id="branchImage"
                     placeholder="https://images.unsplash.com/..."
@@ -636,7 +677,6 @@ export function BranchesPage() {
               </div>
             </div>
 
-            {/* Set Branch Manager Section */}
             <div className="space-y-3 pt-2">
               <h5 className="text-xs font-bold uppercase tracking-wider text-purple-900 border-b border-slate-100 pb-1">
                 Set Branch Manager
@@ -644,7 +684,9 @@ export function BranchesPage() {
 
               <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                 <div className="space-y-1">
-                  <Label htmlFor="mgrName" className="text-xs">Name of branch manager *</Label>
+                  <Label htmlFor="mgrName" className="text-xs">
+                    Name of branch manager *
+                  </Label>
                   <Input
                     id="mgrName"
                     placeholder="e.g. Farhan Ali"
@@ -655,11 +697,13 @@ export function BranchesPage() {
                 </div>
 
                 <div className="space-y-1">
-                  <Label htmlFor="mgrEmail" className="text-xs">Email *</Label>
+                  <Label htmlFor="mgrEmail" className="text-xs">
+                    Email (login) *
+                  </Label>
                   <Input
                     id="mgrEmail"
                     type="email"
-                    placeholder="e.g. farhan.ali@fluxone.b2b"
+                    placeholder="e.g. bm.wah@softwareflux.com"
                     value={formData.managerEmail}
                     onChange={(e) => setFormData({ ...formData, managerEmail: e.target.value })}
                     required
@@ -667,7 +711,9 @@ export function BranchesPage() {
                 </div>
 
                 <div className="space-y-1">
-                  <Label htmlFor="mgrContact" className="text-xs">Contract number *</Label>
+                  <Label htmlFor="mgrContact" className="text-xs">
+                    Contact number *
+                  </Label>
                   <Input
                     id="mgrContact"
                     placeholder="03001234567 or +923001234567"
@@ -681,20 +727,27 @@ export function BranchesPage() {
                 </div>
 
                 <div className="space-y-1">
-                  <Label htmlFor="mgrOtherContact" className="text-xs">Other contact number</Label>
+                  <Label htmlFor="mgrOtherContact" className="text-xs">
+                    Other contact number
+                  </Label>
                   <Input
                     id="mgrOtherContact"
                     placeholder="03217654321"
                     value={formData.managerOtherContact}
                     onChange={(e) =>
-                      setFormData({ ...formData, managerOtherContact: sanitizePhoneInput(e.target.value) })
+                      setFormData({
+                        ...formData,
+                        managerOtherContact: sanitizePhoneInput(e.target.value),
+                      })
                     }
                     maxLength={13}
                   />
                 </div>
 
                 <div className="space-y-1">
-                  <Label htmlFor="mgrGender" className="text-xs">Gender (Male / Female / Other)</Label>
+                  <Label htmlFor="mgrGender" className="text-xs">
+                    Gender
+                  </Label>
                   <NativeSelect
                     id="mgrGender"
                     value={formData.managerGender}
@@ -707,10 +760,12 @@ export function BranchesPage() {
                 </div>
 
                 <div className="space-y-1">
-                  <Label htmlFor="mgrAddress" className="text-xs">Address</Label>
+                  <Label htmlFor="mgrAddress" className="text-xs">
+                    Address
+                  </Label>
                   <Input
                     id="mgrAddress"
-                    placeholder="e.g. House 12, Sector C, Abbottabad"
+                    placeholder="e.g. House 12, Sector C, Wah Cantt"
                     value={formData.managerAddress}
                     onChange={(e) => setFormData({ ...formData, managerAddress: e.target.value })}
                   />
@@ -718,34 +773,43 @@ export function BranchesPage() {
               </div>
             </div>
 
-            <div className="rounded-xl border border-purple-100 bg-purple-50/50 p-3 text-xs text-purple-900 flex items-start gap-2">
-              <KeyRound className="size-4 shrink-0 text-purple-700 mt-0.5" />
-              <span>
-                New branch will create it and by email inform to branch manager login credentials &amp; online login details.
-              </span>
-            </div>
+            {!editingBranch ? (
+              <div className="rounded-xl border border-purple-100 bg-purple-50/50 p-3 text-xs text-purple-900 flex items-start gap-2">
+                <KeyRound className="size-4 shrink-0 text-purple-700 mt-0.5" />
+                <span>
+                  Password is auto-generated. The manager receives login email + temporary password (or it is
+                  logged on the server if SMTP is not configured). Ask them to change it from Profile after first
+                  login.
+                </span>
+              </div>
+            ) : null}
 
             <DialogFooter className="pt-3">
-              <Button
-                type="button"
-                variant="outline"
-                onClick={() => setAddDialogOpen(false)}
-              >
+              <Button type="button" variant="outline" onClick={() => setAddDialogOpen(false)} disabled={mutating}>
                 Cancel
               </Button>
               <Button
                 type="submit"
+                disabled={mutating}
                 className="text-white font-semibold"
                 style={{ background: `linear-gradient(90deg, ${BRAND.purple}, ${BRAND.deep})` }}
               >
-                {editingBranch ? 'Save Changes' : 'Save'}
+                {mutating ? (
+                  <>
+                    <Loader2 className="mr-1.5 size-4 animate-spin" />
+                    Saving…
+                  </>
+                ) : editingBranch ? (
+                  'Save Changes'
+                ) : (
+                  'Save'
+                )}
               </Button>
             </DialogFooter>
           </form>
         </DialogContent>
       </Dialog>
 
-      {/* Branch Status Confirmation Modal */}
       <Dialog open={confirmStatusOpen} onOpenChange={setConfirmStatusOpen}>
         <DialogContent className="max-w-md">
           <DialogHeader>
@@ -765,15 +829,15 @@ export function BranchesPage() {
             <DialogDescription className="text-xs leading-relaxed pt-1">
               {targetBranch?.status === 'open' ? (
                 <>
-                  Are you sure you want to block <strong>&quot;{targetBranch?.name}&quot;</strong> ({targetBranch?.id})?
+                  Are you sure you want to block <strong>&quot;{targetBranch?.name}&quot;</strong>?
                   <br />
-                  All POS terminals, cashier checkouts, and staff logins for this branch will immediately be disabled.
+                  The branch manager login for this branch will be deactivated.
                 </>
               ) : (
                 <>
-                  Are you sure you want to open and activate <strong>&quot;{targetBranch?.name}&quot;</strong> ({targetBranch?.id})?
+                  Are you sure you want to open and activate <strong>&quot;{targetBranch?.name}&quot;</strong>?
                   <br />
-                  This branch will be re-enabled and POS terminals will resume transaction processing.
+                  The branch manager login will be re-enabled.
                 </>
               )}
             </DialogDescription>
@@ -784,16 +848,53 @@ export function BranchesPage() {
               type="button"
               variant="outline"
               onClick={() => setConfirmStatusOpen(false)}
+              disabled={mutating}
             >
               Cancel
             </Button>
             <Button
               type="button"
               onClick={handleConfirmToggleStatus}
+              disabled={mutating}
               className="text-white font-semibold cursor-pointer shadow-sm"
               style={{ background: targetBranch?.status === 'open' ? BRAND.deep : BRAND.purple }}
             >
-              {targetBranch?.status === 'open' ? 'Yes, Block Branch' : 'Yes, Open Branch'}
+              {mutating ? 'Updating…' : targetBranch?.status === 'open' ? 'Yes, Block Branch' : 'Yes, Open Branch'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={resetDialogOpen} onOpenChange={setResetDialogOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <KeyRound className="size-5 text-purple-700" />
+              Reset manager password
+            </DialogTitle>
+            <DialogDescription className="text-xs leading-relaxed pt-1">
+              Generate a new temporary password for{' '}
+              <strong>{resetTarget?.manager?.email || 'this branch manager'}</strong> and send credentials by
+              email (or stub to server logs if SMTP is unset).
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter className="pt-3 gap-2">
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => setResetDialogOpen(false)}
+              disabled={mutating}
+            >
+              Cancel
+            </Button>
+            <Button
+              type="button"
+              onClick={handleConfirmResetPassword}
+              disabled={mutating}
+              className="text-white font-semibold"
+              style={{ background: `linear-gradient(90deg, ${BRAND.purple}, ${BRAND.deep})` }}
+            >
+              {mutating ? 'Resetting…' : 'Reset & send'}
             </Button>
           </DialogFooter>
         </DialogContent>

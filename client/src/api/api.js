@@ -1,5 +1,4 @@
 import { API_BASE_URL, DEMO_ACCOUNTS, MOCK_API } from '@/lib/constants'
-import { BRANCH_DASHBOARD_DUMMY } from '@/data/branchDashboard'
 import { endpoints } from '@/api/endpoints'
 import { getErrorMessage, parseJson, toQuery } from '@/api/apiHelper'
 import { fail, ok } from '@/api/result'
@@ -137,7 +136,7 @@ async function refreshAccessToken() {
   return refreshInFlight
 }
 
-/** Minimal mock: auth + BM dashboard dummy only (inventory modules are live-API). */
+/** Minimal mock: auth only (inventory/branch modules use live API). */
 async function mockRequest(method, path, body) {
   await delay()
   const route = mockPath(path)
@@ -159,7 +158,12 @@ async function mockRequest(method, path, body) {
       role: account.role,
       tenantSlug: account.tenantSlug,
       tenantId: account.tenantSlug,
-      tenantName: account.tenantSlug === 'company-a' ? 'Company A' : 'Company B',
+      tenantName:
+        account.tenantSlug === 'company-a'
+          ? 'Company A'
+          : account.tenantSlug === 'softwareflux'
+            ? 'SoftwareFlux'
+            : 'Company B',
       branchId: null,
     }
     return ok({
@@ -188,27 +192,18 @@ async function mockRequest(method, path, body) {
     if (method === 'PATCH') {
       const nextName = body?.name?.trim()
       const nextId = (body?.id || body?.email || '').trim()
-      if (!nextName && !nextId) return fail('name or id is required')
+      if (!nextName && !nextId && !body?.password) return fail('name, id, or password is required')
       return ok({
         ...user,
         name: nextName || user.name,
         email: nextId || user.email,
+        passwordUpdated: Boolean(body?.password),
       })
     }
     return ok(user)
   }
 
   if (route === endpoints.auth.logout) return ok({ loggedOut: true })
-
-  if (route === endpoints.branch.dashboard) {
-    const queryDate = path.includes('date=')
-      ? decodeURIComponent(path.split('date=')[1]?.split('&')[0] || '')
-      : ''
-    return ok({
-      ...BRANCH_DASHBOARD_DUMMY,
-      date: queryDate || BRANCH_DASHBOARD_DUMMY.date,
-    })
-  }
 
   if (method === 'POST' || method === 'PATCH') {
     return ok({ ...(body || {}), id: body?.id || crypto.randomUUID() })

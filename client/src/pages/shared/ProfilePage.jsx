@@ -47,7 +47,11 @@ export function ProfilePage() {
     try {
       const result = await dispatch(updateProfile(fields))
       if (updateProfile.fulfilled.match(result)) {
-        toastSuccess('Profile updated')
+        toastSuccess(
+          result.payload?.passwordUpdated
+            ? 'Profile updated. New password saved — use it next time you sign in.'
+            : 'Profile updated',
+        )
         return { success: true, data: result.payload }
       }
       const error = result.payload || result.error?.message || 'Update failed'

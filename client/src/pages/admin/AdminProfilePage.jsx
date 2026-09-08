@@ -2,38 +2,45 @@ import { useState } from 'react'
 import { ProfileCard } from '@/components/feature/profile/ProfileCard'
 import { ProfileEditDialog } from '@/components/feature/profile/ProfileEditDialog'
 import { MotionHeader, MotionReveal } from '@/components/shared/MotionReveal'
-import { getAdminSession, setAdminSession } from '@/config/adminAuth.config'
-import { toastSuccess } from '@/lib/toast'
+import { useAuthSession } from '@/hooks/useAuthSession'
+import { updateProfile } from '@/rtk/features/auth/authSlice'
+import { useAppDispatch } from '@/rtk/hooks'
+import { toastSuccess, toastError } from '@/lib/toast'
 
 export function AdminProfilePage() {
-  const session = getAdminSession() || {
-    name: 'Asad',
-    email: 'admin@fluxone.b2b',
-    role: 'b2b_admin',
-    loginExpires: '01 Sept 2026, 12:11 pm',
-  }
-
-  const [name, setName] = useState(session.name || 'Asad')
-  const [loginId, setLoginId] = useState(session.loginId || session.email || 'INV-Wah01')
+  const dispatch = useAppDispatch()
+  const { user } = useAuthSession()
+  const [name, setName] = useState(user?.name || 'Admin')
+  const [loginId, setLoginId] = useState(user?.email || user?.id || '')
   const [editOpen, setEditOpen] = useState(false)
   const [saving, setSaving] = useState(false)
 
   async function handleSave(fields) {
     setSaving(true)
     try {
-      const updated = {
-        ...session,
-        name: fields.name,
-        loginId: fields.id || fields.loginId || session.loginId || 'INV-Wah01',
-        email: fields.id || session.email,
+      const result = await dispatch(
+        updateProfile({
+          name: fields.name?.trim(),
+          id: (fields.id || fields.loginId || '').trim(),
+          password: fields.password || undefined,
+        }),
+      )
+      if (updateProfile.rejected.match(result)) {
+        toastError(result.payload || 'Failed to update profile')
+        return { success: false, error: result.payload }
       }
-      setAdminSession(updated)
-      setName(fields.name)
-      setLoginId(fields.id || fields.loginId || 'INV-Wah01')
-      toastSuccess('Profile updated successfully')
+      const data = result.payload
+      setName(data?.name || fields.name)
+      setLoginId(data?.email || fields.id || fields.loginId)
+      toastSuccess(
+        data?.passwordUpdated
+          ? 'Profile updated. New password saved — use it next time you sign in.'
+          : 'Profile updated successfully',
+      )
       setEditOpen(false)
       return { success: true }
     } catch {
+      toastError('Failed to update profile')
       return { success: false, error: 'Failed to update profile' }
     } finally {
       setSaving(false)
@@ -51,7 +58,7 @@ export function AdminProfilePage() {
           name={name}
           loginId={loginId}
           role="b2b_admin"
-          loginExpires={session.loginExpires || '01 Sept 2026, 12:11 pm'}
+          loginExpires="Session (JWT)"
           onEdit={() => setEditOpen(true)}
         />
       </MotionReveal>

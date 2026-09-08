@@ -1,3 +1,4 @@
+import fluxOneLogo from '@/assets/FluxOne(2).png'
 import { cn } from '@/lib/utils'
 import { BRAND } from '@/lib/constants'
 
@@ -12,7 +13,7 @@ export function BrandLogo({ className, size = 'md', withGlow = false }) {
   return (
     <div
       className={cn(
-        'relative shrink-0 overflow-hidden rounded-full',
+        'relative shrink-0 overflow-hidden rounded-full border border-gray-200',
         sizes[size] || sizes.md,
         withGlow && 'shadow-[0_0_60px_rgba(142,35,143,0.55)]',
         className,
@@ -20,11 +21,11 @@ export function BrandLogo({ className, size = 'md', withGlow = false }) {
       aria-label={BRAND.name}
     >
       <img
-        src="/assets/company-logo.png"
+        src={fluxOneLogo}
         alt={BRAND.name}
-        width={160}
-        height={160}
-        className="size-full object-cover"
+        width={200}
+        height={200}
+        className="size-full object-contain"
         draggable={false}
       />
     </div>

@@ -10,6 +10,26 @@ function isGuid(value) {
   return typeof value === 'string' && GUID_RE.test(value)
 }
 
+// POS JSON often uses null for "unset"; Zod .optional() only allows undefined
+function stripNullFields(value) {
+  if (Array.isArray(value)) {
+    return value.map(stripNullFields)
+  }
+  if (value && typeof value === 'object') {
+    const out = {}
+    for (const [key, nested] of Object.entries(value)) {
+      if (nested === null) continue
+      out[key] = stripNullFields(nested)
+    }
+    return out
+  }
+  return value
+}
+
+// Optional string that accepts null/undefined (after normalize, null should already be gone)
+const optionalString = z.string().nullish()
+const optionalGuid = idSchema.nullish()
+
 export function formatZodIssues(error) {
   return (
     error?.issues
@@ -34,31 +54,32 @@ export function zodErrorDetails(error) {
 export const saleLineSchema = z.object({
   productId: idSchema,
   quantity: z.coerce.number().positive(),
-  scale: z.coerce.string().min(1).optional(),
-  unitPrice: z.coerce.number().nonnegative().optional(),
-  discountAmount: z.coerce.number().nonnegative().optional(),
-  taxAmount: z.coerce.number().nonnegative().optional(),
-  lineTotal: z.coerce.number().nonnegative().optional(),
-  isExchange: z.boolean().optional(),
-  isReturned: z.boolean().optional(),
+  scale: z.coerce.string().min(1).nullish(),
+  unitPrice: z.coerce.number().nonnegative().nullish(),
+  discountAmount: z.coerce.number().nonnegative().nullish(),
+  taxAmount: z.coerce.number().nonnegative().nullish(),
+  lineTotal: z.coerce.number().nonnegative().nullish(),
+  isExchange: z.boolean().nullish(),
+  isReturned: z.boolean().nullish(),
 })
 
 export const salePayloadSchema = z.object({
-  localSaleId: z.string().optional(),
-  saleNumber: z.string().optional(),
-  soldAt: z.string().optional(),
-  counterCode: z.string().optional(),
-  staffUserId: idSchema.optional(),
-  paymentMethod: z.string().optional(),
-  subtotal: z.coerce.number().nonnegative().optional(),
-  taxAmount: z.coerce.number().nonnegative().optional(),
-  discountAmount: z.coerce.number().nonnegative().optional(),
-  finalAmount: z.coerce.number().nonnegative().optional(),
-  paidAmount: z.coerce.number().nonnegative().optional(),
-  returnAmount: z.coerce.number().nonnegative().optional(),
-  originalInvoiceId: z.string().optional(),
-  /** POS exchange sale leg: same invoiceId, received lines + stock OUT */
-  exchange: z.boolean().optional(),
+  localSaleId: optionalString,
+  saleNumber: optionalString,
+  soldAt: optionalString,
+  // POS may send counterCode: null when no till is selected
+  counterCode: optionalString,
+  staffUserId: optionalGuid,
+  paymentMethod: optionalString,
+  subtotal: z.coerce.number().nonnegative().nullish(),
+  taxAmount: z.coerce.number().nonnegative().nullish(),
+  discountAmount: z.coerce.number().nonnegative().nullish(),
+  finalAmount: z.coerce.number().nonnegative().nullish(),
+  paidAmount: z.coerce.number().nonnegative().nullish(),
+  returnAmount: z.coerce.number().nonnegative().nullish(),
+  originalInvoiceId: optionalString,
+  // POS exchange sale leg: same invoiceId, received lines + stock OUT
+  exchange: z.boolean().nullish(),
   status: z
     .enum([
       SALE_STATUS.COMPLETED,
@@ -66,9 +87,9 @@ export const salePayloadSchema = z.object({
       SALE_STATUS.PARTIAL_REFUND,
       SALE_STATUS.VOID,
     ])
-    .optional(),
+    .nullish(),
   lines: z.array(saleLineSchema).min(1),
-  reason: z.string().optional(),
+  reason: optionalString,
 })
 
 export const salesPullQuerySchema = z.object({
@@ -80,13 +101,13 @@ export const salesPullQuerySchema = z.object({
 export const productPricePayloadSchema = z.object({
   productId: idSchema,
   sellingPrice: z.coerce.number().nonnegative(),
-  discountPercent: z.coerce.number().min(0).max(100).optional(),
-  branchId: idSchema.optional(),
-  currency: z.string().optional(),
-  updatedAt: z.string().optional(),
-  updatedByUserId: idSchema.optional(),
-  source: z.string().optional(),
-  deviceId: z.string().optional(),
+  discountPercent: z.coerce.number().min(0).max(100).nullish(),
+  branchId: optionalGuid,
+  currency: optionalString,
+  updatedAt: optionalString,
+  updatedByUserId: optionalGuid,
+  source: optionalString,
+  deviceId: optionalString,
 })
 
 export const SYNC_EVENT_TYPES = /** @type {const} */ ([
@@ -102,12 +123,12 @@ export const syncEventSchema = z.object({
   clientEventId: z.string().min(1),
   eventType: z.enum(SYNC_EVENT_TYPES),
   payload: z.record(z.string(), z.any()),
-  deviceId: z.string().optional(),
+  deviceId: optionalString,
 })
 
 export const pushBodySchema = z.object({
-  deviceId: z.string().optional(),
-  branchId: idSchema.optional(),
+  deviceId: optionalString,
+  branchId: optionalGuid,
   events: z.array(syncEventSchema).min(1),
 })
 
@@ -120,19 +141,20 @@ export const deltaQuerySchema = z.object({
   since: z.string().min(1),
 })
 
-/** Map POS field names to cloud schema before validation. */
+// Map POS field names to cloud schema before validation
 export function normalizePosSalePayload(raw = {}) {
-  const payload = { ...raw }
+  // Drop nulls so counterCode/cashierName/etc. do not fail Zod
+  const payload = stripNullFields({ ...raw })
 
   // Prefer non-empty lines; fall back to POS alias `items`
   const rawLines = Array.isArray(raw.lines) ? raw.lines : null
   const rawItems = Array.isArray(raw.items) ? raw.items : null
   if ((!rawLines || rawLines.length === 0) && rawItems && rawItems.length > 0) {
-    payload.lines = rawItems
+    payload.lines = stripNullFields(rawItems)
   } else if (rawLines) {
-    payload.lines = rawLines
+    payload.lines = stripNullFields(rawLines)
   } else if (rawItems) {
-    payload.lines = rawItems
+    payload.lines = stripNullFields(rawItems)
   }
 
   const staffCandidate = payload.staffUserId ?? raw.cashierId ?? raw.cashier_id
@@ -159,23 +181,23 @@ export function normalizePosSalePayload(raw = {}) {
     payload.originalInvoiceId = raw.originalSaleNumber
   }
 
-  if (raw.discount !== undefined && payload.discountAmount === undefined) {
+  if (raw.discount !== undefined && raw.discount !== null && payload.discountAmount === undefined) {
     payload.discountAmount = raw.discount
   }
-  if (raw.tax !== undefined && payload.taxAmount === undefined) {
+  if (raw.tax !== undefined && raw.tax !== null && payload.taxAmount === undefined) {
     payload.taxAmount = raw.tax
   }
-  if (payload.finalAmount === undefined && raw.total !== undefined) {
+  if (payload.finalAmount === undefined && raw.total !== undefined && raw.total !== null) {
     payload.finalAmount = raw.total
   }
-  if (payload.paidAmount === undefined && raw.tendered !== undefined) {
+  if (payload.paidAmount === undefined && raw.tendered !== undefined && raw.tendered !== null) {
     payload.paidAmount = raw.tendered
   }
-  if (raw.changeDue !== undefined && payload.returnAmount === undefined) {
+  if (raw.changeDue !== undefined && raw.changeDue !== null && payload.returnAmount === undefined) {
     payload.returnAmount = raw.changeDue
   }
 
-  if (raw.refundAmount !== undefined && payload.finalAmount === undefined) {
+  if (raw.refundAmount !== undefined && raw.refundAmount !== null && payload.finalAmount === undefined) {
     payload.finalAmount = raw.refundAmount
   }
 
@@ -185,6 +207,7 @@ export function normalizePosSalePayload(raw = {}) {
       productId: line.productId ?? line.product_id,
       discountAmount: line.discountAmount ?? line.discount,
       taxAmount: line.taxAmount ?? line.tax,
+      // Coerce numeric scale from POS (e.g. 1) to string
       scale: line.scale != null && line.scale !== '' ? String(line.scale) : undefined,
       isExchange: line.isExchange ?? line.is_exchange ?? false,
       isReturned: line.isReturned ?? line.is_returned ?? false,
@@ -194,20 +217,20 @@ export function normalizePosSalePayload(raw = {}) {
   return payload
 }
 
-/** Normalize POS Items Rate / price push aliases. */
+// Normalize POS Items Rate / price push aliases
 export function normalizePosPricePayload(raw = {}) {
-  const payload = { ...raw }
+  const payload = stripNullFields({ ...raw })
 
   const productId = raw.productId ?? raw.product_id ?? raw.id
   if (productId && !payload.productId) payload.productId = productId
 
   const sellingPrice = raw.sellingPrice ?? raw.selling_price ?? raw.price
-  if (sellingPrice !== undefined && payload.sellingPrice === undefined) {
+  if (sellingPrice !== undefined && sellingPrice !== null && payload.sellingPrice === undefined) {
     payload.sellingPrice = sellingPrice
   }
 
   const discountPercent = raw.discountPercent ?? raw.discount_percent ?? raw.discount
-  if (discountPercent !== undefined && payload.discountPercent === undefined) {
+  if (discountPercent !== undefined && discountPercent !== null && payload.discountPercent === undefined) {
     payload.discountPercent = discountPercent
   }
 

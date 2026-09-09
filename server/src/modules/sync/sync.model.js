@@ -2,16 +2,36 @@ import { tenantClientQuery, tenantQuery, withTransaction } from '../../config/db
 import { INVOICE_TYPES, MOVEMENT_TYPES, ROLES, SALE_STATUS } from '../../config/constants.js'
 import { insertLedgerEventInTx } from '../inventory-manager/control/control.model.js'
 import {
+  formatZodIssues,
   validateProductPricePayload,
   validateRefundPayload,
   validateSalePayload,
+  zodErrorDetails,
 } from './sync.validator.js'
 import { normalizeImageUrl } from '../../utils/uploadUrl.util.js'
 
-function httpError(status, message) {
+function httpError(status, message, details) {
   const error = new Error(message)
   error.status = status
+  if (details !== undefined) error.details = details
   return error
+}
+
+function throwSaleValidationError(label, syncEvent, parsed) {
+  const details = zodErrorDetails(parsed.error)
+  console.error(`[sync] ${label} validation failed`, {
+    clientEventId: syncEvent.clientEventId,
+    eventType: syncEvent.eventType,
+    syncEventId: syncEvent.id || null,
+    payload: syncEvent.payload,
+    ...details,
+  })
+  throw httpError(422, `${label}: ${formatZodIssues(parsed.error)}`, {
+    clientEventId: syncEvent.clientEventId,
+    eventType: syncEvent.eventType,
+    payload: syncEvent.payload,
+    ...details,
+  })
 }
 
 // ---------------------------------------------------------------------------
@@ -348,7 +368,7 @@ function isExchangeGivenRefund(payload) {
 export async function ingestSaleEvent(client, tenantId, syncEvent, userId) {
   const parsed = validateSalePayload(syncEvent.payload)
   if (!parsed.success) {
-    throw httpError(422, 'Sale events require a valid payload with lines')
+    throwSaleValidationError('Sale payload validation failed', syncEvent, parsed)
   }
 
   if (await eventAlreadyProcessed(client, tenantId, syncEvent.id)) {
@@ -433,7 +453,7 @@ export async function ingestSaleEvent(client, tenantId, syncEvent, userId) {
 export async function ingestRefundEvent(client, tenantId, syncEvent, userId) {
   const parsed = validateRefundPayload(syncEvent.payload)
   if (!parsed.success) {
-    throw httpError(422, 'Refund events require a valid payload with lines')
+    throwSaleValidationError('Refund payload validation failed', syncEvent, parsed)
   }
 
   if (await eventAlreadyProcessed(client, tenantId, syncEvent.id)) {

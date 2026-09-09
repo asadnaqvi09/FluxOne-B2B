@@ -46,9 +46,17 @@ export async function push(req, res) {
       events.push(row)
       accepted.push(row.clientEventId)
     } catch (err) {
+      console.error('[sync/push] event rejected', {
+        clientEventId: event.clientEventId,
+        eventType: event.eventType,
+        reason: err.message || 'Event rejected',
+        details: err.details || null,
+        payload: normalized.payload,
+      })
       rejected.push({
         clientEventId: event.clientEventId,
         reason: err.message || 'Event rejected',
+        ...(err.details ? { details: err.details } : {}),
       })
     }
   }

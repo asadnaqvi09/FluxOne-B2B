@@ -3,11 +3,38 @@ import { SALE_STATUS } from '../../config/constants.js'
 
 /** Accept demo/seed UUID-shaped ids (Zod 4 z.uuid() is RFC-4122 strict). */
 const idSchema = z.guid()
+const GUID_RE =
+  /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/
+
+function isGuid(value) {
+  return typeof value === 'string' && GUID_RE.test(value)
+}
+
+export function formatZodIssues(error) {
+  return (
+    error?.issues
+      ?.map((issue) => `${issue.path?.length ? issue.path.join('.') : '(root)'}: ${issue.message}`)
+      .join('; ') || 'Validation failed'
+  )
+}
+
+export function zodErrorDetails(error) {
+  const flattened = error?.flatten?.() || { formErrors: [], fieldErrors: {} }
+  return {
+    formErrors: flattened.formErrors,
+    fieldErrors: flattened.fieldErrors,
+    issues: (error?.issues || []).map((issue) => ({
+      path: issue.path?.join('.') || '',
+      message: issue.message,
+      code: issue.code,
+    })),
+  }
+}
 
 export const saleLineSchema = z.object({
   productId: idSchema,
   quantity: z.coerce.number().positive(),
-  scale: z.string().min(1).optional(),
+  scale: z.coerce.string().min(1).optional(),
   unitPrice: z.coerce.number().nonnegative().optional(),
   discountAmount: z.coerce.number().nonnegative().optional(),
   taxAmount: z.coerce.number().nonnegative().optional(),
@@ -97,12 +124,24 @@ export const deltaQuerySchema = z.object({
 export function normalizePosSalePayload(raw = {}) {
   const payload = { ...raw }
 
-  if (Array.isArray(raw.items) && !raw.lines) {
-    payload.lines = raw.items
+  // Prefer non-empty lines; fall back to POS alias `items`
+  const rawLines = Array.isArray(raw.lines) ? raw.lines : null
+  const rawItems = Array.isArray(raw.items) ? raw.items : null
+  if ((!rawLines || rawLines.length === 0) && rawItems && rawItems.length > 0) {
+    payload.lines = rawItems
+  } else if (rawLines) {
+    payload.lines = rawLines
+  } else if (rawItems) {
+    payload.lines = rawItems
   }
 
-  if (raw.cashierId && !payload.staffUserId) {
-    payload.staffUserId = raw.cashierId
+  const staffCandidate = payload.staffUserId ?? raw.cashierId ?? raw.cashier_id
+  if (staffCandidate != null && payload.staffUserId == null) {
+    payload.staffUserId = staffCandidate
+  }
+  // Non-UUID cashier/local ids must not fail the whole sale — staff is optional
+  if (payload.staffUserId != null && !isGuid(String(payload.staffUserId))) {
+    delete payload.staffUserId
   }
 
   if (raw.invoiceId && !payload.saleNumber) {
@@ -126,10 +165,10 @@ export function normalizePosSalePayload(raw = {}) {
   if (raw.tax !== undefined && payload.taxAmount === undefined) {
     payload.taxAmount = raw.tax
   }
-  if (raw.total !== undefined && payload.finalAmount === undefined) {
+  if (payload.finalAmount === undefined && raw.total !== undefined) {
     payload.finalAmount = raw.total
   }
-  if (raw.tendered !== undefined && payload.paidAmount === undefined) {
+  if (payload.paidAmount === undefined && raw.tendered !== undefined) {
     payload.paidAmount = raw.tendered
   }
   if (raw.changeDue !== undefined && payload.returnAmount === undefined) {
@@ -146,6 +185,7 @@ export function normalizePosSalePayload(raw = {}) {
       productId: line.productId ?? line.product_id,
       discountAmount: line.discountAmount ?? line.discount,
       taxAmount: line.taxAmount ?? line.tax,
+      scale: line.scale != null && line.scale !== '' ? String(line.scale) : undefined,
       isExchange: line.isExchange ?? line.is_exchange ?? false,
       isReturned: line.isReturned ?? line.is_returned ?? false,
     }))

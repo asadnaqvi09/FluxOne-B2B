@@ -115,6 +115,7 @@ export async function listBranches(tenantId, filters = {}) {
         AND (
           $3::text IS NULL
           OR b.name ILIKE '%' || $3 || '%'
+          OR b.id::text ILIKE '%' || $3 || '%'
           OR COALESCE(b.location, '') ILIKE '%' || $3 || '%'
           OR EXISTS (
             SELECT 1 FROM users u
@@ -171,6 +172,7 @@ export async function listBranches(tenantId, filters = {}) {
         AND (
           $3::text IS NULL
           OR b.name ILIKE '%' || $3 || '%'
+          OR b.id::text ILIKE '%' || $3 || '%'
           OR COALESCE(b.location, '') ILIKE '%' || $3 || '%'
           OR COALESCE(u.full_name, '') ILIKE '%' || $3 || '%'
           OR COALESCE(u.email, '') ILIKE '%' || $3 || '%'

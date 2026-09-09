@@ -1,4 +1,4 @@
-import { useEffect, useState, useMemo } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { Search, Send } from 'lucide-react'
 import { PageHeader } from '@/components/shared/PageHeader'
 import { MotionHeader, MotionReveal } from '@/components/shared/MotionReveal'
@@ -19,6 +19,7 @@ import {
 } from '@/components/ui/table'
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogCancelButton } from '@/components/ui/dialog'
 import { apiClient } from '@/api/api'
+import { useDebouncedValue } from '@/hooks/useDebouncedValue'
 import { BRAND } from '@/lib/constants'
 import { toastError, toastSuccess } from '@/lib/toast'
 
@@ -30,10 +31,12 @@ export function BranchInventoryPage() {
   const [loading, setLoading] = useState(false)
   const [page, setPage] = useState(1)
 
-  // Filters
+  // Filters — input instant; list fetch after debounce
   const [searchQuery, setSearchQuery] = useState('')
+  const debouncedQ = useDebouncedValue(searchQuery, 300)
   const [filterCategory, setFilterCategory] = useState('')
   const [filterSubcategory, setFilterSubcategory] = useState('')
+  const fetchSeq = useRef(0)
 
   // Derived: top-level categories (no parentId) and subcategories (has parentId)
   const topCategories = categories.filter((c) => !c.parentId)
@@ -49,9 +52,10 @@ export function BranchInventoryPage() {
   const [submitting, setSubmitting] = useState(false)
 
   const fetchInventory = async () => {
+    const seq = ++fetchSeq.current
     setLoading(true)
     const params = { limit: 100 }
-    if (searchQuery.trim()) params.q = searchQuery
+    if (debouncedQ.trim()) params.q = debouncedQ.trim()
     if (filterSubcategory) {
       params.categoryId = filterSubcategory
     } else if (filterCategory) {
@@ -59,6 +63,8 @@ export function BranchInventoryPage() {
     }
 
     const res = await apiClient.get('/inventory/products', params)
+    if (seq !== fetchSeq.current) return
+
     setLoading(false)
     if (res.success && res.data) {
       setProducts(res.data.items || res.data || [])
@@ -74,11 +80,15 @@ export function BranchInventoryPage() {
 
   useEffect(() => {
     void fetchInventory()
-  }, [searchQuery, filterCategory, filterSubcategory])
+  }, [debouncedQ, filterCategory, filterSubcategory])
 
   useEffect(() => {
     void fetchCategories()
   }, [])
+
+  useEffect(() => {
+    setPage(1)
+  }, [debouncedQ, filterCategory, filterSubcategory])
 
   const handleOpenRequest = (prod) => {
     setRequestTarget(prod)

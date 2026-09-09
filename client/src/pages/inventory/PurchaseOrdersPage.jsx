@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react'
+import { useState } from 'react'
 import { Plus } from 'lucide-react'
 import { GenerateOrderDialog } from '@/components/feature/orders/GenerateOrderDialog'
 import { OrderDetailPanel } from '@/components/feature/orders/OrderDetailPanel'
@@ -8,6 +8,7 @@ import { MotionHeader, MotionReveal } from '@/components/shared/MotionReveal'
 import { PageHeader } from '@/components/shared/PageHeader'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
+import { useDebouncedSearch } from '@/hooks/useDebouncedSearch'
 import { usePurchaseOrders } from '@/hooks/usePurchaseOrders'
 import { BRAND } from '@/lib/constants'
 import { toastError, toastSuccess } from '@/lib/toast'
@@ -38,14 +39,7 @@ export function PurchaseOrdersPage() {
   const [generateOpen, setGenerateOpen] = useState(false)
   const [detailOpen, setDetailOpen] = useState(false)
   const [historyOpen, setHistoryOpen] = useState(false)
-  const [localQ, setLocalQ] = useState('')
-  const searchTimer = useRef(null)
-
-  function onSearchChange(q) {
-    setLocalQ(q)
-    if (searchTimer.current) clearTimeout(searchTimer.current)
-    searchTimer.current = setTimeout(() => updateFilters({ q }), 300)
-  }
+  const { localQ, onSearchChange } = useDebouncedSearch(updateFilters)
 
   async function openGenerate() {
     await loadFormOptions()

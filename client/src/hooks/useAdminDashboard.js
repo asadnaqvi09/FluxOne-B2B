@@ -2,10 +2,8 @@ import { useCallback, useEffect, useState } from 'react'
 import { apiClient } from '@/api/api'
 import { endpoints } from '@/api/endpoints'
 
-/**
- * Live B2B Admin dashboard (`GET /api/admin/dashboard`).
- * Refetches when `date` or `branchId` changes.
- */
+//Live B2B Admin dashboard (`GET /api/admin/dashboard`).
+// Refetches when `date` or `branchId` changes.
 export function useAdminDashboard({ date, branchId = 'all' } = {}) {
   const [data, setData] = useState(null)
   const [loading, setLoading] = useState(true)

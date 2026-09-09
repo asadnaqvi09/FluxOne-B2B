@@ -9,6 +9,7 @@ import { signAuthTokens, verifyRefreshToken } from '../../utils/jwt.util.js'
 import { listBranchesForLookup } from '../inventory-manager/lookups/lookup.model.js'
 import { ROLES } from '../../config/constants.js'
 import { fail, success } from '../../utils/response.util.js'
+import { resolveUploadUrl } from '../../utils/uploadUrl.util.js'
 
 function publicUser(user) {
   return {
@@ -97,12 +98,19 @@ export async function updateMe(req, res) {
   const fullName = body.name?.trim() || undefined
   const loginId = body.id?.trim() || undefined
   const newPassword = body.password || undefined
+  // New upload or replace — multer field name `image`
+  const imageUrl = resolveUploadUrl(req.file, req) || undefined
+
+  if (!fullName && !loginId && !newPassword && !imageUrl) {
+    return fail(res, 'name, id, password, or image is required', 422)
+  }
 
   try {
-    if (fullName || loginId) {
+    if (fullName || loginId || imageUrl) {
       const updated = await updateAuthProfile(req.user.id, req.tenantId, {
         fullName,
         email: loginId,
+        imageUrl,
       })
       if (!updated) return fail(res, 'User not found', 404)
     }

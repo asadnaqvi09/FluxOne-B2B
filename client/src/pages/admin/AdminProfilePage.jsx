@@ -14,6 +14,8 @@ export function AdminProfilePage() {
   const [loginId, setLoginId] = useState(user?.email || user?.id || '')
   const [editOpen, setEditOpen] = useState(false)
   const [saving, setSaving] = useState(false)
+  // Prefer live session (updates after save via authSlice)
+  const imageUrl = user?.imageUrl || null
 
   async function handleSave(fields) {
     setSaving(true)
@@ -23,6 +25,7 @@ export function AdminProfilePage() {
           name: fields.name?.trim(),
           id: (fields.id || fields.loginId || '').trim(),
           password: fields.password || undefined,
+          image: fields.image,
         }),
       )
       if (updateProfile.rejected.match(result)) {
@@ -60,6 +63,7 @@ export function AdminProfilePage() {
           role="b2b_admin"
           loginExpires="Session (JWT)"
           onEdit={() => setEditOpen(true)}
+          imageUrl={imageUrl}
         />
       </MotionReveal>
 
@@ -68,6 +72,7 @@ export function AdminProfilePage() {
         onOpenChange={setEditOpen}
         initialName={name}
         initialLoginId={loginId}
+        initialImageUrl={imageUrl}
         loading={saving}
         onSubmit={handleSave}
       />

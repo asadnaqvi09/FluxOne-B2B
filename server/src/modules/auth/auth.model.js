@@ -70,8 +70,9 @@ export async function updatePasswordHash(userId, tenantId, passwordHash) {
   )
 }
 
-// Update display name and/or login ID (email column).
-export async function updateAuthProfile(userId, tenantId, { fullName, email }) {
+// Update display name, login ID (email), and/or profile image.
+// Image also syncs to staff.image_url so BM staff lists stay in sync.
+export async function updateAuthProfile(userId, tenantId, { fullName, email, imageUrl }) {
   if (email) {
     const { rows: clashes } = await query(
       `
@@ -96,11 +97,27 @@ export async function updateAuthProfile(userId, tenantId, { fullName, email }) {
       UPDATE users
       SET
         full_name = COALESCE($3, full_name),
-        email = COALESCE($4, email)
+        email = COALESCE($4, email),
+        image_url = COALESCE($5, image_url)
       WHERE id = $1 AND tenant_id = $2
       RETURNING id
     `,
-    [userId, tenantId, fullName || null, email || null],
+    [userId, tenantId, fullName || null, email || null, imageUrl || null],
   )
-  return rows[0] || null
+  if (!rows[0]) return null
+
+  // Mirror photo onto linked staff row (IM / cashier / etc.)
+  if (imageUrl) {
+    await query(
+      `
+        UPDATE staff
+        SET image_url = $3
+        WHERE tenant_id = $1
+          AND user_id = $2
+      `,
+      [tenantId, userId, imageUrl],
+    )
+  }
+
+  return rows[0]
 }

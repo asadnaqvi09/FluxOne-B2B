@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react'
+import { useState } from 'react'
 import { ArrowDownToLine, ArrowUpFromLine, Camera, Plus } from 'lucide-react'
 import { ImportItemsDialog } from '@/components/feature/products/ImportItemsDialog'
 import { ItemFormDialog } from '@/components/feature/products/ItemFormDialog'
@@ -18,23 +18,11 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
+import { useDebouncedSearch } from '@/hooks/useDebouncedSearch'
 import { useProducts } from '@/hooks/useProducts'
 import { BRAND } from '@/lib/constants'
 import { PRODUCT_STATUS, PRODUCT_TYPES } from '@/lib/mapProduct'
 import { toastError, toastSuccess } from '@/lib/toast'
-
-function useDebouncedSearch(updateFilters) {
-  const [localQ, setLocalQ] = useState('')
-  const timerRef = useRef(null)
-
-  function onSearchChange(q) {
-    setLocalQ(q)
-    if (timerRef.current) clearTimeout(timerRef.current)
-    timerRef.current = setTimeout(() => updateFilters({ q }), 300)
-  }
-
-  return { localQ, onSearchChange }
-}
 
 export function ProductsPage() {
   const {

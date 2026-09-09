@@ -32,6 +32,7 @@ import {
   changeAdminPassword,
   useAdminDevices,
 } from '@/hooks/useAdminSettings'
+import { useDebouncedValue } from '@/hooks/useDebouncedValue'
 import {
   KeyRound,
   Monitor,
@@ -73,17 +74,12 @@ export function SettingsPage() {
   const [passwordSaving, setPasswordSaving] = useState(false)
 
   const [searchQuery, setSearchQuery] = useState('')
-  const [debouncedQ, setDebouncedQ] = useState('')
+  const debouncedQ = useDebouncedValue(searchQuery.trim(), 300)
   const [statusFilter, setStatusFilter] = useState('all')
   const [page, setPage] = useState(1)
 
   const [confirmDialogOpen, setConfirmDialogOpen] = useState(false)
   const [targetSystem, setTargetSystem] = useState(null)
-
-  useEffect(() => {
-    const timer = setTimeout(() => setDebouncedQ(searchQuery.trim()), 300)
-    return () => clearTimeout(timer)
-  }, [searchQuery])
 
   useEffect(() => {
     setPage(1)

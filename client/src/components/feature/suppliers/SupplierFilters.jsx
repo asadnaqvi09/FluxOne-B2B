@@ -1,10 +1,11 @@
-import { useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { NativeSelect } from '@/components/ui/select'
 
 /**
  * Debounced search + active filter for suppliers.
+ * Input updates immediately; parent fetch fires after 300ms.
  */
 export function SupplierFilters({
   q = '',
@@ -16,11 +17,22 @@ export function SupplierFilters({
   const [localQ, setLocalQ] = useState(q)
   const timerRef = useRef(null)
 
+  // Keep local box in sync if parent resets filters
+  useEffect(() => {
+    setLocalQ(q || '')
+  }, [q])
+
   function handleChange(value) {
     setLocalQ(value)
     if (timerRef.current) clearTimeout(timerRef.current)
     timerRef.current = setTimeout(() => onSearchChange?.(value), 300)
   }
+
+  useEffect(() => {
+    return () => {
+      if (timerRef.current) clearTimeout(timerRef.current)
+    }
+  }, [])
 
   return (
     <div className={`flex flex-col gap-3 sm:flex-row sm:items-end ${className || ''}`}>

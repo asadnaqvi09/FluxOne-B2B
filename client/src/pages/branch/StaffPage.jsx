@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Plus } from 'lucide-react'
 import { PageHeader } from '@/components/shared/PageHeader'
 import { MotionHeader, MotionReveal } from '@/components/shared/MotionReveal'
@@ -12,24 +12,12 @@ import { StaffLeavesTab } from '@/components/feature/branch/staff/StaffLeavesTab
 import { StaffPerformanceTab } from '@/components/feature/branch/staff/StaffPerformanceTab'
 import { Button } from '@/components/ui/button'
 import { useBranchStaff } from '@/hooks/useBranchStaff'
+import { useDebouncedSearch } from '@/hooks/useDebouncedSearch'
 import { BRAND } from '@/lib/constants'
 import { toastError, toastSuccess } from '@/lib/toast'
 import { apiClient } from '@/api/api'
 import { endpoints } from '@/api/endpoints'
 import { cn } from '@/lib/utils'
-
-function useDebouncedSearch(updateFilters) {
-  const [localQ, setLocalQ] = useState('')
-  const timerRef = useRef(null)
-
-  function onSearchChange(q) {
-    setLocalQ(q)
-    if (timerRef.current) clearTimeout(timerRef.current)
-    timerRef.current = setTimeout(() => updateFilters({ q }), 300)
-  }
-
-  return { localQ, onSearchChange }
-}
 
 export function StaffPage() {
   const {

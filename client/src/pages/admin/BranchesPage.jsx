@@ -24,6 +24,7 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
+  DialogCancelButton,
 } from '@/components/ui/dialog'
 import { ConfirmDialog } from '@/components/shared/ConfirmDialog'
 import { ImageUploadField } from '@/components/shared/ImageUploadField'
@@ -36,6 +37,7 @@ import {
 } from '@/lib/validation/formValidators'
 import { useAdminBranches } from '@/hooks/useAdminBranches'
 import { useAuthSession } from '@/hooks/useAuthSession'
+import { useDebouncedValue } from '@/hooks/useDebouncedValue'
 import {
   Plus,
   Search,
@@ -123,6 +125,7 @@ const emptyForm = {
 export function BranchesPage() {
   const { user } = useAuthSession()
   const [searchQuery, setSearchQuery] = useState('')
+  const debouncedQ = useDebouncedValue(searchQuery.trim(), 300)
   const [statusFilter, setStatusFilter] = useState('all')
   const [page, setPage] = useState(1)
   const [addDialogOpen, setAddDialogOpen] = useState(false)
@@ -144,7 +147,7 @@ export function BranchesPage() {
     setBranchStatus,
     resetManagerPassword,
     deleteBranch,
-  } = useAdminBranches({ limit: 100 })
+  } = useAdminBranches({ q: debouncedQ, limit: 100 })
 
   const slowHint = useSlowLoadingHint(loading)
 
@@ -156,21 +159,10 @@ export function BranchesPage() {
     return { total, open, blocked, totalStaff }
   }, [items])
 
+  // Search is server-side (debounced); status tabs stay client-side on the result set
   const filteredBranches = useMemo(() => {
-    const q = searchQuery.trim().toLowerCase()
-    return items.filter((b) => {
-      const matchesSearch =
-        !q ||
-        b.name?.toLowerCase().includes(q) ||
-        b.location?.toLowerCase().includes(q) ||
-        String(b.id).toLowerCase().includes(q) ||
-        b.manager?.name?.toLowerCase().includes(q) ||
-        b.manager?.email?.toLowerCase().includes(q)
-
-      const matchesStatus = statusFilter === 'all' ? true : b.status === statusFilter
-      return matchesSearch && matchesStatus
-    })
-  }, [items, searchQuery, statusFilter])
+    return items.filter((b) => (statusFilter === 'all' ? true : b.status === statusFilter))
+  }, [items, statusFilter])
 
   const totalPages = Math.max(1, Math.ceil(filteredBranches.length / PAGE_SIZE))
 
@@ -509,7 +501,7 @@ export function BranchesPage() {
                           <img
                             src={imageSrc}
                             alt={b.name}
-                            className="size-9 sm:size-11 rounded-xl object-cover border border-slate-200 shrink-0 shadow-2xs"
+                            className="size-9 sm:size-11 rounded-md object-cover border border-slate-200 shrink-0 shadow-2xs"
                           />
                         </TableCell>
                         <TableCell className="px-2 py-3 sm:px-3">

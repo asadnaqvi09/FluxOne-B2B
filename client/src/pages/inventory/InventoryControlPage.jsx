@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react'
+import { useState } from 'react'
 import { ClipboardList, Plus } from 'lucide-react'
 import { AddStockInDialog } from '@/components/feature/control/AddStockInDialog'
 import { AdjustmentDialog } from '@/components/feature/control/AdjustmentDialog'
@@ -16,23 +16,11 @@ import { MotionHeader, MotionReveal } from '@/components/shared/MotionReveal'
 import { PageHeader } from '@/components/shared/PageHeader'
 import { SlowLoadingBanner, useSlowLoadingHint } from '@/components/shared/SlowLoadingBanner'
 import { Button } from '@/components/ui/button'
+import { useDebouncedSearch } from '@/hooks/useDebouncedSearch'
 import { useInventoryControl } from '@/hooks/useInventoryControl'
 import { BRAND } from '@/lib/constants'
 import { MOVEMENT_TYPES } from '@/lib/mapStockMovement'
 import { toastError, toastSuccess } from '@/lib/toast'
-
-function useDebouncedSearch(updateFilters) {
-  const [localQ, setLocalQ] = useState('')
-  const timerRef = useRef(null)
-
-  function onSearchChange(q) {
-    setLocalQ(q)
-    if (timerRef.current) clearTimeout(timerRef.current)
-    timerRef.current = setTimeout(() => updateFilters({ q }), 300)
-  }
-
-  return { localQ, setLocalQ, onSearchChange }
-}
 
 /** Tabs that expose an "Add …" CTA (Stock Out / Expired are history-only). */
 const TABS_WITH_ADD = new Set([
@@ -89,7 +77,10 @@ function ControlTabPanel({ tab }) {
 
   const combinedLoading = (tab === MOVEMENT_TYPES.IN || tab === MOVEMENT_TYPES.OUT) ? loading || adjustmentLoading : loading
 
-  const { localQ, setLocalQ, onSearchChange } = useDebouncedSearch(updateFilters)
+  const { localQ, setLocalQ, onSearchChange } = useDebouncedSearch(
+    updateFilters,
+    filters.q || '',
+  )
 
   const [addOpen, setAddOpen] = useState(false)
   const [orderOpen, setOrderOpen] = useState(false)

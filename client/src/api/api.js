@@ -190,14 +190,22 @@ async function mockRequest(method, path, body) {
     const user = tokenStorage.getUser()
     if (!user) return fail('Unauthorized')
     if (method === 'PATCH') {
-      const nextName = body?.name?.trim()
-      const nextId = (body?.id || body?.email || '').trim()
-      if (!nextName && !nextId && !body?.password) return fail('name, id, or password is required')
+      // Support JSON or FormData (profile photo upload)
+      const asForm = typeof FormData !== 'undefined' && body instanceof FormData
+      const nextName = (asForm ? body.get('name') : body?.name)?.toString?.()?.trim?.() || ''
+      const nextId =
+        (asForm ? body.get('id') : body?.id || body?.email)?.toString?.()?.trim?.() || ''
+      const nextPassword = (asForm ? body.get('password') : body?.password) || ''
+      const nextImage = asForm ? body.get('image') : body?.image
+      if (!nextName && !nextId && !nextPassword && !nextImage) {
+        return fail('name, id, password, or image is required')
+      }
       return ok({
         ...user,
         name: nextName || user.name,
         email: nextId || user.email,
-        passwordUpdated: Boolean(body?.password),
+        imageUrl: nextImage ? user.imageUrl || 'mock://profile-image' : user.imageUrl,
+        passwordUpdated: Boolean(nextPassword),
       })
     }
     return ok(user)

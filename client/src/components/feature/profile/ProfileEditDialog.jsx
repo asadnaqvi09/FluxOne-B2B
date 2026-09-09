@@ -11,19 +11,21 @@ import {
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import { ImageUploadField } from '@/components/shared/ImageUploadField'
 import { BRAND } from '@/lib/constants'
 import { useFormBaseline } from '@/hooks/useFormBaseline'
 
 /**
  * Shared edit profile modal (Admin / BM / IM / etc.).
  * View card never shows password — only this dialog does.
- * Fields: Name, User ID or Email, Password, Confirm Password.
+ * Fields: Photo, Name, User ID or Email, Password, Confirm Password.
  */
 export function ProfileEditDialog({
   open,
   onOpenChange,
   initialName = '',
   initialLoginId = '',
+  initialImageUrl = null,
   onSubmit,
   loading = false,
 }) {
@@ -31,6 +33,7 @@ export function ProfileEditDialog({
   const [loginId, setLoginId] = useState('')
   const [password, setPassword] = useState('')
   const [confirmPassword, setConfirmPassword] = useState('')
+  const [image, setImage] = useState(null)
   const [error, setError] = useState(null)
   const { captureBaseline, isDirty } = useFormBaseline(open)
 
@@ -41,11 +44,13 @@ export function ProfileEditDialog({
       loginId: initialLoginId || '',
       password: '',
       confirmPassword: '',
+      image: null,
     }
     setName(snapshot.name)
     setLoginId(snapshot.loginId)
     setPassword('')
     setConfirmPassword('')
+    setImage(null)
     setError(null)
     captureBaseline(snapshot)
   }, [open, initialName, initialLoginId, captureBaseline])
@@ -84,8 +89,10 @@ export function ProfileEditDialog({
       }
     }
 
+    // Build payload — image File triggers multipart on the API layer
     const payload = { name: nextName, id: nextId }
     if (changingPassword) payload.password = nextPassword
+    if (image instanceof File && image.size > 0) payload.image = image
 
     const result = await onSubmit?.(payload)
     if (result && result.success === false) {
@@ -95,7 +102,7 @@ export function ProfileEditDialog({
     onOpenChange?.(false)
   }
 
-  const dirty = isDirty({ name, loginId, password, confirmPassword })
+  const dirty = isDirty({ name, loginId, password, confirmPassword, image })
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange} dirty={dirty}>
@@ -103,12 +110,22 @@ export function ProfileEditDialog({
         <DialogHeader>
           <DialogTitle>Edit profile</DialogTitle>
           <DialogDescription>
-            Update your display name and login ID. Optionally set a new password (leave blank to keep the
-            current one). Role cannot be changed here.
+            Update your photo, display name, and login ID. Optionally set a new password (leave blank
+            to keep the current one). Role cannot be changed here.
           </DialogDescription>
         </DialogHeader>
 
         <form className="space-y-4" onSubmit={handleSubmit}>
+          {/* Upload new photo or replace existing one */}
+          <ImageUploadField
+            id="profile-image"
+            label="Profile photo"
+            optionalLabel="(optional)"
+            value={image}
+            existingImageUrl={initialImageUrl}
+            onChange={setImage}
+          />
+
           <div className="space-y-1.5">
             <Label htmlFor="profile-name">Name</Label>
             <Input

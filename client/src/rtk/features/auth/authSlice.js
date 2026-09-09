@@ -39,16 +39,31 @@ export const logoutUser = createAsyncThunk('auth/logout', async () => {
   }
 })
 
-export const updateProfile = createAsyncThunk(
-  'auth/updateProfile',
-  async (payload, { rejectWithValue }) => {
+// JSON when text-only; multipart FormData when a new profile image is selected
+function buildProfileUpdateBody(payload) {
+  const hasImage = payload.image instanceof File && payload.image.size > 0
+
+  if (!hasImage) {
     const body = {
       name: payload.name,
       id: payload.id,
     }
     if (payload.password) body.password = payload.password
+    return body
+  }
 
-    const result = await apiClient.patch(endpoints.auth.update, body)
+  const form = new FormData()
+  if (payload.name) form.append('name', payload.name)
+  if (payload.id) form.append('id', payload.id)
+  if (payload.password) form.append('password', payload.password)
+  form.append('image', payload.image)
+  return form
+}
+
+export const updateProfile = createAsyncThunk(
+  'auth/updateProfile',
+  async (payload, { rejectWithValue }) => {
+    const result = await apiClient.patch(endpoints.auth.update, buildProfileUpdateBody(payload))
     if (!result?.success) {
       return rejectWithValue(result?.error || 'Profile update failed')
     }

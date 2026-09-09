@@ -87,6 +87,7 @@ export function ProfilePage() {
         onOpenChange={setEditOpen}
         initialName={name}
         initialLoginId={loginId}
+        initialImageUrl={imageUrl}
         loading={saving}
         onSubmit={handleSave}
       />

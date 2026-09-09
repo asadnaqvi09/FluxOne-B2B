@@ -30,6 +30,7 @@ import {
   ADMIN_TAX_PROFIT_PAGE_SIZE,
   useAdminTaxProfit,
 } from '@/hooks/useAdminTaxProfit'
+import { useDebouncedValue } from '@/hooks/useDebouncedValue'
 import { BRAND } from '@/lib/constants'
 import { toastSuccess, toastError } from '@/lib/toast'
 import { validatePercentage } from '@/lib/validation/formValidators'
@@ -52,7 +53,7 @@ const PAGE_SIZE = ADMIN_TAX_PROFIT_PAGE_SIZE
 export function TaxProfitPage() {
   const [selectedIds, setSelectedIds] = useState([])
   const [searchQuery, setSearchQuery] = useState('')
-  const [debouncedQ, setDebouncedQ] = useState('')
+  const debouncedQ = useDebouncedValue(searchQuery.trim(), 300)
   const [selectedCategoryId, setSelectedCategoryId] = useState('')
   const [selectedSubcategoryId, setSelectedSubcategoryId] = useState('')
   const [selectedScale, setSelectedScale] = useState('')
@@ -76,11 +77,6 @@ export function TaxProfitPage() {
     finalPrice: true,
   })
   const [colMenuOpen, setColMenuOpen] = useState(false)
-
-  useEffect(() => {
-    const timer = setTimeout(() => setDebouncedQ(searchQuery.trim()), 300)
-    return () => clearTimeout(timer)
-  }, [searchQuery])
 
   useEffect(() => {
     setPage(1)

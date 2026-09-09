@@ -40,26 +40,14 @@ export const changePasswordSchema = z.object({
   params: z.object({}).optional(),
 })
 
-// Self-service profile: name + login ID (maps to users.email); optional new password.
-export const updateProfileSchema = z
-  .object({
-    body: z.object({
-      name: z.string().min(1).max(120).optional(),
-      id: z.string().min(3).max(190).optional(),
-      password: z.string().min(8).max(72).optional(),
-    }),
-    query: z.object({}).optional(),
-    params: z.object({}).optional(),
-  })
-  .superRefine((data, ctx) => {
-    const hasName = Boolean(data.body.name?.trim())
-    const hasId = Boolean(data.body.id?.trim())
-    const hasPassword = Boolean(data.body.password)
-    if (!hasName && !hasId && !hasPassword) {
-      ctx.addIssue({
-        code: z.ZodIssueCode.custom,
-        message: 'name, id, or password is required',
-        path: ['body', 'name'],
-      })
-    }
-  })
+// Self-service profile: name + login ID; optional password.
+// Image-only updates are allowed (multer file checked in controller).
+export const updateProfileSchema = z.object({
+  body: z.object({
+    name: z.string().min(1).max(120).optional(),
+    id: z.string().min(3).max(190).optional(),
+    password: z.string().min(8).max(72).optional(),
+  }),
+  query: z.object({}).optional(),
+  params: z.object({}).optional(),
+})

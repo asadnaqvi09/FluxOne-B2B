@@ -1,4 +1,4 @@
-import { useEffect, useState, useMemo } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import {
   Search,
   Printer,
@@ -30,6 +30,7 @@ import {
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogCancelButton } from '@/components/ui/dialog'
 import { apiClient } from '@/api/api'
 import { endpoints } from '@/api/endpoints'
+import { useDebouncedValue } from '@/hooks/useDebouncedValue'
 import { BRAND } from '@/lib/constants'
 import { toastError, toastSuccess } from '@/lib/toast'
 
@@ -42,10 +43,12 @@ export function SalesPage() {
   const [categories, setCategories] = useState([])
   const [page, setPage] = useState(1)
 
-  // Filters
+  // Filters — input is instant; API uses debounced query
   const [searchQuery, setSearchQuery] = useState('')
+  const debouncedQ = useDebouncedValue(searchQuery, 300)
   const [filterDate, setFilterDate] = useState('')
   const [filterCategory, setFilterCategory] = useState('')
+  const fetchSeq = useRef(0)
 
   // Refund dialog
   const [refundTarget, setRefundTarget] = useState(null)
@@ -55,13 +58,17 @@ export function SalesPage() {
   const [invoiceTarget, setInvoiceTarget] = useState(null)
 
   const fetchSales = async () => {
+    const seq = ++fetchSeq.current
     setLoading(true)
     const params = {}
-    if (searchQuery.trim()) params.q = searchQuery
+    if (debouncedQ.trim()) params.q = debouncedQ.trim()
     if (filterDate) params.date = filterDate
     if (filterCategory) params.categoryId = filterCategory
 
     const res = await apiClient.get(endpoints.branch.sales.list, params)
+    // Drop stale responses so fast typing does not flash old results
+    if (seq !== fetchSeq.current) return
+
     setLoading(false)
     if (res.success && res.data) {
       const items = res.data.items || []
@@ -92,8 +99,15 @@ export function SalesPage() {
 
   useEffect(() => {
     void fetchSales()
+  }, [debouncedQ, filterDate, filterCategory])
+
+  useEffect(() => {
     void fetchCategories()
-  }, [searchQuery, filterDate, filterCategory])
+  }, [])
+
+  useEffect(() => {
+    setPage(1)
+  }, [debouncedQ, filterDate, filterCategory])
 
   const handleRefund = async () => {
     if (!refundTarget) return

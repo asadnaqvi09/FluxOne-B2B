@@ -31,6 +31,7 @@ import {
   useAdminInvoices,
 } from '@/hooks/useAdminInvoices'
 import { useAdminCompany } from '@/hooks/useAdminCompany'
+import { useDebouncedValue } from '@/hooks/useDebouncedValue'
 import { BRAND } from '@/lib/constants'
 import { downloadBillingInvoicePdf } from '@/lib/pdfDownload'
 import { toastSuccess, toastError } from '@/lib/toast'
@@ -79,15 +80,10 @@ export function InvoicesPage() {
   const [selectedMonth, setSelectedMonth] = useState('all')
   const [selectedYear, setSelectedYear] = useState(String(new Date().getFullYear()))
   const [searchQuery, setSearchQuery] = useState('')
-  const [debouncedQ, setDebouncedQ] = useState('')
+  const debouncedQ = useDebouncedValue(searchQuery.trim(), 300)
   const [selectedInvoice, setSelectedInvoice] = useState(null)
   const [previewOpen, setPreviewOpen] = useState(false)
   const [page, setPage] = useState(1)
-
-  useEffect(() => {
-    const timer = setTimeout(() => setDebouncedQ(searchQuery.trim()), 300)
-    return () => clearTimeout(timer)
-  }, [searchQuery])
 
   useEffect(() => {
     setPage(1)

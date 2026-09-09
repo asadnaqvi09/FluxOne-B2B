@@ -3,12 +3,12 @@ import { Outlet, useNavigate, NavLink } from 'react-router-dom'
 import { ChevronDown, LogOut, Menu, Settings, UserRound, X } from 'lucide-react'
 import { AnimatePresence, motion } from 'motion/react'
 import { BrandLogo } from '@/components/shared/BrandLogo'
+import { UserAvatar } from '@/components/shared/UserAvatar'
 import { BRAND } from '@/lib/constants'
 import { clearAdminSession } from '@/config/adminAuth.config'
 import { toastSuccess } from '@/lib/toast'
 import { PATHS } from '@/router/paths'
 import { useAuthSession } from '@/hooks/useAuthSession'
-import { getInitials } from '@/lib/nav'
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -16,21 +16,6 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
-import { cn } from '@/lib/utils'
-
-function UserAvatar({ initials = 'AD', className }) {
-  return (
-    <div
-      className={cn(
-        'flex size-9 sm:size-10 shrink-0 items-center justify-center rounded-full text-xs font-bold text-white',
-        className,
-      )}
-      style={{ background: BRAND.purple }}
-    >
-      {initials}
-    </div>
-  )
-}
 
 const ADMIN_NAV_LINKS = [
   { to: '/admin/dashboard', label: 'Dashboard' },
@@ -47,7 +32,7 @@ export function AdminLayout() {
   const { user, logout } = useAuthSession()
 
   const name = user?.name || 'Admin'
-  const initials = getInitials(name, user?.email)
+  const imageUrl = user?.imageUrl || null
   const tenantName = user?.tenantName || (user?.tenantSlug === 'company-b' ? 'Company B' : 'Company A')
   const roleLabel = `${tenantName} · B2B Admin`
   const adminId = user?.email || user?.id || (user?.tenantSlug === 'company-b' ? 'admin@companyb.local' : 'admin@companya.local')
@@ -65,7 +50,7 @@ export function AdminLayout() {
       <header className="sticky top-0 z-40 flex h-14 items-center border-b border-border bg-white px-3 sm:h-[4.25rem] sm:px-6">
         <div className="flex h-full w-full min-w-0 items-center justify-between gap-2 sm:gap-6">
           {/* Logo & Desktop Nav Tabs */}
-          <div className="flex items-center gap-3 lg:gap-6 min-w-0">
+          <div className="flex h-full min-w-0 items-center gap-3 lg:gap-6">
             {/* Mobile Menu Hamburger Trigger */}
             <button
               type="button"
@@ -78,27 +63,27 @@ export function AdminLayout() {
 
             <BrandLogo size="sm" className="size-9 shrink-0 sm:size-11" />
 
-            {/* Desktop Navigation Links */}
-            <nav className="hidden lg:flex items-center gap-1 shrink-0 overflow-x-auto py-1">
+            {/* Desktop Navigation Links — same active style as AppTopNav (BM / IM) */}
+            <nav className="hidden h-full min-w-0 items-stretch gap-1 overflow-x-auto lg:flex">
               {ADMIN_NAV_LINKS.map((link) => (
                 <NavLink
                   key={link.to}
                   to={link.to}
                   className={({ isActive }) =>
-                    `relative flex items-center px-3 py-2 text-xs xl:text-sm font-semibold transition-colors whitespace-nowrap ${
-                      isActive ? 'text-[#8E238F]' : 'text-slate-600 hover:text-slate-900'
+                    `relative flex shrink-0 cursor-pointer items-center px-3 text-sm font-semibold whitespace-nowrap transition-colors duration-200 ${
+                      isActive ? 'text-[#8E238F]' : 'text-slate-800 hover:text-[#8E238F]'
                     }`
                   }
                 >
                   {({ isActive }) => (
                     <>
                       {link.label}
-                      {isActive && (
+                      {isActive ? (
                         <span
                           className="absolute right-0 bottom-0 left-0 h-[3px]"
                           style={{ background: BRAND.purple }}
                         />
-                      )}
+                      ) : null}
                     </>
                   )}
                 </NavLink>
@@ -108,11 +93,7 @@ export function AdminLayout() {
 
           {/* Right Role Context Badge & Dropdown User Menu */}
           <div className="flex items-center gap-2 sm:gap-3 shrink-0">
-            {/* Deep purple badge */}
-            <span
-              className="hidden max-w-[14rem] truncate rounded-full px-2.5 py-1 text-xs font-semibold text-white md:inline-block lg:max-w-xs"
-              style={{ background: BRAND.deep }}
-            >
+            <span className="hidden max-w-[14rem] truncate rounded-full bg-slate-100 px-2.5 py-1 text-xs font-semibold text-slate-600 md:inline-block lg:max-w-xs">
               {tenantName} · B2B Admin
             </span>
 
@@ -121,7 +102,12 @@ export function AdminLayout() {
               <DropdownMenu>
                 <DropdownMenuTrigger className="cursor-pointer rounded-lg outline-none focus-visible:ring-2 focus-visible:ring-[#8E238F]/40">
                   <div className="flex items-center gap-2 py-1">
-                    <UserAvatar initials={initials} />
+                    <UserAvatar
+                      name={name}
+                      loginId={user?.email}
+                      imageUrl={imageUrl}
+                      className="size-9 sm:size-10"
+                    />
                     <div className="hidden min-w-0 text-left sm:block">
                       <p className="truncate text-sm leading-tight font-semibold text-slate-900">{name}</p>
                       <p className="truncate text-xs leading-tight text-slate-500">{roleLabel}</p>
@@ -136,7 +122,13 @@ export function AdminLayout() {
                 >
                   {/* Top user profile details card */}
                   <div className="flex items-center gap-3 px-4 py-3">
-                    <UserAvatar initials={initials} className="size-11 text-sm" />
+                    <UserAvatar
+                      name={name}
+                      loginId={user?.email}
+                      imageUrl={imageUrl}
+                      className="size-11"
+                      fallbackClassName="text-sm"
+                    />
                     <div className="min-w-0">
                       <p className="truncate text-sm font-semibold text-slate-800">{name}</p>
                       <p className="truncate text-xs text-slate-500">{roleLabel}</p>
@@ -237,7 +229,13 @@ export function AdminLayout() {
               {/* Drawer Footer */}
               <div className="border-t border-border p-3 space-y-2 bg-slate-50/70">
                 <div className="flex items-center gap-3 px-2">
-                  <UserAvatar initials="AS" className="size-9 text-xs" />
+                  <UserAvatar
+                    name={name}
+                    loginId={user?.email}
+                    imageUrl={imageUrl}
+                    className="size-9"
+                    fallbackClassName="text-xs"
+                  />
                   <div className="min-w-0 flex-1">
                     <p className="truncate text-xs font-bold text-slate-900">{name}</p>
                     <p className="truncate text-[11px] text-slate-500">{roleLabel}</p>

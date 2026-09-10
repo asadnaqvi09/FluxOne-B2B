@@ -1,4 +1,4 @@
-import { useEffect, useState, useMemo } from 'react'
+import { useEffect, useState } from 'react'
 import { Plus, Tag, Pencil, Trash2 } from 'lucide-react'
 import { PageHeader } from '@/components/shared/PageHeader'
 import { MotionHeader, MotionReveal } from '@/components/shared/MotionReveal'
@@ -181,60 +181,112 @@ export function DiscountsPage() {
             </span>
           }
         >
-          <div className="overflow-x-auto">
-            <Table>
-              <TableHeader>
-                <TableRow className="text-slate-500 text-xs uppercase">
-                  <TableHead>Campaign ID</TableHead>
-                  <TableHead>Campaign Name / Explanation</TableHead>
-                  <TableHead className="text-center">Discount Percentage</TableHead>
-                  <TableHead className="text-right">Actions</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {loading ? (
-                  <TableRow>
-                    <TableCell colSpan={4} className="py-8 text-center text-slate-400">Loading campaign offers...</TableCell>
-                  </TableRow>
-                ) : filteredDiscounts.length === 0 ? (
-                  <TableRow>
-                    <TableCell colSpan={4} className="py-8 text-center text-slate-400">No campaigns found</TableCell>
-                  </TableRow>
-                ) : (
-                  filteredDiscounts
-                    .slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE)
-                    .map((disc) => (
-                      <TableRow key={disc.id}>
-                        <TableCell className="font-mono font-bold text-slate-900">{disc.id}</TableCell>
-                        <TableCell className="text-slate-800 font-semibold">{disc.name}</TableCell>
-                        <TableCell className="text-center">
-                          <Badge variant="success" className="inline-flex items-center gap-1 font-bold text-xs bg-emerald-50 text-emerald-800 hover:bg-emerald-100 border-none rounded px-2.5 py-1">
-                            <Tag className="size-3" />
-                            {parseFloat(disc.percent)}% OFF
-                          </Badge>
-                        </TableCell>
-                        <TableCell className="text-right space-x-3.5">
-                          <button
-                            type="button"
-                            className="text-slate-500 hover:text-slate-800 transition-colors inline-block align-middle"
-                            onClick={() => handleOpenEdit(disc)}
-                          >
-                            <Pencil className="size-4" />
-                          </button>
-                          <button
-                            type="button"
-                            className="text-slate-500 hover:text-slate-800 transition-colors inline-block align-middle"
-                            onClick={() => handleDeleteDiscount(disc.id)}
-                          >
-                            <Trash2 className="size-4" />
-                          </button>
-                        </TableCell>
-                      </TableRow>
-                    ))
-                )}
-              </TableBody>
-            </Table>
-          </div>
+          {loading ? (
+            <p className="py-8 text-center text-sm text-slate-400">Loading campaign offers...</p>
+          ) : filteredDiscounts.length === 0 ? (
+            <p className="py-8 text-center text-sm text-slate-400">No campaigns found</p>
+          ) : (
+            <>
+              <div className="space-y-3 md:hidden">
+                {filteredDiscounts
+                  .slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE)
+                  .map((disc) => (
+                    <article
+                      key={disc.id}
+                      className="rounded-xl border border-border bg-slate-50/60 px-3 py-3"
+                    >
+                      <div className="flex items-start justify-between gap-2">
+                        <div className="min-w-0">
+                          <p className="truncate text-sm font-semibold text-slate-900">{disc.name}</p>
+                          <p className="mt-0.5 truncate font-mono text-[11px] text-slate-400">
+                            {disc.id}
+                          </p>
+                        </div>
+                        <Badge
+                          variant="success"
+                          className="inline-flex shrink-0 items-center gap-1 rounded border-none bg-emerald-50 px-2.5 py-1 text-xs font-bold text-emerald-800 hover:bg-emerald-100"
+                        >
+                          <Tag className="size-3" />
+                          {parseFloat(disc.percent)}% OFF
+                        </Badge>
+                      </div>
+                      <div className="mt-3 flex justify-end gap-3">
+                        <button
+                          type="button"
+                          className="text-slate-500 transition-colors hover:text-slate-800"
+                          onClick={() => handleOpenEdit(disc)}
+                          aria-label="Edit discount"
+                        >
+                          <Pencil className="size-4" />
+                        </button>
+                        <button
+                          type="button"
+                          className="text-slate-500 transition-colors hover:text-slate-800"
+                          onClick={() => handleDeleteDiscount(disc.id)}
+                          aria-label="Delete discount"
+                        >
+                          <Trash2 className="size-4" />
+                        </button>
+                      </div>
+                    </article>
+                  ))}
+              </div>
+
+              <div className="hidden overflow-x-auto md:block">
+                <Table className="min-w-[32rem] text-left text-sm">
+                  <TableHeader>
+                    <TableRow className="text-xs text-slate-500 uppercase">
+                      <TableHead className="px-2 py-3">Campaign ID</TableHead>
+                      <TableHead className="px-2 py-3">Campaign Name / Explanation</TableHead>
+                      <TableHead className="px-2 py-3 text-center">Discount Percentage</TableHead>
+                      <TableHead className="sticky right-0 z-[1] bg-white px-2 py-3 text-right">
+                        Actions
+                      </TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {filteredDiscounts
+                      .slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE)
+                      .map((disc) => (
+                        <TableRow key={disc.id} className="group">
+                          <TableCell className="px-2 py-3 font-mono font-bold text-slate-900">
+                            {disc.id}
+                          </TableCell>
+                          <TableCell className="px-2 py-3 font-semibold text-slate-800">
+                            {disc.name}
+                          </TableCell>
+                          <TableCell className="px-2 py-3 text-center">
+                            <Badge
+                              variant="success"
+                              className="inline-flex items-center gap-1 rounded border-none bg-emerald-50 px-2.5 py-1 text-xs font-bold text-emerald-800 hover:bg-emerald-100"
+                            >
+                              <Tag className="size-3" />
+                              {parseFloat(disc.percent)}% OFF
+                            </Badge>
+                          </TableCell>
+                          <TableCell className="sticky right-0 z-[1] space-x-3.5 bg-white px-2 py-3 text-right group-hover:bg-slate-50/80">
+                            <button
+                              type="button"
+                              className="inline-block align-middle text-slate-500 transition-colors hover:text-slate-800"
+                              onClick={() => handleOpenEdit(disc)}
+                            >
+                              <Pencil className="size-4" />
+                            </button>
+                            <button
+                              type="button"
+                              className="inline-block align-middle text-slate-500 transition-colors hover:text-slate-800"
+                              onClick={() => handleDeleteDiscount(disc.id)}
+                            >
+                              <Trash2 className="size-4" />
+                            </button>
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                  </TableBody>
+                </Table>
+              </div>
+            </>
+          )}
 
           <TablePagination
             page={page}

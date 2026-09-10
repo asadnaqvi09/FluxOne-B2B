@@ -1,12 +1,10 @@
-/**
- * Admin (Owner of B2B) Dashboard Mock Data (Phase 1)
- *
- * Provides comprehensive, reactive data for:
- * 1. KPIs (Today Earning, Last Month Earning, This Year Earning, Total Sale)
- * 2. Branch Overview (Monthly profit & revenue representation for current year)
- * 3. Branch Inventory Status (Today's stock health per branch)
- * 4. AI Business Insights (Tomorrow sales aspect, expected top products, causality analysis)
- */
+// Admin (Owner of B2B) Dashboard Mock Data (Phase 1)
+//
+// Provides comprehensive, reactive data for:
+// 1. KPIs (Today Earning, Last Month Earning, This Year Earning, Total Sale)
+// 2. Branch Overview (Monthly profit & revenue representation for current year)
+// 3. Branch Inventory Status (Today's stock health per branch)
+// 4. AI Business Insights (Tomorrow sales aspect, expected top products, causality analysis)
 
 export const ADMIN_DASHBOARD_DATA = {
   // 1. Executive KPIs

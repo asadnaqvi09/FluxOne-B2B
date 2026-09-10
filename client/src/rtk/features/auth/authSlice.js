@@ -27,10 +27,8 @@ export const loginUser = createAsyncThunk('auth/login', async (credentials, { re
   return result.data
 })
 
-/**
- * Optimistic logout: session is cleared on `pending` so LoginPage never
- * bounces back to the dashboard while the API request is in flight.
- */
+// Optimistic logout: session is cleared on `pending` so LoginPage never
+// bounces back to the dashboard while the API request is in flight.
 export const logoutUser = createAsyncThunk('auth/logout', async () => {
   try {
     await apiClient.post(endpoints.auth.logout, {})

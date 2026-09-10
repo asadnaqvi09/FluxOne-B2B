@@ -2,7 +2,7 @@ function isPlainObject(value) {
   return value !== null && typeof value === 'object' && !Array.isArray(value)
 }
 
-/** Empty dashboard shape when API has not returned data yet. */
+// Empty dashboard shape when API has not returned data yet.
 export function emptyBranchDashboard(date = new Date().toISOString().slice(0, 10)) {
   return {
     branchName: '',
@@ -32,7 +32,7 @@ export function emptyBranchDashboard(date = new Date().toISOString().slice(0, 10
   }
 }
 
-/** Normalize API payload onto the empty dashboard shape (live data only). */
+// Normalize API payload onto the empty dashboard shape (live data only).
 export function mergeBranchDashboard(apiData) {
   const date = apiData?.date || new Date().toISOString().slice(0, 10)
   if (!isPlainObject(apiData)) return emptyBranchDashboard(date)

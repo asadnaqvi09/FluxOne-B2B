@@ -18,6 +18,7 @@ import {
   TablePagination,
 } from '@/components/ui/table'
 import { ConfirmDialog } from '@/components/shared/ConfirmDialog'
+import { DataCard, ResponsiveDataShell } from '@/components/shared/ResponsiveDataShell'
 import { BRAND } from '@/lib/constants'
 import { toastSuccess, toastError } from '@/lib/toast'
 import {
@@ -395,9 +396,9 @@ export function SettingsPage() {
                 />
               </div>
 
-              <div className="flex items-center gap-2">
-                <span className="text-xs text-slate-500 font-semibold shrink-0">Status:</span>
-                <div className="flex rounded-xl bg-slate-100 p-0.5 border border-slate-200">
+              <div className="flex min-w-0 flex-col gap-2 sm:flex-row sm:items-center">
+                <span className="shrink-0 text-xs font-semibold text-slate-500">Status:</span>
+                <div className="flex max-w-full overflow-x-auto rounded-xl border border-slate-200 bg-slate-100 p-0.5">
                   {[
                     { key: 'all', label: `All (${stats.total})` },
                     { key: 'active', label: `Active (${stats.active})` },
@@ -407,9 +408,9 @@ export function SettingsPage() {
                       key={opt.key}
                       type="button"
                       onClick={() => setStatusFilter(opt.key)}
-                      className={`rounded-lg px-3 py-1 text-xs font-semibold transition-all cursor-pointer ${
+                      className={`shrink-0 cursor-pointer rounded-lg px-3 py-1 text-xs font-semibold transition-all ${
                         statusFilter === opt.key
-                          ? 'bg-white text-purple-900 shadow-xs font-bold'
+                          ? 'bg-white font-bold text-purple-900 shadow-xs'
                           : 'text-slate-600 hover:text-slate-900'
                       }`}
                     >
@@ -451,109 +452,187 @@ export function SettingsPage() {
                 />
               ) : (
                 <>
-                  <div className="overflow-x-auto">
-                    <Table className="w-full text-left text-sm">
-                      <TableHeader>
-                        <TableRow className="text-xs text-slate-500 uppercase">
-                          <TableHead className="px-4 py-3 font-medium">Device & Branch</TableHead>
-                          <TableHead className="px-4 py-3 font-medium">
-                            Hardware Signature & Network
-                          </TableHead>
-                          <TableHead className="px-4 py-3 font-medium">Assigned User</TableHead>
-                          <TableHead className="px-4 py-3 font-medium">Status & Activity</TableHead>
-                          <TableHead className="px-4 py-3 text-right font-medium">Action</TableHead>
-                        </TableRow>
-                      </TableHeader>
-                      <TableBody>
-                        {systems.map((sys) => {
-                          const isActive = sys.status === 'active'
-                          return (
-                            <TableRow key={sys.id} className="hover:bg-slate-50/70 transition-colors">
-                              <TableCell className="px-4 py-3.5">
-                                <div className="flex items-center gap-3">
-                                  <div
-                                    className={`flex size-9 shrink-0 items-center justify-center rounded-xl text-white ${
-                                      isActive ? 'bg-purple-900' : 'bg-rose-600'
-                                    }`}
-                                  >
-                                    <Cpu className="size-4" />
-                                  </div>
-                                  <div className="min-w-0">
-                                    <p className="font-semibold text-xs text-slate-900 leading-tight">
-                                      {sys.deviceName}
-                                    </p>
-                                    <p className="text-[11px] text-slate-500 font-medium mt-0.5">
-                                      Branch: {sys.branch || 'Unassigned'}
-                                    </p>
-                                  </div>
-                                </div>
-                              </TableCell>
-
-                              <TableCell className="px-4 py-3.5">
-                                <div>
-                                  <span className="font-mono text-xs font-semibold px-2 py-0.5 rounded-md bg-purple-50 text-purple-900 border border-purple-100 whitespace-nowrap inline-block tracking-wide">
-                                    {sys.hardwareSignature}
-                                  </span>
-                                  <p className="font-mono text-[11px] text-slate-500 mt-1">
-                                    IP: {sys.ipAddress || '—'} · MAC: {sys.macAddress || '—'}
+                  <ResponsiveDataShell
+                    mobile={systems.map((sys) => {
+                      const isActive = sys.status === 'active'
+                      return (
+                        <DataCard key={sys.id}>
+                          <div className="flex items-start gap-3">
+                            <div
+                              className={`flex size-9 shrink-0 items-center justify-center rounded-xl text-white ${
+                                isActive ? 'bg-purple-900' : 'bg-rose-600'
+                              }`}
+                            >
+                              <Cpu className="size-4" />
+                            </div>
+                            <div className="min-w-0 flex-1">
+                              <div className="flex items-start justify-between gap-2">
+                                <div className="min-w-0">
+                                  <p className="truncate text-sm font-semibold text-slate-900">
+                                    {sys.deviceName}
+                                  </p>
+                                  <p className="text-[11px] font-medium text-slate-500">
+                                    Branch: {sys.branch || 'Unassigned'}
                                   </p>
                                 </div>
-                              </TableCell>
-
-                              <TableCell className="px-4 py-3.5 text-xs text-slate-700">
-                                <p className="font-semibold text-slate-900">{sys.userName}</p>
-                                <p className="text-[11px] text-slate-500 font-mono mt-0.5">
-                                  {sys.userId || '—'}
-                                </p>
-                              </TableCell>
-
-                              <TableCell className="px-4 py-3.5 whitespace-nowrap">
-                                <div className="flex items-center gap-2">
-                                  <Badge
-                                    variant="outline"
-                                    className={
-                                      isActive
-                                        ? 'bg-emerald-50 text-emerald-700 border-emerald-200 font-bold text-[11px]'
-                                        : 'bg-rose-50 text-rose-700 border-rose-200 font-bold text-[11px]'
-                                    }
-                                  >
-                                    {isActive ? 'Active' : 'Blocked'}
-                                  </Badge>
-                                  <span className="inline-flex items-center gap-1 text-[11px] text-slate-500 font-medium">
-                                    <Clock className="size-3 text-slate-400" />
-                                    {formatLastActive(sys.lastActiveAt)}
-                                  </span>
-                                </div>
-                              </TableCell>
-
-                              <TableCell className="px-4 py-3.5 text-right whitespace-nowrap">
-                                <Button
-                                  type="button"
-                                  size="sm"
-                                  disabled={mutating}
-                                  onClick={() => handlePromptBlockSystem(sys)}
-                                  className="h-8 px-3.5 text-xs font-semibold cursor-pointer text-white shadow-xs"
-                                  style={{ background: isActive ? BRAND.deep : BRAND.purple }}
+                                <Badge
+                                  variant="outline"
+                                  className={
+                                    isActive
+                                      ? 'shrink-0 border-emerald-200 bg-emerald-50 text-[11px] font-bold text-emerald-700'
+                                      : 'shrink-0 border-rose-200 bg-rose-50 text-[11px] font-bold text-rose-700'
+                                  }
                                 >
-                                  {isActive ? (
-                                    <>
-                                      <Ban className="mr-1.5 size-3.5" />
-                                      Block System
-                                    </>
-                                  ) : (
-                                    <>
-                                      <CheckCircle2 className="mr-1.5 size-3.5" />
-                                      Authorize
-                                    </>
-                                  )}
-                                </Button>
-                              </TableCell>
-                            </TableRow>
-                          )
-                        })}
-                      </TableBody>
-                    </Table>
-                  </div>
+                                  {isActive ? 'Active' : 'Blocked'}
+                                </Badge>
+                              </div>
+                              <p className="mt-2 font-mono text-[11px] font-semibold tracking-wide text-purple-900">
+                                {sys.hardwareSignature}
+                              </p>
+                              <p className="mt-0.5 font-mono text-[11px] text-slate-500">
+                                IP: {sys.ipAddress || '—'} · MAC: {sys.macAddress || '—'}
+                              </p>
+                              <p className="mt-1 text-xs font-semibold text-slate-900">{sys.userName}</p>
+                              <p className="flex items-center gap-1 text-[11px] text-slate-500">
+                                <Clock className="size-3 text-slate-400" />
+                                {formatLastActive(sys.lastActiveAt)}
+                              </p>
+                              <Button
+                                type="button"
+                                size="sm"
+                                disabled={mutating}
+                                onClick={() => handlePromptBlockSystem(sys)}
+                                className="mt-3 h-8 w-full cursor-pointer px-3.5 text-xs font-semibold text-white shadow-xs"
+                                style={{ background: isActive ? BRAND.deep : BRAND.purple }}
+                              >
+                                {isActive ? (
+                                  <>
+                                    <Ban className="mr-1.5 size-3.5" />
+                                    Block System
+                                  </>
+                                ) : (
+                                  <>
+                                    <CheckCircle2 className="mr-1.5 size-3.5" />
+                                    Authorize
+                                  </>
+                                )}
+                              </Button>
+                            </div>
+                          </div>
+                        </DataCard>
+                      )
+                    })}
+                    desktop={
+                      <Table className="min-w-[44rem] w-full text-left text-sm">
+                        <TableHeader>
+                          <TableRow className="text-xs text-slate-500 uppercase">
+                            <TableHead className="px-4 py-3 font-medium">Device & Branch</TableHead>
+                            <TableHead className="px-4 py-3 font-medium">
+                              Hardware Signature & Network
+                            </TableHead>
+                            <TableHead className="hidden px-4 py-3 font-medium lg:table-cell">
+                              Assigned User
+                            </TableHead>
+                            <TableHead className="px-4 py-3 font-medium">Status & Activity</TableHead>
+                            <TableHead className="sticky right-0 z-[1] bg-white px-4 py-3 text-right font-medium">
+                              Action
+                            </TableHead>
+                          </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                          {systems.map((sys) => {
+                            const isActive = sys.status === 'active'
+                            return (
+                              <TableRow
+                                key={sys.id}
+                                className="group transition-colors hover:bg-slate-50/70"
+                              >
+                                <TableCell className="px-4 py-3.5">
+                                  <div className="flex items-center gap-3">
+                                    <div
+                                      className={`flex size-9 shrink-0 items-center justify-center rounded-xl text-white ${
+                                        isActive ? 'bg-purple-900' : 'bg-rose-600'
+                                      }`}
+                                    >
+                                      <Cpu className="size-4" />
+                                    </div>
+                                    <div className="min-w-0">
+                                      <p className="text-xs leading-tight font-semibold text-slate-900">
+                                        {sys.deviceName}
+                                      </p>
+                                      <p className="mt-0.5 text-[11px] font-medium text-slate-500">
+                                        Branch: {sys.branch || 'Unassigned'}
+                                      </p>
+                                    </div>
+                                  </div>
+                                </TableCell>
+
+                                <TableCell className="px-4 py-3.5">
+                                  <div>
+                                    <span className="inline-block rounded-md border border-purple-100 bg-purple-50 px-2 py-0.5 font-mono text-xs font-semibold tracking-wide whitespace-nowrap text-purple-900">
+                                      {sys.hardwareSignature}
+                                    </span>
+                                    <p className="mt-1 font-mono text-[11px] text-slate-500">
+                                      IP: {sys.ipAddress || '—'} · MAC: {sys.macAddress || '—'}
+                                    </p>
+                                  </div>
+                                </TableCell>
+
+                                <TableCell className="hidden px-4 py-3.5 text-xs text-slate-700 lg:table-cell">
+                                  <p className="font-semibold text-slate-900">{sys.userName}</p>
+                                  <p className="mt-0.5 font-mono text-[11px] text-slate-500">
+                                    {sys.userId || '—'}
+                                  </p>
+                                </TableCell>
+
+                                <TableCell className="px-4 py-3.5 whitespace-nowrap">
+                                  <div className="flex items-center gap-2">
+                                    <Badge
+                                      variant="outline"
+                                      className={
+                                        isActive
+                                          ? 'border-emerald-200 bg-emerald-50 text-[11px] font-bold text-emerald-700'
+                                          : 'border-rose-200 bg-rose-50 text-[11px] font-bold text-rose-700'
+                                      }
+                                    >
+                                      {isActive ? 'Active' : 'Blocked'}
+                                    </Badge>
+                                    <span className="inline-flex items-center gap-1 text-[11px] font-medium text-slate-500">
+                                      <Clock className="size-3 text-slate-400" />
+                                      {formatLastActive(sys.lastActiveAt)}
+                                    </span>
+                                  </div>
+                                </TableCell>
+
+                                <TableCell className="sticky right-0 z-[1] bg-white px-4 py-3.5 text-right whitespace-nowrap group-hover:bg-slate-50/70">
+                                  <Button
+                                    type="button"
+                                    size="sm"
+                                    disabled={mutating}
+                                    onClick={() => handlePromptBlockSystem(sys)}
+                                    className="h-8 cursor-pointer px-3.5 text-xs font-semibold text-white shadow-xs"
+                                    style={{ background: isActive ? BRAND.deep : BRAND.purple }}
+                                  >
+                                    {isActive ? (
+                                      <>
+                                        <Ban className="mr-1.5 size-3.5" />
+                                        Block System
+                                      </>
+                                    ) : (
+                                      <>
+                                        <CheckCircle2 className="mr-1.5 size-3.5" />
+                                        Authorize
+                                      </>
+                                    )}
+                                  </Button>
+                                </TableCell>
+                              </TableRow>
+                            )
+                          })}
+                        </TableBody>
+                      </Table>
+                    }
+                  />
 
                   <TablePagination
                     page={pagination.page || page}

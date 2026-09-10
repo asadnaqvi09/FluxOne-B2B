@@ -3,10 +3,8 @@ import { cn } from '@/lib/utils'
 
 const EASE = [0.22, 1, 0.36, 1]
 
-/**
- * Fade / slide-in on view — Framer Motion replacement for GSAP reveal.
- * Avoids scale so Recharts ResponsiveContainer stays stable.
- */
+// Fade / slide-in on view — Framer Motion replacement for GSAP reveal.
+// Avoids scale so Recharts ResponsiveContainer stays stable.
 export function MotionReveal({ children, className, delay = 0, y = 24, once = true, amount = 0.12 }) {
   const reduceMotion = useReducedMotion()
 
@@ -27,7 +25,7 @@ export function MotionReveal({ children, className, delay = 0, y = 24, once = tr
   )
 }
 
-/** Header entrance (slightly lighter than card reveal). */
+// Header entrance (slightly lighter than card reveal).
 export function MotionHeader({ children, className }) {
   const reduceMotion = useReducedMotion()
 

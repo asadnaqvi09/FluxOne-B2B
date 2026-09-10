@@ -3,10 +3,8 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { NativeSelect } from '@/components/ui/select'
 
-/**
- * Debounced search + active filter for suppliers.
- * Input updates immediately; parent fetch fires after 300ms.
- */
+// Debounced search + active filter for suppliers.
+// Input updates immediately; parent fetch fires after 300ms.
 export function SupplierFilters({
   q = '',
   active = 'active',

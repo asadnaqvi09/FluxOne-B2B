@@ -111,6 +111,8 @@ const emptyForm = {
   createdAt: '',
   name: '',
   location: '',
+  openingTime: '',
+  closingTime: '',
   imageFile: null,
   managerImageFile: null,
   managerName: '',
@@ -119,6 +121,19 @@ const emptyForm = {
   managerOtherContact: '',
   managerGender: 'Male',
   managerAddress: '',
+}
+
+function timeInputValue(value) {
+  if (!value) return ''
+  const text = String(value)
+  return text.length >= 5 ? text.slice(0, 5) : text
+}
+
+function formatHoursRange(openingTime, closingTime) {
+  const open = timeInputValue(openingTime)
+  const close = timeInputValue(closingTime)
+  if (!open || !close) return null
+  return `${open}–${close}`
 }
 
 export function BranchesPage() {
@@ -187,6 +202,8 @@ export function BranchesPage() {
       createdAt: formatCreatedAt(b.createdAt),
       name: b.name || '',
       location: b.location || '',
+      openingTime: timeInputValue(b.openingTime),
+      closingTime: timeInputValue(b.closingTime),
       imageFile: null,
       managerImageFile: null,
       managerName: b.manager?.name || '',
@@ -281,9 +298,22 @@ export function BranchesPage() {
       }
     }
 
+    const hasOpen = Boolean(formData.openingTime?.trim())
+    const hasClose = Boolean(formData.closingTime?.trim())
+    if (hasOpen !== hasClose) {
+      toastError('Set both opening and closing time, or leave both empty')
+      return
+    }
+    if (hasOpen && hasClose && formData.openingTime >= formData.closingTime) {
+      toastError('Closing time must be after opening time')
+      return
+    }
+
     const payload = {
       name: formData.name.trim(),
       location: formData.location.trim(),
+      openingTime: formData.openingTime || '',
+      closingTime: formData.closingTime || '',
       image: formData.imageFile || undefined,
       profileImage: formData.managerImageFile || undefined,
       managerName: formData.managerName.trim(),
@@ -508,6 +538,11 @@ export function BranchesPage() {
                           <span className="text-[10px] sm:text-[11px] text-slate-400 whitespace-nowrap">
                             Est. {formatCreatedAt(b.createdAt)}
                           </span>
+                          {formatHoursRange(b.openingTime, b.closingTime) ? (
+                            <p className="mt-0.5 text-[10px] font-medium text-purple-800 whitespace-nowrap">
+                              Hours {formatHoursRange(b.openingTime, b.closingTime)}
+                            </p>
+                          ) : null}
                           <p className="mt-1 flex items-start gap-1 text-[10px] text-slate-500 sm:hidden">
                             <MapPin className="mt-0.5 size-3 shrink-0 text-slate-400" />
                             <span className="line-clamp-2">{b.location || '—'}</span>
@@ -703,6 +738,35 @@ export function BranchesPage() {
                     required
                   />
                 </div>
+
+                <div className="space-y-1">
+                  <Label htmlFor="branchOpeningTime" className="text-xs">
+                    Opening time
+                  </Label>
+                  <Input
+                    id="branchOpeningTime"
+                    type="time"
+                    value={formData.openingTime}
+                    onChange={(e) => setFormData({ ...formData, openingTime: e.target.value })}
+                  />
+                </div>
+
+                <div className="space-y-1">
+                  <Label htmlFor="branchClosingTime" className="text-xs">
+                    Closing time
+                  </Label>
+                  <Input
+                    id="branchClosingTime"
+                    type="time"
+                    value={formData.closingTime}
+                    onChange={(e) => setFormData({ ...formData, closingTime: e.target.value })}
+                  />
+                </div>
+
+                <p className="text-[11px] text-slate-500 sm:col-span-2">
+                  Optional. Same-day window only (opening before closing). Staff shifts must fall inside
+                  these hours when set.
+                </p>
 
                 <div className="space-y-1 sm:col-span-2">
                   <ImageUploadField

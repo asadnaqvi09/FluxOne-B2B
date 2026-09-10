@@ -2,9 +2,7 @@ import { cn } from '@/lib/utils'
 
 const CARD_SHADOW = 'shadow-[0_8px_24px_rgba(15,23,42,0.04)]'
 
-/**
- * Shared white panel used across branch dashboard + staff screens.
- */
+// Shared white panel used across branch dashboard + staff screens.
 export function SurfaceCard({
   as: Comp = 'section',
   title,

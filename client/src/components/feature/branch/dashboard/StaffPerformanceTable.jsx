@@ -1,5 +1,6 @@
 import { useMemo, useState } from 'react'
 import { Users } from 'lucide-react'
+import { DataCard, ResponsiveDataShell } from '@/components/shared/ResponsiveDataShell'
 import { EmptyState } from '@/components/shared/EmptyState'
 import { SurfaceCard } from '@/components/shared/SurfaceCard'
 import { UserAvatar } from '@/components/shared/UserAvatar'
@@ -45,8 +46,8 @@ export function StaffPerformanceTable({ staff = [], className }) {
 
   return (
     <SurfaceCard
-      className={cn('h-full flex flex-col justify-between', className)}
-      bodyClassName="flex-1 flex flex-col justify-between"
+      className={cn('flex h-full flex-col justify-between', className)}
+      bodyClassName="flex flex-1 flex-col justify-between"
       title="Staff List"
       description="Name, ID, status & points"
       actions={
@@ -63,62 +64,95 @@ export function StaffPerformanceTable({ staff = [], className }) {
           className="flex-1 py-12"
         />
       ) : (
-        <div className="flex-1 flex flex-col justify-between">
-          <div className="overflow-x-auto">
-            <Table className="min-w-[32rem] text-left text-sm">
-              <TableHeader>
-                <TableRow className="text-xs tracking-wide text-slate-500 uppercase">
-                  <TableHead className="px-2 py-2.5 font-medium">Employee</TableHead>
-                  <TableHead className="px-2 py-2.5 font-medium">ID</TableHead>
-                  <TableHead className="px-2 py-2.5 font-medium">Status</TableHead>
-                  <TableHead className="px-2 py-2.5 text-right font-medium">Points</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {rows.map((person) => (
-                  <TableRow
-                    key={person.id}
-                    className="hover:bg-slate-50/80"
-                  >
-                    <TableCell className="px-2 py-3">
-                      <div className="flex items-center gap-3">
-                        <UserAvatar
-                          name={person.name}
-                          imageUrl={person.image}
-                          className="size-9"
-                        />
-                        <div className="min-w-0">
-                          <p className="truncate font-semibold text-slate-900">{person.name}</p>
-                          <p className="truncate text-xs text-slate-500">{person.role || 'Staff'}</p>
-                        </div>
+        <div className="flex flex-1 flex-col justify-between">
+          <ResponsiveDataShell
+            mobile={rows.map((person) => (
+              <DataCard key={person.id}>
+                <div className="flex items-start gap-3">
+                  <UserAvatar name={person.name} imageUrl={person.image} className="size-10 shrink-0" />
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="min-w-0">
+                        <p className="truncate text-sm font-semibold text-slate-900">{person.name}</p>
+                        <p className="truncate text-xs text-slate-500">{person.role || 'Staff'}</p>
                       </div>
-                    </TableCell>
-                    <TableCell className="px-2 py-3">
-                      <span
-                        className="inline-block font-mono text-[11px] font-semibold text-purple-800 bg-purple-50 px-2 py-0.5 rounded border border-purple-100 whitespace-nowrap"
-                        title={person.id}
-                      >
-                        {person.id?.length > 12 ? `${person.id.slice(0, 8)}...` : person.id}
-                      </span>
-                    </TableCell>
-                    <TableCell className="px-2 py-3">
                       <span
                         className={cn(
-                          'inline-flex rounded-full px-2.5 py-0.5 text-xs font-semibold ring-1 ring-inset',
+                          'inline-flex shrink-0 rounded-full px-2.5 py-0.5 text-xs font-semibold ring-1 ring-inset',
                           STATUS_STYLES[person.status] || STATUS_STYLES.offline,
                         )}
                       >
                         {statusLabel(person.status)}
                       </span>
-                    </TableCell>
-                    <TableCell className="px-2 py-3 text-right font-semibold text-slate-900">
-                      {Number(person.points || 0).toLocaleString()}
-                    </TableCell>
+                    </div>
+                    <div className="mt-2 flex items-center justify-between gap-2">
+                      <span
+                        className="inline-block rounded border border-purple-100 bg-purple-50 px-2 py-0.5 font-mono text-[11px] font-semibold whitespace-nowrap text-purple-800"
+                        title={person.id}
+                      >
+                        {person.id?.length > 12 ? `${person.id.slice(0, 8)}...` : person.id}
+                      </span>
+                      <p className="text-sm font-semibold text-slate-900">
+                        {Number(person.points || 0).toLocaleString()} pts
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              </DataCard>
+            ))}
+            desktop={
+              <Table className="min-w-[32rem] text-left text-sm">
+                <TableHeader>
+                  <TableRow className="text-xs tracking-wide text-slate-500 uppercase">
+                    <TableHead className="px-2 py-2.5 font-medium">Employee</TableHead>
+                    <TableHead className="px-2 py-2.5 font-medium">ID</TableHead>
+                    <TableHead className="px-2 py-2.5 font-medium">Status</TableHead>
+                    <TableHead className="px-2 py-2.5 text-right font-medium">Points</TableHead>
                   </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </div>
+                </TableHeader>
+                <TableBody>
+                  {rows.map((person) => (
+                    <TableRow key={person.id} className="hover:bg-slate-50/80">
+                      <TableCell className="px-2 py-3">
+                        <div className="flex items-center gap-3">
+                          <UserAvatar
+                            name={person.name}
+                            imageUrl={person.image}
+                            className="size-9"
+                          />
+                          <div className="min-w-0">
+                            <p className="truncate font-semibold text-slate-900">{person.name}</p>
+                            <p className="truncate text-xs text-slate-500">{person.role || 'Staff'}</p>
+                          </div>
+                        </div>
+                      </TableCell>
+                      <TableCell className="px-2 py-3">
+                        <span
+                          className="inline-block rounded border border-purple-100 bg-purple-50 px-2 py-0.5 font-mono text-[11px] font-semibold whitespace-nowrap text-purple-800"
+                          title={person.id}
+                        >
+                          {person.id?.length > 12 ? `${person.id.slice(0, 8)}...` : person.id}
+                        </span>
+                      </TableCell>
+                      <TableCell className="px-2 py-3">
+                        <span
+                          className={cn(
+                            'inline-flex rounded-full px-2.5 py-0.5 text-xs font-semibold ring-1 ring-inset',
+                            STATUS_STYLES[person.status] || STATUS_STYLES.offline,
+                          )}
+                        >
+                          {statusLabel(person.status)}
+                        </span>
+                      </TableCell>
+                      <TableCell className="px-2 py-3 text-right font-semibold text-slate-900">
+                        {Number(person.points || 0).toLocaleString()}
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            }
+          />
 
           <TablePagination
             page={safePage}

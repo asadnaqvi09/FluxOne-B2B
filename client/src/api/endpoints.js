@@ -93,7 +93,7 @@ export const endpoints = {
     taxes: '/inventory/products/taxes',
     offers: '/inventory/products/offers',
   },
-  /** @deprecated prefer products.* — kept for older slices */
+  // @deprecated prefer products.* — kept for older slices
   categories: {
     list: '/inventory/products/categories',
     create: '/inventory/products/categories',

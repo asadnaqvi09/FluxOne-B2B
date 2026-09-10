@@ -1,9 +1,7 @@
 import { cn } from '@/lib/utils'
 
-/**
- * Reusable page title row for BM / IM screens.
- * @param {{ eyebrow?: string, title: string, description?: string, actions?: import('react').ReactNode, className?: string }} props
- */
+// Reusable page title row for BM / IM screens.
+// @param {{ eyebrow?: string, title: string, description?: string, actions?: import('react').ReactNode, className?: string }} props
 export function PageHeader({ eyebrow, title, description, actions, className }) {
   return (
     <header

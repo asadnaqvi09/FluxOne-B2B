@@ -1,13 +1,11 @@
 import { cn } from '@/lib/utils'
 
-/** Base pulse block for loading placeholders. */
+// Base pulse block for loading placeholders.
 export function Skeleton({ className }) {
   return <div className={cn('skeleton-block rounded-xl', className)} aria-hidden />
 }
 
-/**
- * Card-style rows for tables/lists — friendlier than bare bars during cold starts.
- */
+// Card-style rows for tables/lists — friendlier than bare bars during cold starts.
 export function TableRowsSkeleton({ rows = 6, className, hint = true }) {
   return (
     <div

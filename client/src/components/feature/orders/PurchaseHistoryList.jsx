@@ -9,9 +9,7 @@ import {
 import { Button } from '@/components/ui/button'
 import { money } from '@/lib/mapProduct'
 
-/**
- * Price direction history for an order (last vs current unit cost).
- */
+// Price direction history for an order (last vs current unit cost).
 export function PurchaseHistoryList({ open, onOpenChange, history = null }) {
   const lines = history?.lines || []
 

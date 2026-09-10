@@ -453,7 +453,77 @@ export function TaxProfitPage() {
             />
           ) : (
             <>
-              <div className="overflow-x-auto">
+              <div className="space-y-3 md:hidden">
+                {products.map((p) => {
+                  const isChecked = selectedIds.includes(p.id)
+                  const finalPrice =
+                    p.finalPrice ?? calculateFinalPrice(p.baseCost, p.profitPct, p.taxPct)
+
+                  return (
+                    <article
+                      key={p.id}
+                      className={`rounded-xl border px-3 py-3 ${
+                        isChecked
+                          ? 'border-purple-200 bg-purple-50/40'
+                          : 'border-border bg-slate-50/60'
+                      }`}
+                    >
+                      <div className="flex items-start gap-3">
+                        <input
+                          type="checkbox"
+                          checked={isChecked}
+                          onChange={() => handleToggleRow(p.id)}
+                          className="mt-1 rounded text-purple-600 focus:ring-0"
+                          aria-label={`Select ${p.name}`}
+                        />
+                        {p.image ? (
+                          <img
+                            src={p.image}
+                            alt={p.name}
+                            className="size-10 shrink-0 rounded-lg border border-slate-200 object-cover shadow-2xs"
+                          />
+                        ) : (
+                          <div className="size-10 shrink-0 rounded-lg border border-dashed border-slate-200 bg-slate-50" />
+                        )}
+                        <div className="min-w-0 flex-1">
+                          <p className="truncate text-sm font-bold text-slate-900">{p.name}</p>
+                          <p className="font-mono text-[11px] text-slate-400">
+                            {p.itemCode || p.id}
+                          </p>
+                          <p className="mt-1 text-xs text-slate-500">
+                            {p.category || 'Uncategorized'}
+                            {p.subcategory ? ` / ${p.subcategory}` : ''}
+                            {' · '}
+                            {p.scaleLabel || p.scale || '—'}
+                          </p>
+                          <div className="mt-2 flex flex-wrap gap-1.5">
+                            <span className="inline-flex items-center rounded border border-emerald-200 bg-emerald-50 px-2 py-0.5 text-xs font-bold text-emerald-700">
+                              +{p.profitPct}%
+                            </span>
+                            <span className="inline-flex items-center rounded border border-blue-200 bg-blue-50 px-2 py-0.5 text-xs font-bold text-blue-700">
+                              {p.taxPct > 0 ? `${p.taxPct}%` : '0% (Exempt)'}
+                            </span>
+                          </div>
+                          <div className="mt-2 flex items-end justify-between gap-2">
+                            <div>
+                              <p className="text-[10px] text-slate-400">Base Rs. {Number(p.baseCost || 0).toLocaleString()}</p>
+                              <p className="text-sm font-extrabold text-purple-950">
+                                Rs. {Number(finalPrice).toLocaleString()}
+                              </p>
+                            </div>
+                            <p className="text-[10px] text-slate-400">
+                              Margin Rs.{' '}
+                              {(Number(finalPrice) - Number(p.baseCost || 0)).toLocaleString()}
+                            </p>
+                          </div>
+                        </div>
+                      </div>
+                    </article>
+                  )
+                })}
+              </div>
+
+              <div className="hidden overflow-x-auto md:block">
                 <Table className="min-w-[50rem] text-left text-sm">
                   <TableHeader>
                     <TableRow className="text-xs text-slate-500 uppercase">
@@ -475,7 +545,9 @@ export function TaxProfitPage() {
                         <TableHead className="px-3 py-3 font-medium">Product Name</TableHead>
                       )}
                       {visibleColumns.barcode && (
-                        <TableHead className="px-3 py-3 font-medium">Barcode</TableHead>
+                        <TableHead className="hidden px-3 py-3 font-medium lg:table-cell">
+                          Barcode
+                        </TableHead>
                       )}
                       {visibleColumns.category && (
                         <TableHead className="px-3 py-3 font-medium">Category / Scale</TableHead>
@@ -490,7 +562,7 @@ export function TaxProfitPage() {
                         <TableHead className="px-3 py-3 font-medium">Tax %</TableHead>
                       )}
                       {visibleColumns.finalPrice && (
-                        <TableHead className="px-3 py-3 text-right font-bold text-slate-900">
+                        <TableHead className="sticky right-0 z-[1] bg-white px-3 py-3 text-right font-bold text-slate-900">
                           Final Price
                         </TableHead>
                       )}
@@ -506,7 +578,7 @@ export function TaxProfitPage() {
                       return (
                         <TableRow
                           key={p.id}
-                          className={`hover:bg-slate-50/70 transition-colors ${
+                          className={`group hover:bg-slate-50/70 transition-colors ${
                             isChecked ? 'bg-purple-50/40' : ''
                           }`}
                         >
@@ -546,7 +618,7 @@ export function TaxProfitPage() {
                           )}
 
                           {visibleColumns.barcode && (
-                            <TableCell className="px-3 py-3 font-mono text-xs text-slate-500">
+                            <TableCell className="hidden px-3 py-3 font-mono text-xs text-slate-500 lg:table-cell">
                               {p.barcode || '—'}
                             </TableCell>
                           )}
@@ -586,7 +658,7 @@ export function TaxProfitPage() {
                           )}
 
                           {visibleColumns.finalPrice && (
-                            <TableCell className="px-3 py-3 text-right">
+                            <TableCell className="sticky right-0 z-[1] bg-white px-3 py-3 text-right group-hover:bg-slate-50/70">
                               <span className="font-extrabold text-sm text-purple-950 block">
                                 Rs. {Number(finalPrice).toLocaleString()}
                               </span>

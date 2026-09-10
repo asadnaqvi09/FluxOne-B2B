@@ -22,7 +22,7 @@ import { BRAND } from '@/lib/constants'
 import { MOVEMENT_TYPES } from '@/lib/mapStockMovement'
 import { toastError, toastSuccess } from '@/lib/toast'
 
-/** Tabs that expose an "Add …" CTA (Stock Out / Expired are history-only). */
+// Tabs that expose an "Add …" CTA (Stock Out / Expired are history-only).
 const TABS_WITH_ADD = new Set([
   MOVEMENT_TYPES.IN,
   MOVEMENT_TYPES.ADJUSTMENT,

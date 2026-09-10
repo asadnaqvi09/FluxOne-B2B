@@ -47,7 +47,7 @@ export const createStaffSchema = z
   .object({
     body: z.object({
       fullName: z.string().min(1),
-      /** Login ID (same field used by /auth/login as `id`). */
+      // Login ID (same field used by /auth/login as `id`).
       email: z.string().min(3).max(190),
       password: z.string().min(8),
       role: staffRoleEnum,
@@ -58,7 +58,7 @@ export const createStaffSchema = z
       phone: optionalString,
       status: staffStatusEnum.optional(),
       scheduleStart: optionalTime,
-      /** Single break time maps to break start; optional end for ranges. */
+      // Single break time maps to break start; optional end for ranges.
       scheduleBreakStart: optionalTime,
       scheduleBreakEnd: optionalTime,
       scheduleEnd: optionalTime,

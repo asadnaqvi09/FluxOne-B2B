@@ -17,10 +17,38 @@ import { formatMovementDateTime } from '@/lib/mapStockMovement'
 import { displayMovementRef } from '@/lib/formatDisplayId'
 import { cn } from '@/lib/utils'
 
-/**
- * Shared ledger history table shell.
- * @param {{ columns: Array<{ key: string, label: string, className?: string, render: (row) => import('react').ReactNode }> }} props
- */
+function MovementRowActions({ row, onEdit, onDelete }) {
+  return (
+    <div className="inline-flex items-center gap-1">
+      {onEdit ? (
+        <Button
+          type="button"
+          variant="ghost"
+          size="sm"
+          className="cursor-pointer"
+          onClick={() => onEdit(row)}
+          title="Edit"
+        >
+          <Pencil className="size-4" />
+        </Button>
+      ) : null}
+      {onDelete ? (
+        <Button
+          type="button"
+          variant="ghost"
+          size="sm"
+          className="cursor-pointer text-red-600 hover:text-red-700"
+          onClick={() => onDelete(row)}
+          title="Delete"
+        >
+          <Trash2 className="size-4" />
+        </Button>
+      ) : null}
+    </div>
+  )
+}
+
+// Shared ledger history — mobile cards + desktop table
 export function MovementHistoryTable({
   title,
   description,
@@ -59,7 +87,32 @@ export function MovementHistoryTable({
         <EmptyState icon={Package} title={emptyTitle} description={emptyHint} />
       ) : (
         <>
-          <div className="overflow-x-auto -mx-1 px-1 sm:mx-0 sm:px-0">
+          <div className="space-y-3 md:hidden">
+            {list.map((row) => (
+              <article
+                key={row.id}
+                className="rounded-xl border border-border bg-slate-50/60 px-3 py-3"
+              >
+                <div className="space-y-2.5">
+                  {columns.map((col) => (
+                    <div key={col.key} className="min-w-0">
+                      <p className="text-[10px] font-semibold tracking-wide text-slate-400 uppercase">
+                        {col.label}
+                      </p>
+                      <div className="mt-0.5 text-sm text-slate-800">{col.render(row)}</div>
+                    </div>
+                  ))}
+                </div>
+                {showActions ? (
+                  <div className="mt-3 flex justify-end border-t border-border pt-2">
+                    <MovementRowActions row={row} onEdit={onEdit} onDelete={onDelete} />
+                  </div>
+                ) : null}
+              </article>
+            ))}
+          </div>
+
+          <div className="hidden overflow-x-auto md:block -mx-1 px-1 sm:mx-0 sm:px-0">
             <Table className="min-w-[640px] text-left text-sm md:min-w-[720px]">
               <TableHeader>
                 <TableRow className="text-xs tracking-wide text-slate-400 uppercase">
@@ -83,32 +136,7 @@ export function MovementHistoryTable({
                     ))}
                     {showActions ? (
                       <TableCell className="px-2 py-3 text-right">
-                        <div className="inline-flex items-center gap-1">
-                          {onEdit ? (
-                            <Button
-                              type="button"
-                              variant="ghost"
-                              size="sm"
-                              className="cursor-pointer"
-                              onClick={() => onEdit(row)}
-                              title="Edit"
-                            >
-                              <Pencil className="size-4" />
-                            </Button>
-                          ) : null}
-                          {onDelete ? (
-                            <Button
-                              type="button"
-                              variant="ghost"
-                              size="sm"
-                              className="cursor-pointer text-red-600 hover:text-red-700"
-                              onClick={() => onDelete(row)}
-                              title="Delete"
-                            >
-                              <Trash2 className="size-4" />
-                            </Button>
-                          ) : null}
-                        </div>
+                        <MovementRowActions row={row} onEdit={onEdit} onDelete={onDelete} />
                       </TableCell>
                     ) : null}
                   </TableRow>

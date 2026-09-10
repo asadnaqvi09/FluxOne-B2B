@@ -6,7 +6,7 @@ function httpError(status, message) {
   return error
 }
 
-/** Roles BM can create via Staff API (excludes BM / B2B admin). */
+// Roles BM can create via Staff API (excludes BM / B2B admin).
 export const CREATABLE_STAFF_ROLES = [
   ROLES.INVENTORY_MANAGER,
   ROLES.CASHIER,
@@ -15,10 +15,10 @@ export const CREATABLE_STAFF_ROLES = [
   ROLES.WEBSITE_MANAGER,
 ]
 
-/** SQL `IN (...)` list for creatable staff role slugs. */
+// SQL `IN (...)` list for creatable staff role slugs.
 export const CREATABLE_STAFF_ROLE_SQL = CREATABLE_STAFF_ROLES.map((slug) => `'${slug}'`).join(', ')
 
-/** Fixed staff designations auto-mapped from system role (no custom designation picker). */
+// Fixed staff designations auto-mapped from system role (no custom designation picker).
 export const STAFF_ROLE_TO_DESIGNATION = {
   [ROLES.INVENTORY_MANAGER]: 'Inventory Manager',
   [ROLES.CASHIER]: 'Cashier',
@@ -27,10 +27,8 @@ export const STAFF_ROLE_TO_DESIGNATION = {
   [ROLES.WEBSITE_MANAGER]: 'Website Manager',
 }
 
-/**
- * Branch Managers are locked to their JWT branch.
- * B2B Admins may pass an explicit branchId (required when creating staff).
- */
+// Branch Managers are locked to their JWT branch.
+// B2B Admins may pass an explicit branchId (required when creating staff).
 export function resolveScopedBranchId(req, bodyBranchId) {
   const role = req.user?.role
   const tokenBranchId = req.user?.branchId || null
@@ -49,7 +47,7 @@ export function resolveScopedBranchId(req, bodyBranchId) {
   return bodyBranchId || tokenBranchId || null
 }
 
-/** List/filter branch scope — BM always forced to own branch. */
+// List/filter branch scope — BM always forced to own branch.
 export function resolveListBranchId(req, queryBranchId) {
   const role = req.user?.role
   const tokenBranchId = req.user?.branchId || null
@@ -64,10 +62,8 @@ export function resolveListBranchId(req, queryBranchId) {
   return queryBranchId || null
 }
 
-/**
- * Ensures a staff row is visible/editable for the caller.
- * BM: must match JWT branch. B2B: any staff in tenant.
- */
+// Ensures a staff row is visible/editable for the caller.
+// BM: must match JWT branch. B2B: any staff in tenant.
 export function assertStaffBranchAccess(req, staffRow) {
   if (!staffRow) {
     throw httpError(404, 'Staff not found')
@@ -86,7 +82,7 @@ export function assertStaffBranchAccess(req, staffRow) {
   return staffRow
 }
 
-/** Strip branch reassignment from BM update payloads. */
+// Strip branch reassignment from BM update payloads.
 export function sanitizeStaffWritePayload(req, body) {
   const next = { ...body }
   if (req.user?.role === ROLES.BRANCH_MANAGER) {

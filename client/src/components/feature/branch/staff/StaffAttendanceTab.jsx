@@ -1,4 +1,4 @@
-import { useEffect, useState, useMemo } from 'react'
+import { useEffect, useState } from 'react'
 import { Calendar as CalendarIcon, List, CheckSquare, ChevronLeft, ChevronRight } from 'lucide-react'
 import { SurfaceCard } from '@/components/shared/SurfaceCard'
 import { Button } from '@/components/ui/button'
@@ -15,7 +15,6 @@ import {
   TablePagination,
 } from '@/components/ui/table'
 import { apiClient } from '@/api/api'
-import { endpoints } from '@/api/endpoints'
 import { BRAND } from '@/lib/constants'
 import { toastError, toastSuccess } from '@/lib/toast'
 
@@ -270,48 +269,100 @@ export function StaffAttendanceTab({ designations = [], staff = [] }) {
                   </NativeSelect>
                 </div>
               </div>
-              <div className="overflow-x-auto">
-                <Table className="min-w-[36rem] text-left text-sm">
-                  <TableHeader>
-                    <TableRow className="text-xs text-slate-500 uppercase">
-                      <TableHead className="px-3 py-2 font-medium">Employee</TableHead>
-                      <TableHead className="px-3 py-2 font-medium">Designation</TableHead>
-                      <TableHead className="px-3 py-2 font-medium">Date</TableHead>
-                      <TableHead className="px-3 py-2 font-medium">Status</TableHead>
-                      <TableHead className="px-3 py-2 font-medium">Note</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {loading ? (
-                      <TableRow><TableCell colSpan={5} className="py-8 text-center text-slate-400">Loading...</TableCell></TableRow>
-                    ) : filteredLogs.length === 0 ? (
-                      <TableRow><TableCell colSpan={5} className="py-8 text-center text-slate-400">No logs found for this date</TableCell></TableRow>
-                    ) : (
-                      filteredLogs
-                        .slice((logPage - 1) * PAGE_SIZE, logPage * PAGE_SIZE)
-                        .map((log) => {
-                          const m = staff.find((s) => s.id === log.staffId)
-                          const logDateFormatted = new Date(log.workDate).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })
-                          return (
-                            <TableRow key={log.id} className="hover:bg-slate-50/50">
-                              <TableCell className="px-3 py-2.5 font-semibold text-slate-900">{m?.fullName || 'Employee'}</TableCell>
-                              <TableCell className="px-3 py-2.5 text-slate-600">{m?.designation || '—'}</TableCell>
-                              <TableCell className="px-3 py-2.5 text-slate-600 font-mono text-xs">
-                                {logDateFormatted}
-                              </TableCell>
-                              <TableCell className="px-3 py-2.5">
-                                <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-semibold ring-1 ring-inset ${getStatusBadge(log.status)}`}>
-                                  {log.status}
-                                </span>
-                              </TableCell>
-                              <TableCell className="px-3 py-2.5 text-slate-400 italic">{log.note || '—'}</TableCell>
-                            </TableRow>
-                          )
+              {loading ? (
+                <p className="py-8 text-center text-sm text-slate-400">Loading...</p>
+              ) : filteredLogs.length === 0 ? (
+                <p className="py-8 text-center text-sm text-slate-400">No logs found for this date</p>
+              ) : (
+                <>
+                  <div className="space-y-3 md:hidden">
+                    {filteredLogs
+                      .slice((logPage - 1) * PAGE_SIZE, logPage * PAGE_SIZE)
+                      .map((log) => {
+                        const m = staff.find((s) => s.id === log.staffId)
+                        const logDateFormatted = new Date(log.workDate).toLocaleDateString('en-GB', {
+                          day: '2-digit',
+                          month: 'short',
+                          year: 'numeric',
                         })
-                    )}
-                  </TableBody>
-                </Table>
-              </div>
+                        return (
+                          <article
+                            key={log.id}
+                            className="rounded-xl border border-border bg-slate-50/60 px-3 py-3"
+                          >
+                            <div className="flex items-start justify-between gap-2">
+                              <div className="min-w-0">
+                                <p className="truncate text-sm font-semibold text-slate-900">
+                                  {m?.fullName || 'Employee'}
+                                </p>
+                                <p className="text-xs text-slate-500">{m?.designation || '—'}</p>
+                                <p className="mt-0.5 font-mono text-[11px] text-slate-400">
+                                  {logDateFormatted}
+                                </p>
+                              </div>
+                              <span
+                                className={`inline-flex shrink-0 items-center rounded-full px-2 py-0.5 text-xs font-semibold ring-1 ring-inset capitalize ${getStatusBadge(log.status)}`}
+                              >
+                                {log.status}
+                              </span>
+                            </div>
+                            {log.note ? (
+                              <p className="mt-2 text-xs text-slate-400 italic">{log.note}</p>
+                            ) : null}
+                          </article>
+                        )
+                      })}
+                  </div>
+
+                  <div className="hidden overflow-x-auto md:block">
+                    <Table className="min-w-[36rem] text-left text-sm">
+                      <TableHeader>
+                        <TableRow className="text-xs text-slate-500 uppercase">
+                          <TableHead className="px-3 py-2 font-medium">Employee</TableHead>
+                          <TableHead className="px-3 py-2 font-medium">Designation</TableHead>
+                          <TableHead className="px-3 py-2 font-medium">Date</TableHead>
+                          <TableHead className="px-3 py-2 font-medium">Status</TableHead>
+                          <TableHead className="px-3 py-2 font-medium">Note</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {filteredLogs
+                          .slice((logPage - 1) * PAGE_SIZE, logPage * PAGE_SIZE)
+                          .map((log) => {
+                            const m = staff.find((s) => s.id === log.staffId)
+                            const logDateFormatted = new Date(log.workDate).toLocaleDateString(
+                              'en-GB',
+                              { day: '2-digit', month: 'short', year: 'numeric' },
+                            )
+                            return (
+                              <TableRow key={log.id} className="hover:bg-slate-50/50">
+                                <TableCell className="px-3 py-2.5 font-semibold text-slate-900">
+                                  {m?.fullName || 'Employee'}
+                                </TableCell>
+                                <TableCell className="px-3 py-2.5 text-slate-600">
+                                  {m?.designation || '—'}
+                                </TableCell>
+                                <TableCell className="px-3 py-2.5 font-mono text-xs text-slate-600">
+                                  {logDateFormatted}
+                                </TableCell>
+                                <TableCell className="px-3 py-2.5">
+                                  <span
+                                    className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-semibold ring-1 ring-inset capitalize ${getStatusBadge(log.status)}`}
+                                  >
+                                    {log.status}
+                                  </span>
+                                </TableCell>
+                                <TableCell className="px-3 py-2.5 text-slate-400 italic">
+                                  {log.note || '—'}
+                                </TableCell>
+                              </TableRow>
+                            )
+                          })}
+                      </TableBody>
+                    </Table>
+                  </div>
+                </>
+              )}
 
               <TablePagination
                 page={logPage}
@@ -334,35 +385,54 @@ export function StaffAttendanceTab({ designations = [], staff = [] }) {
                 </div>
               }
             >
-              <div className="overflow-x-auto">
-                <div className="min-w-[40rem]">
-                  <div className="grid grid-cols-7 gap-2 mb-2 text-center text-xs font-bold text-slate-400 uppercase">
-                    <div>Sun</div><div>Mon</div><div>Tue</div><div>Wed</div><div>Thu</div><div>Fri</div><div>Sat</div>
-                  </div>
-                  <div className="grid grid-cols-7 gap-2">
-                    {Array.from({ length: firstDayIndex }).map((_, i) => (
-                      <div key={`empty-${i}`} className="h-20 bg-slate-50/50 rounded-lg border border-dashed border-slate-100" />
-                    ))}
-                    {Array.from({ length: daysInMonth }).map((_, i) => {
-                      const dayNum = i + 1
-                      const dayLogs = getLogsForDate(dayNum)
-                      const presents = dayLogs.filter((l) => l.status === 'present').length
-                      const absents = dayLogs.filter((l) => l.status === 'absent').length
-                      return (
-                        <div key={`day-${dayNum}`} className="h-20 p-1 bg-white border border-border rounded-lg flex flex-col justify-between hover:bg-slate-50">
-                          <span className="text-xs font-bold text-slate-700">{dayNum}</span>
-                          {dayLogs.length > 0 ? (
-                            <div className="text-[10px] space-y-0.5">
-                              {presents > 0 && <div className="bg-emerald-50 text-emerald-800 px-1 rounded truncate text-left">P: {presents}</div>}
-                              {absents > 0 && <div className="bg-rose-50 text-rose-800 px-1 rounded truncate text-left">A: {absents}</div>}
-                            </div>
-                          ) : (
-                            <span className="text-[9px] text-slate-300 italic">No logs</span>
-                          )}
-                        </div>
-                      )
-                    })}
-                  </div>
+              {/* Compact month grid — no forced min-width crush on phones */}
+              <div className="w-full">
+                <div className="mb-2 grid grid-cols-7 gap-1 text-center text-[10px] font-bold text-slate-400 uppercase sm:gap-2 sm:text-xs">
+                  <div>S</div>
+                  <div>M</div>
+                  <div>T</div>
+                  <div>W</div>
+                  <div>T</div>
+                  <div>F</div>
+                  <div>S</div>
+                </div>
+                <div className="grid grid-cols-7 gap-1 sm:gap-2">
+                  {Array.from({ length: firstDayIndex }).map((_, i) => (
+                    <div
+                      key={`empty-${i}`}
+                      className="h-14 rounded-lg border border-dashed border-slate-100 bg-slate-50/50 sm:h-20"
+                    />
+                  ))}
+                  {Array.from({ length: daysInMonth }).map((_, i) => {
+                    const dayNum = i + 1
+                    const dayLogs = getLogsForDate(dayNum)
+                    const presents = dayLogs.filter((l) => l.status === 'present').length
+                    const absents = dayLogs.filter((l) => l.status === 'absent').length
+                    return (
+                      <div
+                        key={`day-${dayNum}`}
+                        className="flex h-14 flex-col justify-between rounded-lg border border-border bg-white p-1 hover:bg-slate-50 sm:h-20"
+                      >
+                        <span className="text-[10px] font-bold text-slate-700 sm:text-xs">{dayNum}</span>
+                        {dayLogs.length > 0 ? (
+                          <div className="space-y-0.5 text-[8px] sm:text-[10px]">
+                            {presents > 0 && (
+                              <div className="truncate rounded bg-emerald-50 px-0.5 text-left text-emerald-800 sm:px-1">
+                                P:{presents}
+                              </div>
+                            )}
+                            {absents > 0 && (
+                              <div className="truncate rounded bg-rose-50 px-0.5 text-left text-rose-800 sm:px-1">
+                                A:{absents}
+                              </div>
+                            )}
+                          </div>
+                        ) : (
+                          <span className="hidden text-[9px] text-slate-300 italic sm:inline">No logs</span>
+                        )}
+                      </div>
+                    )
+                  })}
                 </div>
               </div>
             </SurfaceCard>
@@ -372,80 +442,149 @@ export function StaffAttendanceTab({ designations = [], staff = [] }) {
         <SurfaceCard
           title="Daily Attendance Registry"
           actions={
-            <div className="flex items-center gap-2">
+            <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row sm:items-center">
               <Input
                 type="date"
                 value={selectedDate}
                 onChange={(e) => setSelectedDate(e.target.value)}
-                className="w-36 py-1 h-9"
+                className="h-9 w-full py-1 sm:w-36"
               />
               <Button
                 onClick={handleSaveAll}
                 disabled={mutating || staff.length === 0}
                 style={{ backgroundColor: BRAND.purple }}
-                className="text-white"
+                className="w-full text-white sm:w-auto"
               >
                 Save All
               </Button>
             </div>
           }
         >
-          <div className="overflow-x-auto">
-            <Table className="min-w-[38rem] text-left text-sm">
-              <TableHeader>
-                <TableRow className="text-xs text-slate-500 uppercase">
-                  <TableHead className="px-3 py-2 font-medium">Employee</TableHead>
-                  <TableHead className="px-3 py-2 font-medium">Designation</TableHead>
-                  <TableHead className="px-3 py-2 font-medium">Mark Attendance</TableHead>
-                  <TableHead className="px-3 py-2 font-medium">Shift Note</TableHead>
-                  <TableHead className="px-3 py-2 text-right font-medium">Action</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
+          {staff.length === 0 ? (
+            <p className="py-8 text-center text-sm text-slate-400">No staff to mark</p>
+          ) : (
+            <>
+              <div className="space-y-3 md:hidden">
                 {staff.map((m) => {
                   const local = localAttendance[m.id] || { status: 'present', note: '', isSaved: false }
                   return (
-                    <TableRow key={m.id} className="hover:bg-slate-50/50">
-                      <TableCell className="px-3 py-2.5">
-                        <div className="font-semibold text-slate-900">{m.fullName}</div>
-                        <div className="text-xs text-slate-400">{m.email}</div>
-                      </TableCell>
-                      <TableCell className="px-3 py-2.5 text-slate-600">{m.designation || '—'}</TableCell>
-                      <TableCell className="px-3 py-2.5">
-                        <NativeSelect value={local.status} onChange={(e) => handleStatusChange(m.id, e.target.value)} className="w-32 py-1 h-8">
+                    <article
+                      key={m.id}
+                      className="rounded-xl border border-border bg-slate-50/60 px-3 py-3"
+                    >
+                      <p className="truncate text-sm font-semibold text-slate-900">{m.fullName}</p>
+                      <p className="truncate text-xs text-slate-400">{m.email}</p>
+                      <p className="mt-0.5 text-xs text-slate-500">{m.designation || '—'}</p>
+                      <div className="mt-3 space-y-2">
+                        <NativeSelect
+                          value={local.status}
+                          onChange={(e) => handleStatusChange(m.id, e.target.value)}
+                          className="h-9 w-full py-1"
+                        >
                           <option value="present">Present</option>
                           <option value="absent">Absent</option>
                           <option value="late">Late</option>
                           <option value="leave">Leave</option>
                           <option value="holiday">Holiday</option>
                         </NativeSelect>
-                      </TableCell>
-                      <TableCell className="px-3 py-2.5">
                         <Input
                           placeholder="e.g. Late by 10 mins"
                           value={local.note}
                           onChange={(e) => handleNoteChange(m.id, e.target.value)}
-                          className="h-8 py-0.5 text-xs max-w-[160px]"
+                          className="h-9 text-xs"
                         />
-                      </TableCell>
-                      <TableCell className="px-3 py-2.5 text-right">
                         <Button
                           size="sm"
                           variant={local.isSaved ? 'outline' : 'default'}
                           style={local.isSaved ? {} : { backgroundColor: BRAND.purple }}
-                          className={local.isSaved ? 'border-slate-300 text-slate-700 hover:bg-slate-50' : 'text-white'}
+                          className={
+                            local.isSaved
+                              ? 'w-full border-slate-300 text-slate-700 hover:bg-slate-50'
+                              : 'w-full text-white'
+                          }
                           onClick={() => handleSaveAttendance(m.id)}
                           disabled={mutating}
                         >
                           {local.isSaved ? 'Update' : 'Save'}
                         </Button>
-                      </TableCell>
-                    </TableRow>
+                      </div>
+                    </article>
                   )
                 })}
-              </TableBody>
-            </Table>
-          </div>
+              </div>
+
+              <div className="hidden overflow-x-auto md:block">
+                <Table className="min-w-[38rem] text-left text-sm">
+                  <TableHeader>
+                    <TableRow className="text-xs text-slate-500 uppercase">
+                      <TableHead className="px-3 py-2 font-medium">Employee</TableHead>
+                      <TableHead className="px-3 py-2 font-medium">Designation</TableHead>
+                      <TableHead className="px-3 py-2 font-medium">Mark Attendance</TableHead>
+                      <TableHead className="px-3 py-2 font-medium">Shift Note</TableHead>
+                      <TableHead className="px-3 py-2 text-right font-medium">Action</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {staff.map((m) => {
+                      const local = localAttendance[m.id] || {
+                        status: 'present',
+                        note: '',
+                        isSaved: false,
+                      }
+                      return (
+                        <TableRow key={m.id} className="hover:bg-slate-50/50">
+                          <TableCell className="px-3 py-2.5">
+                            <div className="font-semibold text-slate-900">{m.fullName}</div>
+                            <div className="text-xs text-slate-400">{m.email}</div>
+                          </TableCell>
+                          <TableCell className="px-3 py-2.5 text-slate-600">
+                            {m.designation || '—'}
+                          </TableCell>
+                          <TableCell className="px-3 py-2.5">
+                            <NativeSelect
+                              value={local.status}
+                              onChange={(e) => handleStatusChange(m.id, e.target.value)}
+                              className="h-8 w-32 py-1"
+                            >
+                              <option value="present">Present</option>
+                              <option value="absent">Absent</option>
+                              <option value="late">Late</option>
+                              <option value="leave">Leave</option>
+                              <option value="holiday">Holiday</option>
+                            </NativeSelect>
+                          </TableCell>
+                          <TableCell className="px-3 py-2.5">
+                            <Input
+                              placeholder="e.g. Late by 10 mins"
+                              value={local.note}
+                              onChange={(e) => handleNoteChange(m.id, e.target.value)}
+                              className="h-8 max-w-[160px] py-0.5 text-xs"
+                            />
+                          </TableCell>
+                          <TableCell className="px-3 py-2.5 text-right">
+                            <Button
+                              size="sm"
+                              variant={local.isSaved ? 'outline' : 'default'}
+                              style={local.isSaved ? {} : { backgroundColor: BRAND.purple }}
+                              className={
+                                local.isSaved
+                                  ? 'border-slate-300 text-slate-700 hover:bg-slate-50'
+                                  : 'text-white'
+                              }
+                              onClick={() => handleSaveAttendance(m.id)}
+                              disabled={mutating}
+                            >
+                              {local.isSaved ? 'Update' : 'Save'}
+                            </Button>
+                          </TableCell>
+                        </TableRow>
+                      )
+                    })}
+                  </TableBody>
+                </Table>
+              </div>
+            </>
+          )}
         </SurfaceCard>
       )}
     </div>

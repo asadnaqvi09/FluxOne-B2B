@@ -205,7 +205,7 @@ async function insertSaleItemsInTx(client, tenantId, saleId, lines) {
   }
 }
 
-/** Prefer canonical live invoice when legacy duplicate sale_numbers exist. */
+// Prefer canonical live invoice when legacy duplicate sale_numbers exist.
 async function findSaleByNumber(client, tenantId, branchId, saleNumber) {
   if (!saleNumber) return null
   const { rows } = await tenantClientQuery(
@@ -588,10 +588,8 @@ export async function ingestRefundEvent(client, tenantId, syncEvent, userId) {
   }
 }
 
-/**
- * POS Items Rate → cloud products.selling_price (Policy A: branch-scoped product row).
- * Final Price is derived on read (selling × discount × offer × tax) — no stored final column.
- */
+// POS Items Rate → cloud products.selling_price (Policy A: branch-scoped product row).
+// Final Price is derived on read (selling × discount × offer × tax) — no stored final column.
 export async function ingestProductPriceUpdate(client, tenantId, syncEvent) {
   const parsed = validateProductPricePayload(syncEvent.payload)
   if (!parsed.success) {
@@ -769,11 +767,9 @@ function mapPosPaymentStatus(type) {
   return 'Paid'
 }
 
-/**
- * Cloud → POS sales history (current state, one row per saleNumber).
- * Does NOT adjust stock — POS applies invoices only; stock from branch_inventory / push.
- * Legacy: when duplicate sale_numbers exist, prefer completed/partial over orphan refund rows.
- */
+// Cloud → POS sales history (current state, one row per saleNumber).
+// Does NOT adjust stock — POS applies invoices only; stock from branch_inventory / push.
+// Legacy: when duplicate sale_numbers exist, prefer completed/partial over orphan refund rows.
 export async function listSalesForPosPull(tenantId, { branchId, page = 1, limit = 100 } = {}) {
   if (!branchId) throw httpError(422, 'branchId is required')
 

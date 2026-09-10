@@ -17,6 +17,8 @@ const AUTH_USER_SELECT = `
     t.slug AS "tenantSlug",
     t.name AS "tenantName",
     b.name AS "branchName",
+    to_char(b.opening_time, 'HH24:MI') AS "openingTime",
+    to_char(b.closing_time, 'HH24:MI') AS "closingTime",
     COALESCE(u.image_url, s.image_url) AS "imageUrl"
   FROM users u
   JOIN roles r ON r.id = u.role_id
@@ -25,10 +27,25 @@ const AUTH_USER_SELECT = `
   LEFT JOIN staff s ON s.user_id = u.id AND s.tenant_id = u.tenant_id
 `
 
+function formatTimeValue(value) {
+  if (value == null || value === '') return null
+  if (value instanceof Date && !Number.isNaN(value.getTime())) {
+    const hours = String(value.getUTCHours()).padStart(2, '0')
+    const minutes = String(value.getUTCMinutes()).padStart(2, '0')
+    return `${hours}:${minutes}`
+  }
+  const text = String(value).trim()
+  const match = text.match(/^(\d{1,2}):(\d{2})/)
+  if (!match) return null
+  return `${match[1].padStart(2, '0')}:${match[2]}`
+}
+
 function mapAuthUser(row) {
   if (!row) return null
   return {
     ...row,
+    openingTime: formatTimeValue(row.openingTime),
+    closingTime: formatTimeValue(row.closingTime),
     imageUrl: normalizeImageUrl(row.imageUrl),
   }
 }

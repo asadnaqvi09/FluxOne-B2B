@@ -6,7 +6,7 @@ const dateString = z
   .regex(/^\d{4}-\d{2}-\d{2}$/, 'date must be YYYY-MM-DD')
   .optional()
 
-/** UUID-shaped id (allows legacy seed UUIDs that are not RFC-version-strict). */
+// UUID-shaped id (allows legacy seed UUIDs that are not RFC-version-strict).
 const looseUuid = z
   .string()
   .regex(
@@ -14,7 +14,7 @@ const looseUuid = z
     'Invalid branch id',
   )
 
-/** Accept UUID branch id, or "all" / empty for consolidated. */
+// Accept UUID branch id, or "all" / empty for consolidated.
 const branchIdQuery = z.preprocess((value) => {
   if (value === '' || value === null || value === undefined || value === 'all') {
     return undefined

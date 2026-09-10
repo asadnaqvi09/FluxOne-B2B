@@ -44,9 +44,49 @@ function designationLabel(row) {
   return '—'
 }
 
-/**
- * Branch staff table with status control + edit/delete actions.
- */
+function ScheduleBlock({ row }) {
+  return (
+    <>
+      <span className="whitespace-nowrap">
+        {formatTime(row.scheduleStart)} – {formatTime(row.scheduleEnd)}
+      </span>
+      {row.scheduleBreakStart || row.scheduleBreakEnd ? (
+        <span className="mt-0.5 block text-slate-400">
+          Break {formatTime(row.scheduleBreakStart)}
+          {row.scheduleBreakEnd ? ` – ${formatTime(row.scheduleBreakEnd)}` : ''}
+        </span>
+      ) : null}
+    </>
+  )
+}
+
+function StaffRowActions({ row, onEdit, onDelete }) {
+  return (
+    <div className="flex items-center gap-1">
+      <Button
+        type="button"
+        variant="ghost"
+        size="icon"
+        aria-label={`Edit ${row.fullName || 'staff'}`}
+        onClick={() => onEdit?.(row)}
+      >
+        <Pencil className="size-4" />
+      </Button>
+      <Button
+        type="button"
+        variant="ghost"
+        size="icon"
+        aria-label={`Delete ${row.fullName || 'staff'}`}
+        className="text-slate-500 transition-colors hover:bg-transparent hover:text-slate-800"
+        onClick={() => onDelete?.(row)}
+      >
+        <Trash2 className="size-4" />
+      </Button>
+    </div>
+  )
+}
+
+// Branch staff table — mobile cards + desktop table
 export function StaffTable({
   items = [],
   loading = false,
@@ -85,7 +125,54 @@ export function StaffTable({
         />
       ) : (
         <>
-          <div className="overflow-x-auto">
+          <div className="space-y-3 md:hidden">
+            {list.map((row) => (
+              <article
+                key={row.id}
+                className="rounded-xl border border-border bg-slate-50/60 px-3 py-3"
+              >
+                <div className="flex items-start gap-3">
+                  <UserAvatar
+                    name={row.fullName}
+                    imageUrl={row.imageUrl}
+                    className="size-10 shrink-0"
+                  />
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="min-w-0">
+                        <p className="truncate text-sm font-semibold text-slate-900">
+                          {row.fullName || '—'}
+                        </p>
+                        <p className="truncate font-mono text-[11px] text-slate-400">
+                          {row.email || '—'}
+                        </p>
+                      </div>
+                      <EntityStatusToggle
+                        status={row.status}
+                        loading={statusUpdatingId === row.id}
+                        onChange={(nextActive) => onStatusChange?.(row, nextActive)}
+                      />
+                    </div>
+                    <p className="mt-1 text-xs text-slate-600">{designationLabel(row)}</p>
+                    <div className="mt-2 space-y-1 text-xs text-slate-500">
+                      <p>Joined {formatJoined(row.joiningDate || row.createdAt)}</p>
+                      <p className="text-slate-600">
+                        <ScheduleBlock row={row} />
+                      </p>
+                      {row.hardwareDeviceId ? (
+                        <p className="truncate">Device {row.hardwareDeviceId}</p>
+                      ) : null}
+                    </div>
+                    <div className="mt-3 flex justify-end">
+                      <StaffRowActions row={row} onEdit={onEdit} onDelete={onDelete} />
+                    </div>
+                  </div>
+                </div>
+              </article>
+            ))}
+          </div>
+
+          <div className="hidden overflow-x-auto md:block">
             <Table className="min-w-[56rem] text-left text-sm">
               <TableHeader>
                 <TableRow className="text-xs tracking-wide text-slate-500 uppercase">
@@ -101,11 +188,10 @@ export function StaffTable({
               </TableHeader>
               <TableBody>
                 {list.map((row) => (
-                  <TableRow
-                    key={row.id}
-                    className="hover:bg-slate-50/80"
-                  >
-                    <TableCell className="px-2 py-3 font-mono text-xs text-slate-600">{row.email || '—'}</TableCell>
+                  <TableRow key={row.id} className="hover:bg-slate-50/80">
+                    <TableCell className="px-2 py-3 font-mono text-xs text-slate-600">
+                      {row.email || '—'}
+                    </TableCell>
                     <TableCell className="px-2 py-3">
                       <div className="flex items-center gap-3">
                         <UserAvatar
@@ -113,25 +199,23 @@ export function StaffTable({
                           imageUrl={row.imageUrl}
                           className="size-9"
                         />
-                        <p className="truncate font-semibold text-slate-900">{row.fullName || '—'}</p>
+                        <p className="truncate font-semibold text-slate-900">
+                          {row.fullName || '—'}
+                        </p>
                       </div>
                     </TableCell>
                     <TableCell className="px-2 py-3 text-slate-600">
                       {formatJoined(row.joiningDate || row.createdAt)}
                     </TableCell>
-                    <TableCell className="px-2 py-3 text-slate-700">{designationLabel(row)}</TableCell>
-                    <TableCell className="px-2 py-3 text-xs text-slate-600">
-                      <span className="whitespace-nowrap">
-                        {formatTime(row.scheduleStart)} – {formatTime(row.scheduleEnd)}
-                      </span>
-                      {row.scheduleBreakStart || row.scheduleBreakEnd ? (
-                        <span className="mt-0.5 block text-slate-400">
-                          Break {formatTime(row.scheduleBreakStart)}
-                          {row.scheduleBreakEnd ? ` – ${formatTime(row.scheduleBreakEnd)}` : ''}
-                        </span>
-                      ) : null}
+                    <TableCell className="px-2 py-3 text-slate-700">
+                      {designationLabel(row)}
                     </TableCell>
-                    <TableCell className="px-2 py-3 text-slate-600">{row.hardwareDeviceId || '—'}</TableCell>
+                    <TableCell className="px-2 py-3 text-xs text-slate-600">
+                      <ScheduleBlock row={row} />
+                    </TableCell>
+                    <TableCell className="px-2 py-3 text-slate-600">
+                      {row.hardwareDeviceId || '—'}
+                    </TableCell>
                     <TableCell className="px-2 py-3">
                       <EntityStatusToggle
                         status={row.status}
@@ -140,26 +224,8 @@ export function StaffTable({
                       />
                     </TableCell>
                     <TableCell className="px-2 py-3">
-                      <div className="flex items-center justify-end gap-1">
-                        <Button
-                          type="button"
-                          variant="ghost"
-                          size="icon"
-                          aria-label={`Edit ${row.fullName || 'staff'}`}
-                          onClick={() => onEdit?.(row)}
-                        >
-                          <Pencil className="size-4" />
-                        </Button>
-                        <Button
-                          type="button"
-                          variant="ghost"
-                          size="icon"
-                          aria-label={`Delete ${row.fullName || 'staff'}`}
-                          className="text-slate-500 hover:text-slate-800 hover:bg-transparent transition-colors"
-                          onClick={() => onDelete?.(row)}
-                        >
-                          <Trash2 className="size-4" />
-                        </Button>
+                      <div className="flex items-center justify-end">
+                        <StaffRowActions row={row} onEdit={onEdit} onDelete={onDelete} />
                       </div>
                     </TableCell>
                   </TableRow>

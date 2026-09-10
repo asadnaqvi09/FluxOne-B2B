@@ -4,9 +4,7 @@ import { Input } from '@/components/ui/input'
 import { NativeSelect } from '@/components/ui/select'
 import { Label } from '@/components/ui/label'
 
-/**
- * Light filters for BM staff list: search + role + status.
- */
+// Light filters for BM staff list: search + role + status.
 export function StaffFilters({
   q = '',
   status = '',

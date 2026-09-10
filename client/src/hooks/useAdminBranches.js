@@ -16,6 +16,8 @@ export function buildAdminBranchPayload(fields) {
     managerGender: fields.managerGender || undefined,
     managerAddress: fields.managerAddress?.trim() || undefined,
     status: fields.status || undefined,
+    openingTime: fields.openingTime != null ? String(fields.openingTime).trim() : '',
+    closingTime: fields.closingTime != null ? String(fields.closingTime).trim() : '',
   }
 
   const branchImage = fields.image instanceof File && fields.image.size > 0 ? fields.image : null
@@ -31,6 +33,9 @@ export function buildAdminBranchPayload(fields) {
         form.append(key, String(value))
       }
     })
+    // Always send hour fields (empty clears) so multipart updates match JSON.
+    form.set('openingTime', base.openingTime)
+    form.set('closingTime', base.closingTime)
     if (branchImage) form.append('image', branchImage)
     if (managerImage) form.append('profile_image', managerImage)
     return form

@@ -1,6 +1,4 @@
-/**
- * Dynamic Mock Data for Admin Company Details & Policies (Phase 1)
- */
+// Dynamic Mock Data for Admin Company Details & Policies (Phase 1)
 
 export const INITIAL_COMPANY_DETAILS = {
   name: 'FluxOne Enterprise B2B Solutions',

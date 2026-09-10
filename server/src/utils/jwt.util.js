@@ -48,7 +48,7 @@ export function signAuthTokens(user) {
   }
 }
 
-/** Seconds until access token expiry (for POS login contract). */
+// Seconds until access token expiry (for POS login contract).
 export function getAccessTokenExpiresInSeconds() {
   const raw = process.env.JWT_ACCESS_EXPIRES || '15m'
   const match = String(raw).match(/^(\d+)([smhd]?)$/i)

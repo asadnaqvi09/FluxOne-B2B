@@ -175,7 +175,7 @@ export async function setSupplierActive(tenantId, id, isActive, { branchId = nul
   return mapSupplierRow(rows[0] || null)
 }
 
-/** Soft-deactivate supplier (replaces hard delete for client UX). */
+// Soft-deactivate supplier (replaces hard delete for client UX).
 export async function deleteSupplier(tenantId, id, { branchId = null } = {}) {
   const row = await setSupplierActive(tenantId, id, false, { branchId })
   return Boolean(row)

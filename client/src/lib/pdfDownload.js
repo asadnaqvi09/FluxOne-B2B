@@ -19,9 +19,7 @@ async function blobUrlToDataUrl(url) {
   })
 }
 
-/**
- * Download product barcode as a one-page PDF (no printer required).
- */
+// Download product barcode as a one-page PDF (no printer required).
 export async function downloadBarcodePdf({ product, pngUrl }) {
   if (!pngUrl) throw new Error('Barcode image is missing')
 
@@ -53,9 +51,7 @@ export async function downloadBarcodePdf({ product, pngUrl }) {
   return { filename }
 }
 
-/**
- * Download purchase order as PDF from structured order detail.
- */
+// Download purchase order as PDF from structured order detail.
 export function downloadPurchaseOrderPdf(order) {
   if (!order) throw new Error('Order is missing')
 

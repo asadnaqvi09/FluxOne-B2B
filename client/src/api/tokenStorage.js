@@ -28,7 +28,7 @@ export const tokenStorage = {
     if (user) localStorage.setItem(USER_KEY, JSON.stringify(user))
     else localStorage.removeItem(USER_KEY)
   },
-  /** Persist access + refresh (+ optional user) from login/refresh responses. */
+  // Persist access + refresh (+ optional user) from login/refresh responses.
   setSession({ token, refreshToken, user } = {}) {
     if (token !== undefined) this.setToken(token)
     if (refreshToken !== undefined) this.setRefreshToken(refreshToken)

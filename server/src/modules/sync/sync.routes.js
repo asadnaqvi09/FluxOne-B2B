@@ -10,7 +10,7 @@ router.get('/bootstrap', requirePermission('sync:pull'), asyncHandler(bootstrap)
 router.get('/delta', requirePermission('sync:pull'), asyncHandler(delta))
 router.get('/sales', requirePermission('sync:pull'), asyncHandler(sales))
 router.get('/events', requirePermission('sync:pull'), asyncHandler(events))
-/** @deprecated Prefer /bootstrap and /delta for POS. Kept for backward compatibility. */
+// @deprecated Prefer /bootstrap and /delta for POS. Kept for backward compatibility.
 router.get('/pull', requirePermission('sync:pull'), asyncHandler(pull))
 
 export default router

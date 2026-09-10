@@ -1,4 +1,4 @@
-/** Decode JWT `exp` without a library (payload only; not verified). */
+// Decode JWT `exp` without a library (payload only; not verified).
 export function getTokenExpiryDate(token) {
   if (!token || typeof token !== 'string') return null
   try {

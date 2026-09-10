@@ -3,12 +3,12 @@ import { isCloudinaryConfigured } from '../config/cloudinary.js'
 
 const CLOUDINARY_FOLDER = 'fluxone'
 
-/** Cloudinary / remote URL as stored in DB. */
+// Cloudinary / remote URL as stored in DB.
 export function isAbsoluteImageUrl(value) {
   return typeof value === 'string' && /^https?:\/\//i.test(value)
 }
 
-/** Build a Cloudinary delivery URL from a public_id (e.g. fluxone/abc123). */
+// Build a Cloudinary delivery URL from a public_id (e.g. fluxone/abc123).
 export function cloudinaryDeliveryUrl(publicId) {
   const cloudName = process.env.CLOUDINARY_CLOUD_NAME
   if (!cloudName || !publicId) return null
@@ -24,12 +24,10 @@ export function cloudinaryDeliveryUrl(publicId) {
   return `https://res.cloudinary.com/${cloudName}/image/upload/${id}`
 }
 
-/**
- * Normalize stored image paths for clients (IM web, POS offline sync).
- * - HTTPS Cloudinary URLs pass through
- * - Legacy fluxone public_ids → Cloudinary HTTPS URL
- * - Local /uploads/<file> paths for disk storage
- */
+// Normalize stored image paths for clients (IM web, POS offline sync).
+// - HTTPS Cloudinary URLs pass through
+// - Legacy fluxone public_ids → Cloudinary HTTPS URL
+// - Local /uploads/<file> paths for disk storage
 export function normalizeImageUrl(value) {
   if (!value || typeof value !== 'string') return null
   const trimmed = value.trim()
@@ -62,11 +60,9 @@ export function normalizeImageUrl(value) {
   return base ? `/uploads/${base}` : null
 }
 
-/**
- * Resolve a multer file to a storable public URL.
- * Cloudinary → full https://res.cloudinary.com/... URL
- * Local disk → /uploads/<filename>
- */
+// Resolve a multer file to a storable public URL.
+// Cloudinary → full https://res.cloudinary.com/... URL
+// Local disk → /uploads/<filename>
 export function resolveUploadUrl(file, req) {
   if (!file) return null
 

@@ -6,9 +6,7 @@ import { cn } from '@/lib/utils'
 
 const COUNTER_COLORS = [BRAND.purple, BRAND.deep, '#2563eb', '#16a34a']
 
-/**
- * POS Counter Sales Distribution component matching standard dashboard layout.
- */
+// POS Counter Sales Distribution component matching standard dashboard layout.
 export function CounterSalesCard({ counters = [], className }) {
   const list =
     Array.isArray(counters) && counters.length > 0

@@ -14,7 +14,12 @@ import { Label } from '@/components/ui/label'
 import { NativeSelect } from '@/components/ui/select'
 import { ImageUploadField } from '@/components/shared/ImageUploadField'
 import { BRAND } from '@/lib/constants'
-import { validateStaffForm } from '@/lib/validation/staffSchedule'
+import {
+  getBranchHoursSoftWarning,
+  validateStaffForm,
+} from '@/lib/validation/staffSchedule'
+import { apiClient } from '@/api/api'
+import { endpoints } from '@/api/endpoints'
 import { useFormBaseline } from '@/hooks/useFormBaseline'
 
 const EMPTY_FORM = {
@@ -55,11 +60,9 @@ function resolveRole(initialStaff) {
   return 'inventory_manager'
 }
 
-/**
- * Add / Edit staff modal for Branch Manager.
- * Does not send branchId — server scopes from JWT.
- * System role drives designation automatically (no custom designation picker).
- */
+// Add / Edit staff modal for Branch Manager.
+// Does not send branchId — server scopes from JWT.
+// System role drives designation automatically (no custom designation picker).
 export function StaffFormDialog({
   open,
   onOpenChange,
@@ -69,6 +72,8 @@ export function StaffFormDialog({
   loading = false,
 }) {
   const isEdit = mode === 'edit'
+  const [branchHours, setBranchHours] = useState({ openingTime: '', closingTime: '' })
+  const hoursWarning = getBranchHoursSoftWarning(branchHours)
   const [form, setForm] = useState(EMPTY_FORM)
   const [error, setError] = useState(null)
   const { captureBaseline, isDirty } = useFormBaseline(open)
@@ -76,6 +81,19 @@ export function StaffFormDialog({
   useEffect(() => {
     if (!open) return
     setError(null)
+
+    async function loadBranchHours() {
+      const res = await apiClient.get(endpoints.auth.me)
+      if (res.success && res.data) {
+        setBranchHours({
+          openingTime: timeInputValue(res.data.openingTime),
+          closingTime: timeInputValue(res.data.closingTime),
+        })
+      } else {
+        setBranchHours({ openingTime: '', closingTime: '' })
+      }
+    }
+    void loadBranchHours()
 
     if (isEdit && initialStaff) {
       const nextForm = {
@@ -106,7 +124,17 @@ export function StaffFormDialog({
     event.preventDefault()
     setError(null)
 
-    const validationError = validateStaffForm(form, { isEdit })
+    let hours = branchHours
+    const meRes = await apiClient.get(endpoints.auth.me)
+    if (meRes.success && meRes.data) {
+      hours = {
+        openingTime: timeInputValue(meRes.data.openingTime),
+        closingTime: timeInputValue(meRes.data.closingTime),
+      }
+      setBranchHours(hours)
+    }
+
+    const validationError = validateStaffForm(form, { isEdit, branchHours: hours })
     if (validationError) {
       setError(validationError)
       return
@@ -194,6 +222,17 @@ export function StaffFormDialog({
                 onChange={(e) => patch('hardwareDeviceId', e.target.value)}
               />
             </div>
+
+            {hoursWarning ? (
+              <p className="rounded-lg bg-amber-50 px-3 py-2 text-xs text-amber-800 ring-1 ring-amber-100 sm:col-span-2">
+                {hoursWarning}
+              </p>
+            ) : branchHours.openingTime && branchHours.closingTime ? (
+              <p className="text-xs text-slate-500 sm:col-span-2">
+                Branch hours: {branchHours.openingTime}–{branchHours.closingTime}. Shift must fall
+                inside this window.
+              </p>
+            ) : null}
 
             <div className="space-y-1.5">
               <Label htmlFor="staff-start">Start Time</Label>

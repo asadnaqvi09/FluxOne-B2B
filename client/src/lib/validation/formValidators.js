@@ -1,7 +1,5 @@
-/**
- * Universal Form Validators & Input Formatters for FluxOne B2B
- * Provides strict validation and real-time input sanitization for Phone, Email, URLs, and Numbers.
- */
+// Universal Form Validators & Input Formatters for FluxOne B2B
+// Provides strict validation and real-time input sanitization for Phone, Email, URLs, and Numbers.
 
 // Phone Validation: 10 to 13 digits, optional leading +, typical format 03XXXXXXXXX or +923XXXXXXXXX
 export const PHONE_REGEX = /^(?:\+92|0)?3[0-9]{9}$/
@@ -13,10 +11,8 @@ export const EMAIL_REGEX = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/
 // URL Regex (http / https)
 export const URL_REGEX = /^(https?:\/\/)?(www\.)?[-a-zA-Z0-9@:%._+~#=]{1,256}\.[a-zA-Z0-9()]{1,6}\b([-a-zA-Z0-9()@:%_+.~#?&//=]*)$/i
 
-/**
- * Real-time filter that only allows digits and an optional leading plus '+'
- * Automatically limits length to 11 digits (or 13 if starts with +92)
- */
+// Real-time filter that only allows digits and an optional leading plus '+'
+// Automatically limits length to 11 digits (or 13 if starts with +92)
 export function sanitizePhoneInput(value) {
   if (!value) return ''
   let cleaned = value.replace(/[^\d+]/g, '')
@@ -29,9 +25,7 @@ export function sanitizePhoneInput(value) {
   return cleaned.slice(0, maxLen)
 }
 
-/**
- * Validates a phone / mobile contact number
- */
+// Validates a phone / mobile contact number
 export function validatePhone(phone, { required = true, fieldName = 'Phone number' } = {}) {
   const trimmed = (phone || '').trim()
   if (!trimmed) {
@@ -63,9 +57,7 @@ export function validatePhone(phone, { required = true, fieldName = 'Phone numbe
   return null
 }
 
-/**
- * Validates an email address
- */
+// Validates an email address
 export function validateEmail(email, { required = true, fieldName = 'Email' } = {}) {
   const trimmed = (email || '').trim()
   if (!trimmed) {
@@ -80,9 +72,7 @@ export function validateEmail(email, { required = true, fieldName = 'Email' } = 
   return null
 }
 
-/**
- * Validates a web URL (Facebook, Instagram, website)
- */
+// Validates a web URL (Facebook, Instagram, website)
 export function validateUrl(url, { required = false, fieldName = 'URL' } = {}) {
   const trimmed = (url || '').trim()
   if (!trimmed) {
@@ -97,9 +87,7 @@ export function validateUrl(url, { required = false, fieldName = 'URL' } = {}) {
   return null
 }
 
-/**
- * Validates numeric range percentage
- */
+// Validates numeric range percentage
 export function validatePercentage(val, { min = 0, max = 100, fieldName = 'Percentage' } = {}) {
   const num = Number(val)
   if (isNaN(num)) return `${fieldName} must be a valid number`

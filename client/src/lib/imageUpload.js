@@ -5,10 +5,8 @@ export const IMAGE_FORMATS_LABEL = 'JPEG, PNG, or WebP'
 
 const ALLOWED_TYPES = new Set(['image/jpeg', 'image/png', 'image/webp'])
 
-/**
- * Client-side image validation before upload.
- * Returns a user-facing error string, or null when valid.
- */
+// Client-side image validation before upload.
+// Returns a user-facing error string, or null when valid.
 export function validateImageFile(file) {
   if (!file) return null
 
@@ -27,7 +25,7 @@ export function imageUploadHint() {
   return `Max ${IMAGE_MAX_LABEL}. ${IMAGE_FORMATS_LABEL}.`
 }
 
-/** Extract a display filename from a stored image URL (e.g. Asad.jpeg). */
+// Extract a display filename from a stored image URL (e.g. Asad.jpeg).
 export function imageFileNameFromUrl(url) {
   if (!url || typeof url !== 'string') return ''
   try {

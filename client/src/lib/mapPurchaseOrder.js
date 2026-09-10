@@ -1,6 +1,4 @@
-/**
- * Live purchase-order mapper (IM API).
- */
+// Live purchase-order mapper (IM API).
 export function mapPurchaseOrder(row = {}) {
   return {
     id: row.id,

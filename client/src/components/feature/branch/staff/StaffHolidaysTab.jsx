@@ -1,5 +1,5 @@
-import { useEffect, useState, useMemo } from 'react'
-import { Calendar, Users, ArrowRight, ArrowLeft, Check, CheckSquare } from 'lucide-react'
+import { useEffect, useState } from 'react'
+import { ArrowRight, ArrowLeft } from 'lucide-react'
 import { SurfaceCard } from '@/components/shared/SurfaceCard'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -135,34 +135,56 @@ export function StaffHolidaysTab({ designations = [], staff = [] }) {
             </span>
           }
         >
-          <div className="overflow-x-auto">
-            <Table className="w-full text-left text-sm">
-              <TableHeader>
-                <TableRow className="text-xs text-slate-500 uppercase">
-                  <TableHead className="px-3 py-2 font-medium">Holiday Date</TableHead>
-                  <TableHead className="px-3 py-2 font-medium">Holiday Name</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {loading ? (
-                  <TableRow><TableCell colSpan={2} className="py-8 text-center text-slate-400">Loading...</TableCell></TableRow>
-                ) : holidays.length === 0 ? (
-                  <TableRow><TableCell colSpan={2} className="py-8 text-center text-slate-400">No holidays scheduled</TableCell></TableRow>
-                ) : (
-                  holidays
-                    .slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE)
-                    .map((h) => (
+          {loading ? (
+            <p className="py-8 text-center text-sm text-slate-400">Loading...</p>
+          ) : holidays.length === 0 ? (
+            <p className="py-8 text-center text-sm text-slate-400">No holidays scheduled</p>
+          ) : (
+            <>
+              <div className="space-y-3 md:hidden">
+                {holidays.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE).map((h) => (
+                  <article
+                    key={h.id}
+                    className="rounded-xl border border-border bg-slate-50/60 px-3 py-3"
+                  >
+                    <p className="text-sm font-semibold text-slate-900">{h.name}</p>
+                    <p className="mt-1 text-xs text-slate-600">
+                      {new Date(h.holidayDate).toLocaleDateString('en-GB', {
+                        day: '2-digit',
+                        month: 'short',
+                        year: 'numeric',
+                      })}
+                    </p>
+                  </article>
+                ))}
+              </div>
+
+              <div className="hidden overflow-x-auto md:block">
+                <Table className="w-full text-left text-sm">
+                  <TableHeader>
+                    <TableRow className="text-xs text-slate-500 uppercase">
+                      <TableHead className="px-3 py-2 font-medium">Holiday Date</TableHead>
+                      <TableHead className="px-3 py-2 font-medium">Holiday Name</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {holidays.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE).map((h) => (
                       <TableRow key={h.id} className="hover:bg-slate-50/50">
                         <TableCell className="px-3 py-3 font-semibold text-slate-900">
-                          {new Date(h.holidayDate).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })}
+                          {new Date(h.holidayDate).toLocaleDateString('en-GB', {
+                            day: '2-digit',
+                            month: 'short',
+                            year: 'numeric',
+                          })}
                         </TableCell>
                         <TableCell className="px-3 py-3 text-slate-700">{h.name}</TableCell>
                       </TableRow>
-                    ))
-                )}
-              </TableBody>
-            </Table>
-          </div>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
+            </>
+          )}
 
           <TablePagination
             page={page}
@@ -193,7 +215,7 @@ export function StaffHolidaysTab({ designations = [], staff = [] }) {
               </div>
 
               <div>
-                <div className="grid grid-cols-2 gap-3">
+                <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                   <div className="space-y-1.5">
                     <Label htmlFor="holiday-start">Start Date</Label>
                     <Input

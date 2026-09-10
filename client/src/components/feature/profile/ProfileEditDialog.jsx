@@ -15,11 +15,9 @@ import { ImageUploadField } from '@/components/shared/ImageUploadField'
 import { BRAND } from '@/lib/constants'
 import { useFormBaseline } from '@/hooks/useFormBaseline'
 
-/**
- * Shared edit profile modal (Admin / BM / IM / etc.).
- * View card never shows password — only this dialog does.
- * Fields: Photo, Name, User ID or Email, Password, Confirm Password.
- */
+// Shared edit profile modal (Admin / BM / IM / etc.).
+// View card never shows password — only this dialog does.
+// Fields: Photo, Name, User ID or Email, Password, Confirm Password.
 export function ProfileEditDialog({
   open,
   onOpenChange,

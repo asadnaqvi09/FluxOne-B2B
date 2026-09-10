@@ -1,4 +1,4 @@
-/** Dual cloud + POS field names for bootstrap/delta responses. */
+// Dual cloud + POS field names for bootstrap/delta responses.
 
 function mapUser(user) {
   return {

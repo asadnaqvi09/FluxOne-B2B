@@ -12,7 +12,7 @@ const emptyCatalog = () => ({
   offers: [],
 })
 
-/** Module-level cache shared across Products + Categories pages (same session). */
+// Module-level cache shared across Products + Categories pages (same session).
 let cache = {
   data: null,
   fetchedAt: 0,
@@ -45,10 +45,8 @@ function applyFull({ categories, taxes, offers }) {
   return cache.data
 }
 
-/**
- * Load categories + taxes + offers once; dedupe parallel callers.
- * @param {{ force?: boolean }} [options]
- */
+// Load categories + taxes + offers once; dedupe parallel callers.
+// @param {{ force?: boolean }} [options]
 export async function getProductCatalog(options = {}) {
   const force = Boolean(options.force)
   if (!force && isFresh()) return cache.data
@@ -74,7 +72,7 @@ export async function getProductCatalog(options = {}) {
   return cache.inFlight
 }
 
-/** After category/subcategory CRUD — refresh categories only; keep taxes/offers. */
+// After category/subcategory CRUD — refresh categories only; keep taxes/offers.
 export async function refreshProductCategories() {
   // Cache-bust query so intermediaries cannot serve a pre-delete list
   const catsRes = await apiClient.get(endpoints.products.categories, {
@@ -92,9 +90,8 @@ export function peekProductCatalog() {
   return cache.data
 }
 
-/** Patch isActive on a cached category row without refetching the full catalog.
- * When a parent is deactivated, cascade to children (matches server behavior).
- */
+// Patch isActive on a cached category row without refetching the full catalog.
+// When a parent is deactivated, cascade to children (matches server behavior).
 export function patchCatalogCategoryActive(id, isActive) {
   if (!cache.data || !id) return
   const parents = cache.data.parents || []

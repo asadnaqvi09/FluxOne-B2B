@@ -16,7 +16,37 @@ function hasValue(value) {
   return value != null && String(value).trim() !== ''
 }
 
-/** Append Zod issues when shift/break times are illogical. */
+function formatMinutesLabel(minutes) {
+  const hours = Math.floor(minutes / 60)
+  const mins = minutes % 60
+  return `${String(hours).padStart(2, '0')}:${String(mins).padStart(2, '0')}`
+}
+
+// When branch hours exist, shift must sit inside the open→close window.
+// If hours are unset, allow the shift (soft policy — admin can set hours later).
+// Returns an error string or null.
+export function validateShiftAgainstBranchHours(schedule, branchHours) {
+  const openingTime = branchHours?.openingTime
+  const closingTime = branchHours?.closingTime
+  if (!hasValue(openingTime) || !hasValue(closingTime)) return null
+
+  const hasStart = hasValue(schedule?.scheduleStart)
+  const hasEnd = hasValue(schedule?.scheduleEnd)
+  if (!hasStart || !hasEnd) return null
+
+  const start = parseTimeToMinutes(schedule.scheduleStart)
+  const end = parseTimeToMinutes(schedule.scheduleEnd)
+  const open = parseTimeToMinutes(openingTime)
+  const close = parseTimeToMinutes(closingTime)
+  if (start == null || end == null || open == null || close == null) return null
+
+  if (start < open || end > close) {
+    return `Shift must be within branch hours (${formatMinutesLabel(open)}–${formatMinutesLabel(close)})`
+  }
+  return null
+}
+
+// Append Zod issues when shift/break times are illogical.
 export function refineStaffSchedule(body, ctx) {
   const hasStart = hasValue(body.scheduleStart)
   const hasEnd = hasValue(body.scheduleEnd)

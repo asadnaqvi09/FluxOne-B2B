@@ -87,7 +87,7 @@ export async function delta(req, res) {
   return success(res, mapSnapshotForPos(snapshot))
 }
 
-/** Cloud → POS invoice history (paginated, current state per saleNumber). */
+// Cloud → POS invoice history (paginated, current state per saleNumber).
 export async function sales(req, res) {
   const query = parseSchemaOrThrow(salesPullQuerySchema, req.query, 'Sales pull query')
   const branchId = resolveSyncPullBranchId(req, query.branchId)
@@ -99,13 +99,13 @@ export async function sales(req, res) {
   return success(res, paginatedResult(result.items, result))
 }
 
-/** Cloud pos_sync_events audit log — not POS catalog. */
+// Cloud pos_sync_events audit log — not POS catalog.
 export async function events(req, res) {
   const rows = await listSyncEvents(req.tenantId, { since: req.query.since })
   return success(res, rows)
 }
 
-/** @deprecated Use GET /api/sync/bootstrap and /api/sync/delta for POS catalog sync. */
+// @deprecated Use GET /api/sync/bootstrap and /api/sync/delta for POS catalog sync.
 export async function pull(req, res) {
   return events(req, res)
 }

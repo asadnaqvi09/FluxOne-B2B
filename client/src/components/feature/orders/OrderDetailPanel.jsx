@@ -15,12 +15,11 @@ import {
   TableRow,
   TableCell,
 } from '@/components/ui/table'
+import { DataCard, ResponsiveDataShell } from '@/components/shared/ResponsiveDataShell'
 import { BRAND } from '@/lib/constants'
 import { money } from '@/lib/mapProduct'
 
-/**
- * View all lines on a purchase order + approve / cancel.
- */
+// View all lines on a purchase order + approve / cancel
 export function OrderDetailPanel({
   open,
   onOpenChange,
@@ -31,6 +30,8 @@ export function OrderDetailPanel({
   onPrint,
 }) {
   if (!order) return null
+
+  const lines = order.lines || []
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -46,35 +47,65 @@ export function OrderDetailPanel({
           </DialogDescription>
         </DialogHeader>
 
-        <div className="overflow-x-auto rounded-xl border border-border">
-          <Table className="min-w-[520px] text-left text-sm">
-            <TableHeader>
-              <TableRow className="bg-slate-50 text-xs uppercase text-slate-400">
-                <TableHead className="px-3 py-2">Name / Id</TableHead>
-                <TableHead className="px-3 py-2">Scale</TableHead>
-                <TableHead className="px-3 py-2">Qty</TableHead>
-                <TableHead className="px-3 py-2">Price</TableHead>
-                <TableHead className="px-3 py-2">Last purchase</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {(order.lines || []).map((line) => (
-                <TableRow key={line.id || line.productId}>
-                  <TableCell className="px-3 py-2">
-                    <span className="font-medium">{line.name}</span>
-                    <span className="mt-0.5 block font-mono text-[11px] text-slate-400">
-                      {line.itemCode}
-                    </span>
-                  </TableCell>
-                  <TableCell className="px-3 py-2 capitalize">{line.scale}</TableCell>
-                  <TableCell className="px-3 py-2">{line.quantity}</TableCell>
-                  <TableCell className="px-3 py-2">{money(line.unitCost)}</TableCell>
-                  <TableCell className="px-3 py-2 text-slate-500">{money(line.lastPurchasePrice)}</TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-        </div>
+        <ResponsiveDataShell
+          mobile={lines.map((line) => (
+            <DataCard key={line.id || line.productId}>
+              <p className="text-sm font-medium text-slate-900">{line.name}</p>
+              <p className="font-mono text-[11px] text-slate-400">{line.itemCode}</p>
+              <div className="mt-2 grid grid-cols-2 gap-2 text-xs text-slate-600">
+                <div>
+                  <span className="text-slate-400">Scale</span>
+                  <p className="capitalize font-medium text-slate-800">{line.scale}</p>
+                </div>
+                <div>
+                  <span className="text-slate-400">Qty</span>
+                  <p className="font-medium text-slate-800">{line.quantity}</p>
+                </div>
+                <div>
+                  <span className="text-slate-400">Price</span>
+                  <p className="font-medium text-slate-800">{money(line.unitCost)}</p>
+                </div>
+                <div>
+                  <span className="text-slate-400">Last purchase</span>
+                  <p className="font-medium text-slate-800">{money(line.lastPurchasePrice)}</p>
+                </div>
+              </div>
+            </DataCard>
+          ))}
+          desktop={
+            <div className="rounded-xl border border-border">
+              <Table className="min-w-[520px] text-left text-sm">
+                <TableHeader>
+                  <TableRow className="bg-slate-50 text-xs uppercase text-slate-400">
+                    <TableHead className="px-3 py-2">Name / Id</TableHead>
+                    <TableHead className="px-3 py-2">Scale</TableHead>
+                    <TableHead className="px-3 py-2">Qty</TableHead>
+                    <TableHead className="px-3 py-2">Price</TableHead>
+                    <TableHead className="px-3 py-2">Last purchase</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {lines.map((line) => (
+                    <TableRow key={line.id || line.productId}>
+                      <TableCell className="px-3 py-2">
+                        <span className="font-medium">{line.name}</span>
+                        <span className="mt-0.5 block font-mono text-[11px] text-slate-400">
+                          {line.itemCode}
+                        </span>
+                      </TableCell>
+                      <TableCell className="px-3 py-2 capitalize">{line.scale}</TableCell>
+                      <TableCell className="px-3 py-2">{line.quantity}</TableCell>
+                      <TableCell className="px-3 py-2">{money(line.unitCost)}</TableCell>
+                      <TableCell className="px-3 py-2 text-slate-500">
+                        {money(line.lastPurchasePrice)}
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
+          }
+        />
 
         {order.explanation ? (
           <p className="text-sm text-slate-600">
@@ -86,7 +117,7 @@ export function OrderDetailPanel({
           <Button
             type="button"
             variant="outline"
-            className="cursor-pointer"
+            className="w-full cursor-pointer sm:w-auto"
             onClick={() => onOpenChange?.(false)}
           >
             Close
@@ -94,7 +125,7 @@ export function OrderDetailPanel({
           <Button
             type="button"
             variant="outline"
-            className="cursor-pointer"
+            className="w-full cursor-pointer sm:w-auto"
             disabled={loading}
             onClick={() => onPrint?.(order)}
           >
@@ -105,7 +136,7 @@ export function OrderDetailPanel({
               <Button
                 type="button"
                 variant="outline"
-                className="cursor-pointer text-red-600"
+                className="w-full cursor-pointer text-red-600 sm:w-auto"
                 disabled={loading}
                 onClick={() => onCancel?.(order)}
               >
@@ -113,7 +144,7 @@ export function OrderDetailPanel({
               </Button>
               <Button
                 type="button"
-                className="cursor-pointer text-white"
+                className="w-full cursor-pointer text-white sm:w-auto"
                 style={{ background: BRAND.purple }}
                 disabled={loading}
                 onClick={() => onApprove?.(order)}

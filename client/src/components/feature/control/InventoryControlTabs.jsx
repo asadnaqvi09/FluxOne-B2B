@@ -10,9 +10,7 @@ export const CONTROL_TABS = [
   { id: MOVEMENT_TYPES.EXPIRED, label: 'Expired' },
 ]
 
-/**
- * Phase-1 Control tabs (Transfer deferred).
- */
+// Phase-1 Control tabs (Transfer deferred).
 export function InventoryControlTabs({ value, onChange, className }) {
   return (
     <div className={cn('flex flex-wrap gap-2', className)}>

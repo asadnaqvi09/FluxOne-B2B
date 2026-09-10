@@ -1,7 +1,5 @@
-/**
- * Shared product CSV helpers for Import / Export.
- * Format matches productsToCsv / parseProductsCsv.
- */
+// Shared product CSV helpers for Import / Export.
+// Format matches productsToCsv / parseProductsCsv.
 
 export const PRODUCT_CSV_HEADERS = [
   'itemCode',
@@ -15,14 +13,14 @@ export const PRODUCT_CSV_HEADERS = [
   'quantity',
 ]
 
-/** Escape one CSV cell. */
+// Escape one CSV cell.
 export function escapeCsvCell(value) {
   const text = String(value ?? '')
   if (/[",\n\r]/.test(text)) return `"${text.replace(/"/g, '""')}"`
   return text
 }
 
-/** Parse a CSV line respecting quoted fields. */
+// Parse a CSV line respecting quoted fields.
 export function parseCsvLine(line) {
   const cells = []
   let current = ''
@@ -66,10 +64,8 @@ export function productsToCsv(rows = []) {
   return `${lines.join('\n')}\n`
 }
 
-/**
- * Parse CSV text into import rows for POST /inventory/products/import.
- * Accepts export headers or legacy sku,name,barcode,quantity,scale.
- */
+// Parse CSV text into import rows for POST /inventory/products/import.
+// Accepts export headers or legacy sku,name,barcode,quantity,scale.
 export function parseProductsCsv(raw) {
   const text = String(raw || '').replace(/^\uFEFF/, '')
   const lines = text

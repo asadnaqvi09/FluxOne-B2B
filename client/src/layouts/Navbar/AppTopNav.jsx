@@ -24,7 +24,7 @@ function RoleContextBadge() {
 
   if (role === ROLES.B2B_ADMIN) {
     return (
-      <span className="hidden rounded-full bg-slate-100 px-2.5 py-1 text-xs font-semibold text-slate-600 sm:inline-block">
+      <span className="hidden max-w-[14rem] truncate rounded-full bg-slate-100 px-2.5 py-1 text-xs font-semibold text-slate-600 sm:inline-block lg:max-w-xs">
         {user?.tenantName ? `${user.tenantName} · ` : ''}
         {roleDisplayName(role)}
       </span>
@@ -88,8 +88,7 @@ export function AppTopNav({ className }) {
       <div className="flex h-full w-full min-w-0 items-center gap-2 sm:gap-4 lg:gap-8">
         <BrandLogo size="sm" className="size-10 shrink-0 sm:size-12" />
         <DesktopNavLinks items={items} />
-        <div className="ml-auto flex shrink-0 items-center gap-2 sm:gap-3">
-          {/* <NotificationBell className="hidden sm:flex" /> */}
+        <div className="ml-auto flex shrink-0 items-center gap-1.5 sm:gap-3">
           <RoleContextBadge />
           <UserMenu className="hidden md:block" />
           <MobileNav items={items} />

@@ -25,7 +25,7 @@ export const STOCK_STATUS_META = {
   },
 }
 
-/** Pie slice palette (FluxOne-adjacent, not flat purple-only). */
+// Pie slice palette (FluxOne-adjacent, not flat purple-only).
 export const PIE_COLORS = [
   '#8E238F',
   '#412283',
@@ -73,10 +73,8 @@ export function normalizeKpis(raw) {
   }
 }
 
-/**
- * Graph API returns rows: { name, day, quantity }.
- * Aggregate by product name → top 10 for pie chart.
- */
+// Graph API returns rows: { name, day, quantity }.
+// Aggregate by product name → top 10 for pie chart.
 export function aggregateStockOutPie(rows = [], limit = 10) {
   if (!Array.isArray(rows) || rows.length === 0) return []
 

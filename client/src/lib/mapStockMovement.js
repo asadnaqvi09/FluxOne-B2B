@@ -14,9 +14,7 @@ export const DAMAGED_LOCATIONS = [
   { value: 'other', label: 'Other' },
 ]
 
-/**
- * Map inventory_ledger list rows from Control API into UI shape.
- */
+// Map inventory_ledger list rows from Control API into UI shape.
 export function mapStockMovement(row = {}) {
   const movementCandidates = [
     row.movementType,

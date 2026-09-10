@@ -22,9 +22,7 @@ function serializeSnapshot(snapshot) {
   return JSON.stringify(serializeFormValue(snapshot))
 }
 
-/**
- * Capture an initial snapshot when a modal opens and compare against live form state.
- */
+// Capture an initial snapshot when a modal opens and compare against live form state.
 export function useFormBaseline(open) {
   const baselineRef = useRef(null)
 

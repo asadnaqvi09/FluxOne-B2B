@@ -18,9 +18,7 @@ import { BRAND } from '@/lib/constants'
 import { money } from '@/lib/mapProduct'
 import { useFormBaseline } from '@/hooks/useFormBaseline'
 
-/**
- * Generate PO: pick supplier, multi products with qty + unit cost (shows last purchase).
- */
+// Generate PO: pick supplier, multi products with qty + unit cost (shows last purchase).
 export function GenerateOrderDialog({
   open,
   onOpenChange,

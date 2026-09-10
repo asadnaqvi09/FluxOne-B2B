@@ -282,7 +282,55 @@ export function InvoicesPage() {
             />
           ) : (
             <>
-              <div className="overflow-x-auto">
+              <div className="space-y-3 md:hidden">
+                {invoices.map((inv) => (
+                  <article
+                    key={inv.id || inv.trackingId}
+                    className="rounded-xl border border-border bg-slate-50/60 px-3 py-3"
+                  >
+                    <div className="flex items-start justify-between gap-2">
+                      <span className="rounded-md border border-purple-100 bg-purple-50 px-2 py-1 font-mono text-xs font-bold text-purple-700">
+                        {inv.trackingId}
+                      </span>
+                      <Badge
+                        variant="outline"
+                        className="border-emerald-200 bg-emerald-50 font-semibold text-emerald-700"
+                      >
+                        {inv.status}
+                      </Badge>
+                    </div>
+                    <p className="mt-2 text-sm font-semibold text-slate-800">{inv.source}</p>
+                    <p className="mt-0.5 text-xs text-slate-500">{inv.dateTime}</p>
+                    <p className="mt-2 text-base font-extrabold text-slate-900">
+                      {inv.formattedPrice}
+                    </p>
+                    <div className="mt-3 flex flex-wrap gap-1.5">
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={() => handlePreviewInvoice(inv)}
+                        className="h-8 cursor-pointer text-xs"
+                      >
+                        <FileText className="mr-1 size-3.5" />
+                        View
+                      </Button>
+                      <Button
+                        type="button"
+                        size="sm"
+                        onClick={() => handleDownloadPDF(inv)}
+                        className="h-8 cursor-pointer text-xs font-semibold text-white"
+                        style={{ background: BRAND.purple }}
+                      >
+                        <Download className="mr-1 size-3.5" />
+                        PDF
+                      </Button>
+                    </div>
+                  </article>
+                ))}
+              </div>
+
+              <div className="hidden overflow-x-auto md:block">
                 <Table className="min-w-[42rem] text-left text-sm">
                   <TableHeader>
                     <TableRow className="text-xs text-slate-500 uppercase">
@@ -290,19 +338,24 @@ export function InvoicesPage() {
                       <TableHead className="px-4 py-3 font-medium">Date & Time</TableHead>
                       <TableHead className="px-4 py-3 font-medium">Name of Source / Plan</TableHead>
                       <TableHead className="px-4 py-3 font-medium">Price</TableHead>
-                      <TableHead className="px-4 py-3 font-medium">Status</TableHead>
-                      <TableHead className="px-4 py-3 text-right font-medium">Actions</TableHead>
+                      <TableHead className="hidden px-4 py-3 font-medium sm:table-cell">Status</TableHead>
+                      <TableHead className="sticky right-0 z-[1] bg-white px-4 py-3 text-right font-medium">
+                        Actions
+                      </TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
                     {invoices.map((inv) => (
-                      <TableRow key={inv.id || inv.trackingId} className="hover:bg-slate-50/50 transition-colors">
+                      <TableRow
+                        key={inv.id || inv.trackingId}
+                        className="group transition-colors hover:bg-slate-50/50"
+                      >
                         <TableCell className="px-4 py-3.5 font-bold text-slate-900">
-                          <span className="rounded-md bg-purple-50 px-2 py-1 text-xs text-purple-700 border border-purple-100 font-mono font-bold">
+                          <span className="rounded-md border border-purple-100 bg-purple-50 px-2 py-1 font-mono text-xs font-bold text-purple-700">
                             {inv.trackingId}
                           </span>
                         </TableCell>
-                        <TableCell className="px-4 py-3.5 text-xs text-slate-600 font-medium">
+                        <TableCell className="px-4 py-3.5 text-xs font-medium text-slate-600">
                           {inv.dateTime}
                         </TableCell>
                         <TableCell className="px-4 py-3.5 text-xs font-semibold text-slate-800">
@@ -311,22 +364,22 @@ export function InvoicesPage() {
                         <TableCell className="px-4 py-3.5 font-extrabold text-slate-900">
                           {inv.formattedPrice}
                         </TableCell>
-                        <TableCell className="px-4 py-3.5">
+                        <TableCell className="hidden px-4 py-3.5 sm:table-cell">
                           <Badge
                             variant="outline"
-                            className="bg-emerald-50 text-emerald-700 border-emerald-200 font-semibold"
+                            className="border-emerald-200 bg-emerald-50 font-semibold text-emerald-700"
                           >
                             {inv.status}
                           </Badge>
                         </TableCell>
-                        <TableCell className="px-4 py-3.5 text-right">
+                        <TableCell className="sticky right-0 z-[1] bg-white px-4 py-3.5 text-right group-hover:bg-slate-50/50">
                           <div className="flex items-center justify-end gap-1.5">
                             <Button
                               type="button"
                               variant="outline"
                               size="sm"
                               onClick={() => handlePreviewInvoice(inv)}
-                              className="h-8 text-xs cursor-pointer"
+                              className="h-8 cursor-pointer text-xs"
                             >
                               <FileText className="mr-1 size-3.5" />
                               View
@@ -335,7 +388,7 @@ export function InvoicesPage() {
                               type="button"
                               size="sm"
                               onClick={() => handleDownloadPDF(inv)}
-                              className="h-8 text-xs text-white cursor-pointer font-semibold"
+                              className="h-8 cursor-pointer text-xs font-semibold text-white"
                               style={{ background: BRAND.purple }}
                             >
                               <Download className="mr-1 size-3.5" />

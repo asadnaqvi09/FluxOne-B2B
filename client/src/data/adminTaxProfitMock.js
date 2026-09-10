@@ -1,6 +1,4 @@
-/**
- * Dynamic Mock Data for Admin Tax & Profit Management (Phase 1)
- */
+// Dynamic Mock Data for Admin Tax & Profit Management (Phase 1)
 
 export const INITIAL_TAX_PROFIT_PRODUCTS = [
   {

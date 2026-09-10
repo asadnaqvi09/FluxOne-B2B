@@ -1,6 +1,4 @@
-/**
- * Dynamic Mock Data for Admin Subscriptions & Invoices
- */
+// Dynamic Mock Data for Admin Subscriptions & Invoices
 
 export const INITIAL_INVOICES_DATA = [
   // 2026 Invoices (Jan to Sep)

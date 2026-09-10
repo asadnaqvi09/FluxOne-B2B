@@ -4,7 +4,7 @@ import { getErrorMessage, parseJson, toQuery } from '@/api/apiHelper'
 import { fail, ok } from '@/api/result'
 import { tokenStorage } from '@/api/tokenStorage'
 
-/** Paths that must not trigger a silent refresh on 401. */
+// Paths that must not trigger a silent refresh on 401.
 const NO_REFRESH_PATHS = new Set([
   endpoints.auth.login,
   endpoints.auth.refresh,
@@ -91,10 +91,8 @@ function unwrapBackendPayload(payload) {
   return payload?.data ?? payload
 }
 
-/**
- * Exchange refresh token for a new access/refresh pair.
- * Single-flight so parallel 401s share one refresh call.
- */
+// Exchange refresh token for a new access/refresh pair.
+// Single-flight so parallel 401s share one refresh call.
 async function refreshAccessToken() {
   if (refreshInFlight) return refreshInFlight
 
@@ -136,7 +134,7 @@ async function refreshAccessToken() {
   return refreshInFlight
 }
 
-/** Minimal mock: auth only (inventory/branch modules use live API). */
+// Minimal mock: auth only (inventory/branch modules use live API).
 async function mockRequest(method, path, body) {
   await delay()
   const route = mockPath(path)

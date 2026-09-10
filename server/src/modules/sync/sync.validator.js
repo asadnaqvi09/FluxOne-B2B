@@ -1,7 +1,7 @@
 import { z } from 'zod'
 import { SALE_STATUS } from '../../config/constants.js'
 
-/** Accept demo/seed UUID-shaped ids (Zod 4 z.uuid() is RFC-4122 strict). */
+// Accept demo/seed UUID-shaped ids (Zod 4 z.uuid() is RFC-4122 strict).
 const idSchema = z.guid()
 const GUID_RE =
   /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/
@@ -110,14 +110,15 @@ export const productPricePayloadSchema = z.object({
   deviceId: optionalString,
 })
 
-export const SYNC_EVENT_TYPES = /** @type {const} */ ([
+// POS sync event type slugs (kept as a plain array for z.enum).
+export const SYNC_EVENT_TYPES = [
   'sale',
   'refund',
   'cashier_log',
   'attendance',
   'product_price_update',
   'price_change',
-])
+]
 
 export const syncEventSchema = z.object({
   clientEventId: z.string().min(1),

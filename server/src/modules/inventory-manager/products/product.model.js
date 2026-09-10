@@ -129,12 +129,10 @@ export async function updateCategory(tenantId, id, { name, imageUrl, isActive, b
   return mapCategoryRow(rows[0] || null)
 }
 
-/**
- * Soft-disable category.
- * - Parent inactive → cascade inactive children; clear product category_id + subcategory_id
- * - Subcategory inactive → clear product subcategory_id only
- * Products stay active; category shows as N/A.
- */
+// Soft-disable category.
+// - Parent inactive → cascade inactive children; clear product category_id + subcategory_id
+// - Subcategory inactive → clear product subcategory_id only
+// Products stay active; category shows as N/A.
 export async function setCategoryActive(tenantId, id, isActive, { branchId = null } = {}) {
   return withTransaction(async (client) => {
     const { rows: existing } = await tenantClientQuery(
@@ -230,7 +228,7 @@ export async function setCategoryActive(tenantId, id, isActive, { branchId = nul
   })
 }
 
-/** @deprecated Prefer setCategoryActive — hard delete kept for empty unused categories only */
+// @deprecated Prefer setCategoryActive — hard delete kept for empty unused categories only
 export async function deleteCategory(tenantId, id, { branchId = null } = {}) {
   return setCategoryActive(tenantId, id, false, { branchId })
 }

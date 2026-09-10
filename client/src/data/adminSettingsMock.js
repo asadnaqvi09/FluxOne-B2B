@@ -1,6 +1,4 @@
-/**
- * Dynamic Mock Data for Admin Settings & System Access Terminals (Multi-Tenant)
- */
+// Dynamic Mock Data for Admin Settings & System Access Terminals (Multi-Tenant)
 
 export const COMPANY_A_SYSTEMS = [
   {

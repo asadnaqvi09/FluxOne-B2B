@@ -13,10 +13,8 @@ const BRANCH_LOCKED_ROLES = new Set([
   ROLES.BRANCH_ADMIN,
 ])
 
-/**
- * Resolve branchId for sync pull (bootstrap/delta).
- * Branch-scoped roles must match JWT branchId.
- */
+// Resolve branchId for sync pull (bootstrap/delta).
+// Branch-scoped roles must match JWT branchId.
 export function resolveSyncPullBranchId(req, queryBranchId) {
   const branchId = queryBranchId || req.user?.branchId || null
   if (!branchId) {
@@ -31,7 +29,7 @@ export function resolveSyncPullBranchId(req, queryBranchId) {
   return branchId
 }
 
-/** Push resolves branch from body or JWT; branch-scoped roles must match token. */
+// Push resolves branch from body or JWT; branch-scoped roles must match token.
 export function resolveSyncPushBranchId(req, bodyBranchId) {
   const branchId = bodyBranchId || req.user?.branchId || null
   if (!branchId) {

@@ -140,7 +140,7 @@ export async function setDesignationActive(tenantId, id, isActive) {
   return rows[0] || null
 }
 
-/** Soft-deactivate. Keeps staff.designation_id for history. */
+// Soft-deactivate. Keeps staff.designation_id for history.
 export async function deleteDesignation(tenantId, id) {
   return setDesignationActive(tenantId, id, false)
 }

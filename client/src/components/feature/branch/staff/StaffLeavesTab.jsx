@@ -1,5 +1,5 @@
-import { useEffect, useState, useMemo } from 'react'
-import { ArrowLeft, ArrowRight, Calendar, Users } from 'lucide-react'
+import { useEffect, useState } from 'react'
+import { ArrowLeft, ArrowRight } from 'lucide-react'
 import { SurfaceCard } from '@/components/shared/SurfaceCard'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -131,33 +131,55 @@ export function StaffLeavesTab({ designations = [], staff = [] }) {
             </span>
           }
         >
-          <div className="overflow-x-auto">
-            <Table className="w-full text-left text-sm">
-              <TableHeader>
-                <TableRow className="text-xs text-slate-500 uppercase">
-                  <TableHead className="px-3 py-2 font-medium">Employee</TableHead>
-                  <TableHead className="px-3 py-2 font-medium">Leave Dates</TableHead>
-                  <TableHead className="px-3 py-2 font-medium">Reason</TableHead>
-                  <TableHead className="px-3 py-2 font-medium">Status</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {loading ? (
-                  <TableRow>
-                    <TableCell colSpan={4} className="py-8 text-center text-slate-400">
-                      Loading...
-                    </TableCell>
-                  </TableRow>
-                ) : leaves.length === 0 ? (
-                  <TableRow>
-                    <TableCell colSpan={4} className="py-8 text-center text-slate-400">
-                      No active leave records found
-                    </TableCell>
-                  </TableRow>
-                ) : (
-                  leaves
-                    .slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE)
-                    .map((l) => (
+          {loading ? (
+            <p className="py-8 text-center text-sm text-slate-400">Loading...</p>
+          ) : leaves.length === 0 ? (
+            <p className="py-8 text-center text-sm text-slate-400">No active leave records found</p>
+          ) : (
+            <>
+              <div className="space-y-3 md:hidden">
+                {leaves.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE).map((l) => (
+                  <article
+                    key={l.id}
+                    className="rounded-xl border border-border bg-slate-50/60 px-3 py-3"
+                  >
+                    <div className="flex items-start justify-between gap-2">
+                      <p className="truncate text-sm font-semibold text-slate-900">
+                        {l.fullName || 'Employee'}
+                      </p>
+                      <span className="inline-flex shrink-0 items-center rounded-full bg-emerald-50 px-2 py-0.5 text-xs font-semibold text-emerald-700 ring-1 ring-inset ring-emerald-200">
+                        {l.status}
+                      </span>
+                    </div>
+                    <p className="mt-1 text-xs text-slate-600">
+                      {new Date(l.startDate).toLocaleDateString('en-GB', {
+                        day: '2-digit',
+                        month: 'short',
+                      })}{' '}
+                      —{' '}
+                      {new Date(l.endDate).toLocaleDateString('en-GB', {
+                        day: '2-digit',
+                        month: 'short',
+                        year: 'numeric',
+                      })}
+                    </p>
+                    <p className="mt-1 truncate text-xs text-slate-500 italic">{l.reason || 'Leave'}</p>
+                  </article>
+                ))}
+              </div>
+
+              <div className="hidden overflow-x-auto md:block">
+                <Table className="w-full min-w-[32rem] text-left text-sm">
+                  <TableHeader>
+                    <TableRow className="text-xs text-slate-500 uppercase">
+                      <TableHead className="px-3 py-2 font-medium">Employee</TableHead>
+                      <TableHead className="px-3 py-2 font-medium">Leave Dates</TableHead>
+                      <TableHead className="px-3 py-2 font-medium">Reason</TableHead>
+                      <TableHead className="px-3 py-2 font-medium">Status</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {leaves.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE).map((l) => (
                       <TableRow key={l.id} className="hover:bg-slate-50/50">
                         <TableCell className="px-3 py-3">
                           <div className="font-semibold text-slate-900">{l.fullName || 'Employee'}</div>
@@ -174,7 +196,7 @@ export function StaffLeavesTab({ designations = [], staff = [] }) {
                             year: 'numeric',
                           })}
                         </TableCell>
-                        <TableCell className="px-3 py-3 text-slate-700 italic max-w-xs truncate">
+                        <TableCell className="max-w-xs truncate px-3 py-3 text-slate-700 italic">
                           {l.reason || 'Leave'}
                         </TableCell>
                         <TableCell className="px-3 py-3">
@@ -183,11 +205,12 @@ export function StaffLeavesTab({ designations = [], staff = [] }) {
                           </span>
                         </TableCell>
                       </TableRow>
-                    ))
-                )}
-              </TableBody>
-            </Table>
-          </div>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
+            </>
+          )}
 
           <TablePagination
             page={page}
@@ -208,7 +231,7 @@ export function StaffLeavesTab({ designations = [], staff = [] }) {
               </div>
 
               <div>
-                <div className="grid grid-cols-2 gap-3">
+                <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                   <div className="space-y-1.5">
                     <Label htmlFor="leave-start">Start Date</Label>
                     <Input

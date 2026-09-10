@@ -13,6 +13,8 @@ import {
   resolveScopedBranchId,
   sanitizeStaffWritePayload,
 } from './staff.access.js'
+import { validateShiftAgainstBranchHours } from './schedule.validation.js'
+import { getBranchHours } from '../../b2b-admin/branches/branches.model.js'
 import { ROLE_IDS, ROLES } from '../../../config/constants.js'
 import { fail, success } from '../../../utils/response.util.js'
 import { paginatedResult } from '../../../utils/pagination.util.js'
@@ -22,6 +24,25 @@ function bmBranchFilter(req) {
   if (req.user?.role === ROLES.BRANCH_MANAGER) {
     return req.user.branchId || null
   }
+  return null
+}
+
+function hasScheduleField(body) {
+  return (
+    body.scheduleStart !== undefined ||
+    body.scheduleEnd !== undefined ||
+    body.scheduleBreakStart !== undefined ||
+    body.scheduleBreakEnd !== undefined
+  )
+}
+
+async function rejectIfShiftOutsideBranchHours(res, tenantId, branchId, schedule) {
+  const hours = await getBranchHours(tenantId, branchId)
+  if (hours === null) {
+    return fail(res, 'Branch not found', 404)
+  }
+  const message = validateShiftAgainstBranchHours(schedule, hours)
+  if (message) return fail(res, message, 400)
   return null
 }
 
@@ -39,6 +60,9 @@ export async function createStaff(req, res) {
   if (req.user.role === ROLES.B2B_ADMIN && !branchId) {
     return fail(res, 'branchId is required when creating staff as B2B Admin', 400)
   }
+
+  const hoursError = await rejectIfShiftOutsideBranchHours(res, req.tenantId, branchId, body)
+  if (hoursError) return hoursError
 
   const passwordHash = await bcrypt.hash(body.password, 10)
   const created = await createStaffUser(req.tenantId, {
@@ -69,6 +93,37 @@ export async function patchStaff(req, res) {
   }
   const imageUrl = resolveUploadUrl(req.file, req)
   if (imageUrl) body.imageUrl = imageUrl
+
+  if (hasScheduleField(body)) {
+    const existing = await getStaffById(req.tenantId, req.validated.params.id, {
+      branchId: bmBranchFilter(req),
+    })
+    if (!existing) return fail(res, 'Staff not found', 404)
+
+    const nextBranchId =
+      body.branchId !== undefined ? body.branchId : existing.branchId
+    const mergedSchedule = {
+      scheduleStart:
+        body.scheduleStart !== undefined ? body.scheduleStart : existing.scheduleStart,
+      scheduleEnd: body.scheduleEnd !== undefined ? body.scheduleEnd : existing.scheduleEnd,
+      scheduleBreakStart:
+        body.scheduleBreakStart !== undefined
+          ? body.scheduleBreakStart
+          : existing.scheduleBreakStart,
+      scheduleBreakEnd:
+        body.scheduleBreakEnd !== undefined
+          ? body.scheduleBreakEnd
+          : existing.scheduleBreakEnd,
+    }
+
+    const hoursError = await rejectIfShiftOutsideBranchHours(
+      res,
+      req.tenantId,
+      nextBranchId,
+      mergedSchedule,
+    )
+    if (hoursError) return hoursError
+  }
 
   const row = await updateStaff(req.tenantId, req.validated.params.id, body, {
     branchId: bmBranchFilter(req),

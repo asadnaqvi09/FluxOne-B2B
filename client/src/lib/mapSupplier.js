@@ -1,7 +1,5 @@
-/**
- * Map live IM supplier API rows to UI shape.
- * (Older mock mapper used name/phone — live API uses companyName / companyPhone.)
- */
+// Map live IM supplier API rows to UI shape.
+// (Older mock mapper used name/phone — live API uses companyName / companyPhone.)
 export function mapSupplier(row = {}) {
   return {
     id: row.id,
@@ -23,7 +21,7 @@ export function mapSupplier(row = {}) {
   }
 }
 
-/** Build JSON or multipart body for create/update. */
+// Build JSON or multipart body for create/update.
 export function buildSupplierPayload(fields) {
   const base = {
     companyName: String(fields.companyName || '').trim(),

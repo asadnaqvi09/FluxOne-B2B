@@ -59,7 +59,7 @@ function useDialogContext() {
   return ctx
 }
 
-/** Guarded close for Cancel buttons — must be rendered inside Dialog. */
+// Guarded close for Cancel buttons — must be rendered inside Dialog.
 function useRequestDialogClose() {
   const { requestClose } = useDialogContext()
   return requestClose

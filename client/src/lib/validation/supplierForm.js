@@ -1,4 +1,4 @@
-/** Required supplier fields aligned with SupplierFormDialog + API. */
+// Required supplier fields aligned with SupplierFormDialog + API.
 export function validateSupplierForm(form) {
   if (!String(form.companyName || '').trim()) {
     return 'Company name is required'

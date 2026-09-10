@@ -6,24 +6,22 @@ export const PRODUCT_TYPES = {
 export const PRODUCT_STATUS = {
   ACTIVE: 'active',
   INACTIVE: 'inactive',
-  /** @deprecated */
+  // @deprecated
   OPEN: 'active',
-  /** @deprecated */
+  // @deprecated
   CLOSE: 'inactive',
 }
 
 export const SCALE_OPTIONS = ['unit', 'kg', 'g', 'liter', 'ml', 'pack', 'box', 'dozen']
 
-/**
- * Zod rejects empty strings on optional UUID fields.
- * Use undefined so JSON.stringify / apiClient omit them.
- */
+// Zod rejects empty strings on optional UUID fields.
+// Use undefined so JSON.stringify / apiClient omit them.
 export function asOptionalUuid(value) {
   if (value == null || value === '') return undefined
   return String(value)
 }
 
-/** Drop blanks so taxIds: [""] never hits the API. */
+// Drop blanks so taxIds: [""] never hits the API.
 export function cleanUuidList(ids) {
   if (!Array.isArray(ids)) return []
   return ids.map((id) => asOptionalUuid(id)).filter(Boolean)
@@ -99,17 +97,15 @@ export function money(value) {
   })
 }
 
-/**
- * For PATCH: preserve explicit null to clear nullable FK columns.
- * Empty string / undefined → omit (no change).
- */
+// For PATCH: preserve explicit null to clear nullable FK columns.
+// Empty string / undefined → omit (no change).
 export function asNullableUuid(value) {
   if (value === null) return null
   if (value === undefined || value === '') return undefined
   return String(value)
 }
 
-/** Build JSON body or FormData when an image file is present. */
+// Build JSON body or FormData when an image file is present.
 export function buildProductPayload(fields, { withConfirmed = true } = {}) {
   // Never send categoryId: "" — Zod uuid() → 422 Invalid uuid
   const categoryId = asOptionalUuid(fields.categoryId)
@@ -157,7 +153,7 @@ export function buildProductPayload(fields, { withConfirmed = true } = {}) {
   return base
 }
 
-/** PATCH body — always sends category/subcategory keys so null can clear subcategory_id. */
+// PATCH body — always sends category/subcategory keys so null can clear subcategory_id.
 export function buildProductUpdatePayload(fields) {
   const categoryId = asOptionalUuid(fields.categoryId)
   const subcategoryRaw = fields.subcategoryId
@@ -194,9 +190,7 @@ export function buildProductUpdatePayload(fields) {
   return base
 }
 
-/**
- * Prefer JSON create/update (arrays validate). If image present, follow with image-only PATCH.
- */
+// Prefer JSON create/update (arrays validate). If image present, follow with image-only PATCH.
 export function splitProductWrite(fields, { withConfirmed = true } = {}) {
   const image = fields.image instanceof File && fields.image.size > 0 ? fields.image : null
   const json = withConfirmed
@@ -205,6 +199,6 @@ export function splitProductWrite(fields, { withConfirmed = true } = {}) {
   return { json, image }
 }
 
-/** @deprecated use productCsv.js — kept for older imports */
+// @deprecated use productCsv.js — kept for older imports
 export { productsToCsv, downloadTextFile } from '@/lib/productCsv'
 

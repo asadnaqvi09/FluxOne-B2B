@@ -2,7 +2,7 @@ export const APP_NAME = 'FluxOne'
 export const COMPANY_NAME = 'Software Flux Solution'
 
 export const MOCK_API = String(import.meta.env.VITE_MOCK_API ?? 'false') !== 'false'
-/** Prefer Vite proxy `/api` in local dev (see vite.config.js). */
+// Prefer Vite proxy `/api` in local dev (see vite.config.js).
 export const API_BASE_URL = import.meta.env.VITE_API_URL || '/api'
 
 export const PAGE_SIZE = 10

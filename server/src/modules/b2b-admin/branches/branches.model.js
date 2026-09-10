@@ -27,12 +27,28 @@ export function generateTemporaryPassword(length = 12) {
   return out
 }
 
+// Normalize PG TIME / Date / "HH:MM:SS" to HH:MM for API clients.
+function formatTimeValue(value) {
+  if (value == null || value === '') return null
+  if (value instanceof Date && !Number.isNaN(value.getTime())) {
+    const hours = String(value.getUTCHours()).padStart(2, '0')
+    const minutes = String(value.getUTCMinutes()).padStart(2, '0')
+    return `${hours}:${minutes}`
+  }
+  const text = String(value).trim()
+  const match = text.match(/^(\d{1,2}):(\d{2})/)
+  if (!match) return null
+  return `${match[1].padStart(2, '0')}:${match[2]}`
+}
+
 const branchSelect = `
   b.id,
   b.name,
   b.location,
   b.image_url AS "imageUrl",
   b.status,
+  to_char(b.opening_time, 'HH24:MI') AS "openingTime",
+  to_char(b.closing_time, 'HH24:MI') AS "closingTime",
   b.created_at AS "createdAt",
   u.id AS "managerUserId",
   u.full_name AS "managerName",
@@ -59,6 +75,8 @@ function mapBranchRow(row) {
     location: row.location || '',
     image: normalizeImageUrl(row.imageUrl) || row.imageUrl || '',
     status: row.status || BRANCH_STATUS.OPEN,
+    openingTime: formatTimeValue(row.openingTime),
+    closingTime: formatTimeValue(row.closingTime),
     createdAt: row.createdAt,
     totalStaff: row.totalStaff ?? 0,
     manager: row.managerUserId
@@ -141,6 +159,8 @@ export async function listBranches(tenantId, filters = {}) {
         b.location,
         b.image_url AS "imageUrl",
         b.status,
+        to_char(b.opening_time, 'HH24:MI') AS "openingTime",
+        to_char(b.closing_time, 'HH24:MI') AS "closingTime",
         b.created_at AS "createdAt",
         u.id AS "managerUserId",
         u.full_name AS "managerName",
@@ -218,8 +238,8 @@ export async function createBranchWithManager(tenantId, payload) {
         client,
         tenantId,
         `
-          INSERT INTO branches (tenant_id, name, location, image_url, status)
-          VALUES ($1, $2, $3, $4, $5)
+          INSERT INTO branches (tenant_id, name, location, image_url, status, opening_time, closing_time)
+          VALUES ($1, $2, $3, $4, $5, $6, $7)
           RETURNING id
         `,
         [
@@ -227,6 +247,8 @@ export async function createBranchWithManager(tenantId, payload) {
           payload.location?.trim() || null,
           payload.image || payload.imageUrl || null,
           payload.status || BRANCH_STATUS.OPEN,
+          payload.openingTime || null,
+          payload.closingTime || null,
         ],
       )
 
@@ -273,7 +295,9 @@ export async function updateBranch(tenantId, id, payload) {
         payload.name !== undefined ||
         payload.location !== undefined ||
         payload.image !== undefined ||
-        payload.imageUrl !== undefined
+        payload.imageUrl !== undefined ||
+        payload.openingTime !== undefined ||
+        payload.closingTime !== undefined
       ) {
         await tenantClientQuery(
           client,
@@ -283,7 +307,9 @@ export async function updateBranch(tenantId, id, payload) {
             SET
               name = CASE WHEN $3::text IS NOT NULL THEN $3 ELSE name END,
               location = CASE WHEN $4::boolean THEN $5 ELSE location END,
-              image_url = CASE WHEN $6::boolean THEN $7 ELSE image_url END
+              image_url = CASE WHEN $6::boolean THEN $7 ELSE image_url END,
+              opening_time = CASE WHEN $8::boolean THEN $9::time ELSE opening_time END,
+              closing_time = CASE WHEN $10::boolean THEN $11::time ELSE closing_time END
             WHERE tenant_id = $1 AND id = $2
           `,
           [
@@ -295,6 +321,10 @@ export async function updateBranch(tenantId, id, payload) {
             payload.image !== undefined || payload.imageUrl !== undefined
               ? payload.image || payload.imageUrl || null
               : null,
+            payload.openingTime !== undefined,
+            payload.openingTime !== undefined ? payload.openingTime || null : null,
+            payload.closingTime !== undefined,
+            payload.closingTime !== undefined ? payload.closingTime || null : null,
           ],
         )
       }
@@ -404,7 +434,7 @@ export async function resetBranchManagerPassword(tenantId, id, passwordHash) {
   })
 }
 
-/** Persist whether BM credentials email was delivered (controls admin Key icon). */
+// Persist whether BM credentials email was delivered (controls admin Key icon).
 export async function setManagerCredentialsEmailed(tenantId, managerUserId, emailed) {
   await tenantQuery(
     tenantId,
@@ -417,10 +447,8 @@ export async function setManagerCredentialsEmailed(tenantId, managerUserId, emai
   )
 }
 
-/**
- * Hard-delete branch + its users when safe.
- * Blocks (409) if inventory masters / ledger still reference the branch (RESTRICT FKs).
- */
+// Hard-delete branch + its users when safe.
+// Blocks (409) if inventory masters / ledger still reference the branch (RESTRICT FKs).
 export async function deleteBranch(tenantId, id) {
   return withTransaction(async (client) => {
     const existing = await getBranchByIdInTx(client, tenantId, id)
@@ -499,4 +527,27 @@ export async function getTenantName(tenantId) {
     [],
   )
   return rows[0]?.name || null
+}
+
+// Opening/closing window for staff shift bounds (nulls when unset).
+export async function getBranchHours(tenantId, branchId) {
+  if (!branchId) return { openingTime: null, closingTime: null }
+  const { rows } = await tenantQuery(
+    tenantId,
+    `
+      SELECT
+        to_char(opening_time, 'HH24:MI') AS "openingTime",
+        to_char(closing_time, 'HH24:MI') AS "closingTime"
+      FROM branches
+      WHERE tenant_id = $1 AND id = $2
+      LIMIT 1
+    `,
+    [branchId],
+  )
+  const row = rows[0]
+  if (!row) return null
+  return {
+    openingTime: formatTimeValue(row.openingTime),
+    closingTime: formatTimeValue(row.closingTime),
+  }
 }

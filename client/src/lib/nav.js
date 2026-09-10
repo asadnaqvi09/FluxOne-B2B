@@ -1,7 +1,7 @@
 import { PATHS } from '@/router/paths'
 import { ROLES } from '@/lib/constants'
 
-// Shared top-nav links by role — BM currently only Dashboard + Staff
+// Shared top-nav links by role (used by AppTopNav / MobileNav)
 const INVENTORY_NAV = [
   { to: PATHS.inventory.dashboard, label: 'Dashboard', end: true },
   { to: PATHS.inventory.categories, label: 'Categories', end: false },
@@ -9,6 +9,15 @@ const INVENTORY_NAV = [
   { to: PATHS.inventory.control, label: 'Control', end: false },
   { to: PATHS.inventory.suppliers, label: 'Suppliers', end: false },
   { to: PATHS.inventory.orders, label: 'Orders', end: false },
+]
+
+const ADMIN_NAV = [
+  { to: PATHS.admin.dashboard, label: 'Dashboard', end: false },
+  { to: PATHS.admin.reports, label: 'Reports', end: false },
+  { to: PATHS.admin.branches, label: 'Manage Branches', end: false },
+  { to: PATHS.admin.invoices, label: 'Invoices', end: false },
+  { to: PATHS.admin.taxProfit, label: 'Tax & Profit', end: false },
+  { to: PATHS.admin.company, label: 'Company & Policies', end: false },
 ]
 
 export const NAV_BY_ROLE = {
@@ -20,7 +29,7 @@ export const NAV_BY_ROLE = {
     { to: PATHS.branch.inventory, label: 'Inventory Monitoring', end: false },
   ],
   [ROLES.INVENTORY_MANAGER]: INVENTORY_NAV,
-  [ROLES.B2B_ADMIN]: INVENTORY_NAV,
+  [ROLES.B2B_ADMIN]: ADMIN_NAV,
   // Phase 2: logo + profile + logout only (no module links yet)
   [ROLES.PRODUCTION_STAFF]: [],
   [ROLES.DELIVERY_STAFF]: [],

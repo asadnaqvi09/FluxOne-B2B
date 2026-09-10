@@ -5,10 +5,8 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { cn } from '@/lib/utils'
 
-/**
- * Pick existing single items for a bundle.
- * Items may already belong to other bundles — selection is from the full single-item catalog.
- */
+// Pick existing single items for a bundle.
+// Items may already belong to other bundles — selection is from the full single-item catalog.
 export function BundleItemPicker({
   catalogItems = [],
   value = [],

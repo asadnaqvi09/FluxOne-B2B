@@ -1,5 +1,5 @@
-import { useEffect, useState, useMemo } from 'react'
-import { Laptop, Scale, Plus, Trash2, Edit3, Monitor } from 'lucide-react'
+import { useEffect, useState } from 'react'
+import { Scale, Plus, Trash2, Edit3, Monitor } from 'lucide-react'
 import { PageHeader } from '@/components/shared/PageHeader'
 import { MotionHeader, MotionReveal } from '@/components/shared/MotionReveal'
 import { SurfaceCard } from '@/components/shared/SurfaceCard'
@@ -267,23 +267,23 @@ export function ResourcesPage() {
           title="Resources Management"
           description="Register and track POS hardware assets and configure product weighing scales."
           actions={
-            <div className="flex gap-2">
+            <div className="flex w-full flex-wrap gap-2 sm:w-auto">
               <Button
                 variant={activeTab === 'hardware' ? 'default' : 'outline'}
                 onClick={() => setActiveTab('hardware')}
                 style={activeTab === 'hardware' ? { backgroundColor: BRAND.purple } : {}}
-                className={activeTab === 'hardware' ? 'text-white' : ''}
+                className={`flex-1 sm:flex-none ${activeTab === 'hardware' ? 'text-white' : ''}`}
               >
-                <Monitor className="size-4 mr-1.5" />
+                <Monitor className="mr-1.5 size-4" />
                 Hardware
               </Button>
               <Button
                 variant={activeTab === 'scales' ? 'default' : 'outline'}
                 onClick={() => setActiveTab('scales')}
                 style={activeTab === 'scales' ? { backgroundColor: BRAND.purple } : {}}
-                className={activeTab === 'scales' ? 'text-white' : ''}
+                className={`flex-1 sm:flex-none ${activeTab === 'scales' ? 'text-white' : ''}`}
               >
-                <Scale className="size-4 mr-1.5" />
+                <Scale className="mr-1.5 size-4" />
                 Items Scales
               </Button>
             </div>
@@ -332,82 +332,166 @@ export function ResourcesPage() {
                 </span>
               }
             >
-              <Table>
-                <TableHeader>
-                  <TableRow className="text-slate-500 text-xs uppercase">
-                    <TableHead>Device Image</TableHead>
-                    <TableHead>Hardware ID / Date</TableHead>
-                    <TableHead>Device Name / Type</TableHead>
-                    <TableHead>Brand/Company</TableHead>
-                    <TableHead className="text-center">Status</TableHead>
-                    <TableHead className="text-center">Assignee</TableHead>
-                    <TableHead className="text-right">Actions</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {filteredHardware.length === 0 ? (
-                    <TableRow>
-                      <TableCell colSpan={7} className="py-8 text-center text-slate-400">No hardware assets found</TableCell>
-                    </TableRow>
-                  ) : (
-                    filteredHardware
+              {filteredHardware.length === 0 ? (
+                <p className="py-8 text-center text-sm text-slate-400">No hardware assets found</p>
+              ) : (
+                <>
+                  <div className="space-y-3 md:hidden">
+                    {filteredHardware
                       .slice((hwPage - 1) * PAGE_SIZE, hwPage * PAGE_SIZE)
                       .map((hw) => {
                         const assignedEmployee = staff.find((s) => s.hardwareDeviceId === hw.id)
                         return (
-                          <TableRow key={hw.id}>
-                            <TableCell>
+                          <article
+                            key={hw.id}
+                            className="rounded-xl border border-border bg-slate-50/60 px-3 py-3"
+                          >
+                            <div className="flex items-start gap-3">
                               {hw.image ? (
-                                <img src={hw.image} alt={hw.name} className="size-10 rounded-lg object-cover" />
+                                <img
+                                  src={hw.image}
+                                  alt={hw.name}
+                                  className="size-12 shrink-0 rounded-lg object-cover"
+                                />
                               ) : (
-                                <div className="size-10 bg-slate-100 border border-slate-200 rounded-lg flex items-center justify-center text-[10px] text-slate-400 font-bold uppercase">HW</div>
+                                <div className="flex size-12 shrink-0 items-center justify-center rounded-lg border border-slate-200 bg-slate-100 text-[10px] font-bold text-slate-400 uppercase">
+                                  HW
+                                </div>
                               )}
-                            </TableCell>
-                            <TableCell>
-                              <div className="font-bold text-slate-900 font-mono">{hw.id}</div>
-                              <div className="text-[10px] text-slate-400">{new Date(hw.createdAt).toLocaleDateString()}</div>
-                            </TableCell>
-                            <TableCell>
-                              <div className="font-semibold text-slate-900">{hw.name}</div>
-                              <div className="text-[10px] text-slate-400 font-medium">{hw.type}</div>
-                            </TableCell>
-                            <TableCell className="text-slate-600">{hw.companyName}</TableCell>
-                            <TableCell className="text-center">
-                              <Badge variant="outline" className={getStatusBadge(hw.status)}>
-                                {hw.status}
-                              </Badge>
-                            </TableCell>
-                            <TableCell className="text-center text-slate-600">
-                              {assignedEmployee ? (
-                                <Badge variant="secondary" className="bg-purple-50 text-purple-700 hover:bg-purple-100 border-none font-semibold rounded">
-                                  {assignedEmployee.fullName}
-                                </Badge>
-                              ) : (
-                                <span className="text-xs text-slate-400 italic">Unassigned</span>
-                              )}
-                            </TableCell>
-                            <TableCell className="text-right space-x-3.5">
-                              <button
-                                type="button"
-                                className="text-slate-500 hover:text-slate-800 transition-colors inline-block align-middle"
-                                onClick={() => handleOpenHardwareEdit(hw)}
-                              >
-                                <Edit3 className="size-4" />
-                              </button>
-                              <button
-                                type="button"
-                                className="text-slate-500 hover:text-slate-800 transition-colors inline-block align-middle"
-                                onClick={() => handleDeleteHardware(hw.id)}
-                              >
-                                <Trash2 className="size-4" />
-                              </button>
-                            </TableCell>
-                          </TableRow>
+                              <div className="min-w-0 flex-1">
+                                <div className="flex items-start justify-between gap-2">
+                                  <div className="min-w-0">
+                                    <p className="truncate text-sm font-semibold text-slate-900">
+                                      {hw.name}
+                                    </p>
+                                    <p className="font-mono text-[11px] text-slate-400">{hw.id}</p>
+                                  </div>
+                                  <Badge variant="outline" className={getStatusBadge(hw.status)}>
+                                    {hw.status}
+                                  </Badge>
+                                </div>
+                                <p className="mt-1 text-xs text-slate-500">
+                                  {hw.type} · {hw.companyName}
+                                </p>
+                                <p className="mt-0.5 text-xs text-slate-400">
+                                  {assignedEmployee ? assignedEmployee.fullName : 'Unassigned'}
+                                </p>
+                                <div className="mt-3 flex justify-end gap-3">
+                                  <button
+                                    type="button"
+                                    className="text-slate-500 transition-colors hover:text-slate-800"
+                                    onClick={() => handleOpenHardwareEdit(hw)}
+                                    aria-label="Edit hardware"
+                                  >
+                                    <Edit3 className="size-4" />
+                                  </button>
+                                  <button
+                                    type="button"
+                                    className="text-slate-500 transition-colors hover:text-slate-800"
+                                    onClick={() => handleDeleteHardware(hw.id)}
+                                    aria-label="Delete hardware"
+                                  >
+                                    <Trash2 className="size-4" />
+                                  </button>
+                                </div>
+                              </div>
+                            </div>
+                          </article>
                         )
-                      })
-                  )}
-                </TableBody>
-              </Table>
+                      })}
+                  </div>
+
+                  <div className="hidden overflow-x-auto md:block">
+                    <Table className="min-w-[44rem] text-left text-sm">
+                      <TableHeader>
+                        <TableRow className="text-xs text-slate-500 uppercase">
+                          <TableHead className="px-2 py-3">Device Image</TableHead>
+                          <TableHead className="px-2 py-3">Hardware ID / Date</TableHead>
+                          <TableHead className="px-2 py-3">Device Name / Type</TableHead>
+                          <TableHead className="px-2 py-3">Brand/Company</TableHead>
+                          <TableHead className="px-2 py-3 text-center">Status</TableHead>
+                          <TableHead className="hidden px-2 py-3 text-center lg:table-cell">
+                            Assignee
+                          </TableHead>
+                          <TableHead className="sticky right-0 z-[1] bg-white px-2 py-3 text-right">
+                            Actions
+                          </TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {filteredHardware
+                          .slice((hwPage - 1) * PAGE_SIZE, hwPage * PAGE_SIZE)
+                          .map((hw) => {
+                            const assignedEmployee = staff.find((s) => s.hardwareDeviceId === hw.id)
+                            return (
+                              <TableRow key={hw.id} className="group">
+                                <TableCell className="px-2 py-3">
+                                  {hw.image ? (
+                                    <img
+                                      src={hw.image}
+                                      alt={hw.name}
+                                      className="size-10 rounded-lg object-cover"
+                                    />
+                                  ) : (
+                                    <div className="flex size-10 items-center justify-center rounded-lg border border-slate-200 bg-slate-100 text-[10px] font-bold text-slate-400 uppercase">
+                                      HW
+                                    </div>
+                                  )}
+                                </TableCell>
+                                <TableCell className="px-2 py-3">
+                                  <div className="font-mono font-bold text-slate-900">{hw.id}</div>
+                                  <div className="text-[10px] text-slate-400">
+                                    {new Date(hw.createdAt).toLocaleDateString()}
+                                  </div>
+                                </TableCell>
+                                <TableCell className="px-2 py-3">
+                                  <div className="font-semibold text-slate-900">{hw.name}</div>
+                                  <div className="text-[10px] font-medium text-slate-400">{hw.type}</div>
+                                </TableCell>
+                                <TableCell className="px-2 py-3 text-slate-600">
+                                  {hw.companyName}
+                                </TableCell>
+                                <TableCell className="px-2 py-3 text-center">
+                                  <Badge variant="outline" className={getStatusBadge(hw.status)}>
+                                    {hw.status}
+                                  </Badge>
+                                </TableCell>
+                                <TableCell className="hidden px-2 py-3 text-center text-slate-600 lg:table-cell">
+                                  {assignedEmployee ? (
+                                    <Badge
+                                      variant="secondary"
+                                      className="rounded border-none bg-purple-50 font-semibold text-purple-700 hover:bg-purple-100"
+                                    >
+                                      {assignedEmployee.fullName}
+                                    </Badge>
+                                  ) : (
+                                    <span className="text-xs text-slate-400 italic">Unassigned</span>
+                                  )}
+                                </TableCell>
+                                <TableCell className="sticky right-0 z-[1] space-x-3.5 bg-white px-2 py-3 text-right group-hover:bg-slate-50/80">
+                                  <button
+                                    type="button"
+                                    className="inline-block align-middle text-slate-500 transition-colors hover:text-slate-800"
+                                    onClick={() => handleOpenHardwareEdit(hw)}
+                                  >
+                                    <Edit3 className="size-4" />
+                                  </button>
+                                  <button
+                                    type="button"
+                                    className="inline-block align-middle text-slate-500 transition-colors hover:text-slate-800"
+                                    onClick={() => handleDeleteHardware(hw.id)}
+                                  >
+                                    <Trash2 className="size-4" />
+                                  </button>
+                                </TableCell>
+                              </TableRow>
+                            )
+                          })}
+                      </TableBody>
+                    </Table>
+                  </div>
+                </>
+              )}
 
               <TablePagination
                 page={hwPage}
@@ -419,7 +503,7 @@ export function ResourcesPage() {
           </MotionReveal>
         </>
       ) : (
-        /* Scales Tab using Shadcn Table component */
+        // Scales Tab using Shadcn Table component
         <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
           <div className="lg:col-span-2">
             <MotionReveal delay={0.02}>
@@ -431,49 +515,94 @@ export function ResourcesPage() {
                   </span>
                 }
               >
-                <Table>
-                  <TableHeader>
-                    <TableRow className="text-slate-500 text-xs uppercase">
-                      <TableHead>Scale ID</TableHead>
-                      <TableHead>Created Date</TableHead>
-                      <TableHead>Scale unit</TableHead>
-                      <TableHead className="text-right">Actions</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {scalesList.length === 0 ? (
-                      <TableRow>
-                        <TableCell colSpan={4} className="py-8 text-center text-slate-400">No scales found</TableCell>
-                      </TableRow>
-                    ) : (
-                      scalesList
+                {scalesList.length === 0 ? (
+                  <p className="py-8 text-center text-sm text-slate-400">No scales found</p>
+                ) : (
+                  <>
+                    <div className="space-y-3 md:hidden">
+                      {scalesList
                         .slice((scalesPage - 1) * PAGE_SIZE, scalesPage * PAGE_SIZE)
                         .map((sc) => (
-                          <TableRow key={sc.id}>
-                            <TableCell className="font-mono font-bold text-slate-900">{sc.id}</TableCell>
-                            <TableCell className="text-slate-500">{new Date(sc.createdAt).toLocaleDateString()}</TableCell>
-                            <TableCell className="font-semibold text-slate-800">{sc.name}</TableCell>
-                            <TableCell className="text-right space-x-3.5">
+                          <article
+                            key={sc.id}
+                            className="flex items-center justify-between gap-3 rounded-xl border border-border bg-slate-50/60 px-3 py-3"
+                          >
+                            <div className="min-w-0">
+                              <p className="font-semibold text-slate-800">{sc.name}</p>
+                              <p className="font-mono text-[11px] text-slate-400">{sc.id}</p>
+                              <p className="text-[11px] text-slate-400">
+                                {new Date(sc.createdAt).toLocaleDateString()}
+                              </p>
+                            </div>
+                            <div className="flex shrink-0 gap-3">
                               <button
                                 type="button"
-                                className="text-slate-500 hover:text-slate-800 transition-colors inline-block align-middle"
+                                className="text-slate-500 transition-colors hover:text-slate-800"
                                 onClick={() => handleOpenScaleEdit(sc)}
+                                aria-label="Edit scale"
                               >
                                 <Edit3 className="size-4" />
                               </button>
                               <button
                                 type="button"
-                                className="text-slate-500 hover:text-slate-800 transition-colors inline-block align-middle"
+                                className="text-slate-500 transition-colors hover:text-slate-800"
                                 onClick={() => handleDeleteScale(sc.id)}
+                                aria-label="Delete scale"
                               >
                                 <Trash2 className="size-4" />
                               </button>
-                            </TableCell>
+                            </div>
+                          </article>
+                        ))}
+                    </div>
+
+                    <div className="hidden overflow-x-auto md:block">
+                      <Table className="w-full text-left text-sm">
+                        <TableHeader>
+                          <TableRow className="text-xs text-slate-500 uppercase">
+                            <TableHead className="px-2 py-3">Scale ID</TableHead>
+                            <TableHead className="px-2 py-3">Created Date</TableHead>
+                            <TableHead className="px-2 py-3">Scale unit</TableHead>
+                            <TableHead className="px-2 py-3 text-right">Actions</TableHead>
                           </TableRow>
-                        ))
-                    )}
-                  </TableBody>
-                </Table>
+                        </TableHeader>
+                        <TableBody>
+                          {scalesList
+                            .slice((scalesPage - 1) * PAGE_SIZE, scalesPage * PAGE_SIZE)
+                            .map((sc) => (
+                              <TableRow key={sc.id}>
+                                <TableCell className="px-2 py-3 font-mono font-bold text-slate-900">
+                                  {sc.id}
+                                </TableCell>
+                                <TableCell className="px-2 py-3 text-slate-500">
+                                  {new Date(sc.createdAt).toLocaleDateString()}
+                                </TableCell>
+                                <TableCell className="px-2 py-3 font-semibold text-slate-800">
+                                  {sc.name}
+                                </TableCell>
+                                <TableCell className="space-x-3.5 px-2 py-3 text-right">
+                                  <button
+                                    type="button"
+                                    className="inline-block align-middle text-slate-500 transition-colors hover:text-slate-800"
+                                    onClick={() => handleOpenScaleEdit(sc)}
+                                  >
+                                    <Edit3 className="size-4" />
+                                  </button>
+                                  <button
+                                    type="button"
+                                    className="inline-block align-middle text-slate-500 transition-colors hover:text-slate-800"
+                                    onClick={() => handleDeleteScale(sc.id)}
+                                  >
+                                    <Trash2 className="size-4" />
+                                  </button>
+                                </TableCell>
+                              </TableRow>
+                            ))}
+                        </TableBody>
+                      </Table>
+                    </div>
+                  </>
+                )}
 
                 <TablePagination
                   page={scalesPage}
@@ -523,7 +652,7 @@ export function ResourcesPage() {
           </DialogHeader>
 
           <form className="space-y-4" onSubmit={handleSaveHardware}>
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
               <div className="space-y-1.5">
                 <Label htmlFor="hw-form-id">Hardware ID</Label>
                 <Input
@@ -546,7 +675,7 @@ export function ResourcesPage() {
               </div>
             </div>
 
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
               <div className="space-y-1.5">
                 <Label htmlFor="hw-form-company">Company / Brand</Label>
                 <Input
@@ -573,7 +702,7 @@ export function ResourcesPage() {
               </div>
             </div>
 
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
               <div className="space-y-1.5">
                 <Label htmlFor="hw-form-status">Status</Label>
                 <NativeSelect

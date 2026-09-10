@@ -6,12 +6,10 @@ function httpError(status, message) {
   return error
 }
 
-/**
- * Resolve tenant + branch scope for inventory-manager APIs.
- * - inventory_manager: JWT branch required (403 if missing)
- * - b2b_admin (and other permitted roles): all branches by default; optional ?branchId=
- * Never trust client-sent branchId for IM — JWT wins.
- */
+// Resolve tenant + branch scope for inventory-manager APIs.
+// - inventory_manager: JWT branch required (403 if missing)
+// - b2b_admin (and other permitted roles): all branches by default; optional ?branchId=
+// Never trust client-sent branchId for IM — JWT wins.
 export function resolveInventoryScope(req) {
   const tenantId = req.tenantId
   const role = req.user?.role
@@ -29,10 +27,8 @@ export function resolveInventoryScope(req) {
   return { tenantId, branchId: queryBranchId || null }
 }
 
-/**
- * Scope for CREATE — branch_id must be set (NOT NULL).
- * IM: JWT branch. B2B admin: body.branchId required (same pattern as BM staff create).
- */
+// Scope for CREATE — branch_id must be set (NOT NULL).
+// IM: JWT branch. B2B admin: body.branchId required (same pattern as BM staff create).
 export function resolveInventoryCreateScope(req) {
   const { tenantId, branchId } = resolveInventoryScope(req)
   if (branchId) return { tenantId, branchId }
@@ -44,7 +40,7 @@ export function resolveInventoryCreateScope(req) {
   return { tenantId, branchId: bodyBranchId }
 }
 
-/** Force IM stock destination / allocation to JWT branch; B2B may pass body branchId. */
+// Force IM stock destination / allocation to JWT branch; B2B may pass body branchId.
 export function resolveInventoryBranchId(req, bodyBranchId = null) {
   const { branchId } = resolveInventoryScope(req)
   if (req.user?.role === ROLES.INVENTORY_MANAGER) {

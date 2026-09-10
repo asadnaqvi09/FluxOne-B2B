@@ -98,6 +98,8 @@ export async function createBranch(req, res) {
       location: body.location,
       image: resolveUploadUrl(uploadedFile(req, 'image'), req) || undefined,
       status: body.status,
+      openingTime: body.openingTime,
+      closingTime: body.closingTime,
       manager: {
         ...manager,
         ...(managerProfileImage ? { profileImage: managerProfileImage } : {}),
@@ -155,6 +157,8 @@ export async function patchBranch(req, res) {
       name: body.name,
       location: body.location,
       ...(uploadedBranchImage ? { image: uploadedBranchImage } : {}),
+      ...(body.openingTime !== undefined ? { openingTime: body.openingTime || null } : {}),
+      ...(body.closingTime !== undefined ? { closingTime: body.closingTime || null } : {}),
       manager: managerPayload,
     })
   } catch (err) {

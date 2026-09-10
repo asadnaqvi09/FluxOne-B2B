@@ -34,7 +34,7 @@ export function catalogForUi(catalog) {
   }
 }
 
-/** Inventory control + product forms — active categories/subcategories only. */
+// Inventory control + product forms — active categories/subcategories only.
 export function catalogActiveOnly(catalog) {
   const ui = catalogForUi(catalog)
   const parents = (ui.parents || []).filter((row) => row.isActive !== false)

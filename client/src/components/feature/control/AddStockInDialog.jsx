@@ -59,9 +59,7 @@ function emptyDraft() {
   }
 }
 
-/**
- * Multi-item stock-in: one supplier, many product lines → single POST /stock-in.
- */
+// Multi-item stock-in: one supplier, many product lines → single POST /stock-in.
 export function AddStockInDialog({
   open,
   onOpenChange,

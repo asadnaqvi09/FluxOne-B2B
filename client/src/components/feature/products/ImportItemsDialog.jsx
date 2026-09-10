@@ -19,9 +19,7 @@ import {
 } from '@/lib/productCsv'
 import { useFormBaseline } from '@/hooks/useFormBaseline'
 
-/**
- * Import products from CSV file or pasted text (same columns as Export).
- */
+// Import products from CSV file or pasted text (same columns as Export).
 export function ImportItemsDialog({ open, onOpenChange, loading = false, onSubmit }) {
   const [text, setText] = useState('')
   const [error, setError] = useState(null)

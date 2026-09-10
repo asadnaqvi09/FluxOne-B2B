@@ -454,7 +454,7 @@ export async function setStaffStatus(tenantId, id, status, { branchId } = {}) {
   })
 }
 
-/** Hard-delete staff user (staff row cascades from user). Branch-scoped for BM. */
+// Hard-delete staff user (staff row cascades from user). Branch-scoped for BM.
 export async function deleteStaff(tenantId, id, { branchId } = {}) {
   return withTransaction(async (client) => {
     const existing = await getStaffByIdInTx(client, tenantId, id, { branchId })
@@ -474,5 +474,5 @@ export async function deleteStaff(tenantId, id, { branchId } = {}) {
   })
 }
 
-/** @deprecated Prefer createStaffUser — kept for any legacy imports */
+// @deprecated Prefer createStaffUser — kept for any legacy imports
 export const createStaff = createStaffUser

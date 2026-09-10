@@ -1,6 +1,4 @@
-/**
- * Dynamic Mock Data for Admin Branch Management (Multi-Tenant)
- */
+// Dynamic Mock Data for Admin Branch Management (Multi-Tenant)
 
 export const COMPANY_A_BRANCHES = [
   {

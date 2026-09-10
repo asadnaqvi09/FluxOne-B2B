@@ -464,10 +464,8 @@ async function buildInventoryStatus(tenantId, { branchId, asOfDate }) {
   }
 }
 
-/**
- * Full B2B Admin dashboard payload.
- * Query: date (YYYY-MM-DD), branchId (uuid | omit/all), year (optional, defaults to date's year)
- */
+// Full B2B Admin dashboard payload.
+// Query: date (YYYY-MM-DD), branchId (uuid | omit/all), year (optional, defaults to date's year)
 export async function getAdminDashboard(tenantId, filters = {}) {
   const date = toDateParam(filters.date) || new Date().toISOString().slice(0, 10)
   const year = Number(filters.year) || Number(date.slice(0, 4))

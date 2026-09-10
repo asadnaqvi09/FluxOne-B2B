@@ -33,7 +33,7 @@ export function toastInfo(message, options = {}) {
   return toast.info(String(message), { ...base, ...options })
 }
 
-/** Convenience: show success or error from an apiClient-style result. */
+// Convenience: show success or error from an apiClient-style result.
 export function toastFromResult(result, successMessage) {
   if (result?.success) {
     if (successMessage) toastSuccess(successMessage)

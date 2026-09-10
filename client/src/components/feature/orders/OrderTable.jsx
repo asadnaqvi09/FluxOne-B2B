@@ -20,9 +20,44 @@ function statusClass(status) {
   return 'bg-amber-50 text-amber-800'
 }
 
-/**
- * Purchase order list — order id, company, item count, actions.
- */
+function OrderActions({ row, onView, onHistory, onPrint }) {
+  return (
+    <div className="flex flex-wrap gap-1.5">
+      <Button
+        type="button"
+        size="sm"
+        variant="outline"
+        className="cursor-pointer"
+        onClick={() => onView?.(row)}
+      >
+        <Eye className="size-3.5" />
+        Details
+      </Button>
+      <Button
+        type="button"
+        size="sm"
+        variant="outline"
+        className="cursor-pointer"
+        onClick={() => onHistory?.(row)}
+      >
+        <History className="size-3.5" />
+        History
+      </Button>
+      <Button
+        type="button"
+        size="sm"
+        variant="outline"
+        className="cursor-pointer"
+        onClick={() => onPrint?.(row)}
+      >
+        <Printer className="size-3.5" />
+        PDF
+      </Button>
+    </div>
+  )
+}
+
+// Purchase order list — mobile cards + desktop table
 export function OrderTable({
   items = [],
   loading = false,
@@ -59,79 +94,95 @@ export function OrderTable({
           description="Generate an order after you have suppliers and products."
         />
       ) : (
-        <div className="overflow-x-auto">
-          <Table className="min-w-[720px] text-left text-sm">
-            <TableHeader>
-              <TableRow className="text-xs uppercase tracking-wide text-slate-400">
-                <TableHead className="px-2 py-3 font-semibold">Order id</TableHead>
-                <TableHead className="px-2 py-3 font-semibold">Company</TableHead>
-                <TableHead className="px-2 py-3 font-semibold">Items</TableHead>
-                <TableHead className="px-2 py-3 font-semibold">Status</TableHead>
-                <TableHead className="px-2 py-3 font-semibold">Actions</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {list.map((row) => (
-                <TableRow key={row.id} className="hover:bg-slate-50/80">
-                  <TableCell className="px-2 py-3 font-mono text-xs text-slate-700">
-                    {row.orderNumber || row.id?.slice(0, 8)}
-                  </TableCell>
-                  <TableCell className="px-2 py-3">
-                    <span className="font-medium text-slate-800">{row.companyName}</span>
+        <>
+          <div className="space-y-3 md:hidden">
+            {list.map((row) => (
+              <article
+                key={row.id}
+                className="rounded-xl border border-border bg-slate-50/60 px-3 py-3"
+              >
+                <div className="flex items-start justify-between gap-2">
+                  <div className="min-w-0">
+                    <p className="font-mono text-xs font-semibold text-slate-700">
+                      {row.orderNumber || row.id?.slice(0, 8)}
+                    </p>
+                    <p className="mt-0.5 truncate text-sm font-medium text-slate-900">
+                      {row.companyName}
+                    </p>
                     {row.representativeName ? (
-                      <span className="mt-0.5 block text-xs text-slate-400">
+                      <p className="mt-0.5 truncate text-xs text-slate-400">
                         {row.representativeName}
                         {row.representativePhone ? ` · ${row.representativePhone}` : ''}
-                      </span>
+                      </p>
                     ) : null}
-                  </TableCell>
-                  <TableCell className="px-2 py-3 text-slate-600">{row.itemsNumber}</TableCell>
-                  <TableCell className="px-2 py-3">
-                    <span
-                      className={`rounded-full px-2 py-0.5 text-xs font-medium capitalize ${statusClass(row.status)}`}
-                    >
-                      {row.status}
-                    </span>
-                  </TableCell>
-                  <TableCell className="px-2 py-3">
-                    <div className="flex flex-wrap gap-1">
-                      <Button
-                        type="button"
-                        size="sm"
-                        variant="outline"
-                        className="cursor-pointer"
-                        onClick={() => onView?.(row)}
-                      >
-                        <Eye className="size-3.5" />
-                        Details
-                      </Button>
-                      <Button
-                        type="button"
-                        size="sm"
-                        variant="outline"
-                        className="cursor-pointer"
-                        onClick={() => onHistory?.(row)}
-                      >
-                        <History className="size-3.5" />
-                        History
-                      </Button>
-                      <Button
-                        type="button"
-                        size="sm"
-                        variant="outline"
-                        className="cursor-pointer"
-                        onClick={() => onPrint?.(row)}
-                      >
-                        <Printer className="size-3.5" />
-                        PDF
-                      </Button>
-                    </div>
-                  </TableCell>
+                  </div>
+                  <span
+                    className={`shrink-0 rounded-full px-2 py-0.5 text-xs font-medium capitalize ${statusClass(row.status)}`}
+                  >
+                    {row.status}
+                  </span>
+                </div>
+                <p className="mt-2 text-xs text-slate-500">{row.itemsNumber} items</p>
+                <div className="mt-3">
+                  <OrderActions
+                    row={row}
+                    onView={onView}
+                    onHistory={onHistory}
+                    onPrint={onPrint}
+                  />
+                </div>
+              </article>
+            ))}
+          </div>
+
+          <div className="hidden overflow-x-auto md:block">
+            <Table className="min-w-[640px] text-left text-sm">
+              <TableHeader>
+                <TableRow className="text-xs uppercase tracking-wide text-slate-400">
+                  <TableHead className="px-2 py-3 font-semibold">Order id</TableHead>
+                  <TableHead className="px-2 py-3 font-semibold">Company</TableHead>
+                  <TableHead className="px-2 py-3 font-semibold">Items</TableHead>
+                  <TableHead className="px-2 py-3 font-semibold">Status</TableHead>
+                  <TableHead className="px-2 py-3 font-semibold">Actions</TableHead>
                 </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-        </div>
+              </TableHeader>
+              <TableBody>
+                {list.map((row) => (
+                  <TableRow key={row.id} className="hover:bg-slate-50/80">
+                    <TableCell className="px-2 py-3 font-mono text-xs text-slate-700">
+                      {row.orderNumber || row.id?.slice(0, 8)}
+                    </TableCell>
+                    <TableCell className="px-2 py-3">
+                      <span className="font-medium text-slate-800">{row.companyName}</span>
+                      {row.representativeName ? (
+                        <span className="mt-0.5 block text-xs text-slate-400">
+                          {row.representativeName}
+                          {row.representativePhone ? ` · ${row.representativePhone}` : ''}
+                        </span>
+                      ) : null}
+                    </TableCell>
+                    <TableCell className="px-2 py-3 text-slate-600">{row.itemsNumber}</TableCell>
+                    <TableCell className="px-2 py-3">
+                      <span
+                        className={`rounded-full px-2 py-0.5 text-xs font-medium capitalize ${statusClass(row.status)}`}
+                      >
+                        {row.status}
+                      </span>
+                    </TableCell>
+                    <TableCell className="px-2 py-3">
+                      <OrderActions
+                        row={row}
+                        onView={onView}
+                        onHistory={onHistory}
+                        onPrint={onPrint}
+                      />
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </div>
+        </>
       )}
 
       {!isEmpty ? (

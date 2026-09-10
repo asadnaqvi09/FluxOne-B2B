@@ -10,10 +10,8 @@ import {
 import { toastError } from '@/lib/toast'
 import { cn } from '@/lib/utils'
 
-/**
- * Image file picker with preview + filename for existing URLs and new selections.
- * Browsers cannot pre-fill <input type="file"> — we show the current image separately.
- */
+// Image file picker with preview + filename for existing URLs and new selections.
+// Browsers cannot pre-fill <input type="file"> — we show the current image separately.
 export function ImageUploadField({
   id,
   label,

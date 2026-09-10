@@ -237,50 +237,143 @@ export function SalesPage() {
             </span>
           }
         >
-          <div className="overflow-x-auto">
-            <Table>
-              <TableHeader>
-                <TableRow className="text-slate-500 text-xs">
-                  <TableHead>ID</TableHead>
-                  <TableHead>Date / Time</TableHead>
-                  <TableHead>Sale items</TableHead>
-                  <TableHead>Exchange item</TableHead>
-                  <TableHead>Tax</TableHead>
-                  <TableHead>Discount</TableHead>
-                  <TableHead>Final</TableHead>
-                  <TableHead>Paid</TableHead>
-                  <TableHead>Return</TableHead>
-                  <TableHead className="text-right">Actions</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {loading ? (
-                  <TableRow>
-                    <TableCell colSpan={10} className="py-8 text-center text-slate-400">Loading transactions...</TableCell>
-                  </TableRow>
-                ) : sales.length === 0 ? (
-                  <TableRow>
-                    <TableCell colSpan={10} className="py-8 text-center text-slate-400">No transactions found</TableCell>
-                  </TableRow>
-                ) : (
-                  sales
-                    .slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE)
-                    .map((sale) => {
+          {loading ? (
+            <p className="py-8 text-center text-sm text-slate-400">Loading transactions...</p>
+          ) : sales.length === 0 ? (
+            <p className="py-8 text-center text-sm text-slate-400">No transactions found</p>
+          ) : (
+            <>
+              <div className="space-y-3 md:hidden">
+                {sales.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE).map((sale) => {
+                  const soldItems = (sale.items || []).filter((i) => !i.isExchange)
+                  const exchangeItems = (sale.items || []).filter((i) => i.isExchange)
+                  const indexStr = String(sale.saleNumber || sale.id.slice(0, 4))
+                  const salId = `SAL-${indexStr}`
+                  const trkId = `TRK-${indexStr}`
+                  const soldAtLabel = new Date(sale.soldAt).toLocaleString('en-GB', {
+                    day: 'numeric',
+                    month: 'short',
+                    year: 'numeric',
+                    hour: 'numeric',
+                    minute: '2-digit',
+                    hour12: true,
+                  })
+
+                  return (
+                    <article
+                      key={sale.id}
+                      className="rounded-xl border border-border bg-slate-50/60 px-3 py-3"
+                    >
+                      <div className="flex items-start justify-between gap-2">
+                        <div className="min-w-0">
+                          <Badge
+                            variant="secondary"
+                            className="rounded border-none bg-purple-50 font-semibold text-purple-700 hover:bg-purple-100"
+                          >
+                            {salId}
+                          </Badge>
+                          <p className="mt-0.5 font-mono text-[10px] text-slate-400">{trkId}</p>
+                          <p className="mt-1 text-xs text-slate-500">{soldAtLabel}</p>
+                        </div>
+                        {sale.status === 'refunded' ? (
+                          <Badge
+                            variant="destructive"
+                            className="rounded border-none bg-rose-50 font-semibold text-rose-700 hover:bg-rose-100"
+                          >
+                            Refunded
+                          </Badge>
+                        ) : null}
+                      </div>
+
+                      <p className="mt-2 truncate text-sm text-slate-700" title={soldItems.map((i) => i.name).join(', ')}>
+                        {soldItems.map((i) => i.name).join(', ') || '—'}
+                      </p>
+                      {exchangeItems.length > 0 ? (
+                        <p className="mt-0.5 truncate text-xs text-slate-500">
+                          Exchange: {exchangeItems.map((i) => i.name).join(', ')}
+                        </p>
+                      ) : null}
+
+                      <div className="mt-3 grid grid-cols-2 gap-2 text-xs">
+                        <div>
+                          <span className="text-slate-400">Final</span>
+                          <p className="font-bold text-slate-900">Rs. {formatPrice(sale.finalAmount)}</p>
+                        </div>
+                        <div>
+                          <span className="text-slate-400">Paid</span>
+                          <p className="font-semibold text-slate-700">Rs. {formatPrice(sale.paidAmount)}</p>
+                        </div>
+                        <div>
+                          <span className="text-slate-400">Tax</span>
+                          <p className="text-slate-600">Rs. {formatPrice(sale.tax_amount || sale.taxAmount)}</p>
+                        </div>
+                        <div>
+                          <span className="text-slate-400">Discount</span>
+                          <p className="text-slate-600">
+                            Rs. {formatPrice(sale.discount_amount || sale.discountAmount)}
+                          </p>
+                        </div>
+                      </div>
+
+                      <div className="mt-3 flex items-center justify-end gap-2">
+                        {sale.status !== 'refunded' ? (
+                          <Button
+                            size="xs"
+                            variant="outline"
+                            className="h-7 border-slate-200 px-2 text-xs font-semibold text-slate-700 hover:bg-slate-50"
+                            onClick={() => setRefundTarget(sale)}
+                          >
+                            Refund
+                          </Button>
+                        ) : null}
+                        <button
+                          type="button"
+                          className="inline-flex text-slate-500 transition-colors hover:text-slate-800"
+                          onClick={() => handlePrint(sale)}
+                          aria-label="Print invoice"
+                        >
+                          <Printer className="size-4" />
+                        </button>
+                      </div>
+                    </article>
+                  )
+                })}
+              </div>
+
+              <div className="hidden overflow-x-auto md:block">
+                <Table className="min-w-[56rem]">
+                  <TableHeader>
+                    <TableRow className="text-xs text-slate-500">
+                      <TableHead>ID</TableHead>
+                      <TableHead>Date / Time</TableHead>
+                      <TableHead>Sale items</TableHead>
+                      <TableHead className="hidden lg:table-cell">Exchange item</TableHead>
+                      <TableHead className="hidden xl:table-cell">Tax</TableHead>
+                      <TableHead className="hidden xl:table-cell">Discount</TableHead>
+                      <TableHead>Final</TableHead>
+                      <TableHead>Paid</TableHead>
+                      <TableHead className="hidden lg:table-cell">Return</TableHead>
+                      <TableHead className="sticky right-0 z-[1] bg-white text-right">Actions</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {sales.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE).map((sale) => {
                       const soldItems = (sale.items || []).filter((i) => !i.isExchange)
                       const exchangeItems = (sale.items || []).filter((i) => i.isExchange)
-                      
-                      // Simple SAL ID backfill logic to match design (e.g. SAL-1001)
                       const indexStr = String(sale.saleNumber || sale.id.slice(0, 4))
                       const salId = `SAL-${indexStr}`
                       const trkId = `TRK-${indexStr}`
 
                       return (
-                        <TableRow key={sale.id}>
+                        <TableRow key={sale.id} className="group">
                           <TableCell className="py-4">
-                            <Badge variant="secondary" className="bg-purple-50 text-purple-700 font-semibold rounded hover:bg-purple-100 border-none">
+                            <Badge
+                              variant="secondary"
+                              className="rounded border-none bg-purple-50 font-semibold text-purple-700 hover:bg-purple-100"
+                            >
                               {salId}
                             </Badge>
-                            <div className="text-[10px] text-slate-400 font-mono mt-0.5">{trkId}</div>
+                            <div className="mt-0.5 font-mono text-[10px] text-slate-400">{trkId}</div>
                           </TableCell>
                           <TableCell className="text-slate-600">
                             {new Date(sale.soldAt).toLocaleString('en-GB', {
@@ -289,40 +382,56 @@ export function SalesPage() {
                               year: 'numeric',
                               hour: 'numeric',
                               minute: '2-digit',
-                              hour12: true
+                              hour12: true,
                             })}
                           </TableCell>
                           <TableCell className="text-slate-700">
-                            <div className="max-w-[200px] truncate" title={soldItems.map((i) => i.name).join(', ')}>
-                              {soldItems.map((i) => `${i.name}`).join(', ') || '—'}
+                            <div
+                              className="max-w-[200px] truncate"
+                              title={soldItems.map((i) => i.name).join(', ')}
+                            >
+                              {soldItems.map((i) => i.name).join(', ') || '—'}
                             </div>
                           </TableCell>
-                          <TableCell className="text-slate-500">
+                          <TableCell className="hidden text-slate-500 lg:table-cell">
                             {exchangeItems.map((i) => i.name).join(', ') || '—'}
                           </TableCell>
-                          <TableCell className="text-slate-600">Rs. {formatPrice(sale.tax_amount || sale.taxAmount)}</TableCell>
-                          <TableCell className="text-slate-600">Rs. {formatPrice(sale.discount_amount || sale.discountAmount)}</TableCell>
-                          <TableCell className="font-bold text-slate-900">Rs. {formatPrice(sale.finalAmount)}</TableCell>
-                          <TableCell className="text-slate-600">Rs. {formatPrice(sale.paidAmount)}</TableCell>
-                          <TableCell className="text-slate-600">
-                            {parseFloat(sale.returnAmount) > 0 ? `Rs. ${formatPrice(sale.returnAmount)}` : '—'}
+                          <TableCell className="hidden text-slate-600 xl:table-cell">
+                            Rs. {formatPrice(sale.tax_amount || sale.taxAmount)}
                           </TableCell>
-                          <TableCell className="text-right space-x-2.5">
+                          <TableCell className="hidden text-slate-600 xl:table-cell">
+                            Rs. {formatPrice(sale.discount_amount || sale.discountAmount)}
+                          </TableCell>
+                          <TableCell className="font-bold text-slate-900">
+                            Rs. {formatPrice(sale.finalAmount)}
+                          </TableCell>
+                          <TableCell className="text-slate-600">Rs. {formatPrice(sale.paidAmount)}</TableCell>
+                          <TableCell className="hidden text-slate-600 lg:table-cell">
+                            {parseFloat(sale.returnAmount) > 0
+                              ? `Rs. ${formatPrice(sale.returnAmount)}`
+                              : '—'}
+                          </TableCell>
+                          <TableCell className="sticky right-0 z-[1] space-x-2.5 bg-white text-right group-hover:bg-slate-50/80">
                             {sale.status !== 'refunded' ? (
                               <Button
                                 size="xs"
                                 variant="outline"
-                                className="text-xs h-7 border-slate-200 text-slate-700 font-semibold px-2 hover:bg-slate-50 align-middle"
+                                className="h-7 border-slate-200 px-2 text-xs font-semibold text-slate-700 align-middle hover:bg-slate-50"
                                 onClick={() => setRefundTarget(sale)}
                               >
                                 Refund
                               </Button>
                             ) : (
-                              <Badge variant="destructive" className="bg-rose-50 text-rose-700 hover:bg-rose-100 border-none font-semibold rounded align-middle">Refunded</Badge>
+                              <Badge
+                                variant="destructive"
+                                className="rounded border-none bg-rose-50 font-semibold text-rose-700 align-middle hover:bg-rose-100"
+                              >
+                                Refunded
+                              </Badge>
                             )}
                             <button
                               type="button"
-                              className="text-slate-500 hover:text-slate-800 transition-colors inline-block align-middle"
+                              className="inline-block align-middle text-slate-500 transition-colors hover:text-slate-800"
                               onClick={() => handlePrint(sale)}
                             >
                               <Printer className="size-4" />
@@ -330,11 +439,12 @@ export function SalesPage() {
                           </TableCell>
                         </TableRow>
                       )
-                    })
-                )}
-              </TableBody>
-            </Table>
-          </div>
+                    })}
+                  </TableBody>
+                </Table>
+              </div>
+            </>
+          )}
 
           <TablePagination
             page={page}

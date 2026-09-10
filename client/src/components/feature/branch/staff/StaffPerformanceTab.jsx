@@ -291,7 +291,7 @@ export function StaffPerformanceTab({ designations = [] }) {
           />
         </SurfaceCard>
       ) : (
-        /* Scales configurations using Shadcn Table component */
+        // Scales configurations using Shadcn Table component
         <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
           <div className="lg:col-span-2">
             <SurfaceCard

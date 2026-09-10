@@ -6,7 +6,7 @@ import { SurfaceCard } from '@/components/shared/SurfaceCard'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem, NativeSelect } from '@/components/ui/select'
+import { NativeSelect } from '@/components/ui/select'
 import { Badge } from '@/components/ui/badge'
 import {
   Table,
@@ -213,86 +213,148 @@ export function BranchInventoryPage() {
             </span>
           }
         >
-          <div className="overflow-x-auto">
-            <Table className="table-fixed">
-              <colgroup>
-                <col className="w-[6%]" />
-                <col className="w-[22%]" />
-                <col className="w-[16%]" />
-                <col className="w-[16%]" />
-                <col className="w-[14%]" />
-                <col className="w-[12%]" />
-                <col className="w-[14%]" />
-              </colgroup>
-              <TableHeader>
-                <TableRow className="text-slate-500 text-xs uppercase">
-                  <TableHead>Image</TableHead>
-                  <TableHead>ID / Name</TableHead>
-                  <TableHead>Category</TableHead>
-                  <TableHead>Subcategory</TableHead>
-                  <TableHead className="text-right">In Stock</TableHead>
-                  <TableHead className="text-center">Status</TableHead>
-                  <TableHead className="text-right">Actions</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {loading ? (
-                  <TableRow>
-                    <TableCell colSpan={7} className="py-8 text-center text-slate-400">Loading shelf stock...</TableCell>
-                  </TableRow>
-                ) : products.length === 0 ? (
-                  <TableRow>
-                    <TableCell colSpan={7} className="py-8 text-center text-slate-400">No stock products found</TableCell>
-                  </TableRow>
-                ) : (
-                  products
-                    .slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE)
-                    .map((prod) => {
+          {loading ? (
+            <p className="py-8 text-center text-sm text-slate-400">Loading shelf stock...</p>
+          ) : products.length === 0 ? (
+            <p className="py-8 text-center text-sm text-slate-400">No stock products found</p>
+          ) : (
+            <>
+              {/* Mobile cards — table-fixed was crushing columns on narrow screens */}
+              <div className="space-y-3 md:hidden">
+                {products.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE).map((prod) => {
+                  const status = getStockStatus(prod.quantity, prod.reorderPoint)
+                  const cat = categories.find((c) => c.id === prod.categoryId)?.name || '—'
+                  const subcat = subcategories.find((s) => s.id === prod.subcategoryId)?.name || '—'
+
+                  return (
+                    <article
+                      key={prod.id}
+                      className="rounded-xl border border-border bg-slate-50/60 px-3 py-3"
+                    >
+                      <div className="flex items-start gap-3">
+                        {prod.imageUrl ? (
+                          <img
+                            src={prod.imageUrl}
+                            alt={prod.name}
+                            className="size-12 shrink-0 rounded-lg border border-slate-100 object-cover"
+                          />
+                        ) : (
+                          <div className="flex size-12 shrink-0 items-center justify-center rounded-lg border border-slate-200 bg-slate-100 text-[10px] font-bold text-slate-400 uppercase">
+                            N/A
+                          </div>
+                        )}
+                        <div className="min-w-0 flex-1">
+                          <div className="flex items-start justify-between gap-2">
+                            <div className="min-w-0">
+                              <p className="truncate text-sm font-bold text-slate-900">{prod.name}</p>
+                              <p className="font-mono text-[11px] text-slate-400">SKU: {prod.itemCode}</p>
+                            </div>
+                            <Badge variant={status.variant} className={`shrink-0 ${status.className}`}>
+                              {status.label}
+                            </Badge>
+                          </div>
+                          <p className="mt-1.5 truncate text-xs text-slate-500">
+                            {cat}
+                            {subcat !== '—' ? ` · ${subcat}` : ''}
+                          </p>
+                          <p className="mt-1 font-mono text-sm font-bold text-slate-900">
+                            {parseFloat(prod.quantity || 0).toLocaleString()}{' '}
+                            <span className="text-[10px] font-normal text-slate-400">
+                              {prod.scale || 'pcs'}
+                            </span>
+                          </p>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => handleOpenRequest(prod)}
+                            className="mt-3 h-8 w-full text-xs sm:w-auto"
+                          >
+                            <Send className="mr-1.5 size-3" />
+                            Stock Request
+                          </Button>
+                        </div>
+                      </div>
+                    </article>
+                  )
+                })}
+              </div>
+
+              <div className="hidden overflow-x-auto md:block">
+                <Table className="min-w-[44rem] w-full text-left text-sm">
+                  <TableHeader>
+                    <TableRow className="text-xs text-slate-500 uppercase">
+                      <TableHead className="px-2 py-3 whitespace-nowrap">Image</TableHead>
+                      <TableHead className="px-2 py-3 whitespace-nowrap min-w-[10rem]">ID / Name</TableHead>
+                      <TableHead className="px-2 py-3 whitespace-nowrap">Category</TableHead>
+                      <TableHead className="hidden px-2 py-3 whitespace-nowrap lg:table-cell">
+                        Subcategory
+                      </TableHead>
+                      <TableHead className="px-2 py-3 text-right whitespace-nowrap">In Stock</TableHead>
+                      <TableHead className="px-2 py-3 text-center whitespace-nowrap">Status</TableHead>
+                      <TableHead className="sticky right-0 z-[1] bg-white px-2 py-3 text-right whitespace-nowrap">
+                        Actions
+                      </TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {products.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE).map((prod) => {
                       const status = getStockStatus(prod.quantity, prod.reorderPoint)
                       const cat = categories.find((c) => c.id === prod.categoryId)?.name || '—'
                       const subcat = subcategories.find((s) => s.id === prod.subcategoryId)?.name || '—'
 
                       return (
-                        <TableRow key={prod.id}>
-                          <TableCell>
+                        <TableRow key={prod.id} className="group">
+                          <TableCell className="px-2 py-3">
                             {prod.imageUrl ? (
-                              <img src={prod.imageUrl} alt={prod.name} className="size-10 rounded-lg object-cover border border-slate-100" />
+                              <img
+                                src={prod.imageUrl}
+                                alt={prod.name}
+                                className="size-10 rounded-lg border border-slate-100 object-cover"
+                              />
                             ) : (
-                              <div className="size-10 bg-slate-100 border border-slate-200 rounded-lg flex items-center justify-center text-[10px] text-slate-400 font-bold uppercase">No Image</div>
+                              <div className="flex size-10 items-center justify-center rounded-lg border border-slate-200 bg-slate-100 text-[10px] font-bold text-slate-400 uppercase">
+                                N/A
+                              </div>
                             )}
                           </TableCell>
-                          <TableCell>
+                          <TableCell className="px-2 py-3">
                             <div className="font-bold text-slate-900">{prod.name}</div>
-                            <div className="text-[10px] text-slate-400 font-mono">SKU: {prod.itemCode}</div>
+                            <div className="font-mono text-[10px] text-slate-400">SKU: {prod.itemCode}</div>
                           </TableCell>
-                          <TableCell className="text-slate-600">{cat}</TableCell>
-                          <TableCell className="text-slate-600">{subcat}</TableCell>
-                          <TableCell className="text-right font-bold text-slate-900 font-mono">
-                            {parseFloat(prod.quantity || 0).toLocaleString()} <span className="text-[10px] text-slate-400 font-normal">{prod.scale || 'pcs'}</span>
+                          <TableCell className="px-2 py-3 text-slate-600">{cat}</TableCell>
+                          <TableCell className="hidden px-2 py-3 text-slate-600 lg:table-cell">
+                            {subcat}
                           </TableCell>
-                          <TableCell className="text-center">
+                          <TableCell className="px-2 py-3 text-right font-mono font-bold text-slate-900 whitespace-nowrap">
+                            {parseFloat(prod.quantity || 0).toLocaleString()}{' '}
+                            <span className="text-[10px] font-normal text-slate-400">
+                              {prod.scale || 'pcs'}
+                            </span>
+                          </TableCell>
+                          <TableCell className="px-2 py-3 text-center">
                             <Badge variant={status.variant} className={status.className}>
                               {status.label}
                             </Badge>
                           </TableCell>
-                          <TableCell className="text-right">
+                          <TableCell className="sticky right-0 z-[1] bg-white px-2 py-3 text-right group-hover:bg-slate-50/80">
                             <Button
                               size="sm"
                               variant="outline"
                               onClick={() => handleOpenRequest(prod)}
-                              className="text-xs h-8"
+                              className="h-8 text-xs"
                             >
-                              <Send className="size-3 mr-1.5" />
+                              <Send className="mr-1.5 size-3" />
                               Stock Request
                             </Button>
                           </TableCell>
                         </TableRow>
                       )
-                    })
-                )}
-              </TableBody>
-            </Table>
-          </div>
+                    })}
+                  </TableBody>
+                </Table>
+              </div>
+            </>
+          )}
 
           <TablePagination
             page={page}
@@ -301,10 +363,16 @@ export function BranchInventoryPage() {
             onPageChange={setPage}
           />
 
-          <div className="mt-4 flex gap-4 text-xs text-slate-500 border-t border-border pt-3">
-            <span className="flex items-center gap-1.5"><span className="size-2 rounded-full bg-rose-500" /> Empty: Out of stock (0 items)</span>
-            <span className="flex items-center gap-1.5"><span className="size-2 rounded-full bg-amber-500" /> Limited: Under reorder point threshold</span>
-            <span className="flex items-center gap-1.5"><span className="size-2 rounded-full bg-emerald-500" /> In Stock: Adequate supplies</span>
+          <div className="mt-4 flex flex-col gap-2 border-t border-border pt-3 text-xs text-slate-500 sm:flex-row sm:flex-wrap sm:gap-4">
+            <span className="flex items-center gap-1.5">
+              <span className="size-2 shrink-0 rounded-full bg-rose-500" /> Empty: Out of stock (0 items)
+            </span>
+            <span className="flex items-center gap-1.5">
+              <span className="size-2 shrink-0 rounded-full bg-amber-500" /> Limited: Under reorder point threshold
+            </span>
+            <span className="flex items-center gap-1.5">
+              <span className="size-2 shrink-0 rounded-full bg-emerald-500" /> In Stock: Adequate supplies
+            </span>
           </div>
         </SurfaceCard>
       </MotionReveal>

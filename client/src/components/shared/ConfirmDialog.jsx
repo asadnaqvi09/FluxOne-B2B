@@ -1,9 +1,7 @@
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
 
-/**
- * Simple confirm modal — used for destructive staff actions.
- */
+// Simple confirm modal — destructive / authorize actions
 export function ConfirmDialog({
   open,
   onOpenChange,

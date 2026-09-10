@@ -2,9 +2,7 @@ import { Package } from 'lucide-react'
 import { BRAND } from '@/lib/constants'
 import { cn } from '@/lib/utils'
 
-/**
- * Shared empty list placeholder.
- */
+// Shared empty list placeholder
 export function EmptyState({
   icon: Icon = Package,
   title = 'Nothing here yet',

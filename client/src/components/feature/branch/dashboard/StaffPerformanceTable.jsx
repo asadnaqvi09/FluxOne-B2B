@@ -1,6 +1,8 @@
 import { useMemo, useState } from 'react'
 import { Users } from 'lucide-react'
+import { EmptyState } from '@/components/shared/EmptyState'
 import { SurfaceCard } from '@/components/shared/SurfaceCard'
+import { UserAvatar } from '@/components/shared/UserAvatar'
 import {
   Table,
   TableHeader,
@@ -10,8 +12,6 @@ import {
   TableCell,
   TablePagination,
 } from '@/components/ui/table'
-import { BRAND } from '@/lib/constants'
-import { staffInitials } from '@/lib/mapBranchDashboard'
 import { cn } from '@/lib/utils'
 
 const STATUS_STYLES = {
@@ -56,18 +56,12 @@ export function StaffPerformanceTable({ staff = [], className }) {
       }
     >
       {isEmpty ? (
-        <div className="flex flex-1 flex-col items-center justify-center gap-2 rounded-xl border border-dashed border-border bg-slate-50/80 px-4 py-12 text-center">
-          <div
-            className="flex size-12 items-center justify-center rounded-full"
-            style={{ background: 'rgba(142, 35, 143, 0.1)', color: BRAND.purple }}
-          >
-            <Users className="size-6" strokeWidth={1.75} />
-          </div>
-          <p className="text-sm font-semibold text-slate-800">No staff available</p>
-          <p className="max-w-xs text-xs text-slate-500">
-            Staff assigned to this branch will appear here once loaded from the API.
-          </p>
-        </div>
+        <EmptyState
+          icon={Users}
+          title="No staff available"
+          description="Staff assigned to this branch will appear here once loaded from the API."
+          className="flex-1 py-12"
+        />
       ) : (
         <div className="flex-1 flex flex-col justify-between">
           <div className="overflow-x-auto">
@@ -88,20 +82,11 @@ export function StaffPerformanceTable({ staff = [], className }) {
                   >
                     <TableCell className="px-2 py-3">
                       <div className="flex items-center gap-3">
-                        {person.image ? (
-                          <img
-                            src={person.image}
-                            alt=""
-                            className="size-9 rounded-full object-cover"
-                          />
-                        ) : (
-                          <div
-                            className="flex size-9 shrink-0 items-center justify-center rounded-full text-xs font-bold text-white"
-                            style={{ background: BRAND.purple }}
-                          >
-                            {staffInitials(person.name)}
-                          </div>
-                        )}
+                        <UserAvatar
+                          name={person.name}
+                          imageUrl={person.image}
+                          className="size-9"
+                        />
                         <div className="min-w-0">
                           <p className="truncate font-semibold text-slate-900">{person.name}</p>
                           <p className="truncate text-xs text-slate-500">{person.role || 'Staff'}</p>

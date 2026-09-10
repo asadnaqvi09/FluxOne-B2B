@@ -2,7 +2,7 @@ import { Pencil, Trash2, Users } from 'lucide-react'
 import { EmptyState } from '@/components/shared/EmptyState'
 import { EntityStatusToggle } from '@/components/shared/EntityStatusToggle'
 import { SurfaceCard } from '@/components/shared/SurfaceCard'
-import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
+import { UserAvatar } from '@/components/shared/UserAvatar'
 import { Button } from '@/components/ui/button'
 import {
   Table,
@@ -14,8 +14,6 @@ import {
   TablePagination,
 } from '@/components/ui/table'
 import { TableRowsSkeleton } from '@/components/ui/skeleton'
-import { staffInitials } from '@/lib/mapBranchDashboard'
-import { BRAND } from '@/lib/constants'
 
 function formatJoined(value) {
   if (!value) return '—'
@@ -110,18 +108,11 @@ export function StaffTable({
                     <TableCell className="px-2 py-3 font-mono text-xs text-slate-600">{row.email || '—'}</TableCell>
                     <TableCell className="px-2 py-3">
                       <div className="flex items-center gap-3">
-                        <Avatar className="size-9">
-                          {row.imageUrl ? (
-                            <AvatarImage src={row.imageUrl} alt="" />
-                          ) : (
-                            <AvatarFallback
-                              className="text-xs font-bold text-white"
-                              style={{ background: BRAND.purple }}
-                            >
-                              {staffInitials(row.fullName)}
-                            </AvatarFallback>
-                          )}
-                        </Avatar>
+                        <UserAvatar
+                          name={row.fullName}
+                          imageUrl={row.imageUrl}
+                          className="size-9"
+                        />
                         <p className="truncate font-semibold text-slate-900">{row.fullName || '—'}</p>
                       </div>
                     </TableCell>

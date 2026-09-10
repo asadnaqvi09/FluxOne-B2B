@@ -18,6 +18,8 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog'
+import { ConfirmDialog } from '@/components/shared/ConfirmDialog'
+import { EmptyState } from '@/components/shared/EmptyState'
 import { useAdminCompany } from '@/hooks/useAdminCompany'
 import { useAdminPolicies } from '@/hooks/useAdminPolicies'
 import { BRAND } from '@/lib/constants'
@@ -603,13 +605,12 @@ export function CompanyPage() {
                   Loading policies…
                 </div>
               ) : filteredPolicies.length === 0 ? (
-                <div className="rounded-2xl border border-border bg-white p-12 text-center text-slate-400">
-                  <FileText className="mx-auto size-8 text-slate-300 mb-2" />
-                  <p className="text-sm font-semibold text-slate-700">No corporate policies found</p>
-                  <p className="text-xs text-slate-500 mt-0.5">
-                    Try searching with a different keyword or create a new policy.
-                  </p>
-                </div>
+                <EmptyState
+                  icon={FileText}
+                  title="No corporate policies found"
+                  description="Try searching with a different keyword or create a new policy."
+                  className="rounded-2xl border-border bg-white"
+                />
               ) : (
                 filteredPolicies.map((p) => {
                   const cfg = CATEGORY_CONFIG[p.category] || CATEGORY_CONFIG['Retail Operations']
@@ -691,44 +692,24 @@ export function CompanyPage() {
         </MotionReveal>
       )}
 
-      <Dialog open={deleteConfirmOpen} onOpenChange={setDeleteConfirmOpen}>
-        <DialogContent className="max-w-md">
-          <DialogHeader>
-            <DialogTitle className="text-purple-950 flex items-center gap-2">
-              <Trash2 className="size-5 text-purple-700" />
-              Delete Corporate Policy
-            </DialogTitle>
-            <DialogDescription className="text-xs leading-relaxed pt-1">
-              Are you sure you want to delete{' '}
-              <strong>&quot;{deleteTargetPolicy?.name}&quot;</strong> (
-              {deleteTargetPolicy ? referenceFromUuid(deleteTargetPolicy.id, 'POL') : '—'})?
-              <br />
-              This action cannot be undone and will immediately unpublish this policy across all
-              branch portals.
-            </DialogDescription>
-          </DialogHeader>
-
-          <DialogFooter className="pt-3 gap-2">
-            <Button
-              type="button"
-              variant="outline"
-              onClick={() => setDeleteConfirmOpen(false)}
-              disabled={policiesMutating}
-            >
-              Cancel
-            </Button>
-            <Button
-              type="button"
-              onClick={handleConfirmDelete}
-              disabled={policiesMutating}
-              className="text-white font-semibold cursor-pointer shadow-sm"
-              style={{ background: BRAND.purple }}
-            >
-              {policiesMutating ? 'Deleting…' : 'Delete Policy'}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      <ConfirmDialog
+        open={deleteConfirmOpen}
+        onOpenChange={setDeleteConfirmOpen}
+        title="Delete Corporate Policy"
+        description={
+          <>
+            Are you sure you want to delete{' '}
+            <strong>&quot;{deleteTargetPolicy?.name}&quot;</strong> (
+            {deleteTargetPolicy ? referenceFromUuid(deleteTargetPolicy.id, 'POL') : '—'})?
+            <br />
+            This action cannot be undone and will immediately unpublish this policy across all
+            branch portals.
+          </>
+        }
+        confirmLabel="Delete Policy"
+        loading={policiesMutating}
+        onConfirm={handleConfirmDelete}
+      />
 
       <Dialog open={policyDialogOpen} onOpenChange={setPolicyDialogOpen}>
         <DialogContent className="max-w-lg">

@@ -1,5 +1,6 @@
 import { memo, useMemo, useState } from 'react'
 import { Cell, Pie, PieChart, ResponsiveContainer, Tooltip } from 'recharts'
+import { EmptyState } from '@/components/shared/EmptyState'
 import { SurfaceCard } from '@/components/shared/SurfaceCard'
 import { ChartSkeleton } from '@/components/ui/skeleton'
 import { PIE_COLORS } from '@/lib/mapInventoryDashboard'
@@ -63,12 +64,12 @@ function StockOutChartComponent({
       {loading ? (
         <ChartSkeleton />
       ) : isEmpty ? (
-        <div className="flex h-[280px] flex-col items-center justify-center gap-2 text-center">
-          <p className="text-sm font-semibold text-slate-800">No stock-out activity yet</p>
-          <p className="max-w-xs text-xs text-slate-500">
-            Sales, damaged, and expired movements will show the top movers here.
-          </p>
-        </div>
+        <EmptyState
+          compact
+          className="h-[280px] border-0 bg-transparent"
+          title="No stock-out activity yet"
+          description="Sales, damaged, and expired movements will show the top movers here."
+        />
       ) : (
         <div className="grid grid-cols-1 gap-4 overflow-hidden lg:grid-cols-[minmax(0,1fr)_minmax(0,1.05fr)] lg:items-center">
           <div className="w-full overflow-hidden" style={{ height: CHART_H, minHeight: CHART_H }}>

@@ -24,7 +24,6 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-  DialogCancelButton,
 } from '@/components/ui/dialog'
 import { ConfirmDialog } from '@/components/shared/ConfirmDialog'
 import { ImageUploadField } from '@/components/shared/ImageUploadField'
@@ -861,95 +860,50 @@ export function BranchesPage() {
         </DialogContent>
       </Dialog>
 
-      <Dialog open={confirmStatusOpen} onOpenChange={setConfirmStatusOpen}>
-        <DialogContent className="max-w-md">
-          <DialogHeader>
-            <DialogTitle className="text-purple-950 flex items-center gap-2">
-              {targetBranch?.status === 'open' ? (
-                <>
-                  <Ban className="size-5 text-purple-700" />
-                  Block Branch Access
-                </>
-              ) : (
-                <>
-                  <CheckCircle className="size-5 text-purple-700" />
-                  Open & Activate Branch
-                </>
-              )}
-            </DialogTitle>
-            <DialogDescription className="text-xs leading-relaxed pt-1">
-              {targetBranch?.status === 'open' ? (
-                <>
-                  Are you sure you want to block <strong>&quot;{targetBranch?.name}&quot;</strong>?
-                  <br />
-                  The branch manager login for this branch will be deactivated.
-                </>
-              ) : (
-                <>
-                  Are you sure you want to open and activate <strong>&quot;{targetBranch?.name}&quot;</strong>?
-                  <br />
-                  The branch manager login will be re-enabled.
-                </>
-              )}
-            </DialogDescription>
-          </DialogHeader>
+      <ConfirmDialog
+        open={confirmStatusOpen}
+        onOpenChange={setConfirmStatusOpen}
+        title={
+          targetBranch?.status === 'open' ? 'Block Branch Access' : 'Open & Activate Branch'
+        }
+        description={
+          targetBranch?.status === 'open' ? (
+            <>
+              Are you sure you want to block <strong>&quot;{targetBranch?.name}&quot;</strong>?
+              <br />
+              The branch manager login for this branch will be deactivated.
+            </>
+          ) : (
+            <>
+              Are you sure you want to open and activate <strong>&quot;{targetBranch?.name}&quot;</strong>?
+              <br />
+              The branch manager login will be re-enabled.
+            </>
+          )
+        }
+        confirmLabel={targetBranch?.status === 'open' ? 'Yes, Block Branch' : 'Yes, Open Branch'}
+        variant={targetBranch?.status === 'open' ? 'destructive' : 'default'}
+        loading={mutating}
+        onConfirm={handleConfirmToggleStatus}
+      />
 
-          <DialogFooter className="pt-3 gap-2">
-            <Button
-              type="button"
-              variant="outline"
-              onClick={() => setConfirmStatusOpen(false)}
-              disabled={mutating}
-            >
-              Cancel
-            </Button>
-            <Button
-              type="button"
-              onClick={handleConfirmToggleStatus}
-              disabled={mutating}
-              className="text-white font-semibold cursor-pointer shadow-sm"
-              style={{ background: targetBranch?.status === 'open' ? BRAND.deep : BRAND.purple }}
-            >
-              {mutating ? 'Updating…' : targetBranch?.status === 'open' ? 'Yes, Block Branch' : 'Yes, Open Branch'}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      <Dialog open={resetDialogOpen} onOpenChange={setResetDialogOpen}>
-        <DialogContent className="max-w-md">
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
-              <KeyRound className="size-5 text-purple-700" />
-              Reset manager password
-            </DialogTitle>
-            <DialogDescription className="text-xs leading-relaxed pt-1">
-              Credentials email did not go through for{' '}
-              <strong>{resetTarget?.manager?.email || 'this branch manager'}</strong>. Generate a new temporary
-              password and try sending again. Their previous password will stop working immediately.
-            </DialogDescription>
-          </DialogHeader>
-          <DialogFooter className="pt-3 gap-2">
-            <Button
-              type="button"
-              variant="outline"
-              onClick={() => setResetDialogOpen(false)}
-              disabled={mutating}
-            >
-              Cancel
-            </Button>
-            <Button
-              type="button"
-              onClick={handleConfirmResetPassword}
-              disabled={mutating}
-              className="text-white font-semibold"
-              style={{ background: `linear-gradient(90deg, ${BRAND.purple}, ${BRAND.deep})` }}
-            >
-              {mutating ? 'Resetting…' : 'Reset & send'}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      <ConfirmDialog
+        open={resetDialogOpen}
+        onOpenChange={setResetDialogOpen}
+        title="Reset manager password"
+        description={
+          <>
+            Credentials email did not go through for{' '}
+            <strong>{resetTarget?.manager?.email || 'this branch manager'}</strong>. Generate a new
+            temporary password and try sending again. Their previous password will stop working
+            immediately.
+          </>
+        }
+        confirmLabel="Reset & send"
+        variant="default"
+        loading={mutating}
+        onConfirm={handleConfirmResetPassword}
+      />
 
       <ConfirmDialog
         open={Boolean(deleteTarget)}

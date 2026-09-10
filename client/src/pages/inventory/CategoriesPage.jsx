@@ -3,6 +3,7 @@ import { FolderTree, Pencil, Plus, Trash2 } from 'lucide-react'
 import { CategoryDialog } from '@/components/feature/products/CategoryDialog'
 import { ProductStatusToggle } from '@/components/feature/products/ProductStatusToggle'
 import { ConfirmDialog } from '@/components/shared/ConfirmDialog'
+import { EmptyState } from '@/components/shared/EmptyState'
 import { MotionHeader, MotionReveal } from '@/components/shared/MotionReveal'
 import { PageHeader } from '@/components/shared/PageHeader'
 import { SurfaceCard } from '@/components/shared/SurfaceCard'
@@ -231,16 +232,17 @@ export function CategoriesPage() {
           {catalogLoading ? (
             <TableRowsSkeleton rows={4} />
           ) : !rows.length ? (
-            <div className="flex flex-col items-center gap-2 py-10 text-center text-sm text-slate-500">
-              <FolderTree className="size-8 text-slate-300" />
-              <p>
-                {statusFilter === 'all'
+            <EmptyState
+              icon={FolderTree}
+              title={
+                statusFilter === 'all'
                   ? 'No categories yet. Create a parent category first.'
                   : statusFilter === 'active'
                     ? 'No active categories.'
-                    : 'No inactive categories.'}
-              </p>
-            </div>
+                    : 'No inactive categories.'
+              }
+              compact
+            />
           ) : (
             <ul className="space-y-3">
               {rows.map(({ parent, children }) => (

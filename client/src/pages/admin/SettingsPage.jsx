@@ -17,14 +17,7 @@ import {
   TableCell,
   TablePagination,
 } from '@/components/ui/table'
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from '@/components/ui/dialog'
+import { ConfirmDialog } from '@/components/shared/ConfirmDialog'
 import { BRAND } from '@/lib/constants'
 import { toastSuccess, toastError } from '@/lib/toast'
 import {
@@ -575,68 +568,38 @@ export function SettingsPage() {
         </MotionReveal>
       )}
 
-      <Dialog open={confirmDialogOpen} onOpenChange={setConfirmDialogOpen}>
-        <DialogContent className="max-w-md">
-          <DialogHeader>
-            <DialogTitle className="text-purple-950 flex items-center gap-2">
-              {targetSystem?.status === 'active' ? (
-                <>
-                  <Ban className="size-5 text-purple-700" />
-                  Block System Access
-                </>
-              ) : (
-                <>
-                  <CheckCircle2 className="size-5 text-purple-700" />
-                  Authorize System Access
-                </>
-              )}
-            </DialogTitle>
-            <DialogDescription className="text-xs leading-relaxed pt-1">
-              {targetSystem?.status === 'active' ? (
-                <>
-                  Are you sure you want to block <strong>&quot;{targetSystem?.deviceName}&quot;</strong>?
-                  <span className="font-mono text-[11px] text-slate-500 mt-1 block">
-                    UUID: {targetSystem?.hardwareSignature}
-                  </span>
-                  This workstation will be blocked from accessing the system.
-                </>
-              ) : (
-                <>
-                  Are you sure you want to authorize <strong>&quot;{targetSystem?.deviceName}&quot;</strong>?
-                  <span className="font-mono text-[11px] text-slate-500 mt-1 block">
-                    UUID: {targetSystem?.hardwareSignature}
-                  </span>
-                  This workstation will regain operational access.
-                </>
-              )}
-            </DialogDescription>
-          </DialogHeader>
-
-          <DialogFooter className="pt-3 gap-2">
-            <Button
-              type="button"
-              variant="outline"
-              onClick={() => setConfirmDialogOpen(false)}
-              disabled={mutating}
-            >
-              Cancel
-            </Button>
-            <Button
-              type="button"
-              onClick={handleConfirmToggleBlock}
-              disabled={mutating}
-              className="text-white font-semibold cursor-pointer shadow-sm"
-              style={{ background: targetSystem?.status === 'active' ? BRAND.deep : BRAND.purple }}
-            >
-              {mutating
-                ? 'Saving…'
-                : targetSystem?.status === 'active'
-                  ? 'Yes, Block System'
-                  : 'Yes, Authorize System'}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      <ConfirmDialog
+        open={confirmDialogOpen}
+        onOpenChange={setConfirmDialogOpen}
+        title={
+          targetSystem?.status === 'active' ? 'Block System Access' : 'Authorize System Access'
+        }
+        description={
+          targetSystem?.status === 'active' ? (
+            <>
+              Are you sure you want to block <strong>&quot;{targetSystem?.deviceName}&quot;</strong>?
+              <span className="font-mono text-[11px] text-slate-500 mt-1 block">
+                UUID: {targetSystem?.hardwareSignature}
+              </span>
+              This workstation will be blocked from accessing the system.
+            </>
+          ) : (
+            <>
+              Are you sure you want to authorize <strong>&quot;{targetSystem?.deviceName}&quot;</strong>?
+              <span className="font-mono text-[11px] text-slate-500 mt-1 block">
+                UUID: {targetSystem?.hardwareSignature}
+              </span>
+              This workstation will regain operational access.
+            </>
+          )
+        }
+        confirmLabel={
+          targetSystem?.status === 'active' ? 'Yes, Block System' : 'Yes, Authorize System'
+        }
+        variant={targetSystem?.status === 'active' ? 'destructive' : 'default'}
+        loading={mutating}
+        onConfirm={handleConfirmToggleBlock}
+      />
     </div>
   )
 }

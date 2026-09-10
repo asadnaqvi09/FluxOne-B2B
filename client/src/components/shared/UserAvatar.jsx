@@ -4,10 +4,7 @@ import { BRAND } from '@/lib/constants'
 import { getInitials } from '@/lib/nav'
 import { cn } from '@/lib/utils'
 
-/**
- * Profile avatar — backend image when available, otherwise initials.
- * Renders image OR fallback (not both); falls back on load error.
- */
+// Profile avatar — image when available, otherwise initials (fallback on load error)
 export function UserAvatar({
   name = '',
   loginId = '',

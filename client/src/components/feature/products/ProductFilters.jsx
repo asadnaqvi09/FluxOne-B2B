@@ -1,4 +1,5 @@
 import { Search } from 'lucide-react'
+import { CategoryThumb, FilterChip } from '@/components/shared/FilterChip'
 import { SurfaceCard } from '@/components/shared/SurfaceCard'
 import { Input } from '@/components/ui/input'
 import { NativeSelect } from '@/components/ui/select'
@@ -6,48 +7,7 @@ import { Label } from '@/components/ui/label'
 import { BRAND } from '@/lib/constants'
 import { cn } from '@/lib/utils'
 
-function Chip({ active, onClick, children, className }) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      className={cn(
-        'inline-flex cursor-pointer items-center gap-1.5 rounded-full border px-3.5 py-1.5 text-sm font-medium transition-all',
-        active
-          ? 'border-transparent text-white shadow-sm'
-          : 'border-border bg-white text-slate-700 hover:border-slate-300 hover:bg-slate-50',
-        className,
-      )}
-      style={active ? { background: BRAND.purple } : undefined}
-    >
-      {children}
-    </button>
-  )
-}
-
-function CategoryThumb({ category }) {
-  if (category?.imageUrl) {
-    return (
-      <img
-        src={category.imageUrl}
-        alt=""
-        className="size-4 rounded-full object-cover"
-      />
-    )
-  }
-  return (
-    <span
-      className="flex size-4 items-center justify-center rounded-full text-[9px] font-bold text-white"
-      style={{ background: BRAND.deep }}
-    >
-      {(category?.name || '?').slice(0, 1).toUpperCase()}
-    </span>
-  )
-}
-
-/**
- * Search + type select + category / subcategory chips (POS-style).
- */
+// Search + type select + category / subcategory chips (POS-style)
 export function ProductFilters({
   q = '',
   type = '',
@@ -109,14 +69,14 @@ export function ProductFilters({
           All categories
         </p>
         <div className="flex flex-wrap gap-2">
-          <Chip
+          <FilterChip
             active={!categoryId}
             onClick={() => onChange?.({ categoryId: '', subcategoryId: '' })}
           >
             All
-          </Chip>
+          </FilterChip>
           {categories.map((cat) => (
-            <Chip
+            <FilterChip
               key={cat.id}
               active={categoryId === cat.id}
               onClick={() =>
@@ -128,7 +88,7 @@ export function ProductFilters({
             >
               <CategoryThumb category={cat} />
               {cat.name}
-            </Chip>
+            </FilterChip>
           ))}
         </div>
       </div>
@@ -139,21 +99,21 @@ export function ProductFilters({
             Sub categories
           </p>
           <div className="flex flex-wrap gap-2">
-            <Chip
+            <FilterChip
               active={!subcategoryId}
               onClick={() => onChange?.({ subcategoryId: '' })}
             >
               All in category
-            </Chip>
+            </FilterChip>
             {subcategories.map((sub) => (
-              <Chip
+              <FilterChip
                 key={sub.id}
                 active={subcategoryId === sub.id}
                 onClick={() => onChange?.({ subcategoryId: sub.id })}
               >
                 <CategoryThumb category={sub} />
                 {sub.name}
-              </Chip>
+              </FilterChip>
             ))}
           </div>
         </div>

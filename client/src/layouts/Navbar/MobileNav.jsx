@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { NavLink, useNavigate } from 'react-router-dom'
-import { LogOut, Menu, Settings, UserRound, X } from 'lucide-react'
+import { LogOut, Menu, ScrollText, Settings, UserRound, X } from 'lucide-react'
 import { AnimatePresence, motion } from 'motion/react'
 import { BrandLogo } from '@/components/shared/BrandLogo'
 import { UserAvatar } from '@/components/shared/UserAvatar'
@@ -140,6 +140,19 @@ function MobileDrawer({ open, onClose, items }) {
                 <UserRound className="size-4" />
                 Profile
               </button>
+              {role === ROLES.BRANCH_MANAGER ? (
+                <button
+                  type="button"
+                  className="flex w-full cursor-pointer items-center gap-2.5 rounded-xl px-3 py-3 text-sm font-medium text-slate-700 transition-colors hover:bg-slate-50 active:scale-[0.99]"
+                  onClick={() => {
+                    onClose()
+                    navigate(PATHS.branch.logs)
+                  }}
+                >
+                  <ScrollText className="size-4" />
+                  Logs
+                </button>
+              ) : null}
               {role === ROLES.B2B_ADMIN ? (
                 <button
                   type="button"

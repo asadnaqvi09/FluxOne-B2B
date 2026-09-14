@@ -1,5 +1,5 @@
 import { useNavigate } from 'react-router-dom'
-import { ChevronDown, LogOut, Settings, UserRound } from 'lucide-react'
+import { ChevronDown, LogOut, ScrollText, Settings, UserRound } from 'lucide-react'
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -71,6 +71,15 @@ export function UserMenu({ className }) {
               <UserRound className="size-4" />
               Profile
             </DropdownMenuItem>
+            {role === ROLES.BRANCH_MANAGER && (
+              <DropdownMenuItem
+                className="flex items-center gap-2.5 rounded-xl px-3 py-2.5 text-slate-700 cursor-pointer"
+                onClick={() => navigate(PATHS.branch.logs)}
+              >
+                <ScrollText className="size-4" />
+                Logs
+              </DropdownMenuItem>
+            )}
             {role === ROLES.B2B_ADMIN && (
               <DropdownMenuItem
                 className="flex items-center gap-2.5 rounded-xl px-3 py-2.5 text-slate-700 cursor-pointer"

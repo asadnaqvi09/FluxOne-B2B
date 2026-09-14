@@ -2,6 +2,7 @@ import { Router } from 'express'
 import dashboardRoutes from './dashboard/dashboard.routes.js'
 import staffRoutes from './staff/staff.routes.js'
 import designationRoutes from './designations/designation.routes.js'
+import activityLogsRoutes from './activity-logs/activity_logs.routes.js'
 import { attendanceList, markAttendance } from './attendance/attendance.controller.js'
 import {
   listScales,
@@ -28,6 +29,7 @@ const router = Router()
 router.use('/dashboard', dashboardRoutes)
 router.use('/staff', staffRoutes)
 router.use('/designations', designationRoutes)
+router.use('/activity-logs', activityLogsRoutes)
 
 // Attendance
 router.get('/attendance', requirePermission('attendance:write'), asyncHandler(attendanceList))

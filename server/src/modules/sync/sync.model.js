@@ -3,11 +3,13 @@ import { INVOICE_TYPES, MOVEMENT_TYPES, ROLES, SALE_STATUS } from '../../config/
 import { insertLedgerEventInTx } from '../inventory-manager/control/control.model.js'
 import {
   formatZodIssues,
+  validateCashierLogPayload,
   validateProductPricePayload,
   validateRefundPayload,
   validateSalePayload,
   zodErrorDetails,
 } from './sync.validator.js'
+import { logActivity } from '../../utils/activityLog.util.js'
 import { normalizeImageUrl } from '../../utils/uploadUrl.util.js'
 
 function httpError(status, message, details) {
@@ -705,6 +707,80 @@ export async function ingestProductPriceUpdate(client, tenantId, syncEvent) {
   }
 }
 
+/**
+ * POS cashier_log → activity_logs (also stored in pos_sync_events by caller).
+ * Idempotent on clientEventId: replay skips when sync row already existed.
+ * TODO (later polish): optionally map sale/refund into activity_logs as well.
+ */
+export async function ingestCashierLogEvent(client, tenantId, syncEvent, event = {}) {
+  const parsed = validateCashierLogPayload(syncEvent.payload)
+  if (!parsed.success) {
+    throwSaleValidationError('cashier_log', syncEvent, parsed)
+  }
+
+  const payload = parsed.data
+  const branchId = payload.branchId || syncEvent.branchId
+  if (!branchId) {
+    throw httpError(422, 'cashier_log requires branchId on the payload or sync token')
+  }
+
+  if (payload.branchId && syncEvent.branchId && payload.branchId !== syncEvent.branchId) {
+    throw httpError(403, 'Branch access denied for cashier_log')
+  }
+
+  // Idempotent replay of the same clientEventId (matches product_price_update style)
+  if (!syncEvent.inserted) {
+    return {
+      clientEventId: syncEvent.clientEventId,
+      skipped: true,
+      saleId: null,
+      activityLogId: null,
+      reason: 'duplicate_client_event_id',
+    }
+  }
+
+  const deviceId = payload.deviceId || event.deviceId || null
+  const metadata =
+    payload.metadata && typeof payload.metadata === 'object' && !Array.isArray(payload.metadata)
+      ? payload.metadata
+      : {}
+
+  // details: metadata + deviceId + employeeId (traceability; employeeId ≠ cloud users.id)
+  const details = {
+    ...metadata,
+    ...(deviceId ? { deviceId } : {}),
+    ...(payload.employeeId ? { employeeId: payload.employeeId } : {}),
+  }
+
+  const activity = await logActivity(
+    tenantId,
+    {
+      branchId,
+      source: 'pos',
+      actorUserId: payload.actorUserId || null,
+      actorName: payload.actorName,
+      actorRole: payload.actorRole || 'cashier',
+      action: payload.action,
+      entityType: payload.entityType || null,
+      entityId: payload.entityId != null ? payload.entityId : null,
+      details,
+      createdAt: payload.timestamp,
+      posEventId: syncEvent.id,
+      clientEventId: syncEvent.clientEventId,
+    },
+    client,
+  )
+
+  return {
+    clientEventId: syncEvent.clientEventId,
+    skipped: false,
+    saleId: null,
+    activityLogId: activity.id,
+    action: activity.action,
+    actorName: activity.actorName,
+  }
+}
+
 export async function ingestSyncEvent(tenantId, event, userId) {
   return withTransaction(async (client) => {
     const syncEvent = await insertSyncEventInTx(client, tenantId, event)
@@ -721,12 +797,16 @@ export async function ingestSyncEvent(tenantId, event, userId) {
     if (event.eventType === 'product_price_update' || event.eventType === 'price_change') {
       return ingestProductPriceUpdate(client, tenantId, syncEvent)
     }
+    if (event.eventType === 'cashier_log') {
+      return ingestCashierLogEvent(client, tenantId, syncEvent, event)
+    }
 
-    // cashier_log / attendance — pos_sync_events only (Phase 1)
+    // attendance — pos_sync_events only (Phase 1)
     return {
       clientEventId: syncEvent.clientEventId,
-      skipped: false,
+      skipped: !syncEvent.inserted,
       saleId: null,
+      reason: syncEvent.inserted ? undefined : 'duplicate_client_event_id',
     }
   })
 }

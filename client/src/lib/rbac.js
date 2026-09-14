@@ -13,6 +13,7 @@ export const PERMISSIONS = {
   'suppliers:write': [ROLES.INVENTORY_MANAGER],
   'orders:read': [ROLES.INVENTORY_MANAGER, ROLES.BRANCH_MANAGER],
   'orders:generate': [ROLES.INVENTORY_MANAGER],
+  'activity-logs:read': [ROLES.BRANCH_MANAGER, ROLES.B2B_ADMIN],
 }
 
 export function hasPermission(role, permission) {

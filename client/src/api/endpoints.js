@@ -75,6 +75,9 @@ export const endpoints = {
       update: (id) => `/branch/discounts/${id}`,
       delete: (id) => `/branch/discounts/${id}`,
     },
+    activityLogs: {
+      list: '/branch/activity-logs',
+    },
   },
   products: {
     list: '/inventory/products',

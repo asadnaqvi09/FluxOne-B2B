@@ -26,6 +26,7 @@ export const PATHS = {
     reports: '/branch/reports',
     resources: '/branch/resources',
     discounts: '/branch/discounts',
+    logs: '/branch/logs',
     profile: '/branch/profile',
   },
   // Phase 2 roles — shell only (logo + profile + logout)

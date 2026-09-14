@@ -32,6 +32,7 @@ import { BranchInventoryPage } from '@/pages/branch/BranchInventoryPage'
 import { ReportsPage } from '@/pages/branch/ReportsPage'
 import { ResourcesPage } from '@/pages/branch/ResourcesPage'
 import { DiscountsPage } from '@/pages/branch/DiscountsPage'
+import { ActivityLogsPage } from '@/pages/branch/ActivityLogsPage'
 import { AdminAuthGate } from '@/router/guards/AdminAuthGate'
 import { AdminLayout } from '@/layouts/AdminLayout'
 import { DashboardPage as AdminDashboardPage } from '@/pages/admin/DashboardPage'
@@ -114,6 +115,7 @@ const router = createBrowserRouter([
               { path: 'reports', element: <ReportsPage /> },
               { path: 'resources', element: <ResourcesPage /> },
               { path: 'discounts', element: <DiscountsPage /> },
+              { path: 'logs', element: <ActivityLogsPage /> },
               { path: 'profile', element: <ProfilePage /> },
             ],
           },

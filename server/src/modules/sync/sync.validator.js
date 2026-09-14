@@ -110,6 +110,31 @@ export const productPricePayloadSchema = z.object({
   deviceId: optionalString,
 })
 
+/** Known POS cashier_log action slugs (others still accepted as free-form strings). */
+export const CASHIER_LOG_ACTIONS = [
+  'login',
+  'logout',
+  'open_cash_drawer',
+  'close_cash_drawer',
+  'price_change',
+  'change_cashier',
+]
+
+export const cashierLogPayloadSchema = z.object({
+  action: z.string().min(1),
+  actorName: z.string().min(1),
+  actorUserId: optionalGuid,
+  actorRole: optionalString,
+  // POS employee uuid — not cloud users.id; stored in activity details for traceability
+  employeeId: optionalString,
+  entityType: optionalString,
+  entityId: optionalString,
+  metadata: z.record(z.string(), z.any()).nullish(),
+  timestamp: z.string().min(1),
+  branchId: optionalGuid,
+  deviceId: optionalString,
+})
+
 // POS sync event type slugs (kept as a plain array for z.enum).
 export const SYNC_EVENT_TYPES = [
   'sale',
@@ -247,12 +272,61 @@ export function normalizePosPricePayload(raw = {}) {
   return payload
 }
 
+// Normalize POS cashier_log aliases (camelCase primary; snake_case accepted)
+export function normalizePosCashierLogPayload(raw = {}) {
+  const payload = stripNullFields({ ...raw })
+
+  const action = raw.action ?? raw.event_action
+  if (action && !payload.action) payload.action = action
+
+  const actorName = raw.actorName ?? raw.actor_name ?? raw.cashierName ?? raw.cashier_name
+  if (actorName && !payload.actorName) payload.actorName = actorName
+
+  const actorUserId = raw.actorUserId ?? raw.actor_user_id
+  if (actorUserId != null && payload.actorUserId == null) payload.actorUserId = actorUserId
+  // Non-UUID cloud user ids must not fail the whole event — actor is optional for FK
+  if (payload.actorUserId != null && !isGuid(String(payload.actorUserId))) {
+    delete payload.actorUserId
+  }
+
+  const actorRole = raw.actorRole ?? raw.actor_role ?? raw.role
+  if (actorRole && !payload.actorRole) payload.actorRole = actorRole
+
+  const employeeId = raw.employeeId ?? raw.employee_id
+  if (employeeId && !payload.employeeId) payload.employeeId = String(employeeId)
+
+  const entityType = raw.entityType ?? raw.entity_type
+  if (entityType && !payload.entityType) payload.entityType = entityType
+
+  const entityId = raw.entityId ?? raw.entity_id
+  if (entityId != null && payload.entityId == null) payload.entityId = String(entityId)
+
+  const timestamp = raw.timestamp ?? raw.createdAt ?? raw.created_at
+  if (timestamp && !payload.timestamp) payload.timestamp = timestamp
+
+  const branchId = raw.branchId ?? raw.branch_id
+  if (branchId && !payload.branchId) payload.branchId = branchId
+
+  const deviceId = raw.deviceId ?? raw.device_id
+  if (deviceId && !payload.deviceId) payload.deviceId = String(deviceId)
+
+  const metadata = raw.metadata ?? raw.details
+  if (metadata && typeof metadata === 'object' && !Array.isArray(metadata) && !payload.metadata) {
+    payload.metadata = stripNullFields(metadata)
+  }
+
+  return payload
+}
+
 export function normalizeSyncEventPayload(eventType, payload) {
   if (eventType === 'sale' || eventType === 'refund') {
     return normalizePosSalePayload(payload)
   }
   if (eventType === 'product_price_update' || eventType === 'price_change') {
     return normalizePosPricePayload(payload)
+  }
+  if (eventType === 'cashier_log') {
+    return normalizePosCashierLogPayload(payload)
   }
   return payload || {}
 }
@@ -290,6 +364,11 @@ export function validateRefundPayload(payload) {
 export function validateProductPricePayload(payload) {
   const normalized = normalizePosPricePayload(payload)
   return productPricePayloadSchema.safeParse(normalized)
+}
+
+export function validateCashierLogPayload(payload) {
+  const normalized = normalizePosCashierLogPayload(payload)
+  return cashierLogPayloadSchema.safeParse(normalized)
 }
 
 export function parseSchemaOrThrow(schema, data, label = 'Request') {

@@ -9,7 +9,8 @@ import { StaffTable } from '@/components/feature/branch/staff/StaffTable'
 import { StaffAttendanceTab } from '@/components/feature/branch/staff/StaffAttendanceTab'
 import { StaffHolidaysTab } from '@/components/feature/branch/staff/StaffHolidaysTab'
 import { StaffLeavesTab } from '@/components/feature/branch/staff/StaffLeavesTab'
-import { StaffPerformanceTab } from '@/components/feature/branch/staff/StaffPerformanceTab'
+// Hidden with Performance tab — restore together when ready
+// import { StaffPerformanceTab } from '@/components/feature/branch/staff/StaffPerformanceTab'
 import { Button } from '@/components/ui/button'
 import { useBranchStaff } from '@/hooks/useBranchStaff'
 import { useDebouncedSearch } from '@/hooks/useDebouncedSearch'
@@ -155,7 +156,8 @@ export function StaffPage() {
           { id: 'attendance', label: 'Attendance' },
           { id: 'holidays', label: 'Holidays' },
           { id: 'leaves', label: 'Leaves' },
-          { id: 'performance', label: 'Performance' },
+          // Hidden for now — restore when Performance scoring is ready for demo
+          // { id: 'performance', label: 'Performance' },
         ].map((tab) => {
           const active = activeTab === tab.id
           return (
@@ -225,11 +227,13 @@ export function StaffPage() {
         </MotionReveal>
       )}
 
+      {/* Hidden for now — restore with Performance tab above when ready
       {activeTab === 'performance' && (
         <MotionReveal delay={0.04}>
           <StaffPerformanceTab designations={designations} />
         </MotionReveal>
       )}
+      */}
 
       <StaffFormDialog
         open={formOpen}

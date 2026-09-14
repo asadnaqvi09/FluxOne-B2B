@@ -1,4 +1,6 @@
-import { FileDown, Printer, Calendar } from 'lucide-react'
+import { FileDown, Printer } from 'lucide-react'
+// Date filter UI hidden for now — restore Calendar import with the date control below
+// import { FileDown, Printer, Calendar } from 'lucide-react'
 import { BranchKpiCards } from '@/components/feature/branch/dashboard/BranchKpiCards'
 import { BranchWelcomeBanner } from '@/components/feature/branch/dashboard/BranchWelcomeBanner'
 import { DailySalesSummary } from '@/components/feature/branch/dashboard/DailySalesSummary'
@@ -19,7 +21,9 @@ import { toastSuccess } from '@/lib/toast'
 import { cn } from '@/lib/utils'
 
 export function DashboardPage() {
-  const { data, date, setDate, loading } = useBranchDashboard()
+  const { data, date, loading } = useBranchDashboard()
+  // setDate kept in hook; date picker UI commented out above — restore with Calendar control
+  // const { data, date, setDate, loading } = useBranchDashboard()
   const { user } = useAuthSession()
 
   function handleDownloadPDF() {
@@ -256,9 +260,10 @@ export function DashboardPage() {
         <PageHeader
           eyebrow="Branch Overview"
           title="Branch Dashboard"
-          description="Sales, profit, staff & inventory for the selected date"
+          description="Sales, profit, staff & inventory overview"
           actions={
             <div className="flex flex-wrap items-center gap-2.5">
+              {/* Date filter hidden for now — dashboard still loads today's date by default
               <label className="flex items-center gap-2 rounded-xl border border-border bg-white px-3 py-2 text-xs sm:text-sm shadow-2xs">
                 <Calendar className="size-4 text-purple-700 shrink-0" />
                 <span className="shrink-0 text-slate-500 font-medium">Date</span>
@@ -269,6 +274,7 @@ export function DashboardPage() {
                   className="min-w-0 border-0 bg-transparent font-semibold text-slate-900 outline-none"
                 />
               </label>
+              */}
 
               <Button
                 type="button"

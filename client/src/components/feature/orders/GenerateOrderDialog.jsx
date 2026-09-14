@@ -53,15 +53,14 @@ export function GenerateOrderDialog({
   }, [open, suppliers])
 
   function addLine() {
-    const first = products[0]
-    if (!first) return
+    if (!products.length) return
     setLines((prev) => [
       ...prev,
       {
-        productId: first.id,
+        productId: '',
         quantity: 1,
-        unitCost: Number(first.purchasePrice || 0),
-        scale: first.scale || 'unit',
+        unitCost: '',
+        scale: 'unit',
       },
     ])
   }
@@ -72,10 +71,15 @@ export function GenerateOrderDialog({
         if (i !== index) return row
         const next = { ...row, [field]: value }
         if (field === 'productId') {
-          const product = products.find((p) => p.id === value)
-          if (product) {
-            next.scale = product.scale || 'unit'
-            next.unitCost = Number(product.purchasePrice || 0)
+          if (!value) {
+            next.scale = 'unit'
+            next.unitCost = ''
+          } else {
+            const product = products.find((p) => p.id === value)
+            if (product) {
+              next.scale = product.scale || 'unit'
+              next.unitCost = Number(product.purchasePrice || 0)
+            }
           }
         }
         return next
@@ -186,16 +190,26 @@ export function GenerateOrderDialog({
                 const product = products.find((p) => p.id === line.productId)
                 return (
                   <div
-                    key={`${line.productId}-${index}`}
+                    key={`po-line-${index}`}
                     className="grid gap-2 rounded-xl border border-border bg-slate-50/80 p-3 sm:grid-cols-[1fr_5rem_6rem_auto]"
                   >
                     <NativeSelect
                       value={line.productId}
                       onChange={(e) => patchLine(index, 'productId', e.target.value)}
                     >
+                      <option value="">Select product</option>
                       {products.map((p) => (
-                        <option key={p.id} value={p.id}>
+                        <option
+                          key={p.id}
+                          value={p.id}
+                          disabled={lines.some(
+                            (other, i) => i !== index && other.productId === p.id,
+                          )}
+                        >
                           {p.name} ({p.itemCode}) — last {money(p.purchasePrice)}
+                          {lines.some((other, i) => i !== index && other.productId === p.id)
+                            ? ' — added'
+                            : ''}
                         </option>
                       ))}
                     </NativeSelect>

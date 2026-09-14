@@ -1,0 +1,154 @@
+import { ScrollText } from 'lucide-react'
+import { EmptyState } from '@/components/shared/EmptyState'
+import { DataCard, ResponsiveDataShell } from '@/components/shared/ResponsiveDataShell'
+import { Badge } from '@/components/ui/badge'
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TablePagination,
+  TableRow,
+} from '@/components/ui/table'
+import {
+  activityActionLabel,
+  activitySourceLabel,
+  formatActivityLine,
+  formatActivityTime,
+} from '@/lib/activityLogLabels'
+import { roleDisplayName } from '@/lib/nav'
+import { ACTIVITY_LOGS_PAGE_SIZE } from '@/hooks/useActivityLogs'
+
+function roleLabel(role) {
+  if (!role || role === 'unknown') return '—'
+  return roleDisplayName(role) || role
+}
+
+function LogMessage({ log, includeTime = true }) {
+  const line = formatActivityLine(log)
+  const time = formatActivityTime(log.createdAt)
+  return (
+    <p className="text-sm text-slate-800">
+      <span className="font-medium">{line}</span>
+      {includeTime ? <span className="text-slate-500"> at {time}</span> : null}
+    </p>
+  )
+}
+
+function MetaBadges({ log }) {
+  return (
+    <div className="flex flex-wrap items-center gap-1.5">
+      <Badge variant="secondary" className="font-medium normal-case">
+        {roleLabel(log.actorRole)}
+      </Badge>
+      <Badge variant="outline" className="font-medium normal-case text-slate-600">
+        {activitySourceLabel(log.source)}
+      </Badge>
+      <span className="text-xs text-slate-400">{activityActionLabel(log.action)}</span>
+    </div>
+  )
+}
+
+export function ActivityLogsList({
+  items,
+  loading,
+  error,
+  pagination,
+  onPageChange,
+}) {
+  if (loading && items.length === 0) {
+    return <p className="py-10 text-center text-sm text-slate-400">Loading activity logs…</p>
+  }
+
+  if (error && items.length === 0) {
+    return (
+      <EmptyState
+        icon={ScrollText}
+        title="Could not load logs"
+        description={error}
+        compact
+      />
+    )
+  }
+
+  if (!loading && items.length === 0) {
+    return (
+      <EmptyState
+        icon={ScrollText}
+        title="No activity yet"
+        description="POS cashier actions and branch changes will show up here."
+        compact
+      />
+    )
+  }
+
+  const page = pagination?.page || 1
+  const pageCount = pagination?.pageCount || 1
+  const total = pagination?.total ?? items.length
+  const limit = pagination?.limit || ACTIVITY_LOGS_PAGE_SIZE
+
+  return (
+    <div className="space-y-1">
+      <div className="mb-3 flex items-center justify-between gap-2">
+        <p className="text-xs font-medium text-slate-400">
+          {total} record{total === 1 ? '' : 's'} · {limit} / page
+          {loading ? ' · refreshing…' : ''}
+        </p>
+      </div>
+
+      <ResponsiveDataShell
+        mobile={items.map((log) => (
+          <DataCard key={log.id}>
+            <LogMessage log={log} />
+            <div className="mt-2">
+              <MetaBadges log={log} />
+            </div>
+            <p className="mt-2 text-xs text-slate-400" title={log.createdAt}>
+              {formatActivityTime(log.createdAt)}
+            </p>
+          </DataCard>
+        ))}
+        desktop={
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Activity</TableHead>
+                <TableHead className="w-36">Role</TableHead>
+                <TableHead className="w-28">Source</TableHead>
+                <TableHead className="w-40 text-right">When</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {items.map((log) => (
+                <TableRow key={log.id}>
+                  <TableCell>
+                    <div className="space-y-1">
+                      <LogMessage log={log} includeTime={false} />
+                      <p className="text-xs text-slate-400">{activityActionLabel(log.action)}</p>
+                    </div>
+                  </TableCell>
+                  <TableCell>
+                    <Badge variant="secondary" className="font-medium normal-case">
+                      {roleLabel(log.actorRole)}
+                    </Badge>
+                  </TableCell>
+                  <TableCell>
+                    <Badge variant="outline" className="font-medium normal-case text-slate-600">
+                      {activitySourceLabel(log.source)}
+                    </Badge>
+                  </TableCell>
+                  <TableCell className="text-right text-sm text-slate-600" title={log.createdAt}>
+                    {formatActivityTime(log.createdAt)}
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        }
+      />
+
+      <TablePagination page={page} pageCount={pageCount} loading={loading} onPageChange={onPageChange} />
+    </div>
+  )
+}

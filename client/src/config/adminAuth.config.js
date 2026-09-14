@@ -7,15 +7,16 @@
 // File kept so older imports do not break; clearAdminSession still removes
 // any leftover `fluxone_admin_session` key from earlier test builds.
 
+// Demo admin credentials — commented out for production.
 export const ADMIN_CREDENTIALS = {
-  id: 'admin@fluxone.b2b',
-  email: 'admin@fluxone.b2b',
-  password: 'password123',
-  name: 'Asad Naqvi (B2B Owner)',
-  role: 'b2b_owner',
-  tenantName: 'FluxOne Enterprise Solutions (All Branches)',
-  tenantSlug: 'fluxone-enterprise',
-  branchName: 'Global Enterprise HQ',
+  // id: 'admin@fluxone.b2b',
+  // email: 'admin@fluxone.b2b',
+  // password: 'password123',
+  // name: 'Asad Naqvi (B2B Owner)',
+  // role: 'b2b_owner',
+  // tenantName: 'FluxOne Enterprise Solutions (All Branches)',
+  // tenantSlug: 'fluxone-enterprise',
+  // branchName: 'Global Enterprise HQ',
 }
 
 const STORAGE_KEY = 'fluxone_admin_session'
@@ -47,6 +48,6 @@ export function clearAdminSession() {
 export function validateAdminLogin() {
   return {
     success: false,
-    error: 'Use softwareflux@company.com with the live API login.',
+    error: 'Use the live API login with your account credentials.',
   }
 }

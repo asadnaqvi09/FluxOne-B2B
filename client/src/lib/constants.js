@@ -25,40 +25,40 @@ export const ROLES = {
   WEBSITE_MANAGER: 'website_manager',
 }
 
-//Seeded demo accounts.
+// Seeded demo accounts — commented out for production (re-enable locally if needed).
 export const DEMO_ACCOUNTS = [
-  {
-    tenantSlug: 'softwareflux',
-    id: 'softwareflux@company.com',
-    password: 'admin123',
-    role: ROLES.B2B_ADMIN,
-    name: 'SoftwareFlux Admin',
-    label: 'B2B Admin · SoftwareFlux',
-  },
-  {
-    tenantSlug: 'company-a',
-    id: 'admin@companya.local',
-    password: 'password',
-    role: ROLES.B2B_ADMIN,
-    name: 'Asad',
-    label: 'B2B Admin · Company A (Wah Cantt)',
-  },
-  {
-    tenantSlug: 'company-a',
-    id: 'branch.wah@companya.local',
-    password: 'password',
-    role: ROLES.BRANCH_MANAGER,
-    name: 'Bilal Khan',
-    label: 'Branch Manager · Wah Cantt',
-  },
-  {
-    tenantSlug: 'company-a',
-    id: 'branch.haripur@companya.local',
-    password: 'password',
-    role: ROLES.BRANCH_MANAGER,
-    name: 'Sara Ahmed',
-    label: 'Branch Manager · Haripur',
-  },
+  // {
+  //   tenantSlug: 'softwareflux',
+  //   id: 'softwareflux@company.com',
+  //   password: 'admin123',
+  //   role: ROLES.B2B_ADMIN,
+  //   name: 'SoftwareFlux Admin',
+  //   label: 'B2B Admin · SoftwareFlux',
+  // },
+  // {
+  //   tenantSlug: 'company-a',
+  //   id: 'admin@companya.local',
+  //   password: 'password',
+  //   role: ROLES.B2B_ADMIN,
+  //   name: 'Asad',
+  //   label: 'B2B Admin · Company A (Wah Cantt)',
+  // },
+  // {
+  //   tenantSlug: 'company-a',
+  //   id: 'branch.wah@companya.local',
+  //   password: 'password',
+  //   role: ROLES.BRANCH_MANAGER,
+  //   name: 'Bilal Khan',
+  //   label: 'Branch Manager · Wah Cantt',
+  // },
+  // {
+  //   tenantSlug: 'company-a',
+  //   id: 'branch.haripur@companya.local',
+  //   password: 'password',
+  //   role: ROLES.BRANCH_MANAGER,
+  //   name: 'Sara Ahmed',
+  //   label: 'Branch Manager · Haripur',
+  // },
   // {
   //   tenantSlug: 'company-b',
   //   id: 'admin@companyb.local',

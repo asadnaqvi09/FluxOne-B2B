@@ -94,7 +94,7 @@ export function LoginForm() {
         // Real b2b_admin requires a live JWT from the API.
         if (demoUser.role === ROLES.B2B_ADMIN || demoUser.role === 'b2b_owner') {
           setLocalError(
-            'Admin login requires the live API. Start the server and use softwareflux@company.com / admin123.',
+            'Admin login requires the live API. Start the server and sign in with your admin account.',
           )
           return
         }
@@ -138,7 +138,7 @@ export function LoginForm() {
             id="login-id"
             name="id"
             autoComplete="username"
-            placeholder="e.g. branch.wah@companya.local"
+            placeholder="Enter your user ID"
             value={id}
             disabled={loading}
             onChange={(event) => {
@@ -208,57 +208,59 @@ export function LoginForm() {
           {loading ? 'Signing in…' : 'Login'}
         </Button>
 
-        <div className="overflow-hidden rounded-lg border border-border bg-muted/40">
-          <button
-            type="button"
-            onClick={() => setDemoOpen((open) => !open)}
-            aria-expanded={demoOpen}
-            className="flex w-full cursor-pointer items-center justify-between gap-2 px-3 py-2.5 text-left transition-colors hover:bg-muted/70"
-          >
-            <span className="text-xs font-semibold tracking-wide text-muted-foreground uppercase">
-              Demo credentials
-            </span>
-            <ChevronDown
-              className={cn(
-                'size-4 shrink-0 text-muted-foreground transition-transform duration-200',
-                demoOpen && 'rotate-180',
-              )}
-            />
-          </button>
+        {DEMO_ACCOUNTS.length > 0 ? (
+          <div className="overflow-hidden rounded-lg border border-border bg-muted/40">
+            <button
+              type="button"
+              onClick={() => setDemoOpen((open) => !open)}
+              aria-expanded={demoOpen}
+              className="flex w-full cursor-pointer items-center justify-between gap-2 px-3 py-2.5 text-left transition-colors hover:bg-muted/70"
+            >
+              <span className="text-xs font-semibold tracking-wide text-muted-foreground uppercase">
+                Demo credentials
+              </span>
+              <ChevronDown
+                className={cn(
+                  'size-4 shrink-0 text-muted-foreground transition-transform duration-200',
+                  demoOpen && 'rotate-180',
+                )}
+              />
+            </button>
 
-          <div
-            className={cn(
-              'grid transition-[grid-template-rows] duration-250 ease-out',
-              demoOpen ? 'grid-rows-[1fr]' : 'grid-rows-[0fr]',
-            )}
-          >
-            <div className="overflow-hidden">
-              <div className="border-t border-border px-3 pt-2 pb-3">
-                <ul className="max-h-56 space-y-1.5 overflow-y-auto">
-                  {DEMO_ACCOUNTS.map((account) => (
-                    <li key={`${account.tenantSlug}-${account.id}`}>
-                      <button
-                        type="button"
-                        onClick={() => fillDemo(account)}
-                        className="w-full cursor-pointer rounded-md px-2 py-1.5 text-left text-xs transition-colors hover:bg-white active:scale-[0.99]"
-                      >
-                        <span className="font-medium text-foreground">
-                          {account.label}
-                        </span>
-                        <span className="mt-0.5 block truncate text-muted-foreground">
-                          {account.id}
-                        </span>
-                      </button>
-                    </li>
-                  ))}
-                </ul>
-                <p className="mt-2 text-[11px] text-muted-foreground">
-                  Password for all demos: <span className="font-medium">password</span>
-                </p>
+            <div
+              className={cn(
+                'grid transition-[grid-template-rows] duration-250 ease-out',
+                demoOpen ? 'grid-rows-[1fr]' : 'grid-rows-[0fr]',
+              )}
+            >
+              <div className="overflow-hidden">
+                <div className="border-t border-border px-3 pt-2 pb-3">
+                  <ul className="max-h-56 space-y-1.5 overflow-y-auto">
+                    {DEMO_ACCOUNTS.map((account) => (
+                      <li key={`${account.tenantSlug}-${account.id}`}>
+                        <button
+                          type="button"
+                          onClick={() => fillDemo(account)}
+                          className="w-full cursor-pointer rounded-md px-2 py-1.5 text-left text-xs transition-colors hover:bg-white active:scale-[0.99]"
+                        >
+                          <span className="font-medium text-foreground">
+                            {account.label}
+                          </span>
+                          <span className="mt-0.5 block truncate text-muted-foreground">
+                            {account.id}
+                          </span>
+                        </button>
+                      </li>
+                    ))}
+                  </ul>
+                  <p className="mt-2 text-[11px] text-muted-foreground">
+                    Password for all demos: <span className="font-medium">password</span>
+                  </p>
+                </div>
               </div>
             </div>
           </div>
-        </div>
+        ) : null}
       </form>
     </div>
   )

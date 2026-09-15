@@ -13,6 +13,7 @@ import {
   TableCell,
   TablePagination,
 } from '@/components/ui/table'
+import { displayStaffRef } from '@/lib/formatDisplayId'
 import { cn } from '@/lib/utils'
 
 const STATUS_STYLES = {
@@ -27,6 +28,14 @@ function statusLabel(status) {
   if (status === 'on_break') return 'On break'
   if (status === 'offline') return 'Offline'
   return 'Active'
+}
+
+function scoreValue(person) {
+  return Number(person.rating ?? person.points ?? 0)
+}
+
+function formatScore(person) {
+  return `${scoreValue(person).toFixed(2)}%`
 }
 
 const PAGE_SIZE = 8
@@ -49,7 +58,7 @@ export function StaffPerformanceTable({ staff = [], className }) {
       className={cn('flex h-full flex-col justify-between', className)}
       bodyClassName="flex flex-1 flex-col justify-between"
       title="Staff List"
-      description="Name, ID, status & points"
+      description="Name, code, status & score rating"
       actions={
         <span className="text-xs font-medium text-slate-400">
           {list.length} records · {PAGE_SIZE} / page
@@ -86,15 +95,10 @@ export function StaffPerformanceTable({ staff = [], className }) {
                       </span>
                     </div>
                     <div className="mt-2 flex items-center justify-between gap-2">
-                      <span
-                        className="inline-block rounded border border-purple-100 bg-purple-50 px-2 py-0.5 font-mono text-[11px] font-semibold whitespace-nowrap text-purple-800"
-                        title={person.id}
-                      >
-                        {person.id?.length > 12 ? `${person.id.slice(0, 8)}...` : person.id}
+                      <span className="inline-block rounded border border-purple-100 bg-purple-50 px-2 py-0.5 font-mono text-[11px] font-semibold whitespace-nowrap text-purple-800">
+                        {displayStaffRef(person)}
                       </span>
-                      <p className="text-sm font-semibold text-slate-900">
-                        {Number(person.points || 0).toLocaleString()} pts
-                      </p>
+                      <p className="text-sm font-semibold text-slate-900">{formatScore(person)}</p>
                     </div>
                   </div>
                 </div>
@@ -105,9 +109,9 @@ export function StaffPerformanceTable({ staff = [], className }) {
                 <TableHeader>
                   <TableRow className="text-xs tracking-wide text-slate-500 uppercase">
                     <TableHead className="px-2 py-2.5 font-medium">Employee</TableHead>
-                    <TableHead className="px-2 py-2.5 font-medium">ID</TableHead>
+                    <TableHead className="px-2 py-2.5 font-medium">Code</TableHead>
                     <TableHead className="px-2 py-2.5 font-medium">Status</TableHead>
-                    <TableHead className="px-2 py-2.5 text-right font-medium">Points</TableHead>
+                    <TableHead className="px-2 py-2.5 text-right font-medium">Score</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -127,11 +131,8 @@ export function StaffPerformanceTable({ staff = [], className }) {
                         </div>
                       </TableCell>
                       <TableCell className="px-2 py-3">
-                        <span
-                          className="inline-block rounded border border-purple-100 bg-purple-50 px-2 py-0.5 font-mono text-[11px] font-semibold whitespace-nowrap text-purple-800"
-                          title={person.id}
-                        >
-                          {person.id?.length > 12 ? `${person.id.slice(0, 8)}...` : person.id}
+                        <span className="inline-block rounded border border-purple-100 bg-purple-50 px-2 py-0.5 font-mono text-[11px] font-semibold whitespace-nowrap text-purple-800">
+                          {displayStaffRef(person)}
                         </span>
                       </TableCell>
                       <TableCell className="px-2 py-3">
@@ -145,7 +146,7 @@ export function StaffPerformanceTable({ staff = [], className }) {
                         </span>
                       </TableCell>
                       <TableCell className="px-2 py-3 text-right font-semibold text-slate-900">
-                        {Number(person.points || 0).toLocaleString()}
+                        {formatScore(person)}
                       </TableCell>
                     </TableRow>
                   ))}

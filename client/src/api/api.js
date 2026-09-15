@@ -295,6 +295,7 @@ export async function api(path, options = {}) {
 export const apiClient = {
   get: (path, params) => api(`${path}${toQuery(params)}`),
   post: (path, body) => api(path, { method: 'POST', body }),
+  put: (path, body) => api(path, { method: 'PUT', body }),
   patch: (path, body) => api(path, { method: 'PATCH', body }),
   delete: (path) => api(path, { method: 'DELETE' }),
 }

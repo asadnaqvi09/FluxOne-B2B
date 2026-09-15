@@ -9,34 +9,52 @@ import {
 } from 'recharts'
 import { SurfaceCard } from '@/components/shared/SurfaceCard'
 import { BRAND } from '@/lib/constants'
+import { formatCurrency } from '@/lib/mapBranchDashboard'
 
 const CHART_H = 260
 
 function SalesTooltip({ active, payload, label }) {
   if (!active || !payload?.length) return null
   const row = payload[0]?.payload
+  const revenue = Number(row?.revenue ?? row?.sales ?? 0)
+  const txCount = Number(row?.txCount ?? 0)
   return (
     <div className="rounded-xl border border-border bg-white px-3 py-2 text-xs shadow-lg">
       <p className="font-semibold text-slate-800">{label}</p>
-      <p className="mt-1 text-slate-600">{payload[0].value} sales</p>
-      {row?.topItem ? <p className="mt-0.5 text-slate-400">Top: {row.topItem}</p> : null}
+      <p className="mt-1 text-slate-600">
+        Revenue: <span className="font-semibold text-slate-900">{formatCurrency(revenue)}</span>
+      </p>
+      {txCount ? (
+        <p className="mt-0.5 text-slate-500">{txCount} transaction{txCount === 1 ? '' : 's'}</p>
+      ) : null}
+      {row?.topItem ? <p className="mt-0.5 text-slate-400">Top item: {row.topItem}</p> : null}
     </div>
   )
 }
 
+function formatAxisTick(value) {
+  const n = Number(value) || 0
+  if (n >= 100_000) return `${(n / 1000).toFixed(0)}k`
+  if (n >= 10_000) return `${(n / 1000).toFixed(1)}k`
+  return n.toLocaleString()
+}
+
 export function SalesChart({ series, className }) {
-  const data = Array.isArray(series) ? series : []
+  const data = (Array.isArray(series) ? series : []).map((row) => ({
+    ...row,
+    chartValue: Number(row.revenue ?? row.sales ?? 0),
+    txCount: Number(row.sales ?? 0),
+  }))
 
   return (
     <SurfaceCard
       className={className}
       title="Today's sales by hour"
-      description="When sales increased vs dropped"
+      description="Hourly revenue (Rs) — when sales increased vs dropped"
     >
-      {/* Explicit height — Recharts ResponsiveContainer breaks on flex-1 / % height */}
       <div className="w-full" style={{ height: CHART_H, minHeight: CHART_H }}>
         <ResponsiveContainer width="100%" height={CHART_H}>
-          <AreaChart data={data} margin={{ top: 10, right: 12, left: 0, bottom: 4 }}>
+          <AreaChart data={data} margin={{ top: 10, right: 12, left: 8, bottom: 4 }}>
             <defs>
               <linearGradient id="salesHourFill" x1="0" y1="0" x2="0" y2="1">
                 <stop offset="0%" stopColor={BRAND.purple} stopOpacity={0.28} />
@@ -51,24 +69,39 @@ export function SalesChart({ series, className }) {
               tickLine={false}
               interval="preserveStartEnd"
               minTickGap={8}
+              label={{
+                value: 'Hour of day',
+                position: 'insideBottom',
+                offset: -2,
+                style: { fill: '#94a3b8', fontSize: 10 },
+              }}
             />
             <YAxis
               domain={[0, 'auto']}
               tick={{ fill: '#64748b', fontSize: 11 }}
               axisLine={false}
               tickLine={false}
-              width={28}
-              tickCount={9}
+              width={52}
+              tickCount={6}
+              tickFormatter={formatAxisTick}
+              label={{
+                value: 'Revenue (Rs)',
+                angle: -90,
+                position: 'insideLeft',
+                offset: 8,
+                style: { fill: '#64748b', fontSize: 11, fontWeight: 600 },
+              }}
             />
             <Tooltip content={<SalesTooltip />} />
             <Area
               type="monotone"
-              dataKey="sales"
+              dataKey="chartValue"
+              name="Revenue (Rs)"
               stroke={BRAND.purple}
               strokeWidth={2.5}
               fill="url(#salesHourFill)"
-              dot={{ r: 4, fill: BRAND.purple, stroke: '#fff', strokeWidth: 2 }}
-              activeDot={{ r: 6, fill: BRAND.purple, stroke: '#fff', strokeWidth: 2 }}
+              dot={{ r: 3, fill: BRAND.purple, stroke: '#fff', strokeWidth: 2 }}
+              activeDot={{ r: 5, fill: BRAND.purple, stroke: '#fff', strokeWidth: 2 }}
             />
           </AreaChart>
         </ResponsiveContainer>

@@ -34,5 +34,10 @@ export const idParams = z.object({
 export const dateRangeQuery = z.object({
   from: z.coerce.date().optional(),
   to: z.coerce.date().optional(),
+  /** Single-day shorthand → treated as from=to when from/to omitted */
+  date: z.preprocess(
+    (value) => (value === '' || value === null || value === undefined ? undefined : value),
+    z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
+  ),
   branchId: optionalUuid,
 })

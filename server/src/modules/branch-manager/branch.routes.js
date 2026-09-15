@@ -12,8 +12,8 @@ import {
   scoreStaff,
   getStaffScores,
 } from './performance/performance.controller.js'
-import { holidaysList, addHoliday } from './holidays/holidays.controller.js'
-import { leavesList, addLeave } from './leaves/leaves.controller.js'
+import { holidaysList, addHoliday, editHoliday, removeHoliday } from './holidays/holidays.controller.js'
+import { leavesList, addLeave, editLeave, removeLeave } from './leaves/leaves.controller.js'
 import { salesList, processRefund } from './sales/sales.controller.js'
 import { getDiscounts, addDiscount, editDiscount, removeDiscount } from './discounts/discounts.controller.js'
 import { addStockRequest, stockRequestList } from './stock/stock_request.controller.js'
@@ -43,10 +43,14 @@ router.post(
 // Holidays
 router.get('/holidays', requirePermission('staff:read'), asyncHandler(holidaysList))
 router.post('/holidays', requirePermission('staff:write'), asyncHandler(addHoliday))
+router.put('/holidays/:id', requirePermission('staff:write'), asyncHandler(editHoliday))
+router.delete('/holidays/:id', requirePermission('staff:write'), asyncHandler(removeHoliday))
 
 // Leaves
 router.get('/leaves', requirePermission('staff:read'), asyncHandler(leavesList))
 router.post('/leaves', requirePermission('staff:write'), asyncHandler(addLeave))
+router.put('/leaves/:id', requirePermission('staff:write'), asyncHandler(editLeave))
+router.delete('/leaves/:id', requirePermission('staff:write'), asyncHandler(removeLeave))
 
 // Sales
 router.get('/sales', requirePermission('branch-dashboard:read'), asyncHandler(salesList))

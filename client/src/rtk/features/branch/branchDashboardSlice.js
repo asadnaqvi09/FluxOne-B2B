@@ -21,7 +21,12 @@ export const fetchBranchDashboard = createAsyncThunk(
   async (nextDate, { rejectWithValue }) => {
     const date = nextDate || todayIso()
     try {
-      const result = await apiClient.get(endpoints.branch.dashboard, { date })
+      // Server accepts `date` (single day) and/or `from`/`to`
+      const result = await apiClient.get(endpoints.branch.dashboard, {
+        date,
+        from: date,
+        to: date,
+      })
       if (result.success && result.data) {
         return {
           date,

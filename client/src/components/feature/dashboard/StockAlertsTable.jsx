@@ -15,14 +15,8 @@ import {
 } from '@/components/ui/table'
 import { TableRowsSkeleton } from '@/components/ui/skeleton'
 import { sourceLabel, STOCK_STATUS_META } from '@/lib/mapInventoryDashboard'
+import { displayItemCode } from '@/lib/formatDisplayId'
 import { cn } from '@/lib/utils'
-
-function shortId(id) {
-  if (!id) return '—'
-  const text = String(id)
-  if (text.length <= 10) return text
-  return `${text.slice(0, 8)}…`
-}
 
 function StatusBadge({ status }) {
   const meta = STOCK_STATUS_META[status] || STOCK_STATUS_META.green
@@ -88,7 +82,7 @@ function StockAlertsTableComponent({
                 <div className="flex items-start justify-between gap-2">
                   <div className="min-w-0">
                     <p className="truncate text-sm font-semibold text-slate-900">{row.name}</p>
-                    <p className="mt-0.5 font-mono text-[11px] text-slate-400">{shortId(row.id)}</p>
+                    <p className="mt-0.5 font-mono text-[11px] text-slate-400">{displayItemCode(row)}</p>
                   </div>
                   <StatusBadge status={row.status} />
                 </div>
@@ -107,7 +101,7 @@ function StockAlertsTableComponent({
             <Table className="w-full table-fixed text-left text-sm">
               <TableHeader>
                 <TableRow className="text-xs tracking-wide text-slate-500 uppercase">
-                  <TableHead className="w-[18%] px-2 py-3 font-semibold">Id</TableHead>
+                  <TableHead className="w-[18%] px-2 py-3 font-semibold">Code</TableHead>
                   <TableHead className="w-[28%] px-2 py-3 font-semibold">Name</TableHead>
                   <TableHead className="w-[14%] px-2 py-3 font-semibold">Remaining</TableHead>
                   <TableHead className="w-[18%] px-2 py-3 font-semibold">Status</TableHead>
@@ -122,9 +116,9 @@ function StockAlertsTableComponent({
                   >
                     <TableCell
                       className="truncate px-2 py-3 font-mono text-xs text-slate-500"
-                      title={String(row.id)}
+                      title={displayItemCode(row)}
                     >
-                      {shortId(row.id)}
+                      {displayItemCode(row)}
                     </TableCell>
                     <TableCell className="truncate px-2 py-3 font-medium text-slate-900" title={row.name}>
                       {row.name}

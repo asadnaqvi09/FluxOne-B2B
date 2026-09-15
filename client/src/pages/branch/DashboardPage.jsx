@@ -1,6 +1,4 @@
-import { FileDown, Printer } from 'lucide-react'
-// Date filter UI hidden for now — restore Calendar import with the date control below
-// import { FileDown, Printer, Calendar } from 'lucide-react'
+import { FileDown, Calendar } from 'lucide-react'
 import { BranchKpiCards } from '@/components/feature/branch/dashboard/BranchKpiCards'
 import { BranchWelcomeBanner } from '@/components/feature/branch/dashboard/BranchWelcomeBanner'
 import { DailySalesSummary } from '@/components/feature/branch/dashboard/DailySalesSummary'
@@ -21,9 +19,7 @@ import { toastSuccess } from '@/lib/toast'
 import { cn } from '@/lib/utils'
 
 export function DashboardPage() {
-  const { data, date, loading } = useBranchDashboard()
-  // setDate kept in hook; date picker UI commented out above — restore with Calendar control
-  // const { data, date, setDate, loading } = useBranchDashboard()
+  const { data, date, setDate, loading } = useBranchDashboard()
   const { user } = useAuthSession()
 
   function handleDownloadPDF() {
@@ -34,14 +30,13 @@ export function DashboardPage() {
       return
     }
 
-    const branchName = data.branchName || user?.branchName || 'Wah Cantt Main Branch'
-    const managerName = user?.name || 'Bilal Khan (Branch Manager)'
+    const branchName = data.branchName || user?.branchName || 'Branch'
+    const managerName = user?.name || 'Branch Manager'
     const kpis = data.kpis || {}
     const summary = data.dailySummary || {}
     const topList = (data.topProducts || []).slice(0, 4)
     const lowList = (data.lowProducts || []).slice(0, 4)
     const staffList = (data.staff || []).slice(0, 6)
-    const inventoryList = (data.inventory || []).slice(0, 6)
     const counters = data.counters || []
 
     const html = `
@@ -86,10 +81,12 @@ export function DashboardPage() {
             <div class="kpi-card">
               <div class="kpi-label">Total Sales</div>
               <div class="kpi-val">${formatCurrency(kpis.totalSales)}</div>
+              <div class="sub-title">${formatPct(kpis.salesChangePct)} vs prior day</div>
             </div>
             <div class="kpi-card">
               <div class="kpi-label">Gross Profit</div>
               <div class="kpi-val" style="color: #059669;">${formatCurrency(kpis.profit)}</div>
+              <div class="sub-title">${formatPct(kpis.profitChangePct)} vs prior day</div>
             </div>
             <div class="kpi-card">
               <div class="kpi-label">Transactions</div>
@@ -115,7 +112,7 @@ export function DashboardPage() {
               <tr>
                 <td><strong>${formatCurrency(summary.revenue || kpis.totalSales)}</strong></td>
                 <td>${Number(summary.itemsSold || 0).toLocaleString()} units</td>
-                <td>${summary.peakHour || '14:00 - 15:00'}</td>
+                <td>${summary.peakHour || '—'}</td>
                 <td>${summary.peakHourSales ? formatCurrency(summary.peakHourSales) : '—'}</td>
               </tr>
             </tbody>
@@ -159,20 +156,26 @@ export function DashboardPage() {
                     <th>Product</th>
                     <th>Units</th>
                     <th>Sales</th>
+                    <th>Change</th>
                   </tr>
                 </thead>
                 <tbody>
-                  ${topList
-                    .map(
-                      (p) => `
+                  ${
+                    topList.length
+                      ? topList
+                          .map(
+                            (p) => `
                     <tr>
                       <td><strong>${p.name}</strong></td>
                       <td>${p.units} units</td>
                       <td style="color: #059669; font-weight: 700;">${formatCurrency(p.sales)}</td>
+                      <td>${formatPct(p.changePct)}</td>
                     </tr>
                   `,
-                    )
-                    .join('')}
+                          )
+                          .join('')
+                      : `<tr><td colspan="4" style="text-align:center;color:#94a3b8;">No sales for this date</td></tr>`
+                  }
                 </tbody>
               </table>
             </div>
@@ -185,33 +188,39 @@ export function DashboardPage() {
                     <th>Product</th>
                     <th>Units</th>
                     <th>Sales</th>
+                    <th>Change</th>
                   </tr>
                 </thead>
                 <tbody>
-                  ${lowList
-                    .map(
-                      (p) => `
+                  ${
+                    lowList.length
+                      ? lowList
+                          .map(
+                            (p) => `
                     <tr>
                       <td><strong>${p.name}</strong></td>
                       <td>${p.units} units</td>
                       <td style="color: #e11d48; font-weight: 700;">${formatCurrency(p.sales)}</td>
+                      <td>${formatPct(p.changePct)}</td>
                     </tr>
                   `,
-                    )
-                    .join('')}
+                          )
+                          .join('')
+                      : `<tr><td colspan="4" style="text-align:center;color:#94a3b8;">No sales for this date</td></tr>`
+                  }
                 </tbody>
               </table>
             </div>
           </div>
 
-          <div class="section-title">Staff On-Duty & Inventory Status Summary</div>
+          <div class="section-title">Staff Score Rating</div>
           <table>
             <thead>
               <tr>
                 <th>Staff Member</th>
                 <th>Role / Designation</th>
                 <th>Status</th>
-                <th>Points / Score</th>
+                <th>Score Rating</th>
               </tr>
             </thead>
             <tbody>
@@ -224,12 +233,12 @@ export function DashboardPage() {
                       <td><strong>${s.name || s.fullName}</strong></td>
                       <td>${s.role || s.designation || 'Staff'}</td>
                       <td>${s.status || 'Active'}</td>
-                      <td>${s.points || 100} pts</td>
+                      <td>${Number(s.rating ?? s.points ?? 0).toFixed(2)}%</td>
                     </tr>
                   `,
                       )
                       .join('')
-                  : `<tr><td colspan="4" style="text-align: center; color: #94a3b8;">Branch staff roster active</td></tr>`
+                  : `<tr><td colspan="4" style="text-align: center; color: #94a3b8;">No staff assigned</td></tr>`
               }
             </tbody>
           </table>
@@ -259,11 +268,10 @@ export function DashboardPage() {
       <MotionHeader>
         <PageHeader
           eyebrow="Branch Overview"
-          title="Branch Dashboard"
+          title={data.branchName ? `${data.branchName} Dashboard` : 'Branch Dashboard'}
           description="Sales, profit, staff & inventory overview"
           actions={
             <div className="flex flex-wrap items-center gap-2.5">
-              {/* Date filter hidden for now — dashboard still loads today's date by default
               <label className="flex items-center gap-2 rounded-xl border border-border bg-white px-3 py-2 text-xs sm:text-sm shadow-2xs">
                 <Calendar className="size-4 text-purple-700 shrink-0" />
                 <span className="shrink-0 text-slate-500 font-medium">Date</span>
@@ -274,7 +282,6 @@ export function DashboardPage() {
                   className="min-w-0 border-0 bg-transparent font-semibold text-slate-900 outline-none"
                 />
               </label>
-              */}
 
               <Button
                 type="button"
@@ -298,15 +305,12 @@ export function DashboardPage() {
           loading && 'opacity-60',
         )}
       >
-        {/* 1. KPI Metric Cards */}
         <BranchKpiCards kpis={data.kpis} />
 
-        {/* 2. Daily Sales Summary Snapshot */}
         <MotionReveal delay={0.03}>
           <DailySalesSummary summary={data.dailySummary} />
         </MotionReveal>
 
-        {/* 3. Sales Curve & Product Velocity (Side-by-Side Charts) */}
         <div className="grid grid-cols-1 items-stretch gap-4 md:grid-cols-2 md:gap-5 lg:gap-6">
           <MotionReveal delay={0.06} className="h-full">
             <SalesChart series={data.salesByHour} className="h-full" />
@@ -321,12 +325,10 @@ export function DashboardPage() {
           </MotionReveal>
         </div>
 
-        {/* 4. POS Counter Sales (Full-Width Adaptive Terminal Strip) */}
         <MotionReveal delay={0.11}>
           <CounterSalesCard counters={data.counters} />
         </MotionReveal>
 
-        {/* 5. Staff Performance & Inventory Status (Side-by-Side As Previous) */}
         <div className="grid grid-cols-1 items-stretch gap-5 xl:grid-cols-2 xl:gap-6">
           <MotionReveal delay={0.13} className="h-full">
             <StaffPerformanceTable staff={data.staff} className="h-full" />
@@ -336,7 +338,6 @@ export function DashboardPage() {
           </MotionReveal>
         </div>
 
-        {/* 6. AI Business Insights (Full-Width Executive Component) */}
         <MotionReveal delay={0.18}>
           <AiBusinessInsights data={data} />
         </MotionReveal>

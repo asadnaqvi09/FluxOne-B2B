@@ -52,6 +52,7 @@ export async function listStockAlerts(tenantId, { page = 1, limit = 8, branchId 
       SELECT
         id,
         name,
+        "itemCode",
         "remainingNumber",
         status,
         source,
@@ -60,6 +61,7 @@ export async function listStockAlerts(tenantId, { page = 1, limit = 8, branchId 
         SELECT
           p.id,
           p.name,
+          p.item_code AS "itemCode",
           p.quantity AS "remainingNumber",
           CASE
             WHEN p.quantity <= 0 THEN 'red'
@@ -76,6 +78,7 @@ export async function listStockAlerts(tenantId, { page = 1, limit = 8, branchId 
         SELECT
           sr.id,
           p.name,
+          p.item_code AS "itemCode",
           sr.remaining_quantity AS "remainingNumber",
           CASE
             WHEN sr.remaining_quantity <= 0 THEN 'red'

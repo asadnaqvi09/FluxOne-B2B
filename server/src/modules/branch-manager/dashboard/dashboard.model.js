@@ -1,4 +1,4 @@
-import { tenantQuery } from '../../../config/db.js'
+import { pool, requireTenantId, tenantQuery } from '../../../config/db.js'
 
 function toDateParam(value) {
   if (!value) return null
@@ -6,12 +6,68 @@ function toDateParam(value) {
   return String(value).slice(0, 10)
 }
 
-function scopeParams(filters = {}) {
+function todayIso() {
+  return new Date().toISOString().slice(0, 10)
+}
+
+function scopeParams(filters = {}, { defaultToday = false } = {}) {
+  let from = toDateParam(filters.from)
+  let to = toDateParam(filters.to)
+  const date = toDateParam(filters.date)
+
+  if (!from && !to && date) {
+    from = date
+    to = date
+  }
+
+  if (defaultToday && !from && !to) {
+    const today = todayIso()
+    from = today
+    to = today
+  }
+
   return {
-    from: toDateParam(filters.from),
-    to: toDateParam(filters.to),
+    from,
+    to,
     branchId: filters.branchId || null,
   }
+}
+
+function shiftDate(isoDate, dayDelta) {
+  const d = new Date(`${isoDate}T12:00:00.000Z`)
+  d.setUTCDate(d.getUTCDate() + dayDelta)
+  return d.toISOString().slice(0, 10)
+}
+
+function previousRange(from, to) {
+  if (!from || !to) return { from: null, to: null }
+  const fromMs = Date.parse(`${from}T12:00:00.000Z`)
+  const toMs = Date.parse(`${to}T12:00:00.000Z`)
+  const days = Math.max(1, Math.round((toMs - fromMs) / 86_400_000) + 1)
+  const prevTo = shiftDate(from, -1)
+  const prevFrom = shiftDate(prevTo, -(days - 1))
+  return { from: prevFrom, to: prevTo }
+}
+
+function pctChange(current, previous) {
+  const c = Number(current) || 0
+  const p = Number(previous) || 0
+  if (p === 0) return c > 0 ? 100 : 0
+  return Math.round(((c - p) / p) * 1000) / 10
+}
+
+async function withTenantClient(tenantId, work) {
+  const scopedTenantId = requireTenantId(tenantId)
+  const client = await pool.connect()
+  try {
+    return await work(client, scopedTenantId)
+  } finally {
+    client.release()
+  }
+}
+
+async function clientQuery(client, text, params = []) {
+  return client.query(text, params)
 }
 
 async function salesTotals(tenantId, { from, to, branchId }) {
@@ -118,19 +174,27 @@ async function counterBreakdown(tenantId, { from, to, branchId }) {
     tenantId,
     `
       SELECT
-        COALESCE(c.id::text, 'unassigned') AS "counterId",
-        COALESCE(c.code, 'UNASSIGNED') AS "counterCode",
-        COALESCE(c.name, 'Unassigned') AS "counterName",
+        COALESCE(
+          c.id::text,
+          'hw:' || COALESCE(NULLIF(TRIM(st.hardware_device_id), ''), 'unassigned')
+        ) AS "counterId",
+        COALESCE(c.code, NULLIF(TRIM(st.hardware_device_id), ''), 'UNASSIGNED') AS "counterCode",
+        COALESCE(
+          NULLIF(c.name, ''),
+          NULLIF(TRIM(st.hardware_device_id), ''),
+          'Unassigned till'
+        ) AS "counterName",
         count(s.id)::int AS "saleCount",
         COALESCE(sum(s.final_amount), 0)::numeric AS revenue
       FROM sales s
       LEFT JOIN pos_counters c ON c.id = s.counter_id AND c.tenant_id = s.tenant_id
+      LEFT JOIN staff st ON st.id = s.staff_id AND st.tenant_id = s.tenant_id
       WHERE s.tenant_id = $1
         AND s.status IN ('completed', 'partial_refund')
         AND ($2::date IS NULL OR s.sold_at::date >= $2::date)
         AND ($3::date IS NULL OR s.sold_at::date <= $3::date)
         AND ($4::uuid IS NULL OR s.branch_id = $4)
-      GROUP BY c.id, c.code, c.name
+      GROUP BY c.id, c.code, c.name, st.hardware_device_id
       ORDER BY revenue DESC
     `,
     [from, to, branchId],
@@ -249,8 +313,6 @@ export async function listStaffPerformanceSnapshot(tenantId, filters = {}) {
   const limit = Math.min(50, Math.max(1, Number(filters.limit) || 8))
   const offset = (page - 1) * limit
   const branchId = filters.branchId || null
-  const from = toDateParam(filters.from)
-  const to = toDateParam(filters.to)
 
   const { rows: countRows } = await tenantQuery(
     tenantId,
@@ -271,26 +333,35 @@ export async function listStaffPerformanceSnapshot(tenantId, filters = {}) {
         u.full_name AS "fullName",
         s.image_url AS "imageUrl",
         s.status,
-        COALESCE(ps.points, 0)::numeric AS points
+        COALESCE(ROUND(AVG((ps.points / NULLIF(ss.max_points, 0)) * 100), 2), 0) AS "rating",
+        COALESCE(SUM(ps.points), 0)::numeric AS "pointsRaw"
       FROM staff s
       JOIN users u ON u.id = s.user_id AND u.tenant_id = s.tenant_id
-      LEFT JOIN LATERAL (
-        SELECT sum(p.points)::numeric AS points
-        FROM performance_scores p
-        WHERE p.tenant_id = s.tenant_id
-          AND p.staff_id = s.id
-          AND ($3::date IS NULL OR p.scored_on >= $3::date)
-          AND ($4::date IS NULL OR p.scored_on <= $4::date)
-      ) ps ON true
+      LEFT JOIN performance_scores ps ON ps.staff_id = s.id AND ps.tenant_id = s.tenant_id
+      LEFT JOIN scoring_scales ss ON ss.id = ps.scale_id AND ss.tenant_id = s.tenant_id
       WHERE s.tenant_id = $1
         AND ($2::uuid IS NULL OR s.branch_id = $2)
-      ORDER BY points DESC, u.full_name ASC
-      LIMIT $5 OFFSET $6
+      GROUP BY s.id, u.full_name, s.image_url, s.status
+      ORDER BY "rating" DESC, u.full_name ASC
+      LIMIT $3 OFFSET $4
     `,
-    [branchId, from, to, limit, offset],
+    [branchId, limit, offset],
   )
 
-  return { items: rows, total: countRows[0]?.total || 0, page, limit }
+  return {
+    items: rows.map((row) => ({
+      id: row.id,
+      fullName: row.fullName,
+      imageUrl: row.imageUrl,
+      status: row.status,
+      rating: Number(row.rating) || 0,
+      points: Number(row.rating) || 0,
+      pointsRaw: Number(row.pointsRaw) || 0,
+    })),
+    total: countRows[0]?.total || 0,
+    page,
+    limit,
+  }
 }
 
 export async function getInventoryStatusChart(tenantId, filters = {}) {
@@ -393,7 +464,7 @@ export async function getInventoryStatusChart(tenantId, filters = {}) {
   }
 }
 
-async function getDashboardStaff(tenantId, branchId, from, to) {
+async function getDashboardStaff(tenantId, branchId) {
   const { rows } = await tenantQuery(
     tenantId,
     `
@@ -402,26 +473,32 @@ async function getDashboardStaff(tenantId, branchId, from, to) {
         u.full_name AS "name",
         s.image_url AS "image",
         s.status,
-        COALESCE(ps.points, 0)::int AS "points",
-        d.name AS "role"
+        d.name AS "role",
+        COALESCE(ROUND(AVG((ps.points / NULLIF(ss.max_points, 0)) * 100), 2), 0) AS "rating",
+        COALESCE(SUM(ps.points), 0)::numeric AS "pointsRaw"
       FROM staff s
       JOIN users u ON u.id = s.user_id AND u.tenant_id = s.tenant_id
       LEFT JOIN designations d ON d.id = s.designation_id AND d.tenant_id = s.tenant_id
-      LEFT JOIN LATERAL (
-        SELECT sum(p.points)::numeric AS points
-        FROM performance_scores p
-        WHERE p.tenant_id = s.tenant_id
-          AND p.staff_id = s.id
-          AND ($3::date IS NULL OR p.scored_on >= $3::date)
-          AND ($4::date IS NULL OR p.scored_on <= $4::date)
-      ) ps ON true
+      LEFT JOIN performance_scores ps ON ps.staff_id = s.id AND ps.tenant_id = s.tenant_id
+      LEFT JOIN scoring_scales ss ON ss.id = ps.scale_id AND ss.tenant_id = s.tenant_id
       WHERE s.tenant_id = $1
         AND ($2::uuid IS NULL OR s.branch_id = $2)
-      ORDER BY points DESC, u.full_name ASC
+      GROUP BY s.id, u.full_name, s.image_url, s.status, d.name
+      ORDER BY "rating" DESC, u.full_name ASC
     `,
-    [branchId, from, to],
+    [branchId],
   )
-  return rows
+  return rows.map((row) => ({
+    id: row.id,
+    name: row.name,
+    image: row.image,
+    status: row.status,
+    role: row.role,
+    rating: Number(row.rating) || 0,
+    // Keep `points` as score rating % so Staff List matches Performance tab
+    points: Number(row.rating) || 0,
+    pointsRaw: Number(row.pointsRaw) || 0,
+  }))
 }
 
 async function getDashboardInventory(tenantId, branchId) {
@@ -431,7 +508,11 @@ async function getDashboardInventory(tenantId, branchId) {
       SELECT
         p.name,
         COALESCE(bi.quantity, 0)::int AS stock,
-        300 AS capacity,
+        GREATEST(
+          COALESCE(bi.quantity, 0),
+          COALESCE(p.reorder_point, 10) * 4,
+          1
+        )::int AS capacity,
         CASE
           WHEN COALESCE(bi.quantity, 0) <= 0 THEN 'critical'
           WHEN COALESCE(bi.quantity, 0) <= p.reorder_point THEN 'low'
@@ -456,6 +537,7 @@ async function getDashboardProducts(tenantId, { from, to, branchId }) {
     tenantId,
     `
       SELECT
+        p.id,
         p.name,
         sum(si.quantity)::int AS units,
         sum(si.line_total)::numeric AS sales
@@ -476,65 +558,314 @@ async function getDashboardProducts(tenantId, { from, to, branchId }) {
 }
 
 export async function getFullBranchDashboard(tenantId, filters = {}) {
-  const scope = scopeParams(filters)
-  
-  const [totals, itemsSold, peaks, counters, staff, inventory, soldProducts] = await Promise.all([
-    salesTotals(tenantId, scope),
-    itemsSoldTotal(tenantId, scope),
-    peakHours(tenantId, scope),
-    counterBreakdown(tenantId, scope),
-    getDashboardStaff(tenantId, scope.branchId, scope.from, scope.to),
-    getDashboardInventory(tenantId, scope.branchId),
-    getDashboardProducts(tenantId, scope),
-  ])
+  const scope = scopeParams(filters, { defaultToday: true })
+  const prev = previousRange(scope.from, scope.to)
 
-  const productMix = soldProducts.map(p => ({ name: p.name, units: p.units }))
-  const topProducts = soldProducts.slice(0, 3).map(p => ({ name: p.name, sales: Number(p.sales), units: p.units, changePct: 10 }))
-  const lowProducts = soldProducts.slice(-3).reverse().map(p => ({ name: p.name, sales: Number(p.sales), units: p.units, changePct: -5 }))
+  return withTenantClient(tenantId, async (client, tid) => {
+    const q = (text, params) => clientQuery(client, text, params)
 
-  const totalSales = Number(totals.totalSales)
-  const netSales = Number(totals.netSales)
-  const profit = netSales * 0.23
+    const branchResult = scope.branchId
+      ? await q(
+          `SELECT name FROM branches WHERE tenant_id = $1 AND id = $2 LIMIT 1`,
+          [tid, scope.branchId],
+        )
+      : { rows: [] }
+    const branchName = branchResult.rows[0]?.name || 'Branch'
 
-  const peak = peaks[0]
-  const peakHour = peak ? `${String(peak.hour).padStart(2, '0')}:00–${String(peak.hour + 1).padStart(2, '0')}:00` : '—'
-  const peakHourSales = peak ? Number(peak.revenue) : 0
+    const totalsSql = `
+      SELECT
+        count(*)::int AS "saleCount",
+        COALESCE(sum(final_amount), 0)::numeric AS "totalSales",
+        COALESCE(sum(final_amount - return_amount), 0)::numeric AS "netSales"
+      FROM sales
+      WHERE tenant_id = $1
+        AND status IN ('completed', 'partial_refund')
+        AND ($2::date IS NULL OR sold_at::date >= $2::date)
+        AND ($3::date IS NULL OR sold_at::date <= $3::date)
+        AND ($4::uuid IS NULL OR branch_id = $4)
+    `
 
-  return {
-    branchName: 'Omar Branch',
-    date: scope.from || new Date().toISOString().slice(0, 10),
-    kpis: {
-      totalSales,
-      profit,
-      saleCount: totals.saleCount,
-      profitChangePct: 8.4,
-      salesChangePct: 12.1,
-      avgTicket: totals.saleCount > 0 ? totalSales / totals.saleCount : 0,
-    },
-    dailySummary: {
-      revenue: totalSales,
-      itemsSold,
-      orders: totals.saleCount,
-      peakHour,
-      peakHourSales,
-    },
-    salesByHour: peaks.map(p => ({
-      hour: `${p.hour}:00`,
-      sales: p.saleCount,
-      topItem: 'Mineral Water',
-    })),
-    productMix,
-    topProducts,
-    lowProducts,
-    counters: counters.map(c => ({
-      id: c.counterId,
-      name: c.counterName,
-      sales: Number(c.revenue),
-      orders: c.saleCount,
-    })),
-    staff,
-    inventory,
-  }
+    const profitSql = `
+      SELECT COALESCE(
+        sum(si.line_total - (si.quantity * COALESCE(p.purchase_price, 0))),
+        0
+      )::numeric AS profit
+      FROM sale_items si
+      JOIN sales s ON s.id = si.sale_id AND s.tenant_id = si.tenant_id
+      JOIN products p ON p.id = si.product_id AND p.tenant_id = si.tenant_id
+      WHERE si.tenant_id = $1
+        AND s.status IN ('completed', 'partial_refund')
+        AND si.is_exchange = false
+        AND ($2::date IS NULL OR s.sold_at::date >= $2::date)
+        AND ($3::date IS NULL OR s.sold_at::date <= $3::date)
+        AND ($4::uuid IS NULL OR s.branch_id = $4)
+    `
+
+    const itemsSql = `
+      SELECT COALESCE(sum(si.quantity), 0)::numeric AS "itemsSold"
+      FROM sale_items si
+      JOIN sales s ON s.id = si.sale_id AND s.tenant_id = si.tenant_id
+      WHERE si.tenant_id = $1
+        AND s.status IN ('completed', 'partial_refund')
+        AND ($2::date IS NULL OR s.sold_at::date >= $2::date)
+        AND ($3::date IS NULL OR s.sold_at::date <= $3::date)
+        AND ($4::uuid IS NULL OR s.branch_id = $4)
+    `
+
+    const hourSql = `
+      SELECT
+        extract(hour FROM sold_at)::int AS hour,
+        count(*)::int AS "saleCount",
+        COALESCE(sum(final_amount), 0)::numeric AS revenue
+      FROM sales
+      WHERE tenant_id = $1
+        AND status IN ('completed', 'partial_refund')
+        AND ($2::date IS NULL OR sold_at::date >= $2::date)
+        AND ($3::date IS NULL OR sold_at::date <= $3::date)
+        AND ($4::uuid IS NULL OR branch_id = $4)
+      GROUP BY hour
+      ORDER BY hour ASC
+    `
+
+    const topItemByHourSql = `
+      SELECT DISTINCT ON (hour)
+        hour,
+        product_name AS "topItem"
+      FROM (
+        SELECT
+          extract(hour FROM s.sold_at)::int AS hour,
+          p.name AS product_name,
+          sum(si.quantity) AS qty
+        FROM sale_items si
+        JOIN sales s ON s.id = si.sale_id AND s.tenant_id = si.tenant_id
+        JOIN products p ON p.id = si.product_id AND p.tenant_id = si.tenant_id
+        WHERE si.tenant_id = $1
+          AND s.status IN ('completed', 'partial_refund')
+          AND ($2::date IS NULL OR s.sold_at::date >= $2::date)
+          AND ($3::date IS NULL OR s.sold_at::date <= $3::date)
+          AND ($4::uuid IS NULL OR s.branch_id = $4)
+        GROUP BY hour, p.id, p.name
+      ) ranked
+      ORDER BY hour ASC, qty DESC
+    `
+
+    const productsSql = `
+      SELECT
+        p.id,
+        p.name,
+        sum(si.quantity)::int AS units,
+        sum(si.line_total)::numeric AS sales
+      FROM sale_items si
+      JOIN sales s ON s.id = si.sale_id AND s.tenant_id = si.tenant_id
+      JOIN products p ON p.id = si.product_id AND p.tenant_id = si.tenant_id
+      WHERE si.tenant_id = $1
+        AND s.status IN ('completed', 'partial_refund')
+        AND ($2::date IS NULL OR s.sold_at::date >= $2::date)
+        AND ($3::date IS NULL OR s.sold_at::date <= $3::date)
+        AND ($4::uuid IS NULL OR s.branch_id = $4)
+      GROUP BY p.id, p.name
+      ORDER BY sales DESC
+    `
+
+    const countersSql = `
+      SELECT
+        COALESCE(
+          c.id::text,
+          'hw:' || COALESCE(NULLIF(TRIM(st.hardware_device_id), ''), 'unassigned')
+        ) AS "counterId",
+        COALESCE(
+          NULLIF(c.name, ''),
+          NULLIF(TRIM(st.hardware_device_id), ''),
+          'Unassigned till'
+        ) AS "counterName",
+        count(s.id)::int AS "saleCount",
+        COALESCE(sum(s.final_amount), 0)::numeric AS revenue
+      FROM sales s
+      LEFT JOIN pos_counters c ON c.id = s.counter_id AND c.tenant_id = s.tenant_id
+      LEFT JOIN staff st ON st.id = s.staff_id AND st.tenant_id = s.tenant_id
+      WHERE s.tenant_id = $1
+        AND s.status IN ('completed', 'partial_refund')
+        AND ($2::date IS NULL OR s.sold_at::date >= $2::date)
+        AND ($3::date IS NULL OR s.sold_at::date <= $3::date)
+        AND ($4::uuid IS NULL OR s.branch_id = $4)
+      GROUP BY c.id, c.name, st.hardware_device_id
+      ORDER BY revenue DESC
+    `
+
+    const staffSql = `
+      SELECT
+        s.id,
+        u.full_name AS "name",
+        s.image_url AS "image",
+        s.status,
+        d.name AS "role",
+        COALESCE(ROUND(AVG((ps.points / NULLIF(ss.max_points, 0)) * 100), 2), 0) AS "rating",
+        COALESCE(SUM(ps.points), 0)::numeric AS "pointsRaw"
+      FROM staff s
+      JOIN users u ON u.id = s.user_id AND u.tenant_id = s.tenant_id
+      LEFT JOIN designations d ON d.id = s.designation_id AND d.tenant_id = s.tenant_id
+      LEFT JOIN performance_scores ps ON ps.staff_id = s.id AND ps.tenant_id = s.tenant_id
+      LEFT JOIN scoring_scales ss ON ss.id = ps.scale_id AND ss.tenant_id = s.tenant_id
+      WHERE s.tenant_id = $1
+        AND ($2::uuid IS NULL OR s.branch_id = $2)
+      GROUP BY s.id, u.full_name, s.image_url, s.status, d.name
+      ORDER BY "rating" DESC, u.full_name ASC
+    `
+
+    const inventorySql = `
+      SELECT
+        p.name,
+        COALESCE(bi.quantity, 0)::int AS stock,
+        GREATEST(
+          COALESCE(bi.quantity, 0),
+          COALESCE(p.reorder_point, 10) * 4,
+          1
+        )::int AS capacity,
+        CASE
+          WHEN COALESCE(bi.quantity, 0) <= 0 THEN 'critical'
+          WHEN COALESCE(bi.quantity, 0) <= p.reorder_point THEN 'low'
+          ELSE 'in_stock'
+        END AS status
+      FROM products p
+      LEFT JOIN branch_inventory bi
+        ON bi.tenant_id = p.tenant_id
+        AND bi.product_id = p.id
+        AND ($2::uuid IS NULL OR bi.branch_id = $2)
+      WHERE p.tenant_id = $1
+      ORDER BY stock ASC, p.name ASC
+      LIMIT 10
+    `
+
+    const scopeParamsArr = [tid, scope.from, scope.to, scope.branchId]
+    const prevParamsArr = [tid, prev.from, prev.to, scope.branchId]
+
+    // Sequential on one connection — avoids Supabase session pool exhaustion
+    const totalsRes = await q(totalsSql, scopeParamsArr)
+    const prevTotalsRes = await q(totalsSql, prevParamsArr)
+    const profitRes = await q(profitSql, scopeParamsArr)
+    const prevProfitRes = await q(profitSql, prevParamsArr)
+    const itemsRes = await q(itemsSql, scopeParamsArr)
+    const hoursRes = await q(hourSql, scopeParamsArr)
+    const topByHourRes = await q(topItemByHourSql, scopeParamsArr)
+    const productsRes = await q(productsSql, scopeParamsArr)
+    const prevProductsRes = await q(productsSql, prevParamsArr)
+    const countersRes = await q(countersSql, scopeParamsArr)
+    const staffRes = await q(staffSql, [tid, scope.branchId])
+    const inventoryRes = await q(inventorySql, [tid, scope.branchId])
+
+    const totals = totalsRes.rows[0] || {}
+    const prevTotals = prevTotalsRes.rows[0] || {}
+    const totalSales = Number(totals.totalSales) || 0
+    const netSales = Number(totals.netSales) || 0
+    const saleCount = Number(totals.saleCount) || 0
+    const profit = Number(profitRes.rows[0]?.profit) || 0
+    const prevProfit = Number(prevProfitRes.rows[0]?.profit) || 0
+    const itemsSold = Number(itemsRes.rows[0]?.itemsSold) || 0
+
+    const topItemByHour = new Map(
+      (topByHourRes.rows || []).map((r) => [Number(r.hour), r.topItem]),
+    )
+    const hourMap = new Map(
+      (hoursRes.rows || []).map((r) => [
+        Number(r.hour),
+        {
+          saleCount: Number(r.saleCount) || 0,
+          revenue: Number(r.revenue) || 0,
+        },
+      ]),
+    )
+
+    const salesByHour = Array.from({ length: 24 }, (_, hour) => {
+      const row = hourMap.get(hour) || { saleCount: 0, revenue: 0 }
+      return {
+        hour: `${String(hour).padStart(2, '0')}:00`,
+        sales: row.saleCount,
+        revenue: row.revenue,
+        topItem: topItemByHour.get(hour) || null,
+      }
+    })
+
+    const peakRow = [...hourMap.entries()].sort(
+      (a, b) => b[1].revenue - a[1].revenue || b[1].saleCount - a[1].saleCount,
+    )[0]
+    const peakHourNum = peakRow?.[0]
+    const peakHour =
+      peakHourNum == null
+        ? '—'
+        : `${String(peakHourNum).padStart(2, '0')}:00–${String(peakHourNum + 1).padStart(2, '0')}:00`
+    const peakHourSales = peakRow ? peakRow[1].revenue : 0
+
+    const prevSalesById = new Map(
+      (prevProductsRes.rows || []).map((p) => [p.id, Number(p.sales) || 0]),
+    )
+    const soldProducts = (productsRes.rows || []).map((p) => {
+      const sales = Number(p.sales) || 0
+      return {
+        id: p.id,
+        name: p.name,
+        units: Number(p.units) || 0,
+        sales,
+        changePct: pctChange(sales, prevSalesById.get(p.id) || 0),
+      }
+    })
+
+    const productMix = soldProducts.map((p) => ({ name: p.name, units: p.units }))
+    // Top N highest; lowest only when more than N sold SKUs so lists never overlap
+    const TOP_N = 3
+    const LOW_N = 3
+    const topProducts = soldProducts.slice(0, TOP_N)
+    const lowProducts =
+      soldProducts.length > TOP_N
+        ? soldProducts.slice(TOP_N).slice(-LOW_N).reverse()
+        : []
+
+    const staff = (staffRes.rows || []).map((row) => {
+      const rating = Number(row.rating) || 0
+      return {
+        id: row.id,
+        name: row.name,
+        image: row.image,
+        status: row.status,
+        role: row.role,
+        rating,
+        points: rating,
+        pointsRaw: Number(row.pointsRaw) || 0,
+      }
+    })
+
+    return {
+      branchName,
+      date: scope.from || todayIso(),
+      range: { from: scope.from, to: scope.to, branchId: scope.branchId },
+      kpis: {
+        totalSales,
+        profit,
+        saleCount,
+        profitChangePct: pctChange(profit, prevProfit),
+        salesChangePct: pctChange(totalSales, Number(prevTotals.totalSales) || 0),
+        avgTicket: saleCount > 0 ? totalSales / saleCount : 0,
+      },
+      dailySummary: {
+        revenue: totalSales,
+        itemsSold,
+        orders: saleCount,
+        peakHour,
+        peakHourSales,
+      },
+      salesByHour,
+      productMix,
+      topProducts,
+      lowProducts,
+      counters: (countersRes.rows || []).map((c) => ({
+        id: c.counterId,
+        name: c.counterName,
+        sales: Number(c.revenue) || 0,
+        orders: Number(c.saleCount) || 0,
+      })),
+      staff,
+      inventory: inventoryRes.rows || [],
+    }
+  })
 }
 
 export async function buildBranchReport(tenantId, filters = {}) {

@@ -136,7 +136,7 @@ export async function getStaffScores(req, res) {
         LEFT JOIN performance_scores ps ON ps.staff_id = s.id AND ps.tenant_id = s.tenant_id
         LEFT JOIN scoring_scales ss ON ss.id = ps.scale_id AND ss.tenant_id = s.tenant_id
         WHERE s.tenant_id = $1 AND s.status = 'active'
-        GROUP BY s.id, d.name
+        GROUP BY s.id, u.full_name, s.image_url, s.designation_id, d.name
         ORDER BY u.full_name ASC
       `,
     )

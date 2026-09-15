@@ -12,3 +12,20 @@ export function displayMovementRef(row = {}) {
 export function displaySupplierRef(row = {}) {
   return row.id ? referenceFromUuid(row.id, 'SUP') : '—'
 }
+
+export function displayStaffRef(row = {}) {
+  const id = row.id || row.staffId
+  return id ? referenceFromUuid(id, 'STF') : '—'
+}
+
+export function displayDiscountRef(row = {}) {
+  return row.id ? referenceFromUuid(row.id, 'OFF') : '—'
+}
+
+/** Prefer real product item_code; fall back to ITM-XXXXXXXX from UUID. */
+export function displayItemCode(row = {}) {
+  const code = row.itemCode || row.item_code
+  if (code) return String(code)
+  const id = row.id || row.productId
+  return id ? referenceFromUuid(id, 'ITM') : '—'
+}

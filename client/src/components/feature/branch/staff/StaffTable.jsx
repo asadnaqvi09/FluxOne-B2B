@@ -14,6 +14,7 @@ import {
   TablePagination,
 } from '@/components/ui/table'
 import { TableRowsSkeleton } from '@/components/ui/skeleton'
+import { displayStaffRef } from '@/lib/formatDisplayId'
 
 function formatJoined(value) {
   if (!value) return '—'
@@ -143,7 +144,10 @@ export function StaffTable({
                         <p className="truncate text-sm font-semibold text-slate-900">
                           {row.fullName || '—'}
                         </p>
-                        <p className="truncate font-mono text-[11px] text-slate-400">
+                        <p className="truncate font-mono text-[11px] text-purple-700">
+                          {displayStaffRef(row)}
+                        </p>
+                        <p className="truncate text-[11px] text-slate-400">
                           {row.email || '—'}
                         </p>
                       </div>
@@ -176,7 +180,7 @@ export function StaffTable({
             <Table className="min-w-[56rem] text-left text-sm">
               <TableHeader>
                 <TableRow className="text-xs tracking-wide text-slate-500 uppercase">
-                  <TableHead className="px-2 py-2.5 font-medium">ID</TableHead>
+                  <TableHead className="px-2 py-2.5 font-medium">Code</TableHead>
                   <TableHead className="px-2 py-2.5 font-medium">Name</TableHead>
                   <TableHead className="px-2 py-2.5 font-medium">Joined</TableHead>
                   <TableHead className="px-2 py-2.5 font-medium">Designation</TableHead>
@@ -190,7 +194,10 @@ export function StaffTable({
                 {list.map((row) => (
                   <TableRow key={row.id} className="hover:bg-slate-50/80">
                     <TableCell className="px-2 py-3 font-mono text-xs text-slate-600">
-                      {row.email || '—'}
+                      <div>
+                        <p className="font-semibold text-purple-800">{displayStaffRef(row)}</p>
+                        <p className="mt-0.5 truncate text-[11px] text-slate-400">{row.email || '—'}</p>
+                      </div>
                     </TableCell>
                     <TableCell className="px-2 py-3">
                       <div className="flex items-center gap-3">

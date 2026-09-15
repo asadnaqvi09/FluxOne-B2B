@@ -58,6 +58,7 @@ export function normalizeAlert(row = {}) {
   return {
     id: row.id,
     name: row.name || '—',
+    itemCode: row.itemCode || row.item_code || '',
     remainingNumber: Number(row.remainingNumber ?? row.remaining_number ?? 0),
     status: safeStatus,
     source: row.source || 'system',

@@ -22,6 +22,7 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { apiClient } from '@/api/api'
 import { endpoints } from '@/api/endpoints'
 import { BRAND } from '@/lib/constants'
+import { displayDiscountRef } from '@/lib/formatDisplayId'
 import { toastError, toastSuccess } from '@/lib/toast'
 
 const PAGE_SIZE = 8
@@ -199,7 +200,7 @@ export function DiscountsPage() {
                         <div className="min-w-0">
                           <p className="truncate text-sm font-semibold text-slate-900">{disc.name}</p>
                           <p className="mt-0.5 truncate font-mono text-[11px] text-slate-400">
-                            {disc.id}
+                            {displayDiscountRef(disc)}
                           </p>
                         </div>
                         <Badge
@@ -236,7 +237,7 @@ export function DiscountsPage() {
                 <Table className="min-w-[32rem] text-left text-sm">
                   <TableHeader>
                     <TableRow className="text-xs text-slate-500 uppercase">
-                      <TableHead className="px-2 py-3">Campaign ID</TableHead>
+                      <TableHead className="px-2 py-3">Campaign Code</TableHead>
                       <TableHead className="px-2 py-3">Campaign Name / Explanation</TableHead>
                       <TableHead className="px-2 py-3 text-center">Discount Percentage</TableHead>
                       <TableHead className="sticky right-0 z-[1] bg-white px-2 py-3 text-right">
@@ -250,7 +251,7 @@ export function DiscountsPage() {
                       .map((disc) => (
                         <TableRow key={disc.id} className="group">
                           <TableCell className="px-2 py-3 font-mono font-bold text-slate-900">
-                            {disc.id}
+                            {displayDiscountRef(disc)}
                           </TableCell>
                           <TableCell className="px-2 py-3 font-semibold text-slate-800">
                             {disc.name}

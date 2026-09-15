@@ -28,3 +28,38 @@ export async function listAttendance(tenantId) {
   )
   return rows
 }
+
+/** Clear holiday/leave attendance marks for a staff over dates (only matching status). */
+export async function clearAttendanceMarks(tenantId, { staffId, dates, status, note = null }) {
+  if (!staffId || !Array.isArray(dates) || dates.length === 0 || !status) return { rowCount: 0 }
+
+  const { rowCount } = await tenantQuery(
+    tenantId,
+    `
+      DELETE FROM attendance
+      WHERE tenant_id = $1
+        AND staff_id = $2
+        AND status = $3
+        AND work_date = ANY($4::date[])
+        AND ($5::text IS NULL OR note = $5)
+    `,
+    [staffId, status, dates, note],
+  )
+  return { rowCount: rowCount || 0 }
+}
+
+/** Clear all holiday marks for a given date + holiday name (any staff). */
+export async function clearHolidayAttendanceByDate(tenantId, { workDate, note }) {
+  const { rowCount } = await tenantQuery(
+    tenantId,
+    `
+      DELETE FROM attendance
+      WHERE tenant_id = $1
+        AND work_date = $2::date
+        AND status = 'holiday'
+        AND ($3::text IS NULL OR note = $3)
+    `,
+    [workDate, note || null],
+  )
+  return { rowCount: rowCount || 0 }
+}

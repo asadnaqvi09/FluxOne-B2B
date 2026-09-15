@@ -84,6 +84,28 @@ export function ProductTable({
                     <div className="mt-2">
                       <PricingColumns row={row} />
                     </div>
+                    <div className="mt-2 space-y-1 text-xs leading-snug text-slate-600">
+                      <p>
+                        <span className="text-slate-400">Last purchase</span>{' '}
+                        {money(row.lastPurchasePrice)}
+                        {row.lastPurchaseVendorName ? ` · ${row.lastPurchaseVendorName}` : ''}
+                      </p>
+                      <p>
+                        <span className="text-slate-400">Current purchase</span>{' '}
+                        {money(row.purchasePrice)}
+                        {row.currentPurchaseVendorName
+                          ? ` · ${row.currentPurchaseVendorName}`
+                          : ''}
+                      </p>
+                      <p>
+                        <span className="text-slate-400">Last selling</span>{' '}
+                        {money(row.lastSellingPrice)}
+                      </p>
+                      <p>
+                        <span className="text-slate-400">Current selling</span>{' '}
+                        {money(row.sellingPrice)}
+                      </p>
+                    </div>
                     <div className="mt-3 flex flex-wrap gap-1.5">
                       <Button
                         type="button"
@@ -132,8 +154,12 @@ export function ProductTable({
                   <TableHead className="px-2 py-3 font-semibold">Barcode</TableHead>
                   <TableHead className="px-2 py-3 font-semibold">Prices</TableHead>
                   <TableHead className="px-2 py-3 font-semibold">Discount & offers</TableHead>
-                  <TableHead className="px-2 py-3 font-semibold">Purchase vendors</TableHead>
-                  <TableHead className="px-2 py-3 font-semibold">Selling</TableHead>
+                  <TableHead className="px-2 py-3 font-semibold">
+                    Last / Current purchase
+                  </TableHead>
+                  <TableHead className="px-2 py-3 font-semibold">
+                    Last / Current selling
+                  </TableHead>
                   <TableHead className="px-2 py-3 font-semibold">Status</TableHead>
                   <TableHead className="px-2 py-3 font-semibold">Action</TableHead>
                 </TableRow>
@@ -171,27 +197,42 @@ export function ProductTable({
                         <span className="text-slate-400">Last</span>{' '}
                         <span className="font-medium">{money(row.lastPurchasePrice)}</span>
                       </p>
-                      <p className="truncate text-slate-600" title={row.lastSupplierName}>
-                        {row.lastSupplierName || '—'}
+                      <p
+                        className="truncate text-slate-600"
+                        title={row.lastPurchaseVendorName || undefined}
+                      >
+                        {row.lastPurchaseVendorName || '—'}
                       </p>
-                      <p className="text-[11px] text-slate-400">
-                        {row.lastPurchaseDate ? String(row.lastPurchaseDate).slice(0, 10) : ''}
+                      <p className="mt-1.5">
+                        <span className="text-slate-400">Current</span>{' '}
+                        <span className="font-medium">{money(row.purchasePrice)}</span>
+                      </p>
+                      <p
+                        className="truncate text-slate-600"
+                        title={row.currentPurchaseVendorName || undefined}
+                      >
+                        {row.currentPurchaseVendorName || '—'}
                       </p>
                     </TableCell>
-                    <TableCell className="px-2 py-3 text-xs text-slate-600">
+                    <TableCell className="px-2 py-3 text-xs leading-snug text-slate-600">
                       <p>
-                        <span className="text-slate-400">Rate</span> {row.effectiveTaxRate ?? 0}%
+                        <span className="text-slate-400">Last</span>{' '}
+                        <span className="font-medium text-slate-800">
+                          {money(row.lastSellingPrice)}
+                        </span>
                       </p>
-                      <p>
-                        <span className="text-slate-400">Tax</span>{' '}
-                        {money(row.sellingPriceWithTax - row.sellingPriceWithoutTax)}
+                      <p className="mt-1">
+                        <span className="text-slate-400">Current</span>{' '}
+                        <span className="font-medium text-slate-800">
+                          {money(row.sellingPrice)}
+                        </span>
                       </p>
                     </TableCell>
                     <TableCell className="px-2 py-3">
                       <ProductStatusToggle
-                        product={row}
+                        status={row.status}
                         loading={statusUpdatingId === row.id}
-                        onChange={onStatusChange}
+                        onChange={(status) => onStatusChange?.(row, status)}
                       />
                     </TableCell>
                     <TableCell className="px-2 py-3">

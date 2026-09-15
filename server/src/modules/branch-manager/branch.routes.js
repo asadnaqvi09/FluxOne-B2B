@@ -17,9 +17,20 @@ import { leavesList, addLeave, editLeave, removeLeave } from './leaves/leaves.co
 import { salesList, processRefund } from './sales/sales.controller.js'
 import { getDiscounts, addDiscount, editDiscount, removeDiscount } from './discounts/discounts.controller.js'
 import { addStockRequest, stockRequestList } from './stock/stock_request.controller.js'
+import {
+  hardwareList,
+  hardwareCreate,
+  hardwareUpdate,
+  hardwareRemove,
+  scalesList,
+  scalesCreate,
+  scalesUpdate,
+  scalesRemove,
+} from './resources/resources.controller.js'
 import { asyncHandler } from '../../middlewares/error.middleware.js'
 import { requirePermission } from '../../middlewares/role.middleware.js'
 import { validate } from '../../middlewares/validate.middleware.js'
+import { upload } from '../../middlewares/upload.middleware.js'
 import { attendanceSchema } from './attendance/attendance.validator.js'
 import { createStockRequestSchema, listStockRequestsSchema } from './stock/stock_request.validator.js'
 
@@ -69,6 +80,26 @@ router.get('/discounts', requirePermission('items:read'), asyncHandler(getDiscou
 router.post('/discounts', requirePermission('items:write'), asyncHandler(addDiscount))
 router.put('/discounts/:id', requirePermission('items:write'), asyncHandler(editDiscount))
 router.delete('/discounts/:id', requirePermission('items:write'), asyncHandler(removeDiscount))
+
+// Resources — POS hardware + item scales
+router.get('/resources/hardware', requirePermission('resources:read'), asyncHandler(hardwareList))
+router.post(
+  '/resources/hardware',
+  requirePermission('resources:write'),
+  upload.single('image'),
+  asyncHandler(hardwareCreate),
+)
+router.put(
+  '/resources/hardware/:id',
+  requirePermission('resources:write'),
+  upload.single('image'),
+  asyncHandler(hardwareUpdate),
+)
+router.delete('/resources/hardware/:id', requirePermission('resources:write'), asyncHandler(hardwareRemove))
+router.get('/resources/scales', requirePermission('resources:read'), asyncHandler(scalesList))
+router.post('/resources/scales', requirePermission('resources:write'), asyncHandler(scalesCreate))
+router.put('/resources/scales/:id', requirePermission('resources:write'), asyncHandler(scalesUpdate))
+router.delete('/resources/scales/:id', requirePermission('resources:write'), asyncHandler(scalesRemove))
 
 // Stock Requests
 router.get(

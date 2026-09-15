@@ -92,11 +92,26 @@ export function validateStaffSchedule(fields, branchHours = null) {
 
 // Staff create/edit fields (excludes schedule — use validateStaffSchedule).
 export function validateStaffForm(fields, { isEdit = false, branchHours = null } = {}) {
-  if (!String(fields.fullName || '').trim()) {
+  const fullName = String(fields.fullName || '').trim()
+  const loginId = String(fields.email || '').trim()
+
+  if (!fullName) {
     return 'Name is required'
   }
-  if (!String(fields.email || '').trim()) {
+  if (fullName.length < 2) {
+    return 'Name must be at least 2 characters'
+  }
+  if (!loginId) {
     return 'ID (login) is required'
+  }
+  if (loginId.length < 3) {
+    return 'ID (login) must be at least 3 characters'
+  }
+  if (/\s/.test(loginId)) {
+    return 'ID (login) cannot contain spaces'
+  }
+  if (!fields.role) {
+    return 'System role is required'
   }
   if (!isEdit && (!fields.password || String(fields.password).length < 8)) {
     return 'Password must be at least 8 characters'

@@ -24,7 +24,8 @@ export function buildStaffPayload(fields) {
     fullName: String(fullName || '').trim(),
     email: String(email || '').trim(),
     role,
-    hardwareDeviceId: hardwareDeviceId?.trim() || undefined,
+    // Always send so BM can clear an assignment (null = unassigned).
+    hardwareDeviceId: String(hardwareDeviceId || '').trim() || null,
     scheduleStart: scheduleStart || undefined,
     scheduleBreakStart: scheduleBreakStart || undefined,
     scheduleBreakEnd: scheduleBreakEnd || undefined,
@@ -36,6 +37,10 @@ export function buildStaffPayload(fields) {
   if (image instanceof File && image.size > 0) {
     const form = new FormData()
     Object.entries(base).forEach(([key, value]) => {
+      if (key === 'hardwareDeviceId') {
+        form.append(key, value || '')
+        return
+      }
       if (value !== undefined && value !== null && value !== '') {
         form.append(key, String(value))
       }

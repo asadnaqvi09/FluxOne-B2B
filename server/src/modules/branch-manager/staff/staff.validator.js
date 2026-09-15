@@ -31,6 +31,13 @@ const staffStatusEnum = z
     return value
   })
 
+/** Empty string clears assignment; omit keeps previous on update. */
+const optionalHardwareDeviceId = z.preprocess((value) => {
+  if (value === '') return null
+  if (value === undefined) return undefined
+  return value
+}, z.string().nullable().optional())
+
 export const listStaffSchema = z.object({
   body: empty,
   params: empty,
@@ -54,7 +61,7 @@ export const createStaffSchema = z
       designationId: optionalUuid,
       designation: optionalString,
       branchId: optionalUuid,
-      hardwareDeviceId: optionalString,
+      hardwareDeviceId: optionalHardwareDeviceId,
       phone: optionalString,
       status: staffStatusEnum.optional(),
       scheduleStart: optionalTime,
@@ -80,7 +87,7 @@ export const updateStaffSchema = z
       designationId: optionalUuid,
       designation: optionalString,
       branchId: optionalUuid,
-      hardwareDeviceId: optionalString,
+      hardwareDeviceId: optionalHardwareDeviceId,
       status: staffStatusEnum.optional(),
       scheduleStart: optionalTime,
       scheduleBreakStart: optionalTime,

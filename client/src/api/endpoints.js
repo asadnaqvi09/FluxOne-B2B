@@ -75,6 +75,20 @@ export const endpoints = {
       update: (id) => `/branch/discounts/${id}`,
       delete: (id) => `/branch/discounts/${id}`,
     },
+    resources: {
+      hardware: {
+        list: '/branch/resources/hardware',
+        create: '/branch/resources/hardware',
+        update: (id) => `/branch/resources/hardware/${id}`,
+        delete: (id) => `/branch/resources/hardware/${id}`,
+      },
+      scales: {
+        list: '/branch/resources/scales',
+        create: '/branch/resources/scales',
+        update: (id) => `/branch/resources/scales/${id}`,
+        delete: (id) => `/branch/resources/scales/${id}`,
+      },
+    },
     activityLogs: {
       list: '/branch/activity-logs',
     },

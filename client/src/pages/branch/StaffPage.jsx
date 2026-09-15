@@ -9,8 +9,9 @@ import { StaffTable } from '@/components/feature/branch/staff/StaffTable'
 import { StaffAttendanceTab } from '@/components/feature/branch/staff/StaffAttendanceTab'
 import { StaffHolidaysTab } from '@/components/feature/branch/staff/StaffHolidaysTab'
 import { StaffLeavesTab } from '@/components/feature/branch/staff/StaffLeavesTab'
-// Hidden with Performance tab — restore together when ready
 import { StaffPerformanceTab } from '@/components/feature/branch/staff/StaffPerformanceTab'
+// Phase 1 deferred — restore Create Designation when custom designation assignment ships
+// import { DesignationFormDialog } from '@/components/feature/branch/designations/DesignationFormDialog'
 import { Button } from '@/components/ui/button'
 import { useBranchStaff } from '@/hooks/useBranchStaff'
 import { useDebouncedSearch } from '@/hooks/useDebouncedSearch'
@@ -45,19 +46,20 @@ export function StaffPage() {
   const [statusTarget, setStatusTarget] = useState(null)
   const [statusUpdatingId, setStatusUpdatingId] = useState(null)
   const [designations, setDesignations] = useState([])
+  // const [designationOpen, setDesignationOpen] = useState(false)
   const [activeTab, setActiveTab] = useState('list')
 
-  useEffect(() => {
-    // Attendance / leaves / performance tabs still list auto-mapped designation names.
-    async function loadDesignations() {
-      const res = await apiClient.get(endpoints.branch.designations.list, {
-        active: 'active',
-        limit: 100,
-      })
-      if (res.success && res.data) {
-        setDesignations(res.data.items || res.data || [])
-      }
+  async function loadDesignations() {
+    const res = await apiClient.get(endpoints.branch.designations.list, {
+      active: 'active',
+      limit: 100,
+    })
+    if (res.success && res.data) {
+      setDesignations(res.data.items || res.data || [])
     }
+  }
+
+  useEffect(() => {
     void loadDesignations()
   }, [])
 
@@ -243,6 +245,16 @@ export function StaffPage() {
         loading={mutating}
         onSubmit={handleSubmit}
       />
+
+      {/* Phase 1 deferred — restore with Create Designation button when ready
+      <DesignationFormDialog
+        open={designationOpen}
+        onOpenChange={setDesignationOpen}
+        onSubmitSuccess={() => {
+          void loadDesignations()
+        }}
+      />
+      */}
 
       <ConfirmDialog
         open={Boolean(statusTarget)}

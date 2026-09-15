@@ -19,6 +19,7 @@ import { ImageUploadField } from '@/components/shared/ImageUploadField'
 import { BRAND } from '@/lib/constants'
 import { PRODUCT_TYPES, SCALE_OPTIONS } from '@/lib/mapProduct'
 import { useFormBaseline } from '@/hooks/useFormBaseline'
+import { useItemScales } from '@/hooks/useItemScales'
 
 const EMPTY = {
   name: '',
@@ -64,9 +65,17 @@ export function ItemFormDialog({
   const [created, setCreated] = useState(null)
   const [imageWarning, setImageWarning] = useState(null)
   const { captureBaseline, isDirty } = useFormBaseline(open)
+  const { scales: scaleOptions } = useItemScales({ enabled: open })
 
   const type = isEdit ? form.type : productType
   const isBundle = type === PRODUCT_TYPES.BUNDLE
+
+  const scaleChoices = useMemo(() => {
+    const current = String(form.scale || '').trim()
+    const merged = [...scaleOptions]
+    if (current && !merged.includes(current)) merged.unshift(current)
+    return merged.length > 0 ? merged : SCALE_OPTIONS
+  }, [scaleOptions, form.scale])
 
   const subcategories = useMemo(() => {
     if (!form.categoryId || !childrenByParent) return []
@@ -355,7 +364,7 @@ export function ItemFormDialog({
                         onChange={(event) => patch('scale', event.target.value)}
                       >
                         <option value="">Select Scale</option>
-                        {SCALE_OPTIONS.map((scale) => (
+                        {scaleChoices.map((scale) => (
                           <option key={scale} value={scale}>
                             {scale}
                           </option>
@@ -486,7 +495,7 @@ export function ItemFormDialog({
                     onChange={(event) => patch('scale', event.target.value)}
                   >
                     <option value="">Select Scale</option>
-                    {SCALE_OPTIONS.map((scale) => (
+                    {scaleChoices.map((scale) => (
                       <option key={scale} value={scale}>
                         {scale}
                       </option>

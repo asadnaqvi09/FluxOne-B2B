@@ -15,6 +15,7 @@ import { BRAND } from '@/lib/constants'
 import { useFormBaseline } from '@/hooks/useFormBaseline'
 import { apiClient } from '@/api/api'
 import { endpoints } from '@/api/endpoints'
+import { toastSuccess } from '@/lib/toast'
 
 const EMPTY_FORM = {
   name: '',
@@ -56,9 +57,11 @@ export function DesignationFormDialog({
     setLoading(false)
 
     if (res.success) {
-      setError('You do not have permission to perform this action')
+      toastSuccess('Designation created')
+      onSubmitSuccess?.(res.data)
+      onOpenChange?.(false)
     } else {
-      setError(res.error || 'You do not have permission to perform this action')
+      setError(res.error || 'Failed to create designation')
     }
   }
 
@@ -109,4 +112,5 @@ export function DesignationFormDialog({
     </Dialog>
   )
 }
+
 export default DesignationFormDialog

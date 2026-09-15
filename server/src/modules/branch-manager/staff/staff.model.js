@@ -21,6 +21,8 @@ const staffSelect = `
   s.designation_id AS "designationId",
   COALESCE(d.name, s.designation) AS "designation",
   s.hardware_device_id AS "hardwareDeviceId",
+  hw.code AS "hardwareCode",
+  hw.name AS "hardwareName",
   s.status,
   s.schedule_start AS "scheduleStart",
   s.schedule_break_start AS "scheduleBreakStart",
@@ -94,6 +96,9 @@ export async function listStaff(tenantId, filters = {}) {
       JOIN users u ON u.id = s.user_id AND u.tenant_id = s.tenant_id
       JOIN roles r ON r.id = u.role_id
       LEFT JOIN designations d ON d.id = s.designation_id AND d.tenant_id = s.tenant_id
+      LEFT JOIN branch_hardware hw
+        ON hw.tenant_id = s.tenant_id
+       AND hw.id::text = s.hardware_device_id
       WHERE s.tenant_id = $1
         AND r.slug IN (${CREATABLE_STAFF_ROLE_SQL})
         AND (
@@ -124,6 +129,9 @@ export async function getStaffById(tenantId, id, { branchId } = {}) {
       JOIN users u ON u.id = s.user_id AND u.tenant_id = s.tenant_id
       JOIN roles r ON r.id = u.role_id
       LEFT JOIN designations d ON d.id = s.designation_id AND d.tenant_id = s.tenant_id
+      LEFT JOIN branch_hardware hw
+        ON hw.tenant_id = s.tenant_id
+       AND hw.id::text = s.hardware_device_id
       WHERE s.tenant_id = $1
         AND s.id = $2
         AND ($3::uuid IS NULL OR s.branch_id = $3)
@@ -312,6 +320,9 @@ async function getStaffByIdInTx(client, tenantId, id, { branchId } = {}) {
       JOIN users u ON u.id = s.user_id AND u.tenant_id = s.tenant_id
       JOIN roles r ON r.id = u.role_id
       LEFT JOIN designations d ON d.id = s.designation_id AND d.tenant_id = s.tenant_id
+      LEFT JOIN branch_hardware hw
+        ON hw.tenant_id = s.tenant_id
+       AND hw.id::text = s.hardware_device_id
       WHERE s.tenant_id = $1
         AND s.id = $2
         AND ($3::uuid IS NULL OR s.branch_id = $3)
@@ -387,7 +398,7 @@ export async function updateStaff(tenantId, id, payload, { branchId } = {}) {
           SET
             designation = COALESCE($2, designation),
             designation_id = COALESCE($3, designation_id),
-            hardware_device_id = COALESCE($4, hardware_device_id),
+            hardware_device_id = $4,
             image_url = COALESCE($5, image_url),
             status = COALESCE($6, status),
             schedule_start = COALESCE($7, schedule_start),
@@ -404,7 +415,9 @@ export async function updateStaff(tenantId, id, payload, { branchId } = {}) {
             payload.role !== undefined
             ? designationId
             : null,
-          payload.hardwareDeviceId !== undefined ? payload.hardwareDeviceId : null,
+          payload.hardwareDeviceId !== undefined
+            ? payload.hardwareDeviceId || null
+            : existing.hardwareDeviceId || null,
           payload.imageUrl || null,
           payload.status || null,
           payload.scheduleStart !== undefined ? payload.scheduleStart : null,

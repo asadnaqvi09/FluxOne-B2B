@@ -6,6 +6,7 @@ import { NativeSelect } from '@/components/ui/select'
 import { Label } from '@/components/ui/label'
 import { BRAND } from '@/lib/constants'
 import { SCALE_OPTIONS } from '@/lib/mapProduct'
+import { useItemScales } from '@/hooks/useItemScales'
 import { cn } from '@/lib/utils'
 
 // Shared Control filters: search, type, scale, category / subcategory chips
@@ -21,6 +22,9 @@ export function MovementFilters({
   onChange,
   className,
 }) {
+  const { scales } = useItemScales()
+  const scaleChoices = scales.length > 0 ? scales : SCALE_OPTIONS
+
   return (
     <div className={cn('space-y-4', className)}>
       <SurfaceCard padding="compact">
@@ -58,7 +62,7 @@ export function MovementFilters({
               onChange={(event) => onChange?.({ scale: event.target.value })}
             >
               <option value="">All scales</option>
-              {SCALE_OPTIONS.map((opt) => (
+              {scaleChoices.map((opt) => (
                 <option key={opt} value={opt}>
                   {opt}
                 </option>

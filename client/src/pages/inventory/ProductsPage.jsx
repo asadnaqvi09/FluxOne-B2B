@@ -117,7 +117,7 @@ export function ProductsPage() {
     try {
       const result = await setProductStatus(row.id, status)
       if (!result.success) toastError(result.error || 'Status update failed')
-      else toastSuccess(status === PRODUCT_STATUS.INACTIVE ? 'Product deactivated' : 'Product activated')
+      else toastSuccess(status === PRODUCT_STATUS.INACTIVE ? 'Product closed' : 'Product opened')
     } finally {
       setStatusUpdatingId(null)
     }
@@ -361,7 +361,7 @@ export function ProductsPage() {
         title="Deactivate product?"
         description={
           statusTarget
-            ? `${statusTarget.name || 'This product'} will be hidden from active lists and POS sync. You can reactivate it later.`
+            ? `${statusTarget.name || 'This product'} will be closed (hidden from open lists and POS sync). You can open it again later.`
             : undefined
         }
         confirmLabel="Deactivate"

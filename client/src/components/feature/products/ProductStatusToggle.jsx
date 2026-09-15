@@ -6,6 +6,10 @@ export function ProductStatusToggle({ status, loading = false, onChange, classNa
     <EntityStatusToggle
       status={status}
       loading={loading}
+      activeLabel="Open"
+      inactiveLabel="Close"
+      activeTitle="Click to close"
+      inactiveTitle="Click to open"
       onChange={(nextActive) => onChange?.(nextActive ? 'active' : 'inactive')}
       className={className}
     />

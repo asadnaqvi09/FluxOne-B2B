@@ -76,6 +76,7 @@ export function StaffFormDialog({
   const hoursWarning = getBranchHoursSoftWarning(branchHours)
   const [form, setForm] = useState(EMPTY_FORM)
   const [error, setError] = useState(null)
+  const [hardwareOptions, setHardwareOptions] = useState([])
   const { captureBaseline, isDirty } = useFormBaseline(open)
 
   useEffect(() => {
@@ -93,7 +94,18 @@ export function StaffFormDialog({
         setBranchHours({ openingTime: '', closingTime: '' })
       }
     }
+
+    async function loadHardwareOptions() {
+      const res = await apiClient.get(endpoints.branch.resources.hardware.list)
+      if (res.success) {
+        setHardwareOptions(res.data || [])
+      } else {
+        setHardwareOptions([])
+      }
+    }
+
     void loadBranchHours()
+    void loadHardwareOptions()
 
     if (isEdit && initialStaff) {
       const nextForm = {
@@ -215,12 +227,32 @@ export function StaffFormDialog({
 
             <div className="space-y-1.5">
               <Label htmlFor="staff-hardware">Hardware</Label>
-              <Input
+              <NativeSelect
                 id="staff-hardware"
-                value={form.hardwareDeviceId}
-                placeholder="Device / POS ID"
+                value={form.hardwareDeviceId || ''}
                 onChange={(e) => patch('hardwareDeviceId', e.target.value)}
-              />
+              >
+                <option value="">No hardware assigned</option>
+                {hardwareOptions
+                  .filter((hw) => {
+                    const assignedToOther =
+                      hw.assignedToStaffId &&
+                      hw.assignedToStaffId !== initialStaff?.id
+                    return !assignedToOther || hw.id === form.hardwareDeviceId
+                  })
+                  .map((hw) => (
+                    <option key={hw.id} value={hw.id}>
+                      {hw.name}
+                      {hw.code ? ` (${hw.code})` : ''}
+                      {hw.type ? ` · ${hw.type}` : ''}
+                    </option>
+                  ))}
+              </NativeSelect>
+              {hardwareOptions.length === 0 ? (
+                <p className="text-xs text-slate-500">
+                  No hardware registered yet. Add devices under Resources.
+                </p>
+              ) : null}
             </div>
 
             {hoursWarning ? (

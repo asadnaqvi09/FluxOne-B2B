@@ -7,7 +7,8 @@ import { InventoryStatusChart } from '@/components/feature/branch/dashboard/Inve
 import { ProductSalesInsights } from '@/components/feature/branch/dashboard/ProductSalesInsights'
 import { SalesChart } from '@/components/feature/branch/dashboard/SalesChart'
 import { StaffPerformanceTable } from '@/components/feature/branch/dashboard/StaffPerformanceTable'
-import { AiBusinessInsights } from '@/components/feature/branch/dashboard/AiBusinessInsights'
+// Phase 2 — restore when AI Business Insights ships
+// import { AiBusinessInsights } from '@/components/feature/branch/dashboard/AiBusinessInsights'
 import { MotionHeader, MotionReveal } from '@/components/shared/MotionReveal'
 import { PageHeader } from '@/components/shared/PageHeader'
 import { Button } from '@/components/ui/button'
@@ -338,13 +339,15 @@ export function DashboardPage() {
           </MotionReveal>
         </div>
 
+        {/* Phase 2 — restore when AI Business Insights ships
         <MotionReveal delay={0.18}>
           <AiBusinessInsights data={data} />
         </MotionReveal>
+        */}
       </div>
 
       <p className="text-center text-[11px] text-slate-400">
-        Accent · <span style={{ color: BRAND.purple }}>FluxOne</span> branch analytics · Phase 2 Platform
+        Accent · <span style={{ color: BRAND.purple }}>FluxOne</span> branch analytics
       </p>
     </div>
   )

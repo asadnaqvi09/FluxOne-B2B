@@ -68,6 +68,7 @@ function StaffRowActions({ row, onEdit, onDelete }) {
         type="button"
         variant="ghost"
         size="icon"
+        className="cursor-pointer text-slate-500 transition-colors hover:bg-slate-100 hover:text-slate-900"
         aria-label={`Edit ${row.fullName || 'staff'}`}
         onClick={() => onEdit?.(row)}
       >
@@ -78,7 +79,7 @@ function StaffRowActions({ row, onEdit, onDelete }) {
         variant="ghost"
         size="icon"
         aria-label={`Delete ${row.fullName || 'staff'}`}
-        className="text-slate-500 transition-colors hover:bg-transparent hover:text-slate-800"
+        className="cursor-pointer text-slate-500 transition-colors hover:bg-rose-50 hover:text-rose-700"
         onClick={() => onDelete?.(row)}
       >
         <Trash2 className="size-4" />
@@ -163,8 +164,13 @@ export function StaffTable({
                       <p className="text-slate-600">
                         <ScheduleBlock row={row} />
                       </p>
-                      {row.hardwareDeviceId ? (
-                        <p className="truncate">Device {row.hardwareDeviceId}</p>
+                      {row.hardwareName || row.hardwareCode || row.hardwareDeviceId ? (
+                        <p className="truncate">
+                          {row.hardwareName || row.hardwareCode || row.hardwareDeviceId}
+                          {row.hardwareName && row.hardwareCode ? (
+                            <span className="text-slate-400"> · {row.hardwareCode}</span>
+                          ) : null}
+                        </p>
                       ) : null}
                     </div>
                     <div className="mt-3 flex justify-end">
@@ -221,7 +227,18 @@ export function StaffTable({
                       <ScheduleBlock row={row} />
                     </TableCell>
                     <TableCell className="px-2 py-3 text-slate-600">
-                      {row.hardwareDeviceId || '—'}
+                      {row.hardwareName ? (
+                        <div className="min-w-0">
+                          <p className="truncate font-medium text-slate-800">{row.hardwareName}</p>
+                          {row.hardwareCode ? (
+                            <p className="truncate font-mono text-[11px] text-slate-400">
+                              {row.hardwareCode}
+                            </p>
+                          ) : null}
+                        </div>
+                      ) : (
+                        row.hardwareCode || row.hardwareDeviceId || '—'
+                      )}
                     </TableCell>
                     <TableCell className="px-2 py-3">
                       <EntityStatusToggle

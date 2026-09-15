@@ -24,6 +24,7 @@ import { endpoints } from '@/api/endpoints'
 import { BRAND } from '@/lib/constants'
 import { displayDiscountRef } from '@/lib/formatDisplayId'
 import { toastError, toastSuccess } from '@/lib/toast'
+import { validateDiscountForm } from '@/lib/validation/branchForms'
 
 const PAGE_SIZE = 8
 
@@ -41,35 +42,46 @@ export function DiscountsPage() {
   
   const [name, setName] = useState('')
   const [percent, setPercent] = useState('')
+  const [categoryId, setCategoryId] = useState('')
   const [saving, setSaving] = useState(false)
   const [deleteTargetDiscount, setDeleteTargetDiscount] = useState(null)
 
   const fetchDiscounts = async () => {
     setLoading(true)
-    const res = await apiClient.get(endpoints.branch.discounts.list)
+    const params = {}
+    if (filterCategory) params.categoryId = filterCategory
+    const res = await apiClient.get(endpoints.branch.discounts.list, params)
     setLoading(false)
     if (res.success && res.data) {
       setDiscounts(res.data || [])
+    } else if (!res.success) {
+      toastError(res.error || 'Failed to load discounts')
     }
   }
 
   const fetchCategories = async () => {
     const res = await apiClient.get('/inventory/products/categories')
     if (res.success && res.data) {
-      setCategories(res.data || [])
+      const all = Array.isArray(res.data) ? res.data : res.data.items || []
+      setCategories(all.filter((c) => !c.parentId))
     }
   }
 
   useEffect(() => {
-    void fetchDiscounts()
     void fetchCategories()
   }, [])
+
+  useEffect(() => {
+    setPage(1)
+    void fetchDiscounts()
+  }, [filterCategory])
 
   const handleOpenCreate = () => {
     setMode('create')
     setEditing(null)
     setName('')
     setPercent('')
+    setCategoryId('')
     setOpen(true)
   }
 
@@ -78,26 +90,30 @@ export function DiscountsPage() {
     setEditing(discount)
     setName(discount.name)
     setPercent(String(discount.percent))
+    setCategoryId(discount.categoryId || '')
     setOpen(true)
   }
 
   const handleSaveDiscount = async (e) => {
     e.preventDefault()
-    if (!name.trim() || !percent) {
-      return toastError('Discount name and percentage are required')
+    const validationError = validateDiscountForm({ name, percent })
+    if (validationError) {
+      return toastError(validationError)
     }
 
     const value = parseFloat(percent)
-    if (isNaN(value) || value < 0 || value > 100) {
-      return toastError('Discount percentage must be between 0 and 100')
+    const payload = {
+      name: name.trim(),
+      percent: value,
+      categoryId: categoryId || null,
     }
 
     setSaving(true)
     let res
     if (mode === 'create') {
-      res = await apiClient.post(endpoints.branch.discounts.create, { name, percent: value })
+      res = await apiClient.post(endpoints.branch.discounts.create, payload)
     } else {
-      res = await apiClient.put(endpoints.branch.discounts.update(editing.id), { name, percent: value })
+      res = await apiClient.put(endpoints.branch.discounts.update(editing.id), payload)
     }
     setSaving(false)
 
@@ -129,9 +145,7 @@ export function DiscountsPage() {
     }
   }
 
-  const filteredDiscounts = discounts.filter((d) => {
-    return true
-  })
+  const filteredDiscounts = discounts
 
   return (
     <div className="space-y-6 pb-8">
@@ -139,7 +153,7 @@ export function DiscountsPage() {
         <PageHeader
           eyebrow="Promo Offers"
           title="Discount Management"
-          description="Manage promotional campaigns, store-wide sales, and percentage offers."
+          description="Manage promotional campaigns, store-wide sales, and percentage offers. Staff scoring scales live under Staff → Performance."
           actions={
             <Button
               style={{ backgroundColor: BRAND.purple }}
@@ -202,6 +216,9 @@ export function DiscountsPage() {
                           <p className="mt-0.5 truncate font-mono text-[11px] text-slate-400">
                             {displayDiscountRef(disc)}
                           </p>
+                          <p className="mt-1 text-xs text-slate-500">
+                            {disc.categoryName || 'All categories'}
+                          </p>
                         </div>
                         <Badge
                           variant="success"
@@ -239,6 +256,7 @@ export function DiscountsPage() {
                     <TableRow className="text-xs text-slate-500 uppercase">
                       <TableHead className="px-2 py-3">Campaign Code</TableHead>
                       <TableHead className="px-2 py-3">Campaign Name / Explanation</TableHead>
+                      <TableHead className="px-2 py-3">Category</TableHead>
                       <TableHead className="px-2 py-3 text-center">Discount Percentage</TableHead>
                       <TableHead className="sticky right-0 z-[1] bg-white px-2 py-3 text-right">
                         Actions
@@ -255,6 +273,9 @@ export function DiscountsPage() {
                           </TableCell>
                           <TableCell className="px-2 py-3 font-semibold text-slate-800">
                             {disc.name}
+                          </TableCell>
+                          <TableCell className="px-2 py-3 text-slate-600">
+                            {disc.categoryName || 'All categories'}
                           </TableCell>
                           <TableCell className="px-2 py-3 text-center">
                             <Badge
@@ -318,6 +339,20 @@ export function DiscountsPage() {
                 onChange={(e) => setName(e.target.value)}
                 required
               />
+            </div>
+
+            <div className="space-y-1.5">
+              <Label htmlFor="disc-form-category">Category (optional)</Label>
+              <NativeSelect
+                id="disc-form-category"
+                value={categoryId}
+                onChange={(e) => setCategoryId(e.target.value)}
+              >
+                <option value="">All Categories</option>
+                {categories.map((c) => (
+                  <option key={c.id} value={c.id}>{c.name}</option>
+                ))}
+              </NativeSelect>
             </div>
 
             <div className="space-y-1.5">

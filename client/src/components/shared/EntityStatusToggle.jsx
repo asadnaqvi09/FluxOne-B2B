@@ -11,7 +11,17 @@ export function isEntityActive(value) {
 // Unified Active / Inactive pill used across staff, products, categories, suppliers.
 // onChange receives the next boolean (true = activate).
 //
-export function EntityStatusToggle({ active, status, loading = false, onChange, className, activeLabel = 'Active', inactiveLabel = 'Inactive' }) {
+export function EntityStatusToggle({
+  active,
+  status,
+  loading = false,
+  onChange,
+  className,
+  activeLabel = 'Active',
+  inactiveLabel = 'Inactive',
+  activeTitle = 'Click to deactivate',
+  inactiveTitle = 'Click to activate',
+}) {
   const isActive = active != null ? Boolean(active) : isEntityActive(status)
 
   return (
@@ -26,7 +36,7 @@ export function EntityStatusToggle({ active, status, loading = false, onChange, 
           : 'bg-slate-100 text-slate-600 ring-slate-200',
         className,
       )}
-      title={isActive ? 'Click to deactivate' : 'Click to activate'}
+      title={isActive ? activeTitle : inactiveTitle}
     >
       <span
         className="mr-1.5 size-1.5 rounded-full"

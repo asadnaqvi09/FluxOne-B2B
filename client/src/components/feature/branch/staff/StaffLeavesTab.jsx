@@ -27,6 +27,7 @@ import {
 import { apiClient } from '@/api/api'
 import { BRAND } from '@/lib/constants'
 import { toastError, toastSuccess } from '@/lib/toast'
+import { validateLeaveForm } from '@/lib/validation/branchForms'
 
 const PAGE_SIZE = 8
 
@@ -117,7 +118,8 @@ export function StaffLeavesTab({ designations = [], staff = [] }) {
       : ''
 
   const handleNextStep = () => {
-    if (!startDate || !endDate) return toastError('Please select both start and end dates')
+    const validationError = validateLeaveForm({ reason, startDate, endDate })
+    if (validationError) return toastError(validationError)
     if (dateError) return
     setStep(2)
   }

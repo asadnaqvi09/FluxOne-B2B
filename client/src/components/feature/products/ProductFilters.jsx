@@ -56,8 +56,8 @@ export function ProductFilters({
               value={status}
               onChange={(event) => onChange?.({ status: event.target.value, page: 1 })}
             >
-              <option value="active">Active</option>
-              <option value="inactive">Inactive</option>
+              <option value="active">Open</option>
+              <option value="inactive">Close</option>
               <option value="all">All</option>
             </NativeSelect>
           </div>

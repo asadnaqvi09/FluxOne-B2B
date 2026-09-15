@@ -27,6 +27,7 @@ import {
 import { apiClient } from '@/api/api'
 import { BRAND } from '@/lib/constants'
 import { toastError, toastSuccess } from '@/lib/toast'
+import { validateHolidayForm } from '@/lib/validation/branchForms'
 
 const PAGE_SIZE = 8
 
@@ -100,8 +101,8 @@ export function StaffHolidaysTab({ designations = [], staff = [] }) {
   }, [listSearch])
 
   const handleNextStep = () => {
-    if (!name.trim()) return toastError('Holiday name is required')
-    if (!startDate || !endDate) return toastError('Please select both dates')
+    const validationError = validateHolidayForm({ name, startDate, endDate })
+    if (validationError) return toastError(validationError)
     if (dateError) return
     setStep(2)
   }

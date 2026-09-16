@@ -366,58 +366,6 @@ export function TaxProfitPage() {
               )}
             </div>
           </div>
-
-          <div className="flex flex-wrap items-center justify-between gap-3 pt-3 border-t border-slate-100 bg-slate-50/70 p-3 rounded-xl">
-            <div className="flex items-center gap-3">
-              <button
-                type="button"
-                onClick={handleToggleSelectAll}
-                disabled={products.length === 0}
-                className="flex items-center gap-2 text-xs font-semibold text-slate-800 cursor-pointer disabled:opacity-40"
-              >
-                {isAllSelected ? (
-                  <CheckSquare className="size-4 text-purple-700" />
-                ) : (
-                  <Square className="size-4 text-slate-400" />
-                )}
-                <span>Select Page ({products.length})</span>
-              </button>
-              {selectedIds.length > 0 && (
-                <Badge
-                  variant="outline"
-                  className="bg-purple-100/70 text-purple-900 border-purple-300 text-xs font-bold px-2.5 py-0.5"
-                >
-                  {selectedIds.length} Selected
-                </Badge>
-              )}
-            </div>
-
-            <div className="flex items-center gap-2">
-              <Button
-                type="button"
-                disabled={selectedIds.length === 0 || mutating}
-                onClick={() => setProfitDialogOpen(true)}
-                size="sm"
-                className="h-9 px-4 text-xs font-bold cursor-pointer text-white disabled:opacity-40 rounded-xl shadow-xs"
-                style={{ background: BRAND.purple }}
-              >
-                <Percent className="mr-1.5 size-3.5" />
-                Set Profit %
-              </Button>
-
-              <Button
-                type="button"
-                disabled={selectedIds.length === 0 || mutating}
-                onClick={() => setTaxDialogOpen(true)}
-                size="sm"
-                className="h-9 px-4 text-xs font-bold cursor-pointer text-white disabled:opacity-40 rounded-xl shadow-xs"
-                style={{ background: BRAND.deep }}
-              >
-                <Calculator className="mr-1.5 size-3.5" />
-                Set Tax %
-              </Button>
-            </div>
-          </div>
         </div>
       </MotionReveal>
 
@@ -426,9 +374,41 @@ export function TaxProfitPage() {
           title="Catalog Pricing & Profit Margins"
           description="Final retail price = base cost + profit % + tax % (on cost)"
           actions={
-            <span className="text-xs font-medium text-slate-400">
-              {totalCatalog} records · {PAGE_SIZE} / page
-            </span>
+            <div className="flex flex-wrap items-center gap-2">
+              {selectedIds.length > 0 && (
+                <Badge
+                  variant="outline"
+                  className="bg-purple-50 text-purple-900 border-purple-200 text-xs font-bold px-2.5 py-1"
+                >
+                  {selectedIds.length} Selected
+                </Badge>
+              )}
+              <Button
+                type="button"
+                disabled={selectedIds.length === 0 || mutating}
+                onClick={() => setProfitDialogOpen(true)}
+                size="sm"
+                className="h-9 px-3.5 text-xs font-bold cursor-pointer text-white disabled:opacity-40 rounded-xl shadow-xs"
+                style={{ background: BRAND.purple }}
+              >
+                <Percent className="mr-1.5 size-3.5" />
+                Set Profit %
+              </Button>
+              <Button
+                type="button"
+                disabled={selectedIds.length === 0 || mutating}
+                onClick={() => setTaxDialogOpen(true)}
+                size="sm"
+                className="h-9 px-3.5 text-xs font-bold cursor-pointer text-white disabled:opacity-40 rounded-xl shadow-xs"
+                style={{ background: BRAND.deep }}
+              >
+                <Calculator className="mr-1.5 size-3.5" />
+                Set Tax %
+              </Button>
+              <span className="text-xs font-medium text-slate-400 ml-1 hidden sm:inline">
+                {totalCatalog} records · {PAGE_SIZE} / page
+              </span>
+            </div>
           }
         >
           {loading && products.length === 0 ? (
@@ -675,12 +655,14 @@ export function TaxProfitPage() {
                 </Table>
               </div>
 
-              <TablePagination
-                page={pagination.page || page}
-                pageCount={pagination.pageCount || 1}
-                totalItems={pagination.total || 0}
-                onPageChange={setPage}
-              />
+              <div className="pt-4 border-t border-slate-100">
+                <TablePagination
+                  page={pagination.page || page}
+                  pageCount={pagination.pageCount || 1}
+                  totalItems={pagination.total || 0}
+                  onPageChange={setPage}
+                />
+              </div>
             </>
           )}
         </SurfaceCard>

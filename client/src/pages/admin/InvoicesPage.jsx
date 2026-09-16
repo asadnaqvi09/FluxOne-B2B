@@ -34,9 +34,15 @@ import { useAdminCompany } from '@/hooks/useAdminCompany'
 import { useDebouncedValue } from '@/hooks/useDebouncedValue'
 import { BRAND } from '@/lib/constants'
 import { downloadBillingInvoicePdf } from '@/lib/pdfDownload'
+import {
+  exportInvoicesToExcel,
+  exportSingleInvoiceToExcel,
+  downloadInvoicesTablePdf,
+} from '@/lib/invoiceExport'
 import { toastSuccess, toastError } from '@/lib/toast'
 import {
   FileText,
+  FileSpreadsheet,
   Download,
   Printer,
   Calendar,
@@ -127,9 +133,59 @@ export function InvoicesPage() {
         supportEmail: company?.supportEmail,
         registrationTaxId: company?.registrationTaxId,
       })
-      toastSuccess(`Downloaded ${inv.trackingId}`)
+      toastSuccess(`Downloaded PDF for ${inv.trackingId}`)
     } catch (err) {
       toastError(err?.message || 'Failed to generate PDF')
+    }
+  }
+
+  function handleDownloadSingleExcel(inv = selectedInvoice) {
+    if (!inv) return
+    try {
+      exportSingleInvoiceToExcel(inv, {
+        name: company?.name,
+      })
+      toastSuccess(`Downloaded Excel (CSV) for ${inv.trackingId}`)
+    } catch (err) {
+      toastError(err?.message || 'Failed to export invoice to Excel')
+    }
+  }
+
+  function handleExportTableExcel() {
+    if (!invoices.length) {
+      toastError('No invoice records to export')
+      return
+    }
+    try {
+      const monthObj = MONTHS_OPTIONS.find((m) => m.value === selectedMonth)
+      exportInvoicesToExcel(invoices, {
+        companyName: company?.name || 'FluxOne Enterprise Solutions',
+        filterMonth: monthObj ? monthObj.label : selectedMonth,
+        filterYear: selectedYear,
+      })
+      toastSuccess(`Exported ${invoices.length} invoice records to Excel (CSV)`)
+    } catch (err) {
+      toastError(err?.message || 'Failed to export Excel')
+    }
+  }
+
+  function handleExportTablePDF() {
+    if (!invoices.length) {
+      toastError('No invoice records to export')
+      return
+    }
+    try {
+      const monthObj = MONTHS_OPTIONS.find((m) => m.value === selectedMonth)
+      downloadInvoicesTablePdf(invoices, {
+        company,
+        filterMonth: selectedMonth,
+        filterYear: selectedYear,
+        monthLabel: monthObj?.label || selectedMonth,
+        searchQuery: debouncedQ,
+      })
+      toastSuccess(`Downloaded invoice report PDF (${invoices.length} records)`)
+    } catch (err) {
+      toastError(err?.message || 'Failed to generate PDF report')
     }
   }
 
@@ -255,9 +311,35 @@ export function InvoicesPage() {
           title="Invoices & Payment History"
           description="SaaS platform billing records (not POS sales)"
           actions={
-            <span className="text-xs font-medium text-slate-400">
-              {pagination.total} records · {PAGE_SIZE} / page
-            </span>
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="text-xs font-medium text-slate-400 mr-1 hidden sm:inline">
+                {pagination.total} records · {PAGE_SIZE} / page
+              </span>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={handleExportTableExcel}
+                disabled={loading || invoices.length === 0}
+                className="h-8 cursor-pointer text-xs font-semibold border-slate-200 text-slate-700 hover:bg-slate-50 hover:text-slate-900 shadow-2xs"
+                title="Export current table to Excel / CSV"
+              >
+                <FileSpreadsheet className="mr-1.5 size-3.5 text-emerald-600" />
+                Export Excel
+              </Button>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={handleExportTablePDF}
+                disabled={loading || invoices.length === 0}
+                className="h-8 cursor-pointer text-xs font-semibold border-slate-200 text-slate-700 hover:bg-slate-50 hover:text-slate-900 shadow-2xs"
+                title="Download table report as PDF"
+              >
+                <FileText className="mr-1.5 size-3.5 text-purple-600" />
+                Export PDF
+              </Button>
+            </div>
           }
         >
           {loading && invoices.length === 0 ? (
@@ -314,6 +396,17 @@ export function InvoicesPage() {
                       >
                         <FileText className="mr-1 size-3.5" />
                         View
+                      </Button>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={() => handleDownloadSingleExcel(inv)}
+                        className="h-8 cursor-pointer text-xs font-medium text-slate-700 hover:bg-slate-50"
+                        title="Download Excel breakdown"
+                      >
+                        <FileSpreadsheet className="mr-1 size-3.5 text-emerald-600" />
+                        Excel
                       </Button>
                       <Button
                         type="button"
@@ -383,6 +476,17 @@ export function InvoicesPage() {
                             >
                               <FileText className="mr-1 size-3.5" />
                               View
+                            </Button>
+                            <Button
+                              type="button"
+                              variant="outline"
+                              size="sm"
+                              onClick={() => handleDownloadSingleExcel(inv)}
+                              className="h-8 cursor-pointer text-xs font-medium text-slate-700 hover:bg-slate-50"
+                              title="Download invoice Excel / CSV"
+                            >
+                              <FileSpreadsheet className="mr-1 size-3.5 text-emerald-600" />
+                              Excel
                             </Button>
                             <Button
                               type="button"
@@ -496,7 +600,16 @@ export function InvoicesPage() {
               </div>
             </div>
 
-            <DialogFooter className="pt-2">
+            <DialogFooter className="pt-2 flex flex-col-reverse sm:flex-row sm:justify-end gap-2">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => handleDownloadSingleExcel(selectedInvoice)}
+                className="cursor-pointer"
+              >
+                <FileSpreadsheet className="mr-1.5 size-4 text-emerald-600" />
+                Download Excel
+              </Button>
               <Button
                 type="button"
                 variant="outline"
@@ -509,7 +622,7 @@ export function InvoicesPage() {
               <Button
                 type="button"
                 onClick={() => handleDownloadPDF(selectedInvoice)}
-                className="text-white cursor-pointer"
+                className="text-white cursor-pointer font-semibold"
                 style={{ background: BRAND.purple }}
               >
                 <Download className="mr-1.5 size-4" />

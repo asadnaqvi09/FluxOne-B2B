@@ -113,3 +113,22 @@ body,
   }
 }
 
+/* Toast container positioning */
+.Toastify__toast-container {
+  z-index: 99999 !important;
+}
+
+.Toastify__toast-container--top-right {
+  top: 4.35rem !important;
+  right: 1.25rem !important;
+}
+
+@media (max-width: 640px) {
+  .Toastify__toast-container--top-right {
+    top: 3.6rem !important;
+    right: 0.75rem !important;
+    width: calc(100vw - 1.5rem) !important;
+    max-width: 420px !important;
+  }
+}
+

@@ -13,6 +13,7 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { NativeSelect } from '@/components/ui/select'
 import { ImageUploadField } from '@/components/shared/ImageUploadField'
+import { PhoneInput } from '@/components/shared/PhoneInput'
 import { BRAND } from '@/lib/constants'
 import { validateSupplierForm } from '@/lib/validation/supplierForm'
 import { useFormBaseline } from '@/hooks/useFormBaseline'
@@ -119,11 +120,10 @@ export function SupplierFormDialog({ open, onOpenChange, mode = 'create', initia
 
             <div className="space-y-1.5">
               <Label htmlFor="sup-phone">Company contact number</Label>
-              <Input
+              <PhoneInput
                 id="sup-phone"
                 value={form.companyPhone}
-                onChange={(e) => patch('companyPhone', e.target.value)}
-                placeholder="+92…"
+                onChange={(val) => patch('companyPhone', val)}
               />
             </div>
 
@@ -138,10 +138,10 @@ export function SupplierFormDialog({ open, onOpenChange, mode = 'create', initia
 
             <div className="space-y-1.5">
               <Label htmlFor="sup-rep-phone">Representative contact number</Label>
-              <Input
+              <PhoneInput
                 id="sup-rep-phone"
                 value={form.representativePhone}
-                onChange={(e) => patch('representativePhone', e.target.value)}
+                onChange={(val) => patch('representativePhone', val)}
               />
             </div>
 

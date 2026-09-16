@@ -33,24 +33,30 @@ export function validatePhone(phone, { required = true, fieldName = 'Phone numbe
     return null
   }
 
-  // Remove spaces or hyphens for checking
-  const digitsOnly = trimmed.replace(/[^\d+]/g, '')
+  // Remove spaces, dashes, parentheses
+  const cleaned = trimmed.replace(/[\s()-]/g, '')
   
-  if (/[a-zA-Z]/.test(phone)) {
+  if (/[a-zA-Z]/.test(cleaned)) {
     return `${fieldName} must contain digits only (no alphabets)`
   }
 
-  if (digitsOnly.startsWith('+92')) {
-    if (digitsOnly.length !== 13) {
-      return `${fieldName} with +92 country code must be exactly 13 characters (e.g. +923001234567)`
+  if (cleaned.startsWith('+92')) {
+    const digits = cleaned.slice(3)
+    if (digits.length !== 10) {
+      return `${fieldName} must be exactly 10 digits after +92 (e.g. +923001234567)`
     }
-  } else if (digitsOnly.startsWith('03')) {
-    if (digitsOnly.length !== 11) {
+  } else if (cleaned.startsWith('03')) {
+    if (cleaned.length !== 11) {
       return `${fieldName} must be exactly 11 digits (e.g. 03001234567)`
     }
+  } else if (cleaned.startsWith('+')) {
+    if (cleaned.length < 9 || cleaned.length > 16) {
+      return `${fieldName} must be a valid international phone number with country code (e.g. +923001234567)`
+    }
   } else {
-    if (digitsOnly.length < 10 || digitsOnly.length > 13) {
-      return `${fieldName} must be a valid 10-11 digit mobile number`
+    const digits = cleaned.replace(/\D/g, '')
+    if (digits.length < 8 || digits.length > 15) {
+      return `${fieldName} must be a valid phone number`
     }
   }
 

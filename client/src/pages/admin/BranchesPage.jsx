@@ -1,5 +1,6 @@
 import { useMemo, useState } from 'react'
 import { SurfaceCard } from '@/components/shared/SurfaceCard'
+import { StatCard } from '@/components/shared/StatsCards'
 import { PageHeader } from '@/components/shared/PageHeader'
 import { MotionHeader, MotionReveal } from '@/components/shared/MotionReveal'
 import { SlowLoadingBanner, useSlowLoadingHint } from '@/components/shared/SlowLoadingBanner'
@@ -27,10 +28,11 @@ import {
 } from '@/components/ui/dialog'
 import { ConfirmDialog } from '@/components/shared/ConfirmDialog'
 import { ImageUploadField } from '@/components/shared/ImageUploadField'
+import { PhoneInput } from '@/components/shared/PhoneInput'
+import { TimePicker } from '@/components/shared/TimePicker'
 import { BRAND } from '@/lib/constants'
 import { toastSuccess, toastError } from '@/lib/toast'
 import {
-  sanitizePhoneInput,
   validatePhone,
   validateEmail,
 } from '@/lib/validation/formValidators'
@@ -77,8 +79,9 @@ function formatCreatedAt(value) {
 
 function shortId(id) {
   if (!id) return '—'
-  const raw = String(id)
-  return raw.length > 10 ? `${raw.slice(0, 8)}…` : raw
+  const raw = String(id).trim()
+  if (raw.length <= 20) return raw
+  return `${raw.slice(0, 8)}…${raw.slice(-6)}`
 }
 
 function managerAvatar(manager) {
@@ -373,52 +376,37 @@ export function BranchesPage() {
       ) : null}
 
       <MotionReveal delay={0.03}>
-        <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-          <div className="flex items-center gap-3 rounded-2xl border border-border bg-white p-3.5 shadow-2xs">
-            <div
-              className="flex size-10 shrink-0 items-center justify-center rounded-xl text-white"
-              style={{ background: BRAND.purple }}
-            >
-              <Store className="size-5" />
-            </div>
-            <div className="min-w-0">
-              <p className="text-[11px] font-medium text-slate-500 uppercase tracking-wider">Total Outlets</p>
-              <p className="text-lg font-bold text-slate-900 leading-tight">{loading ? '—' : stats.total}</p>
-            </div>
-          </div>
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+          <StatCard
+            index={0}
+            label="Total Branches"
+            value={loading ? '—' : stats.total}
+            icon={Store}
+          />
 
-          <div className="flex items-center gap-3 rounded-2xl border border-border bg-white p-3.5 shadow-2xs">
-            <div className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-emerald-50 text-emerald-600 border border-emerald-200">
-              <CheckCircle className="size-5" />
-            </div>
-            <div className="min-w-0">
-              <p className="text-[11px] font-medium text-slate-500 uppercase tracking-wider">Active & Open</p>
-              <p className="text-lg font-bold text-emerald-700 leading-tight">{loading ? '—' : stats.open}</p>
-            </div>
-          </div>
+          <StatCard
+            index={1}
+            label="Active & Open Branches"
+            value={loading ? '—' : stats.open}
+            icon={CheckCircle}
+            iconGradient="from-emerald-500 to-teal-600"
+          />
 
-          <div className="flex items-center gap-3 rounded-2xl border border-border bg-white p-3.5 shadow-2xs">
-            <div className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-slate-100 text-slate-600 border border-slate-200">
-              <Ban className="size-5" />
-            </div>
-            <div className="min-w-0">
-              <p className="text-[11px] font-medium text-slate-500 uppercase tracking-wider">Blocked Outlets</p>
-              <p className="text-lg font-bold text-slate-700 leading-tight">{loading ? '—' : stats.blocked}</p>
-            </div>
-          </div>
+          <StatCard
+            index={2}
+            label="Blocked Branches"
+            value={loading ? '—' : stats.blocked}
+            icon={Ban}
+            iconGradient="from-slate-500 to-slate-700"
+          />
 
-          <div className="flex items-center gap-3 rounded-2xl border border-border bg-white p-3.5 shadow-2xs">
-            <div
-              className="flex size-10 shrink-0 items-center justify-center rounded-xl text-white"
-              style={{ background: BRAND.deep }}
-            >
-              <Users className="size-5" />
-            </div>
-            <div className="min-w-0">
-              <p className="text-[11px] font-medium text-slate-500 uppercase tracking-wider">Branch Staff</p>
-              <p className="text-lg font-bold text-slate-900 leading-tight">{loading ? '—' : stats.totalStaff}</p>
-            </div>
-          </div>
+          <StatCard
+            index={3}
+            label="Branch Staff"
+            value={loading ? '—' : stats.totalStaff}
+            icon={Users}
+            iconGradient="from-[#412283] to-[#24104f]"
+          />
         </div>
       </MotionReveal>
 
@@ -481,7 +469,7 @@ export function BranchesPage() {
             <Table className="min-w-[42rem] w-full text-left text-sm sm:min-w-[52rem]">
               <TableHeader>
                 <TableRow className="text-xs text-slate-500 uppercase">
-                  <TableHead className="px-2 py-3 font-medium whitespace-nowrap sm:px-3">Id</TableHead>
+                  <TableHead className="px-2 py-3 font-medium whitespace-nowrap sm:px-3">Branch ID</TableHead>
                   <TableHead className="px-2 py-3 font-medium whitespace-nowrap sm:px-3">Image</TableHead>
                   <TableHead className="px-2 py-3 font-medium whitespace-nowrap sm:px-3 min-w-[10rem]">Branch</TableHead>
                   <TableHead className="hidden px-2 py-3 font-medium whitespace-nowrap sm:table-cell sm:px-3 min-w-[9rem]">
@@ -518,10 +506,10 @@ export function BranchesPage() {
                     const imageSrc = b.image || DEFAULT_BRANCH_IMAGE
                     return (
                       <TableRow key={b.id} className="group hover:bg-slate-50/80">
-                        <TableCell className="px-2 py-3 whitespace-nowrap sm:px-3">
+                        <TableCell className="px-2 py-3 font-mono text-xs whitespace-nowrap sm:px-3">
                           <span
                             title={b.id}
-                            className="inline-block whitespace-nowrap text-[10px] sm:text-xs font-bold font-mono text-purple-700 bg-purple-50 px-2 py-1 rounded-md border border-purple-100 shadow-2xs tracking-wide"
+                            className="inline-flex items-center font-mono text-xs font-medium text-slate-800 bg-slate-100/80 border border-slate-200/80 px-2 py-0.5 rounded select-all hover:bg-slate-200/60 transition-colors"
                           >
                             {shortId(b.id)}
                           </span>
@@ -589,15 +577,15 @@ export function BranchesPage() {
                             className={
                               isOpen
                                 ? 'bg-purple-50 text-purple-900 border-purple-200 font-bold whitespace-nowrap'
-                                : 'bg-slate-100 text-slate-700 border-slate-300 font-bold whitespace-nowrap'
+                                : 'bg-rose-50 text-rose-700 border-rose-200 font-bold whitespace-nowrap'
                             }
                           >
                             {isOpen ? (
                               <CheckCircle className="mr-1 size-3 text-purple-700" />
                             ) : (
-                              <Ban className="mr-1 size-3 text-slate-500" />
+                              <Ban className="mr-1 size-3 text-rose-600" />
                             )}
-                            {isOpen ? 'Open' : 'Block'}
+                            {isOpen ? 'Open' : 'Blocked'}
                           </Badge>
                         </TableCell>
                         <TableCell className="sticky right-0 z-[1] bg-white px-1.5 py-3 text-right whitespace-nowrap sm:px-3 group-hover:bg-slate-50/80">
@@ -650,7 +638,7 @@ export function BranchesPage() {
                               aria-label={isOpen ? `Block ${b.name}` : `Open ${b.name}`}
                               className={`size-8 ${
                                 isOpen
-                                  ? 'text-slate-600 hover:bg-slate-100 hover:text-slate-900'
+                                  ? 'text-rose-600 hover:bg-rose-50 hover:text-rose-800'
                                   : 'text-emerald-700 hover:bg-emerald-50 hover:text-emerald-900'
                               }`}
                             >
@@ -743,9 +731,8 @@ export function BranchesPage() {
                   <Label htmlFor="branchOpeningTime" className="text-xs">
                     Opening time
                   </Label>
-                  <Input
+                  <TimePicker
                     id="branchOpeningTime"
-                    type="time"
                     value={formData.openingTime}
                     onChange={(e) => setFormData({ ...formData, openingTime: e.target.value })}
                   />
@@ -755,9 +742,8 @@ export function BranchesPage() {
                   <Label htmlFor="branchClosingTime" className="text-xs">
                     Closing time
                   </Label>
-                  <Input
+                  <TimePicker
                     id="branchClosingTime"
-                    type="time"
                     value={formData.closingTime}
                     onChange={(e) => setFormData({ ...formData, closingTime: e.target.value })}
                   />
@@ -829,14 +815,10 @@ export function BranchesPage() {
                   <Label htmlFor="mgrContact" className="text-xs">
                     Contact number *
                   </Label>
-                  <Input
+                  <PhoneInput
                     id="mgrContact"
-                    placeholder="03001234567 or +923001234567"
                     value={formData.managerContact}
-                    onChange={(e) =>
-                      setFormData({ ...formData, managerContact: sanitizePhoneInput(e.target.value) })
-                    }
-                    maxLength={13}
+                    onChange={(val) => setFormData({ ...formData, managerContact: val })}
                     required
                   />
                 </div>
@@ -845,17 +827,10 @@ export function BranchesPage() {
                   <Label htmlFor="mgrOtherContact" className="text-xs">
                     Other contact number
                   </Label>
-                  <Input
+                  <PhoneInput
                     id="mgrOtherContact"
-                    placeholder="03217654321"
                     value={formData.managerOtherContact}
-                    onChange={(e) =>
-                      setFormData({
-                        ...formData,
-                        managerOtherContact: sanitizePhoneInput(e.target.value),
-                      })
-                    }
-                    maxLength={13}
+                    onChange={(val) => setFormData({ ...formData, managerOtherContact: val })}
                   />
                 </div>
 
@@ -974,13 +949,16 @@ export function BranchesPage() {
         onOpenChange={(open) => {
           if (!open) setDeleteTarget(null)
         }}
-        title="Delete branch?"
+        title="Delete Branch"
         description={
-          deleteTarget
-            ? `Permanently remove "${deleteTarget.name}" and its branch manager login? Prefer Block if you only want to disable access. This cannot be undone.`
-            : undefined
+          deleteTarget ? (
+            <>
+              Are you sure you want to delete <strong>&ldquo;{deleteTarget.name}&rdquo;</strong> and its branch manager login?
+            </>
+          ) : null
         }
-        confirmLabel="Delete"
+        warning="This action cannot be undone. Prefer Block if you only want to disable access temporarily."
+        confirmLabel="Delete Branch"
         loading={mutating}
         onConfirm={handleConfirmDelete}
       />

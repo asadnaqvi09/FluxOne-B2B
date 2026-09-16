@@ -20,13 +20,13 @@ import {
 } from '@/components/ui/dialog'
 import { ConfirmDialog } from '@/components/shared/ConfirmDialog'
 import { EmptyState } from '@/components/shared/EmptyState'
+import { PhoneInput } from '@/components/shared/PhoneInput'
 import { useAdminCompany } from '@/hooks/useAdminCompany'
 import { useAdminPolicies } from '@/hooks/useAdminPolicies'
 import { BRAND } from '@/lib/constants'
 import { referenceFromUuid } from '@/lib/formatDisplayId'
 import { toastSuccess, toastError } from '@/lib/toast'
 import {
-  sanitizePhoneInput,
   validatePhone,
   validateUrl,
 } from '@/lib/validation/formValidators'
@@ -316,6 +316,23 @@ export function CompanyPage() {
           eyebrow="Corporate Identity & Governance"
           title="Company Details & Policies"
           description="Manage corporate entity profiles, social presence, tax registrations, and store policy handbooks"
+          actions={
+            <Button
+              type="button"
+              onClick={() => {
+                setActiveTab('policies')
+                handleOpenAddPolicy()
+              }}
+              disabled={policiesLoading}
+              className="text-white font-semibold cursor-pointer shadow-xs"
+              style={{
+                background: `linear-gradient(90deg, ${BRAND.purple}, ${BRAND.deep})`,
+              }}
+            >
+              <Plus className="mr-1.5 size-4" />
+              Add New Policy
+            </Button>
+          }
         />
       </MotionHeader>
 
@@ -418,17 +435,10 @@ export function CompanyPage() {
                       <MessageCircle className="size-3.5 text-emerald-600" />
                       WhatsApp Customer Care (Optional)
                     </Label>
-                    <Input
+                    <PhoneInput
                       id="whatsapp"
                       value={form.whatsappNumber}
-                      onChange={(e) =>
-                        setForm({
-                          ...form,
-                          whatsappNumber: sanitizePhoneInput(e.target.value),
-                        })
-                      }
-                      placeholder="03001234567"
-                      maxLength={13}
+                      onChange={(val) => setForm({ ...form, whatsappNumber: val })}
                     />
                   </div>
 
@@ -539,8 +549,8 @@ export function CompanyPage() {
           {slowPolicies ? <SlowLoadingBanner show className="mb-3" /> : null}
 
           <div className="space-y-5">
-            <div className="flex flex-col gap-3 rounded-2xl border border-border bg-white p-4 shadow-2xs sm:flex-row sm:items-center sm:justify-between">
-              <div className="relative flex-1">
+            <div className="flex flex-col gap-3 rounded-2xl border border-border bg-white p-4 shadow-2xs">
+              <div className="relative w-full">
                 <Search className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-slate-400" />
                 <input
                   type="text"
@@ -549,20 +559,6 @@ export function CompanyPage() {
                   onChange={(e) => setPolicySearch(e.target.value)}
                   className="w-full rounded-xl border border-border bg-slate-50/70 py-2 pl-9 pr-4 text-xs sm:text-sm text-slate-900 outline-none focus:border-purple-300 focus:bg-white focus:ring-1 focus:ring-purple-300"
                 />
-              </div>
-
-              <div className="flex items-center gap-2">
-                <Button
-                  type="button"
-                  onClick={handleOpenAddPolicy}
-                  className="text-white font-semibold cursor-pointer shadow-xs"
-                  style={{
-                    background: `linear-gradient(90deg, ${BRAND.purple}, ${BRAND.deep})`,
-                  }}
-                >
-                  <Plus className="mr-1.5 size-4" />
-                  Add New Policy
-                </Button>
               </div>
             </div>
 
@@ -697,15 +693,13 @@ export function CompanyPage() {
         onOpenChange={setDeleteConfirmOpen}
         title="Delete Corporate Policy"
         description={
-          <>
-            Are you sure you want to delete{' '}
-            <strong>&quot;{deleteTargetPolicy?.name}&quot;</strong> (
-            {deleteTargetPolicy ? referenceFromUuid(deleteTargetPolicy.id, 'POL') : '—'})?
-            <br />
-            This action cannot be undone and will immediately unpublish this policy across all
-            branch portals.
-          </>
+          deleteTargetPolicy ? (
+            <>
+              Are you sure you want to delete <strong>&ldquo;{deleteTargetPolicy.name}&rdquo;</strong> ({referenceFromUuid(deleteTargetPolicy.id, 'POL')})?
+            </>
+          ) : null
         }
+        warning="This action cannot be undone and will immediately unpublish this policy across all branch portals."
         confirmLabel="Delete Policy"
         loading={policiesMutating}
         onConfirm={handleConfirmDelete}

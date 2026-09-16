@@ -5,39 +5,37 @@ import {
   Receipt,
   TrendingUp,
 } from 'lucide-react'
-import { formatCurrency, formatPct } from '@/lib/mapBranchDashboard'
+import { formatCurrency } from '@/lib/mapBranchDashboard'
 import { cn } from '@/lib/utils'
 
 const KPI_META = [
   {
     key: 'totalSales',
     label: 'Total Sales',
-    icon: CircleDollarSign,
-    changeKey: 'salesChangePct',
-    format: formatCurrency,
     subtitle: 'Daily branch turnover',
+    icon: CircleDollarSign,
+    format: formatCurrency,
   },
   {
     key: 'profit',
     label: 'Gross Profit',
+    subtitle: 'Net margin earnings today',
     icon: TrendingUp,
-    changeKey: 'profitChangePct',
     format: formatCurrency,
-    subtitle: 'Net margin earnings',
   },
   {
     key: 'saleCount',
     label: 'Transactions',
+    subtitle: 'POS checkouts processed',
     icon: Receipt,
     format: (n) => Number(n || 0).toLocaleString(),
-    subtitle: 'POS checkouts processed',
   },
   {
     key: 'avgTicket',
     label: 'Average Ticket',
+    subtitle: 'Average basket size per order',
     icon: Banknote,
     format: formatCurrency,
-    subtitle: 'Average basket size',
   },
 ]
 
@@ -47,8 +45,6 @@ export function BranchKpiCards({ kpis = {}, className }) {
       {KPI_META.map((meta, index) => {
         const Icon = meta.icon
         const value = kpis[meta.key]
-        const change = meta.changeKey ? Number(kpis[meta.changeKey]) : null
-        const up = change != null && change >= 0
 
         return (
           <StatCard
@@ -58,9 +54,6 @@ export function BranchKpiCards({ kpis = {}, className }) {
             value={meta.format(value)}
             subtitle={meta.subtitle}
             icon={Icon}
-            trend={change != null ? formatPct(change) : null}
-            isUp={up}
-            trendText="vs prior day"
           />
         )
       })}
@@ -69,3 +62,4 @@ export function BranchKpiCards({ kpis = {}, className }) {
 }
 
 export default BranchKpiCards
+

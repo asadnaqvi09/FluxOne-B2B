@@ -16,11 +16,11 @@ function App() {
         draggable
         pauseOnHover
         theme="light"
-        style={{ zIndex: 9999 }}
+        style={{ zIndex: 99999, top: '4.35rem' }}
         toastStyle={{
           fontFamily: 'inherit',
           borderRadius: '12px',
-          boxShadow: '0 8px 24px rgba(65, 34, 131, 0.12)',
+          boxShadow: '0 8px 24px rgba(65, 34, 131, 0.14)',
         }}
         progressStyle={{ background: BRAND.purple }}
       />

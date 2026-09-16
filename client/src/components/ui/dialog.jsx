@@ -158,17 +158,9 @@ function DialogContent({ className, children, showCloseButton = true }) {
 
   return (
     <div className="fixed inset-0 z-50 flex items-end justify-center p-0 sm:items-center sm:p-4">
-      <button
-        type="button"
+      <div
+        aria-hidden="true"
         className="absolute inset-0 bg-black/50"
-        aria-label="Close dialog"
-        onClick={() => {
-          if (discardOpen) {
-            setDiscardOpen(false)
-            return
-          }
-          requestClose()
-        }}
       />
       <div
         className={cn(
@@ -179,7 +171,7 @@ function DialogContent({ className, children, showCloseButton = true }) {
         {showCloseButton ? (
           <button
             type="button"
-            className="absolute right-3 top-3 rounded-md p-1.5 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+            className="absolute right-3 top-3 rounded-md p-1.5 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground cursor-pointer"
             aria-label="Close"
             onClick={() => {
               if (discardOpen) {
@@ -239,5 +231,4 @@ export {
   DialogDescription,
   DialogFooter,
   DialogCancelButton,
-  useRequestDialogClose,
 }

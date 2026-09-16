@@ -13,6 +13,7 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { NativeSelect } from '@/components/ui/select'
 import { ImageUploadField } from '@/components/shared/ImageUploadField'
+import { TimePicker } from '@/components/shared/TimePicker'
 import { BRAND } from '@/lib/constants'
 import {
   getBranchHoursSoftWarning,
@@ -268,9 +269,8 @@ export function StaffFormDialog({
 
             <div className="space-y-1.5">
               <Label htmlFor="staff-start">Start Time</Label>
-              <Input
+              <TimePicker
                 id="staff-start"
-                type="time"
                 value={form.scheduleStart}
                 onChange={(e) => patch('scheduleStart', e.target.value)}
               />
@@ -278,9 +278,8 @@ export function StaffFormDialog({
 
             <div className="space-y-1.5">
               <Label htmlFor="staff-break-start">Break from</Label>
-              <Input
+              <TimePicker
                 id="staff-break-start"
-                type="time"
                 value={form.scheduleBreakStart}
                 onChange={(e) => patch('scheduleBreakStart', e.target.value)}
               />
@@ -288,9 +287,8 @@ export function StaffFormDialog({
 
             <div className="space-y-1.5">
               <Label htmlFor="staff-break-end">Break to</Label>
-              <Input
+              <TimePicker
                 id="staff-break-end"
-                type="time"
                 value={form.scheduleBreakEnd}
                 onChange={(e) => patch('scheduleBreakEnd', e.target.value)}
               />
@@ -298,9 +296,8 @@ export function StaffFormDialog({
 
             <div className="space-y-1.5">
               <Label htmlFor="staff-end">End Time</Label>
-              <Input
+              <TimePicker
                 id="staff-end"
-                type="time"
                 value={form.scheduleEnd}
                 onChange={(e) => patch('scheduleEnd', e.target.value)}
               />

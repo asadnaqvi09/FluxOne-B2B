@@ -32,7 +32,7 @@ export function DashboardPage() {
     <div className="space-y-5 pb-8 sm:space-y-6">
       <MotionHeader>
         <PageHeader
-          eyebrow={user?.tenantName ? `${user.tenantName} · B2B Admin` : 'B2B Admin Overview'}
+          eyebrow={user?.tenantName || 'Overview'}
           title="Admin Dashboard"
           description="Consolidated sales, profit, branch inventory & business insights"
           actions={

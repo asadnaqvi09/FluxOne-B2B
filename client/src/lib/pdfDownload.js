@@ -212,3 +212,222 @@ export function downloadBillingInvoicePdf(invoice, company = {}) {
   doc.save(filename)
   return { filename }
 }
+
+function ensurePageSpace(doc, y, needed = 20, margin = 14) {
+  if (y + needed <= 285) return y
+  doc.addPage()
+  return margin
+}
+
+function drawBwSectionTitle(doc, title, y, margin = 14) {
+  y = ensurePageSpace(doc, y, 12, margin)
+  doc.setFont('helvetica', 'bold')
+  doc.setFontSize(11)
+  doc.setTextColor(0, 0, 0)
+  doc.text(title, margin, y)
+  y += 2
+  doc.setDrawColor(0, 0, 0)
+  doc.setLineWidth(0.3)
+  doc.line(margin, y, 196 - margin, y)
+  doc.setLineWidth(0.2)
+  return y + 6
+}
+
+function drawBwRow(doc, cells, y, margin = 14, { bold = false } = {}) {
+  y = ensurePageSpace(doc, y, 8, margin)
+  doc.setFont('helvetica', bold ? 'bold' : 'normal')
+  doc.setFontSize(9)
+  doc.setTextColor(0, 0, 0)
+  const colW = (196 - margin * 2) / Math.max(cells.length, 1)
+  cells.forEach((cell, index) => {
+    const text = String(cell ?? '—')
+    const clipped = doc.splitTextToSize(text, colW - 2)[0] || text
+    doc.text(clipped, margin + index * colW, y)
+  })
+  return y + 6
+}
+
+/** Branch manager dashboard report — B&W direct download (company → branch → content). */
+export function downloadBranchDashboardPdf({
+  companyName = 'Company',
+  branchName = 'Branch',
+  managerName = 'Branch Manager',
+  date,
+  kpis = {},
+  dailySummary = {},
+  topProducts = [],
+  lowProducts = [],
+  staff = [],
+  counters = [],
+  formatCurrency: money = (v) => String(v ?? '—'),
+  formatPct: pct = (v) => String(v ?? '—'),
+} = {}) {
+  const doc = new jsPDF({ unit: 'mm', format: 'a4' })
+  const margin = 14
+  let y = 18
+
+  const reportDate = date || new Date().toISOString().slice(0, 10)
+  const generatedAt = new Date().toLocaleString()
+  const company = String(companyName || 'Company').trim() || 'Company'
+  const branch = String(branchName || 'Branch').trim() || 'Branch'
+
+  // Header: Company → Branch → report meta (black & white only)
+  doc.setFont('helvetica', 'bold')
+  doc.setFontSize(16)
+  doc.setTextColor(0, 0, 0)
+  doc.text(company, margin, y)
+  y += 7
+
+  doc.setFont('helvetica', 'bold')
+  doc.setFontSize(12)
+  doc.text(`Branch: ${branch}`, margin, y)
+  y += 6
+
+  doc.setFont('helvetica', 'normal')
+  doc.setFontSize(9)
+  doc.text('Branch Performance & Daily Analytics Report', margin, y)
+  y += 5
+  doc.text(`Branch Manager: ${managerName}`, margin, y)
+  y += 5
+  doc.text(`Report date: ${reportDate}  |  Generated: ${generatedAt}`, margin, y)
+  y += 4
+  doc.setDrawColor(0, 0, 0)
+  doc.setLineWidth(0.5)
+  doc.line(margin, y, 196 - margin, y)
+  doc.setLineWidth(0.2)
+  y += 10
+
+  y = drawBwSectionTitle(doc, 'Key performance', y, margin)
+  y = drawBwRow(
+    doc,
+    [`Total sales: ${money(kpis.totalSales)}`, `Gross profit: ${money(kpis.profit)}`],
+    y,
+    margin,
+  )
+  y = drawBwRow(
+    doc,
+    [`Sales change: ${pct(kpis.salesChangePct)}`, `Profit change: ${pct(kpis.profitChangePct)}`],
+    y,
+    margin,
+  )
+  y = drawBwRow(
+    doc,
+    [
+      `Transactions: ${Number(kpis.saleCount || dailySummary.orders || 0).toLocaleString()}`,
+      `Average ticket: ${money(kpis.avgTicket)}`,
+    ],
+    y,
+    margin,
+  )
+  y += 4
+
+  y = drawBwSectionTitle(doc, 'Daily sales throughput', y, margin)
+  y = drawBwRow(
+    doc,
+    [
+      `Revenue: ${money(dailySummary.revenue || kpis.totalSales)}`,
+      `Items sold: ${Number(dailySummary.itemsSold || 0).toLocaleString()}`,
+    ],
+    y,
+    margin,
+  )
+  y = drawBwRow(
+    doc,
+    [
+      `Peak window: ${dailySummary.peakHour || '—'}`,
+      `Peak revenue: ${dailySummary.peakHourSales ? money(dailySummary.peakHourSales) : '—'}`,
+    ],
+    y,
+    margin,
+  )
+  y += 4
+
+  const counterList = Array.isArray(counters) ? counters : []
+  if (counterList.length) {
+    y = drawBwSectionTitle(doc, 'POS counters', y, margin)
+    y = drawBwRow(doc, ['Counter', 'Sales', 'Orders'], y, margin, { bold: true })
+    for (const c of counterList) {
+      y = drawBwRow(
+        doc,
+        [c.name || '—', money(c.sales), `${Number(c.orders || 0)} orders`],
+        y,
+        margin,
+      )
+    }
+    y += 4
+  }
+
+  const topList = (Array.isArray(topProducts) ? topProducts : []).slice(0, 8)
+  y = drawBwSectionTitle(doc, 'Top higher sales products', y, margin)
+  if (!topList.length) {
+    y = drawBwRow(doc, ['No sales for this date'], y, margin)
+  } else {
+    y = drawBwRow(doc, ['Product', 'Units', 'Sales', 'Change'], y, margin, { bold: true })
+    for (const p of topList) {
+      y = drawBwRow(
+        doc,
+        [p.name || '—', `${Number(p.units || 0)}`, money(p.sales), pct(p.changePct)],
+        y,
+        margin,
+      )
+    }
+  }
+  y += 4
+
+  const lowList = (Array.isArray(lowProducts) ? lowProducts : []).slice(0, 8)
+  y = drawBwSectionTitle(doc, 'Lowest volume products', y, margin)
+  if (!lowList.length) {
+    y = drawBwRow(doc, ['No sales for this date'], y, margin)
+  } else {
+    y = drawBwRow(doc, ['Product', 'Units', 'Sales', 'Change'], y, margin, { bold: true })
+    for (const p of lowList) {
+      y = drawBwRow(
+        doc,
+        [p.name || '—', `${Number(p.units || 0)}`, money(p.sales), pct(p.changePct)],
+        y,
+        margin,
+      )
+    }
+  }
+  y += 4
+
+  const staffList = (Array.isArray(staff) ? staff : []).slice(0, 12)
+  y = drawBwSectionTitle(doc, 'Staff score rating', y, margin)
+  if (!staffList.length) {
+    y = drawBwRow(doc, ['No staff assigned'], y, margin)
+  } else {
+    y = drawBwRow(doc, ['Staff', 'Role', 'Status', 'Score'], y, margin, { bold: true })
+    for (const s of staffList) {
+      y = drawBwRow(
+        doc,
+        [
+          s.name || s.fullName || '—',
+          s.role || s.designation || 'Staff',
+          s.status || 'Active',
+          `${Number(s.rating ?? s.points ?? 0).toFixed(2)}%`,
+        ],
+        y,
+        margin,
+      )
+    }
+  }
+
+  y = ensurePageSpace(doc, y, 16, margin)
+  y += 6
+  doc.setDrawColor(0, 0, 0)
+  doc.line(margin, y, 196 - margin, y)
+  y += 6
+  doc.setFont('helvetica', 'normal')
+  doc.setFontSize(8)
+  doc.setTextColor(0, 0, 0)
+  doc.text(
+    `${company} · ${branch} · Branch Analytics Report`,
+    105,
+    y,
+    { align: 'center' },
+  )
+
+  const filename = `${safeFilename(`${company}_${branch}_Report_${reportDate}`)}.pdf`
+  doc.save(filename)
+  return { filename }
+}

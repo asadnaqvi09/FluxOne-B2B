@@ -21,6 +21,7 @@ export function ConfirmDialog({
   variant = 'destructive',
   icon: CustomIcon,
 }) {
+  function renderIcon() {
     if (CustomIcon) {
       return (
         <div className="flex size-9 shrink-0 items-center justify-center rounded-full bg-red-600 text-white shadow-xs sm:size-11">

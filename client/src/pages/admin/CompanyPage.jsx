@@ -12,13 +12,14 @@ import { Badge } from '@/components/ui/badge'
 import { NativeSelect } from '@/components/ui/select'
 import {
   Dialog,
+  DialogCancelButton,
   DialogContent,
   DialogDescription,
   DialogFooter,
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog'
-import { ConfirmDialog } from '@/components/shared/ConfirmDialog'
+import { DeleteEntityDialog } from '@/components/shared/DeleteEntityDialog'
 import { EmptyState } from '@/components/shared/EmptyState'
 import { PhoneInput } from '@/components/shared/PhoneInput'
 import { useAdminCompany } from '@/hooks/useAdminCompany'
@@ -30,6 +31,7 @@ import {
   validatePhone,
   validateUrl,
 } from '@/lib/validation/formValidators'
+import { useFormBaseline } from '@/hooks/useFormBaseline'
 import {
   Building2,
   Phone,
@@ -148,8 +150,15 @@ export function CompanyPage() {
     deletePolicy,
   } = useAdminPolicies({ limit: 100 })
 
+  const { captureBaseline, isDirty } = useFormBaseline(policyDialogOpen)
   const slowCompany = useSlowLoadingHint(companyLoading)
   const slowPolicies = useSlowLoadingHint(policiesLoading)
+
+  useEffect(() => {
+    if (!policyDialogOpen) return
+    captureBaseline(policyForm)
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- capture once per open
+  }, [policyDialogOpen, captureBaseline])
 
   useEffect(() => {
     if (companyLoading || formHydrated) return
@@ -688,24 +697,36 @@ export function CompanyPage() {
         </MotionReveal>
       )}
 
-      <ConfirmDialog
+      <DeleteEntityDialog
         open={deleteConfirmOpen}
-        onOpenChange={setDeleteConfirmOpen}
+        onOpenChange={(open) => {
+          setDeleteConfirmOpen(open)
+          if (!open) setDeleteTargetPolicy(null)
+        }}
+        entityName={deleteTargetPolicy?.name}
         title="Delete Corporate Policy"
         description={
           deleteTargetPolicy ? (
             <>
-              Are you sure you want to delete <strong>&ldquo;{deleteTargetPolicy.name}&rdquo;</strong> ({referenceFromUuid(deleteTargetPolicy.id, 'POL')})?
+              Permanently remove <strong>“{deleteTargetPolicy.name}”</strong> (
+              {referenceFromUuid(deleteTargetPolicy.id, 'POL')})? Policies have no Inactive state —
+              this unpublishes the rule across all branch portals.
             </>
           ) : null
         }
-        warning="This action cannot be undone and will immediately unpublish this policy across all branch portals."
-        confirmLabel="Delete Policy"
+        showSoftAction={false}
+        canHardDelete
+        hardLabel="Delete Policy"
+        hardHint="This cannot be undone."
         loading={policiesMutating}
-        onConfirm={handleConfirmDelete}
+        onHardDelete={handleConfirmDelete}
       />
 
-      <Dialog open={policyDialogOpen} onOpenChange={setPolicyDialogOpen}>
+      <Dialog
+        open={policyDialogOpen}
+        onOpenChange={setPolicyDialogOpen}
+        dirty={isDirty(policyForm)}
+      >
         <DialogContent className="max-w-lg">
           <DialogHeader>
             <DialogTitle>
@@ -762,14 +783,7 @@ export function CompanyPage() {
             </div>
 
             <DialogFooter className="pt-2">
-              <Button
-                type="button"
-                variant="outline"
-                onClick={() => setPolicyDialogOpen(false)}
-                disabled={policiesMutating}
-              >
-                Cancel
-              </Button>
+              <DialogCancelButton disabled={policiesMutating} />
               <Button
                 type="submit"
                 disabled={policiesMutating}

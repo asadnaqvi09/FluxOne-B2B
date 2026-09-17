@@ -3,7 +3,7 @@ import { Plus, Tag, Pencil, Trash2 } from 'lucide-react'
 import { PageHeader } from '@/components/shared/PageHeader'
 import { MotionHeader, MotionReveal } from '@/components/shared/MotionReveal'
 import { SurfaceCard } from '@/components/shared/SurfaceCard'
-import { ConfirmDialog } from '@/components/shared/ConfirmDialog'
+import { DeleteEntityDialog } from '@/components/shared/DeleteEntityDialog'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -25,6 +25,7 @@ import { BRAND } from '@/lib/constants'
 import { displayDiscountRef } from '@/lib/formatDisplayId'
 import { toastError, toastSuccess } from '@/lib/toast'
 import { validateDiscountForm } from '@/lib/validation/branchForms'
+import { useFormBaseline } from '@/hooks/useFormBaseline'
 
 const PAGE_SIZE = 8
 
@@ -45,6 +46,15 @@ export function DiscountsPage() {
   const [categoryId, setCategoryId] = useState('')
   const [saving, setSaving] = useState(false)
   const [deleteTargetDiscount, setDeleteTargetDiscount] = useState(null)
+
+  const discountSnapshot = { name, percent, categoryId }
+  const { captureBaseline, isDirty } = useFormBaseline(open)
+
+  useEffect(() => {
+    if (!open) return
+    captureBaseline(discountSnapshot)
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- capture once per open
+  }, [open, captureBaseline])
 
   const fetchDiscounts = async () => {
     setLoading(true)
@@ -320,7 +330,7 @@ export function DiscountsPage() {
       </MotionReveal>
 
       {/* Add / Edit Form Dialog */}
-      <Dialog open={open} onOpenChange={setOpen}>
+      <Dialog open={open} onOpenChange={setOpen} dirty={isDirty(discountSnapshot)}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
             <DialogTitle>{mode === 'create' ? 'Add New Discount' : 'Edit Discount'}</DialogTitle>
@@ -383,14 +393,23 @@ export function DiscountsPage() {
         </DialogContent>
       </Dialog>
 
-      <ConfirmDialog
+      <DeleteEntityDialog
         open={Boolean(deleteTargetDiscount)}
-        onOpenChange={(open) => { if (!open) setDeleteTargetDiscount(null) }}
-        title="Delete discount campaign?"
-        description={`Delete promotional offer "${deleteTargetDiscount?.name || ''}"? This action cannot be undone.`}
-        confirmLabel="Delete"
-        onConfirm={confirmDeleteDiscount}
+        onOpenChange={(open) => {
+          if (!open) setDeleteTargetDiscount(null)
+        }}
+        entityName={deleteTargetDiscount?.name}
+        description={
+          deleteTargetDiscount
+            ? `Remove promotional offer “${deleteTargetDiscount.name}”? Discount campaigns have no Inactive state — this permanently deletes the offer.`
+            : null
+        }
+        showSoftAction={false}
+        canHardDelete
+        hardLabel="Permanently delete"
+        hardHint="This cannot be undone."
         loading={saving}
+        onHardDelete={confirmDeleteDiscount}
       />
     </div>
   )

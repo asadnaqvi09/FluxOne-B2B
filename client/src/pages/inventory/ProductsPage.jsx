@@ -8,15 +8,8 @@ import { ProductTable } from '@/components/feature/products/ProductTable'
 import { ScanItemDialog } from '@/components/feature/products/ScanItemDialog'
 import { MotionHeader, MotionReveal } from '@/components/shared/MotionReveal'
 import { ConfirmDialog } from '@/components/shared/ConfirmDialog'
+import { DeleteEntityDialog } from '@/components/shared/DeleteEntityDialog'
 import { PageHeader } from '@/components/shared/PageHeader'
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
 import { useDebouncedSearch } from '@/hooks/useDebouncedSearch'
 import { useProducts } from '@/hooks/useProducts'
@@ -369,7 +362,7 @@ export function ProductsPage() {
         onConfirm={handleConfirmDeactivate}
       />
 
-      <Dialog
+      <DeleteEntityDialog
         open={Boolean(deleteTarget)}
         onOpenChange={(open) => {
           if (!open) {
@@ -377,63 +370,31 @@ export function ProductsPage() {
             setDeleteInfo(null)
           }
         }}
-      >
-        <DialogContent className="max-w-md">
-          <DialogHeader>
-            <DialogTitle>Delete product?</DialogTitle>
-            <DialogDescription>
-              {deleteTarget
-                ? deleteIsActive
-                  ? `${deleteTarget.name || 'This product'} can be deactivated (keeps history) or permanently removed when eligible.`
-                  : `${deleteTarget.name || 'This product'} is inactive. ${
-                      canPermanentDelete
-                        ? 'You can permanently remove it from the catalog.'
-                        : 'It cannot be permanently deleted because it has linked records or stock.'
-                    }`
-                : null}
-            </DialogDescription>
-          </DialogHeader>
-          {deleteInfo?.reason && !canPermanentDelete && Number(deleteTarget?.quantity ?? 0) === 0 ? (
-            <p className="text-xs text-slate-500">{deleteInfo.reason}</p>
-          ) : null}
-          <DialogFooter className="flex-col gap-2 sm:flex-row sm:justify-end">
-            <Button
-              type="button"
-              variant="outline"
-              disabled={deleteLoading || mutating}
-              className="w-full sm:w-auto"
-              onClick={() => {
-                setDeleteTarget(null)
-                setDeleteInfo(null)
-              }}
-            >
-              Cancel
-            </Button>
-            {deleteIsActive ? (
-              <Button
-                type="button"
-                variant="outline"
-                disabled={deleteLoading || mutating}
-                className="w-full sm:w-auto"
-                onClick={handleDeactivateFromDelete}
-              >
-                {deleteLoading ? 'Please wait…' : 'Deactivate'}
-              </Button>
-            ) : null}
-            {canPermanentDelete ? (
-              <Button
-                type="button"
-                variant="destructive"
-                disabled={deleteLoading || mutating}
-                className="w-full sm:w-auto"
-                onClick={handlePermanentDelete}
-              >
-                {deleteLoading ? 'Please wait…' : 'Permanently delete'}
-              </Button>
-            ) : null}
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+        entityName={deleteTarget?.name}
+        description={
+          deleteTarget
+            ? deleteIsActive
+              ? `${deleteTarget.name || 'This product'} can be deactivated (keeps history) or permanently removed when eligible.`
+              : `${deleteTarget.name || 'This product'} is inactive. ${
+                  canPermanentDelete
+                    ? 'You can permanently remove it from the catalog.'
+                    : 'It cannot be permanently deleted because it has linked records or stock.'
+                }`
+            : null
+        }
+        softLabel="Deactivate"
+        softHint="Hides from open lists and POS sync. You can open it again later."
+        hardLabel="Permanently delete"
+        showSoftAction={deleteIsActive}
+        canHardDelete={canPermanentDelete}
+        hardDisabledReason={
+          deleteInfo?.reason ||
+          'Linked stock or purchase history blocks permanent delete. Deactivate instead.'
+        }
+        loading={deleteLoading || mutating}
+        onSoftDelete={handleDeactivateFromDelete}
+        onHardDelete={handlePermanentDelete}
+      />
     </div>
   )
 }

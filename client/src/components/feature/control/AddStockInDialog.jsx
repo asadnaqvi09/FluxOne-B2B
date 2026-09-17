@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { Check, ChevronLeft, ChevronRight, Plus, Trash2 } from 'lucide-react'
 import {
   Dialog,
+  DialogCancelButton,
   DialogContent,
   DialogDescription,
   DialogFooter,
@@ -78,6 +79,9 @@ export function AddStockInDialog({
   const [supplierId, setSupplierId] = useState('')
   const [error, setError] = useState(null)
   const [expiryError, setExpiryError] = useState('')
+
+  // Treat stock-in as dirty once the user added lines or picked a supplier
+  const dirty = lines.length > 0 || Boolean(supplierId) || step > 1
   const [loadingOptions, setLoadingOptions] = useState(false)
 
   const subs = useMemo(() => {
@@ -255,12 +259,8 @@ export function AddStockInDialog({
   }
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent
-        className="max-w-lg"
-        onPointerDownOutside={(e) => e.preventDefault()}
-        onEscapeKeyDown={(e) => e.preventDefault()}
-      >
+    <Dialog open={open} onOpenChange={onOpenChange} dirty={dirty}>
+      <DialogContent className="max-w-lg">
         <DialogHeader>
           <DialogTitle>Add New Stock</DialogTitle>
           <DialogDescription>
@@ -556,16 +556,7 @@ export function AddStockInDialog({
               Back
             </Button>
           ) : null}
-          <Button
-            type="button"
-            variant="outline"
-            className="cursor-pointer transition-none"
-            style={{ color: BRAND.purple, borderColor: BRAND.purple }}
-            disabled={loading}
-            onClick={() => onOpenChange?.(false)}
-          >
-            Cancel
-          </Button>
+          <DialogCancelButton disabled={loading} className="cursor-pointer" />
           {step < 3 ? (
             <Button
               type="button"

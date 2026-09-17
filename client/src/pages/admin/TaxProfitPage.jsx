@@ -20,6 +20,7 @@ import {
 } from '@/components/ui/table'
 import {
   Dialog,
+  DialogCancelButton,
   DialogContent,
   DialogDescription,
   DialogFooter,
@@ -31,6 +32,7 @@ import {
   useAdminTaxProfit,
 } from '@/hooks/useAdminTaxProfit'
 import { useDebouncedValue } from '@/hooks/useDebouncedValue'
+import { useFormBaseline } from '@/hooks/useFormBaseline'
 import { BRAND } from '@/lib/constants'
 import { toastSuccess, toastError } from '@/lib/toast'
 import { validatePercentage } from '@/lib/validation/formValidators'
@@ -64,6 +66,21 @@ export function TaxProfitPage() {
   const [taxDialogOpen, setTaxDialogOpen] = useState(false)
   const [bulkProfitValue, setBulkProfitValue] = useState('20')
   const [bulkTaxValue, setBulkTaxValue] = useState('5')
+
+  const profitBaseline = useFormBaseline(profitDialogOpen)
+  const taxBaseline = useFormBaseline(taxDialogOpen)
+
+  useEffect(() => {
+    if (!profitDialogOpen) return
+    profitBaseline.captureBaseline({ bulkProfitValue })
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [profitDialogOpen, profitBaseline.captureBaseline])
+
+  useEffect(() => {
+    if (!taxDialogOpen) return
+    taxBaseline.captureBaseline({ bulkTaxValue })
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [taxDialogOpen, taxBaseline.captureBaseline])
 
   const [visibleColumns, setVisibleColumns] = useState({
     id: true,
@@ -668,7 +685,11 @@ export function TaxProfitPage() {
         </SurfaceCard>
       </MotionReveal>
 
-      <Dialog open={profitDialogOpen} onOpenChange={setProfitDialogOpen}>
+      <Dialog
+        open={profitDialogOpen}
+        onOpenChange={setProfitDialogOpen}
+        dirty={profitBaseline.isDirty({ bulkProfitValue })}
+      >
         <DialogContent className="max-w-md">
           <DialogHeader>
             <DialogTitle>Set Profit Margin Percentage</DialogTitle>
@@ -699,14 +720,7 @@ export function TaxProfitPage() {
             </div>
 
             <DialogFooter className="pt-2">
-              <Button
-                type="button"
-                variant="outline"
-                onClick={() => setProfitDialogOpen(false)}
-                disabled={mutating}
-              >
-                Cancel
-              </Button>
+              <DialogCancelButton disabled={mutating} />
               <Button
                 type="submit"
                 disabled={mutating}
@@ -720,7 +734,11 @@ export function TaxProfitPage() {
         </DialogContent>
       </Dialog>
 
-      <Dialog open={taxDialogOpen} onOpenChange={setTaxDialogOpen}>
+      <Dialog
+        open={taxDialogOpen}
+        onOpenChange={setTaxDialogOpen}
+        dirty={taxBaseline.isDirty({ bulkTaxValue })}
+      >
         <DialogContent className="max-w-md">
           <DialogHeader>
             <DialogTitle>Set Sales Tax Percentage</DialogTitle>
@@ -751,14 +769,7 @@ export function TaxProfitPage() {
             </div>
 
             <DialogFooter className="pt-2">
-              <Button
-                type="button"
-                variant="outline"
-                onClick={() => setTaxDialogOpen(false)}
-                disabled={mutating}
-              >
-                Cancel
-              </Button>
+              <DialogCancelButton disabled={mutating} />
               <Button
                 type="submit"
                 disabled={mutating}

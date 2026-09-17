@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { SurfaceCard } from '@/components/shared/SurfaceCard'
 import { StatCard } from '@/components/shared/StatsCards'
 import { PageHeader } from '@/components/shared/PageHeader'
@@ -20,6 +20,7 @@ import {
 } from '@/components/ui/table'
 import {
   Dialog,
+  DialogCancelButton,
   DialogContent,
   DialogDescription,
   DialogFooter,
@@ -27,6 +28,7 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog'
 import { ConfirmDialog } from '@/components/shared/ConfirmDialog'
+import { DeleteEntityDialog } from '@/components/shared/DeleteEntityDialog'
 import { ImageUploadField } from '@/components/shared/ImageUploadField'
 import { PhoneInput } from '@/components/shared/PhoneInput'
 import { TimePicker } from '@/components/shared/TimePicker'
@@ -39,6 +41,7 @@ import {
 import { useAdminBranches } from '@/hooks/useAdminBranches'
 import { useAuthSession } from '@/hooks/useAuthSession'
 import { useDebouncedValue } from '@/hooks/useDebouncedValue'
+import { useFormBaseline } from '@/hooks/useFormBaseline'
 import {
   Plus,
   Search,
@@ -166,7 +169,15 @@ export function BranchesPage() {
     deleteBranch,
   } = useAdminBranches({ q: debouncedQ, limit: 100 })
 
+  const { captureBaseline, isDirty } = useFormBaseline(addDialogOpen)
   const slowHint = useSlowLoadingHint(loading)
+
+  // Snapshot form when Add/Edit opens so Esc/X only prompt when fields changed
+  useEffect(() => {
+    if (!addDialogOpen) return
+    captureBaseline(formData)
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- capture once per open
+  }, [addDialogOpen, captureBaseline])
 
   const stats = useMemo(() => {
     const total = items.length
@@ -256,16 +267,35 @@ export function BranchesPage() {
     setResetDialogOpen(false)
   }
 
-  async function handleConfirmDelete() {
+  async function handleSoftDeleteFromTrash() {
+    if (!deleteTarget) return
+    if (deleteTarget.status === 'blocked') {
+      setDeleteTarget(null)
+      return
+    }
+    const result = await setBranchStatus(deleteTarget.id, 'blocked')
+    if (!result.success) {
+      toastError(result.error || 'Failed to block branch')
+      return
+    }
+    toastSuccess(`Branch "${deleteTarget.name}" blocked — data kept. Open it anytime from Blocked.`)
+    setDeleteTarget(null)
+  }
+
+  async function handleHardDeleteBranch() {
     if (!deleteTarget) return
     const result = await deleteBranch(deleteTarget.id)
     if (!result.success) {
       toastError(result.error || 'Failed to delete branch')
       return
     }
-    toastSuccess(`Branch "${deleteTarget.name}" deleted`)
+    toastSuccess(`Branch "${deleteTarget.name}" permanently deleted`)
     setDeleteTarget(null)
   }
+
+  const deleteHasStaff = Number(deleteTarget?.totalStaff || 0) > 0
+  const deleteCanHard = Boolean(deleteTarget) && !deleteHasStaff
+  const deleteShowSoft = Boolean(deleteTarget) && deleteTarget.status === 'open'
 
   async function handleSubmitBranch(e) {
     e.preventDefault()
@@ -620,21 +650,9 @@ export function BranchesPage() {
                               type="button"
                               variant="ghost"
                               size="icon"
-                              onClick={() => setDeleteTarget(b)}
-                              disabled={mutating}
-                              title="Delete branch"
-                              aria-label={`Delete ${b.name}`}
-                              className="size-8 text-slate-500 hover:bg-slate-100 hover:text-slate-900"
-                            >
-                              <Trash2 className="size-4" />
-                            </Button>
-                            <Button
-                              type="button"
-                              variant="ghost"
-                              size="icon"
                               onClick={() => handlePromptToggleStatus(b)}
                               disabled={mutating}
-                              title={isOpen ? 'Block branch' : 'Open branch'}
+                              title={isOpen ? 'Block (soft) — keeps data' : 'Open branch'}
                               aria-label={isOpen ? `Block ${b.name}` : `Open ${b.name}`}
                               className={`size-8 ${
                                 isOpen
@@ -643,6 +661,18 @@ export function BranchesPage() {
                               }`}
                             >
                               {isOpen ? <Ban className="size-4" /> : <Eye className="size-4" />}
+                            </Button>
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="icon"
+                              onClick={() => setDeleteTarget(b)}
+                              disabled={mutating}
+                              title="Delete permanently…"
+                              aria-label={`Delete ${b.name}`}
+                              className="size-8 text-slate-500 hover:bg-slate-100 hover:text-slate-900"
+                            >
+                              <Trash2 className="size-4" />
                             </Button>
                           </div>
                         </TableCell>
@@ -658,8 +688,8 @@ export function BranchesPage() {
         </SurfaceCard>
       </MotionReveal>
 
-      <Dialog open={addDialogOpen} onOpenChange={setAddDialogOpen}>
-        <DialogContent className="max-w-xl max-h-[90vh] overflow-y-auto">
+      <Dialog open={addDialogOpen} onOpenChange={setAddDialogOpen} dirty={isDirty(formData)}>
+        <DialogContent className="max-w-full sm:max-w-xl md:max-w-2xl">
           <DialogHeader>
             <DialogTitle>{editingBranch ? 'Edit Branch Details' : 'Add New Branch'}</DialogTitle>
             <DialogDescription>
@@ -874,9 +904,7 @@ export function BranchesPage() {
             ) : null}
 
             <DialogFooter className="pt-3">
-              <Button type="button" variant="outline" onClick={() => setAddDialogOpen(false)} disabled={mutating}>
-                Cancel
-              </Button>
+              <DialogCancelButton disabled={mutating} />
               <Button
                 type="submit"
                 disabled={mutating}
@@ -944,23 +972,36 @@ export function BranchesPage() {
         onConfirm={handleConfirmResetPassword}
       />
 
-      <ConfirmDialog
+      <DeleteEntityDialog
         open={Boolean(deleteTarget)}
         onOpenChange={(open) => {
           if (!open) setDeleteTarget(null)
         }}
-        title="Delete Branch"
+        entityName={deleteTarget?.name}
+        title={deleteTarget ? `Remove “${deleteTarget.name}”?` : 'Remove branch?'}
         description={
           deleteTarget ? (
             <>
-              Are you sure you want to delete <strong>&ldquo;{deleteTarget.name}&rdquo;</strong> and its branch manager login?
+              Permanently remove <strong>{deleteTarget.name}</strong> and its branch manager login?
+              Prefer <strong>Block</strong> if you only want to stop access — sales and staff history stay
+              intact.
             </>
           ) : null
         }
-        warning="This action cannot be undone. Prefer Block if you only want to disable access temporarily."
-        confirmLabel="Delete Branch"
+        softLabel="Block branch"
+        softHint="Recommended when the branch has (or may have) staff, sales, or inventory history."
+        hardLabel="Permanently delete"
+        hardHint="Only use when this outlet was created by mistake and has no linked staff."
+        showSoftAction={deleteShowSoft}
+        canHardDelete={deleteCanHard}
+        hardDisabledReason={
+          deleteHasStaff
+            ? `This branch has ${deleteTarget.totalStaff} staff member(s). Block it instead of permanent delete.`
+            : 'Permanent delete is unavailable while linked records may exist.'
+        }
         loading={mutating}
-        onConfirm={handleConfirmDelete}
+        onSoftDelete={handleSoftDeleteFromTrash}
+        onHardDelete={handleHardDeleteBranch}
       />
     </div>
   )

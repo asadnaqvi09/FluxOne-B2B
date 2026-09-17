@@ -3,7 +3,7 @@ import { Scale, Plus, Trash2, Edit3, Monitor, Search } from 'lucide-react'
 import { PageHeader } from '@/components/shared/PageHeader'
 import { MotionHeader, MotionReveal } from '@/components/shared/MotionReveal'
 import { SurfaceCard } from '@/components/shared/SurfaceCard'
-import { ConfirmDialog } from '@/components/shared/ConfirmDialog'
+import { DeleteEntityDialog } from '@/components/shared/DeleteEntityDialog'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -33,6 +33,7 @@ import { BRAND } from '@/lib/constants'
 import { toastError, toastSuccess } from '@/lib/toast'
 import { ImageUploadField } from '@/components/shared/ImageUploadField'
 import { useDebouncedValue } from '@/hooks/useDebouncedValue'
+import { useFormBaseline } from '@/hooks/useFormBaseline'
 import {
   validateHardwareForm,
   validateItemScaleForm,
@@ -76,6 +77,21 @@ export function ResourcesPage() {
   const [scaleError, setScaleError] = useState(null)
   const [deleteTargetHardware, setDeleteTargetHardware] = useState(null)
   const [deleteTargetScale, setDeleteTargetScale] = useState(null)
+
+  const hardwareSnapshot = {
+    hName,
+    hCompany,
+    hType,
+    hStatus,
+    hImageFile: hImageFile?.name || null,
+  }
+  const { captureBaseline, isDirty } = useFormBaseline(hardwareOpen)
+
+  useEffect(() => {
+    if (!hardwareOpen) return
+    captureBaseline(hardwareSnapshot)
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- capture once per open
+  }, [hardwareOpen, captureBaseline])
 
   async function loadHardware(type = filterHardware, q = debouncedHwSearch) {
     const params = {}
@@ -742,7 +758,11 @@ export function ResourcesPage() {
         </div>
       )}
 
-      <Dialog open={hardwareOpen} onOpenChange={setHardwareOpen}>
+      <Dialog
+        open={hardwareOpen}
+        onOpenChange={setHardwareOpen}
+        dirty={isDirty(hardwareSnapshot)}
+      >
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
             <DialogTitle>
@@ -858,26 +878,40 @@ export function ResourcesPage() {
         </DialogContent>
       </Dialog>
 
-      <ConfirmDialog
+      <DeleteEntityDialog
         open={Boolean(deleteTargetHardware)}
         onOpenChange={(open) => {
           if (!open) setDeleteTargetHardware(null)
         }}
-        title="Delete hardware device?"
-        description={`Delete hardware device "${deleteTargetHardware?.name || ''}"? This action cannot be undone.`}
-        confirmLabel="Delete"
-        onConfirm={confirmDeleteHardware}
+        entityName={deleteTargetHardware?.name}
+        description={
+          deleteTargetHardware
+            ? `Permanently remove hardware “${deleteTargetHardware.name}”? Device records have no Inactive soft-delete — this cannot be undone.`
+            : null
+        }
+        showSoftAction={false}
+        canHardDelete
+        hardLabel="Permanently delete"
+        loading={saving}
+        onHardDelete={confirmDeleteHardware}
       />
 
-      <ConfirmDialog
+      <DeleteEntityDialog
         open={Boolean(deleteTargetScale)}
         onOpenChange={(open) => {
           if (!open) setDeleteTargetScale(null)
         }}
-        title="Delete scale?"
-        description={`Delete weighing scale "${deleteTargetScale?.name || ''}"? This action cannot be undone.`}
-        confirmLabel="Delete"
-        onConfirm={confirmDeleteScale}
+        entityName={deleteTargetScale?.name}
+        description={
+          deleteTargetScale
+            ? `Permanently remove scale “${deleteTargetScale.name}”? This cannot be undone.`
+            : null
+        }
+        showSoftAction={false}
+        canHardDelete
+        hardLabel="Permanently delete"
+        loading={saving}
+        onHardDelete={confirmDeleteScale}
       />
     </div>
   )

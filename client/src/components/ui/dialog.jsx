@@ -5,6 +5,9 @@ import { Button } from '@/components/ui/button'
 
 const DialogContext = createContext(null)
 
+// Modal close policy:
+// - Backdrop / outside click never closes (no message)
+// - Esc / X / DialogCancelButton → Discard prompt only when dirty
 function Dialog({ open, onOpenChange, dirty = false, children }) {
   const [discardOpen, setDiscardOpen] = useState(false)
 
@@ -71,7 +74,7 @@ function DialogCancelButton({ children = 'Cancel', className, ...props }) {
     <Button
       type="button"
       variant="outline"
-      className={className}
+      className={cn('h-11 w-full sm:h-10 sm:w-auto', className)}
       onClick={requestClose}
       {...props}
     >
@@ -103,27 +106,32 @@ function DialogTrigger({ asChild, children, className, ...props }) {
 
 function DiscardChangesPrompt({ onStay, onDiscard }) {
   return (
-    <div className="absolute inset-0 z-20 flex items-end justify-center rounded-t-2xl bg-black/40 p-4 sm:items-center sm:rounded-xl">
+    <div className="absolute inset-0 z-20 flex items-end justify-center rounded-t-2xl bg-black/40 p-3 sm:items-center sm:rounded-xl sm:p-4">
       <div
-        className="w-full max-w-sm rounded-xl border bg-card p-4 shadow-lg"
+        className="w-full max-w-sm rounded-xl border bg-card p-3 shadow-lg sm:p-4"
         role="alertdialog"
         aria-labelledby="discard-dialog-title"
         aria-describedby="discard-dialog-description"
       >
-        <h3 id="discard-dialog-title" className="text-base font-semibold">
+        <h3 id="discard-dialog-title" className="text-sm font-semibold sm:text-base">
           Discard changes?
         </h3>
-        <p id="discard-dialog-description" className="mt-1 text-sm text-muted-foreground">
+        <p id="discard-dialog-description" className="mt-1 text-xs text-muted-foreground sm:text-sm">
           Are you sure you want to close? Unsaved changes will be lost.
         </p>
-        <div className="mt-4 flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
-          <Button type="button" variant="outline" className="w-full sm:w-auto" onClick={onStay}>
+        <div className="mt-3 flex flex-col-reverse gap-2 sm:mt-4 sm:flex-row sm:justify-end">
+          <Button
+            type="button"
+            variant="outline"
+            className="h-11 w-full sm:h-10 sm:w-auto"
+            onClick={onStay}
+          >
             Stay
           </Button>
           <Button
             type="button"
             variant="destructive"
-            className="w-full sm:w-auto"
+            className="h-11 w-full sm:h-10 sm:w-auto"
             onClick={onDiscard}
           >
             Discard
@@ -157,21 +165,21 @@ function DialogContent({ className, children, showCloseButton = true }) {
   if (!open) return null
 
   return (
-    <div className="fixed inset-0 z-50 flex items-end justify-center p-0 sm:items-center sm:p-4">
-      <div
-        aria-hidden="true"
-        className="absolute inset-0 bg-black/50"
-      />
+    <div className="fixed inset-0 z-50 flex items-end justify-center p-0 sm:items-center sm:p-4 lg:p-6">
+      <div aria-hidden="true" className="absolute inset-0 bg-black/50" />
       <div
         className={cn(
-          'relative z-10 max-h-[92dvh] w-full overflow-y-auto rounded-t-2xl border bg-card p-4 shadow-lg sm:max-h-[90dvh] sm:max-w-lg sm:rounded-xl sm:p-6',
+          // Phone: bottom sheet · sm+: centered card · xl: capped width (not full 32" stretch)
+          'relative z-10 w-full max-h-[92dvh] overflow-y-auto overscroll-contain rounded-t-2xl border bg-card p-4 pb-[max(1rem,env(safe-area-inset-bottom))] shadow-lg',
+          'sm:max-h-[90dvh] sm:max-w-lg sm:rounded-xl sm:p-6 sm:pb-6',
+          'md:max-w-xl',
           className,
         )}
       >
         {showCloseButton ? (
           <button
             type="button"
-            className="absolute right-3 top-3 rounded-md p-1.5 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground cursor-pointer"
+            className="absolute right-2.5 top-2.5 z-10 rounded-md p-2 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground cursor-pointer sm:right-3 sm:top-3 sm:p-1.5"
             aria-label="Close"
             onClick={() => {
               if (discardOpen) {
@@ -203,18 +211,18 @@ function DialogHeader({ className, ...props }) {
 }
 
 function DialogTitle({ className, ...props }) {
-  return <h2 className={cn('text-lg font-semibold', className)} {...props} />
+  return <h2 className={cn('text-base font-semibold break-words sm:text-lg', className)} {...props} />
 }
 
 function DialogDescription({ className, ...props }) {
-  return <p className={cn('text-sm text-muted-foreground', className)} {...props} />
+  return <p className={cn('text-xs text-muted-foreground sm:text-sm', className)} {...props} />
 }
 
 function DialogFooter({ className, ...props }) {
   return (
     <div
       className={cn(
-        'mt-6 flex flex-col-reverse gap-2 sm:flex-row sm:justify-end',
+        'mt-4 flex flex-col-reverse gap-2 sm:mt-6 sm:flex-row sm:flex-wrap sm:justify-end sm:gap-2.5',
         className,
       )}
       {...props}

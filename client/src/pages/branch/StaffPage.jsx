@@ -3,6 +3,7 @@ import { Plus } from 'lucide-react'
 import { PageHeader } from '@/components/shared/PageHeader'
 import { MotionHeader, MotionReveal } from '@/components/shared/MotionReveal'
 import { ConfirmDialog } from '@/components/shared/ConfirmDialog'
+import { DeleteEntityDialog } from '@/components/shared/DeleteEntityDialog'
 import { StaffFilters } from '@/components/feature/branch/staff/StaffFilters'
 import { StaffFormDialog } from '@/components/feature/branch/staff/StaffFormDialog'
 import { StaffTable } from '@/components/feature/branch/staff/StaffTable'
@@ -117,13 +118,22 @@ export function StaffPage() {
     setStatusTarget(null)
   }
 
-  async function handleConfirmDelete() {
+  async function handleSoftDeleteStaff() {
+    if (!deleteTarget?.id) return
+    await applyStaffStatus(deleteTarget, 'inactive')
+    setDeleteTarget(null)
+  }
+
+  async function handleHardDeleteStaff() {
     if (!deleteTarget?.id) return
     const result = await deleteStaff(deleteTarget.id)
     setDeleteTarget(null)
-    if (result.success) toastSuccess('Staff deleted')
+    if (result.success) toastSuccess('Staff permanently deleted')
     else toastError(result.error || 'Delete failed')
   }
+
+  const deleteStaffIsActive =
+    deleteTarget?.status === 'active' || deleteTarget?.status === 'open'
 
   return (
     <div className="space-y-5 pb-8 sm:space-y-6">
@@ -272,20 +282,30 @@ export function StaffPage() {
         onConfirm={handleConfirmDeactivate}
       />
 
-      <ConfirmDialog
+      <DeleteEntityDialog
         open={Boolean(deleteTarget)}
         onOpenChange={(open) => {
           if (!open) setDeleteTarget(null)
         }}
-        title="Delete staff?"
+        entityName={deleteTarget?.fullName || deleteTarget?.email}
         description={
-          deleteTarget
-            ? `Permanently remove ${deleteTarget.fullName || deleteTarget.email}? Prefer Inactive if you only want to block login.`
-            : undefined
+          deleteTarget ? (
+            <>
+              Permanently remove <strong>{deleteTarget.fullName || deleteTarget.email}</strong>?
+              Prefer <strong>Inactive</strong> if you only want to block login — attendance and sales
+              history stay intact.
+            </>
+          ) : null
         }
-        confirmLabel="Delete"
+        softLabel="Set Inactive"
+        softHint="Stops login. You can reactivate this person later from the Inactive filter."
+        hardLabel="Permanently delete"
+        hardHint="Use only for mistaken accounts with no operational history."
+        showSoftAction={deleteStaffIsActive}
+        canHardDelete
         loading={mutating}
-        onConfirm={handleConfirmDelete}
+        onSoftDelete={handleSoftDeleteStaff}
+        onHardDelete={handleHardDeleteStaff}
       />
     </div>
   )

@@ -26,15 +26,23 @@ import { displayDiscountRef } from '@/lib/formatDisplayId'
 import { toastError, toastSuccess } from '@/lib/toast'
 import { validateDiscountForm } from '@/lib/validation/branchForms'
 import { useFormBaseline } from '@/hooks/useFormBaseline'
-
-const PAGE_SIZE = 8
+import { useClientPagination } from '@/hooks/useClientPagination'
 
 export function DiscountsPage() {
   const [discounts, setDiscounts] = useState([])
   const [loading, setLoading] = useState(false)
   const [categories, setCategories] = useState([])
   const [filterCategory, setFilterCategory] = useState('')
-  const [page, setPage] = useState(1)
+  const filteredDiscounts = discounts
+  const {
+    page,
+    setPage,
+    pageSize,
+    setPageSize,
+    pageCount,
+    total,
+    slice: pagedDiscounts,
+  } = useClientPagination(filteredDiscounts)
 
   // Form states
   const [open, setOpen] = useState(false)
@@ -155,8 +163,6 @@ export function DiscountsPage() {
     }
   }
 
-  const filteredDiscounts = discounts
-
   return (
     <div className="space-y-6 pb-8">
       <MotionHeader>
@@ -200,11 +206,6 @@ export function DiscountsPage() {
         <SurfaceCard
           title="Active Discount Campaigns"
           description="Standard discount templates that can be applied to products."
-          actions={
-            <span className="text-xs font-medium text-slate-400">
-              {filteredDiscounts.length} records · {PAGE_SIZE} / page
-            </span>
-          }
         >
           {loading ? (
             <p className="py-8 text-center text-sm text-slate-400">Loading campaign offers...</p>
@@ -213,9 +214,7 @@ export function DiscountsPage() {
           ) : (
             <>
               <div className="space-y-3 md:hidden">
-                {filteredDiscounts
-                  .slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE)
-                  .map((disc) => (
+                {pagedDiscounts.map((disc) => (
                     <article
                       key={disc.id}
                       className="rounded-xl border border-border bg-slate-50/60 px-3 py-3"
@@ -274,9 +273,7 @@ export function DiscountsPage() {
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {filteredDiscounts
-                      .slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE)
-                      .map((disc) => (
+                    {pagedDiscounts.map((disc) => (
                         <TableRow key={disc.id} className="group">
                           <TableCell className="px-2 py-3 font-mono font-bold text-slate-900">
                             {displayDiscountRef(disc)}
@@ -322,9 +319,11 @@ export function DiscountsPage() {
 
           <TablePagination
             page={page}
-            pageCount={Math.max(1, Math.ceil(filteredDiscounts.length / PAGE_SIZE))}
-            totalItems={filteredDiscounts.length}
+            pageCount={pageCount}
+            totalItems={total}
+            pageSize={pageSize}
             onPageChange={setPage}
+            onPageSizeChange={setPageSize}
           />
         </SurfaceCard>
       </MotionReveal>

@@ -278,7 +278,8 @@ const controlSlice = createSlice({
         patch.categoryId !== undefined ||
         patch.subcategoryId !== undefined ||
         patch.scale !== undefined ||
-        patch.type !== undefined
+        patch.type !== undefined ||
+        patch.limit !== undefined
       if (resets && patch.page === undefined) next.page = 1
       bucket.filters = next
     },

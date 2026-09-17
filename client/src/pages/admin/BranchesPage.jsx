@@ -32,6 +32,7 @@ import { DeleteEntityDialog } from '@/components/shared/DeleteEntityDialog'
 import { ImageUploadField } from '@/components/shared/ImageUploadField'
 import { PhoneInput } from '@/components/shared/PhoneInput'
 import { TimePicker } from '@/components/shared/TimePicker'
+import { DataCard, ResponsiveDataShell } from '@/components/shared/ResponsiveDataShell'
 import { BRAND } from '@/lib/constants'
 import { toastSuccess, toastError } from '@/lib/toast'
 import {
@@ -42,6 +43,7 @@ import { useAdminBranches } from '@/hooks/useAdminBranches'
 import { useAuthSession } from '@/hooks/useAuthSession'
 import { useDebouncedValue } from '@/hooks/useDebouncedValue'
 import { useFormBaseline } from '@/hooks/useFormBaseline'
+import { useClientPagination } from '@/hooks/useClientPagination'
 import {
   Plus,
   Search,
@@ -59,7 +61,6 @@ import {
   Pencil,
 } from 'lucide-react'
 
-const PAGE_SIZE = 8
 const DEFAULT_BRANCH_IMAGE =
   'https://images.unsplash.com/photo-1578916171728-46686eac8d58?w=500&auto=format&fit=crop&q=60'
 const AVATAR_MALE =
@@ -142,12 +143,80 @@ function formatHoursRange(openingTime, closingTime) {
   return `${open}–${close}`
 }
 
+function BranchRowActions({
+  branch: b,
+  mutating,
+  onEdit,
+  onResetPassword,
+  onToggleStatus,
+  onDelete,
+}) {
+  const isOpen = b.status === 'open'
+  return (
+    <div className="inline-flex items-center justify-end gap-0.5 sm:gap-1">
+      <Button
+        type="button"
+        variant="ghost"
+        size="icon"
+        onClick={() => onEdit(b)}
+        disabled={mutating}
+        title="Edit branch"
+        aria-label={`Edit ${b.name}`}
+        className="size-8 text-purple-800 hover:bg-purple-50 hover:text-purple-950"
+      >
+        <Pencil className="size-4" />
+      </Button>
+      {b.manager?.id && !b.manager?.credentialsEmailed ? (
+        <Button
+          type="button"
+          variant="ghost"
+          size="icon"
+          onClick={() => onResetPassword(b)}
+          disabled={mutating}
+          title="Email failed — reset & resend credentials"
+          aria-label={`Resend credentials for ${b.name}`}
+          className="size-8 text-amber-700 hover:bg-amber-50 hover:text-amber-900"
+        >
+          <KeyRound className="size-4" />
+        </Button>
+      ) : null}
+      <Button
+        type="button"
+        variant="ghost"
+        size="icon"
+        onClick={() => onToggleStatus(b)}
+        disabled={mutating}
+        title={isOpen ? 'Block (soft) — keeps data' : 'Open branch'}
+        aria-label={isOpen ? `Block ${b.name}` : `Open ${b.name}`}
+        className={`size-8 ${
+          isOpen
+            ? 'text-rose-600 hover:bg-rose-50 hover:text-rose-800'
+            : 'text-emerald-700 hover:bg-emerald-50 hover:text-emerald-900'
+        }`}
+      >
+        {isOpen ? <Ban className="size-4" /> : <Eye className="size-4" />}
+      </Button>
+      <Button
+        type="button"
+        variant="ghost"
+        size="icon"
+        onClick={() => onDelete(b)}
+        disabled={mutating}
+        title="Delete permanently…"
+        aria-label={`Delete ${b.name}`}
+        className="size-8 text-slate-500 hover:bg-slate-100 hover:text-slate-900"
+      >
+        <Trash2 className="size-4" />
+      </Button>
+    </div>
+  )
+}
+
 export function BranchesPage() {
   const { user } = useAuthSession()
   const [searchQuery, setSearchQuery] = useState('')
   const debouncedQ = useDebouncedValue(searchQuery.trim(), 300)
   const [statusFilter, setStatusFilter] = useState('all')
-  const [page, setPage] = useState(1)
   const [addDialogOpen, setAddDialogOpen] = useState(false)
   const [editingBranch, setEditingBranch] = useState(null)
   const [confirmStatusOpen, setConfirmStatusOpen] = useState(false)
@@ -192,12 +261,15 @@ export function BranchesPage() {
     return items.filter((b) => (statusFilter === 'all' ? true : b.status === statusFilter))
   }, [items, statusFilter])
 
-  const totalPages = Math.max(1, Math.ceil(filteredBranches.length / PAGE_SIZE))
-
-  const pagedBranches = useMemo(() => {
-    const start = (page - 1) * PAGE_SIZE
-    return filteredBranches.slice(start, start + PAGE_SIZE)
-  }, [filteredBranches, page])
+  const {
+    page,
+    setPage,
+    pageSize,
+    setPageSize,
+    pageCount,
+    total,
+    slice: pagedBranches,
+  } = useClientPagination(filteredBranches)
 
   function handleOpenAdd() {
     setFormData({
@@ -489,125 +561,46 @@ export function BranchesPage() {
         <SurfaceCard
           title="List of branches"
           description="Registered branch network, branch manager assignments, locations & access statuses"
-          actions={
-            <span className="text-xs font-medium text-slate-400 whitespace-nowrap">
-              {filteredBranches.length} records · {PAGE_SIZE} / page
-            </span>
-          }
         >
-          <div className="-mx-1 overflow-x-auto sm:mx-0">
-            <Table className="min-w-[42rem] w-full text-left text-sm sm:min-w-[52rem]">
-              <TableHeader>
-                <TableRow className="text-xs text-slate-500 uppercase">
-                  <TableHead className="px-2 py-3 font-medium whitespace-nowrap sm:px-3">Branch ID</TableHead>
-                  <TableHead className="px-2 py-3 font-medium whitespace-nowrap sm:px-3">Image</TableHead>
-                  <TableHead className="px-2 py-3 font-medium whitespace-nowrap sm:px-3 min-w-[10rem]">Branch</TableHead>
-                  <TableHead className="hidden px-2 py-3 font-medium whitespace-nowrap sm:table-cell sm:px-3 min-w-[9rem]">
-                    Location
-                  </TableHead>
-                  <TableHead className="px-2 py-3 font-medium whitespace-nowrap sm:px-3 min-w-[12rem]">
-                    Manager
-                  </TableHead>
-                  <TableHead className="px-2 py-3 font-medium whitespace-nowrap sm:px-3">Status</TableHead>
-                  <TableHead className="sticky right-0 z-[1] bg-white px-2 py-3 text-right font-medium whitespace-nowrap sm:px-3">
-                    Action
-                  </TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {loading && items.length === 0 ? (
-                  <TableRow>
-                    <TableCell colSpan={7} className="py-10 text-center text-xs text-slate-400">
-                      <span className="inline-flex items-center gap-2">
-                        <Loader2 className="size-4 animate-spin" />
-                        Loading branches…
-                      </span>
-                    </TableCell>
-                  </TableRow>
-                ) : filteredBranches.length === 0 ? (
-                  <TableRow>
-                    <TableCell colSpan={7} className="py-8 text-center text-xs text-slate-400">
-                      No branches match the filter criteria. Add a branch to start the SoftFlux upward flow.
-                    </TableCell>
-                  </TableRow>
-                ) : (
-                  pagedBranches.map((b) => {
-                    const isOpen = b.status === 'open'
-                    const imageSrc = b.image || DEFAULT_BRANCH_IMAGE
-                    return (
-                      <TableRow key={b.id} className="group hover:bg-slate-50/80">
-                        <TableCell className="px-2 py-3 font-mono text-xs whitespace-nowrap sm:px-3">
-                          <span
-                            title={b.id}
-                            className="inline-flex items-center font-mono text-xs font-medium text-slate-800 bg-slate-100/80 border border-slate-200/80 px-2 py-0.5 rounded select-all hover:bg-slate-200/60 transition-colors"
-                          >
-                            {shortId(b.id)}
-                          </span>
-                        </TableCell>
-                        <TableCell className="px-2 py-3 whitespace-nowrap sm:px-3">
-                          <img
-                            src={imageSrc}
-                            alt={b.name}
-                            className="size-9 sm:size-11 rounded-md object-cover border border-slate-200 shrink-0 shadow-2xs"
-                          />
-                        </TableCell>
-                        <TableCell className="px-2 py-3 sm:px-3">
-                          <p className="font-bold text-slate-900 text-xs sm:text-sm">{b.name}</p>
-                          <span className="text-[10px] sm:text-[11px] text-slate-400 whitespace-nowrap">
-                            Est. {formatCreatedAt(b.createdAt)}
-                          </span>
-                          {formatHoursRange(b.openingTime, b.closingTime) ? (
-                            <p className="mt-0.5 text-[10px] font-medium text-purple-800 whitespace-nowrap">
-                              Hours {formatHoursRange(b.openingTime, b.closingTime)}
-                            </p>
-                          ) : null}
-                          <p className="mt-1 flex items-start gap-1 text-[10px] text-slate-500 sm:hidden">
-                            <MapPin className="mt-0.5 size-3 shrink-0 text-slate-400" />
-                            <span className="line-clamp-2">{b.location || '—'}</span>
-                          </p>
-                        </TableCell>
-                        <TableCell className="hidden px-2 py-3 text-xs text-slate-600 sm:table-cell sm:px-3">
-                          <div className="flex items-start gap-1">
-                            <MapPin className="mt-0.5 size-3.5 text-slate-400 shrink-0" />
-                            <span className="line-clamp-2">{b.location || '—'}</span>
+          {loading && items.length === 0 ? (
+            <div className="flex items-center justify-center gap-2 py-10 text-xs text-slate-400">
+              <Loader2 className="size-4 animate-spin" />
+              Loading branches…
+            </div>
+          ) : filteredBranches.length === 0 ? (
+            <p className="py-8 text-center text-xs text-slate-400">
+              No branches match the filter criteria. Add a branch to start the SoftFlux upward flow.
+            </p>
+          ) : (
+            <ResponsiveDataShell
+              mobile={pagedBranches.map((b) => {
+                const isOpen = b.status === 'open'
+                const imageSrc = b.image || DEFAULT_BRANCH_IMAGE
+                return (
+                  <DataCard key={b.id}>
+                    <div className="flex items-start gap-3">
+                      <img
+                        src={imageSrc}
+                        alt={b.name}
+                        className="size-12 shrink-0 rounded-md border border-slate-200 object-cover shadow-2xs"
+                      />
+                      <div className="min-w-0 flex-1">
+                        <div className="flex items-start justify-between gap-2">
+                          <div className="min-w-0">
+                            <p className="truncate text-sm font-bold text-slate-900">{b.name}</p>
+                            <span
+                              title={b.id}
+                              className="mt-0.5 inline-flex items-center rounded border border-slate-200/80 bg-slate-100/80 px-2 py-0.5 font-mono text-[10px] font-medium text-slate-800"
+                            >
+                              {shortId(b.id)}
+                            </span>
                           </div>
-                        </TableCell>
-                        <TableCell className="px-2 py-3 sm:px-3">
-                          <div className="flex items-center gap-2 sm:gap-2.5">
-                            <img
-                              src={managerAvatar(b.manager)}
-                              alt={b.manager?.name || 'Manager'}
-                              className="size-8 sm:size-9 rounded-full object-cover border border-slate-200 shrink-0"
-                            />
-                            <div className="min-w-0">
-                              <div className="flex items-center gap-1.5">
-                                <p className="font-bold text-slate-900 text-xs truncate">
-                                  {b.manager?.name || '—'}
-                                </p>
-                                {b.manager?.gender ? (
-                                  <span className="hidden text-[9px] bg-slate-100 text-slate-600 px-1.5 py-0.2 rounded font-medium shrink-0 sm:inline">
-                                    {b.manager.gender}
-                                  </span>
-                                ) : null}
-                              </div>
-                              <p className="text-[10px] sm:text-[11px] text-slate-500 truncate flex items-center gap-1 mt-0.5">
-                                <Mail className="size-3 text-slate-400 shrink-0" />
-                                <span className="truncate">{b.manager?.email || '—'}</span>
-                              </p>
-                              <p className="hidden text-[11px] text-slate-400 truncate sm:flex items-center gap-1">
-                                <Phone className="size-3 text-slate-400 shrink-0" />
-                                <span className="whitespace-nowrap">{b.manager?.contact || '—'}</span>
-                              </p>
-                            </div>
-                          </div>
-                        </TableCell>
-                        <TableCell className="px-2 py-3 whitespace-nowrap sm:px-3">
                           <Badge
                             variant="outline"
                             className={
                               isOpen
-                                ? 'bg-purple-50 text-purple-900 border-purple-200 font-bold whitespace-nowrap'
-                                : 'bg-rose-50 text-rose-700 border-rose-200 font-bold whitespace-nowrap'
+                                ? 'shrink-0 bg-purple-50 text-purple-900 border-purple-200 font-bold'
+                                : 'shrink-0 bg-rose-50 text-rose-700 border-rose-200 font-bold'
                             }
                           >
                             {isOpen ? (
@@ -617,74 +610,176 @@ export function BranchesPage() {
                             )}
                             {isOpen ? 'Open' : 'Blocked'}
                           </Badge>
-                        </TableCell>
-                        <TableCell className="sticky right-0 z-[1] bg-white px-1.5 py-3 text-right whitespace-nowrap sm:px-3 group-hover:bg-slate-50/80">
-                          <div className="inline-flex items-center justify-end gap-0.5 sm:gap-1">
-                            <Button
-                              type="button"
-                              variant="ghost"
-                              size="icon"
-                              onClick={() => handleOpenEdit(b)}
-                              disabled={mutating}
-                              title="Edit branch"
-                              aria-label={`Edit ${b.name}`}
-                              className="size-8 text-purple-800 hover:bg-purple-50 hover:text-purple-950"
-                            >
-                              <Pencil className="size-4" />
-                            </Button>
-                            {b.manager?.id && !b.manager?.credentialsEmailed ? (
-                              <Button
-                                type="button"
-                                variant="ghost"
-                                size="icon"
-                                onClick={() => handlePromptResetPassword(b)}
-                                disabled={mutating}
-                                title="Email failed — reset & resend credentials"
-                                aria-label={`Resend credentials for ${b.name}`}
-                                className="size-8 text-amber-700 hover:bg-amber-50 hover:text-amber-900"
-                              >
-                                <KeyRound className="size-4" />
-                              </Button>
-                            ) : null}
-                            <Button
-                              type="button"
-                              variant="ghost"
-                              size="icon"
-                              onClick={() => handlePromptToggleStatus(b)}
-                              disabled={mutating}
-                              title={isOpen ? 'Block (soft) — keeps data' : 'Open branch'}
-                              aria-label={isOpen ? `Block ${b.name}` : `Open ${b.name}`}
-                              className={`size-8 ${
-                                isOpen
-                                  ? 'text-rose-600 hover:bg-rose-50 hover:text-rose-800'
-                                  : 'text-emerald-700 hover:bg-emerald-50 hover:text-emerald-900'
-                              }`}
-                            >
-                              {isOpen ? <Ban className="size-4" /> : <Eye className="size-4" />}
-                            </Button>
-                            <Button
-                              type="button"
-                              variant="ghost"
-                              size="icon"
-                              onClick={() => setDeleteTarget(b)}
-                              disabled={mutating}
-                              title="Delete permanently…"
-                              aria-label={`Delete ${b.name}`}
-                              className="size-8 text-slate-500 hover:bg-slate-100 hover:text-slate-900"
-                            >
-                              <Trash2 className="size-4" />
-                            </Button>
+                        </div>
+                        <p className="mt-1.5 flex items-start gap-1 text-xs text-slate-500">
+                          <MapPin className="mt-0.5 size-3 shrink-0 text-slate-400" />
+                          <span className="line-clamp-2">{b.location || '—'}</span>
+                        </p>
+                        {formatHoursRange(b.openingTime, b.closingTime) ? (
+                          <p className="mt-0.5 text-[10px] font-medium text-purple-800">
+                            Hours {formatHoursRange(b.openingTime, b.closingTime)}
+                          </p>
+                        ) : null}
+                        <div className="mt-2 flex items-center gap-2">
+                          <img
+                            src={managerAvatar(b.manager)}
+                            alt={b.manager?.name || 'Manager'}
+                            className="size-8 shrink-0 rounded-full border border-slate-200 object-cover"
+                          />
+                          <div className="min-w-0">
+                            <p className="truncate text-xs font-bold text-slate-900">
+                              {b.manager?.name || '—'}
+                            </p>
+                            <p className="truncate text-[10px] text-slate-500">
+                              {b.manager?.email || '—'}
+                            </p>
                           </div>
-                        </TableCell>
-                      </TableRow>
-                    )
-                  })
-                )}
-              </TableBody>
-            </Table>
-          </div>
+                        </div>
+                        <div className="mt-3 flex justify-end">
+                          <BranchRowActions
+                            branch={b}
+                            mutating={mutating}
+                            onEdit={handleOpenEdit}
+                            onResetPassword={handlePromptResetPassword}
+                            onToggleStatus={handlePromptToggleStatus}
+                            onDelete={setDeleteTarget}
+                          />
+                        </div>
+                      </div>
+                    </div>
+                  </DataCard>
+                )
+              })}
+              desktop={
+                <Table className="min-w-[42rem] w-full text-left text-sm sm:min-w-[52rem]">
+                  <TableHeader>
+                    <TableRow className="text-xs text-slate-500 uppercase">
+                      <TableHead className="px-2 py-3 font-medium whitespace-nowrap sm:px-3">Branch ID</TableHead>
+                      <TableHead className="px-2 py-3 font-medium whitespace-nowrap sm:px-3">Image</TableHead>
+                      <TableHead className="px-2 py-3 font-medium whitespace-nowrap sm:px-3 min-w-[10rem]">Branch</TableHead>
+                      <TableHead className="hidden px-2 py-3 font-medium whitespace-nowrap sm:table-cell sm:px-3 min-w-[9rem]">
+                        Location
+                      </TableHead>
+                      <TableHead className="px-2 py-3 font-medium whitespace-nowrap sm:px-3 min-w-[12rem]">
+                        Manager
+                      </TableHead>
+                      <TableHead className="px-2 py-3 font-medium whitespace-nowrap sm:px-3">Status</TableHead>
+                      <TableHead className="sticky right-0 z-[1] bg-white px-2 py-3 text-right font-medium whitespace-nowrap sm:px-3">
+                        Action
+                      </TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {pagedBranches.map((b) => {
+                      const isOpen = b.status === 'open'
+                      const imageSrc = b.image || DEFAULT_BRANCH_IMAGE
+                      return (
+                        <TableRow key={b.id} className="group hover:bg-slate-50/80">
+                          <TableCell className="px-2 py-3 font-mono text-xs whitespace-nowrap sm:px-3">
+                            <span
+                              title={b.id}
+                              className="inline-flex items-center font-mono text-xs font-medium text-slate-800 bg-slate-100/80 border border-slate-200/80 px-2 py-0.5 rounded select-all hover:bg-slate-200/60 transition-colors"
+                            >
+                              {shortId(b.id)}
+                            </span>
+                          </TableCell>
+                          <TableCell className="px-2 py-3 whitespace-nowrap sm:px-3">
+                            <img
+                              src={imageSrc}
+                              alt={b.name}
+                              className="size-9 sm:size-11 rounded-md object-cover border border-slate-200 shrink-0 shadow-2xs"
+                            />
+                          </TableCell>
+                          <TableCell className="px-2 py-3 sm:px-3">
+                            <p className="font-bold text-slate-900 text-xs sm:text-sm">{b.name}</p>
+                            <span className="text-[10px] sm:text-[11px] text-slate-400 whitespace-nowrap">
+                              Est. {formatCreatedAt(b.createdAt)}
+                            </span>
+                            {formatHoursRange(b.openingTime, b.closingTime) ? (
+                              <p className="mt-0.5 text-[10px] font-medium text-purple-800 whitespace-nowrap">
+                                Hours {formatHoursRange(b.openingTime, b.closingTime)}
+                              </p>
+                            ) : null}
+                          </TableCell>
+                          <TableCell className="hidden px-2 py-3 text-xs text-slate-600 sm:table-cell sm:px-3">
+                            <div className="flex items-start gap-1">
+                              <MapPin className="mt-0.5 size-3.5 text-slate-400 shrink-0" />
+                              <span className="line-clamp-2">{b.location || '—'}</span>
+                            </div>
+                          </TableCell>
+                          <TableCell className="px-2 py-3 sm:px-3">
+                            <div className="flex items-center gap-2 sm:gap-2.5">
+                              <img
+                                src={managerAvatar(b.manager)}
+                                alt={b.manager?.name || 'Manager'}
+                                className="size-8 sm:size-9 rounded-full object-cover border border-slate-200 shrink-0"
+                              />
+                              <div className="min-w-0">
+                                <div className="flex items-center gap-1.5">
+                                  <p className="font-bold text-slate-900 text-xs truncate">
+                                    {b.manager?.name || '—'}
+                                  </p>
+                                  {b.manager?.gender ? (
+                                    <span className="hidden text-[9px] bg-slate-100 text-slate-600 px-1.5 py-0.2 rounded font-medium shrink-0 sm:inline">
+                                      {b.manager.gender}
+                                    </span>
+                                  ) : null}
+                                </div>
+                                <p className="text-[10px] sm:text-[11px] text-slate-500 truncate flex items-center gap-1 mt-0.5">
+                                  <Mail className="size-3 text-slate-400 shrink-0" />
+                                  <span className="truncate">{b.manager?.email || '—'}</span>
+                                </p>
+                                <p className="hidden text-[11px] text-slate-400 truncate sm:flex items-center gap-1">
+                                  <Phone className="size-3 text-slate-400 shrink-0" />
+                                  <span className="whitespace-nowrap">{b.manager?.contact || '—'}</span>
+                                </p>
+                              </div>
+                            </div>
+                          </TableCell>
+                          <TableCell className="px-2 py-3 whitespace-nowrap sm:px-3">
+                            <Badge
+                              variant="outline"
+                              className={
+                                isOpen
+                                  ? 'bg-purple-50 text-purple-900 border-purple-200 font-bold whitespace-nowrap'
+                                  : 'bg-rose-50 text-rose-700 border-rose-200 font-bold whitespace-nowrap'
+                              }
+                            >
+                              {isOpen ? (
+                                <CheckCircle className="mr-1 size-3 text-purple-700" />
+                              ) : (
+                                <Ban className="mr-1 size-3 text-rose-600" />
+                              )}
+                              {isOpen ? 'Open' : 'Blocked'}
+                            </Badge>
+                          </TableCell>
+                          <TableCell className="sticky right-0 z-[1] bg-white px-1.5 py-3 text-right whitespace-nowrap sm:px-3 group-hover:bg-slate-50/80">
+                            <BranchRowActions
+                              branch={b}
+                              mutating={mutating}
+                              onEdit={handleOpenEdit}
+                              onResetPassword={handlePromptResetPassword}
+                              onToggleStatus={handlePromptToggleStatus}
+                              onDelete={setDeleteTarget}
+                            />
+                          </TableCell>
+                        </TableRow>
+                      )
+                    })}
+                  </TableBody>
+                </Table>
+              }
+            />
+          )}
 
-          <TablePagination page={page} pageCount={totalPages} onPageChange={setPage} />
+          <TablePagination
+            page={page}
+            pageCount={pageCount}
+            totalItems={total}
+            pageSize={pageSize}
+            onPageChange={setPage}
+            onPageSizeChange={setPageSize}
+          />
         </SurfaceCard>
       </MotionReveal>
 

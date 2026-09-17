@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useState } from 'react'
 import { ArrowLeft, ArrowRight, Pencil, Trash2 } from 'lucide-react'
 import { SurfaceCard } from '@/components/shared/SurfaceCard'
 import { ConfirmDialog } from '@/components/shared/ConfirmDialog'
@@ -28,8 +28,7 @@ import { apiClient } from '@/api/api'
 import { BRAND } from '@/lib/constants'
 import { toastError, toastSuccess } from '@/lib/toast'
 import { validateLeaveForm } from '@/lib/validation/branchForms'
-
-const PAGE_SIZE = 8
+import { useClientPagination } from '@/hooks/useClientPagination'
 
 function formatDate(value) {
   if (!value) return '—'
@@ -65,7 +64,6 @@ export function StaffLeavesTab({ designations = [], staff = [] }) {
   const [loading, setLoading] = useState(false)
   const [mutating, setMutating] = useState(false)
   const [step, setStep] = useState(1)
-  const [page, setPage] = useState(1)
   const [listDesignation, setListDesignation] = useState('')
 
   const [startDate, setStartDate] = useState('')
@@ -213,10 +211,15 @@ export function StaffLeavesTab({ designations = [], staff = [] }) {
     return true
   })
 
-  const pageRows = useMemo(
-    () => leaves.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE),
-    [leaves, page],
-  )
+  const {
+    page,
+    setPage,
+    pageSize,
+    setPageSize,
+    pageCount,
+    total,
+    slice: pageRows,
+  } = useClientPagination(leaves)
 
   return (
     <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
@@ -224,11 +227,6 @@ export function StaffLeavesTab({ designations = [], staff = [] }) {
         <SurfaceCard
           title="Active Leave Roster"
           description="Recorded leave records for branch employees"
-          actions={
-            <span className="text-xs font-medium text-slate-400">
-              {leaves.length} records · {PAGE_SIZE} / page
-            </span>
-          }
         >
           <div className="mb-4 max-w-xs">
             <Label className="mb-1.5 block text-xs text-slate-500">Filter by Designation</Label>
@@ -354,9 +352,11 @@ export function StaffLeavesTab({ designations = [], staff = [] }) {
 
           <TablePagination
             page={page}
-            pageCount={Math.max(1, Math.ceil(leaves.length / PAGE_SIZE))}
-            totalItems={leaves.length}
+            pageCount={pageCount}
+            totalItems={total}
+            pageSize={pageSize}
             onPageChange={setPage}
+            onPageSizeChange={setPageSize}
           />
         </SurfaceCard>
       </div>

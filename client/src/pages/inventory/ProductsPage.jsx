@@ -298,6 +298,7 @@ export function ProductsPage() {
           pagination={pagination}
           statusUpdatingId={statusUpdatingId}
           onPageChange={setPage}
+          onPageSizeChange={(limit) => updateFilters({ limit })}
           onEdit={openEdit}
           onPrintBarcode={setPrintTarget}
           onStatusChange={handleStatusChange}

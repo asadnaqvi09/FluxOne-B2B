@@ -40,6 +40,7 @@ function StockAlertsTableComponent({
   loading = false,
   pagination,
   onPageChange,
+  onPageSizeChange,
   className,
 }) {
   const list = Array.isArray(items) ? items : []
@@ -47,6 +48,7 @@ function StockAlertsTableComponent({
   const page = pagination?.page || 1
   const pageCount = Math.max(1, pagination?.pageCount || 1)
   const total = pagination?.total ?? list.length
+  const pageSize = pagination?.limit || 8
 
   return (
     <SurfaceCard
@@ -56,11 +58,6 @@ function StockAlertsTableComponent({
       )}
       title="Stock Alerts & Requests"
       description="Low stock, branch alerts, and replenishment requests"
-      actions={
-        <span className="text-xs font-medium text-slate-400">
-          {total} records · 8 / page
-        </span>
-      }
     >
       {loading ? (
         <TableRowsSkeleton rows={5} />
@@ -140,8 +137,10 @@ function StockAlertsTableComponent({
             page={page}
             pageCount={pageCount}
             totalItems={total}
+            pageSize={pageSize}
             loading={loading}
             onPageChange={onPageChange}
+            onPageSizeChange={onPageSizeChange}
           />
 
           <div className="mt-4 border-t border-border pt-3">

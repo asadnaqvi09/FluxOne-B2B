@@ -125,6 +125,7 @@ export function SuppliersPage() {
           loading={loading}
           pagination={pagination}
           onPageChange={setPage}
+          onPageSizeChange={(limit) => updateFilters({ limit })}
           onEdit={openEdit}
           onStatusChange={handleStatusChange}
           statusUpdatingId={statusUpdatingId}

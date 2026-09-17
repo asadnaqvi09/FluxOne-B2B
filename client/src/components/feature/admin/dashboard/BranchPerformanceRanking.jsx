@@ -1,4 +1,3 @@
-import { useState, useMemo } from 'react'
 import { DataCard, ResponsiveDataShell } from '@/components/shared/ResponsiveDataShell'
 import { SurfaceCard } from '@/components/shared/SurfaceCard'
 import { Badge } from '@/components/ui/badge'
@@ -11,6 +10,7 @@ import {
   TableCell,
   TablePagination,
 } from '@/components/ui/table'
+import { useClientPagination } from '@/hooks/useClientPagination'
 import { Trophy, MapPin } from 'lucide-react'
 
 const BRANCH_RANKINGS = [
@@ -64,8 +64,6 @@ const BRANCH_RANKINGS = [
   },
 ]
 
-const PAGE_SIZE = 8
-
 function RankBadge({ rank }) {
   return (
     <span
@@ -85,26 +83,16 @@ function RankBadge({ rank }) {
 }
 
 export function BranchPerformanceRanking() {
-  const [page, setPage] = useState(1)
-  const totalPages = Math.max(1, Math.ceil(BRANCH_RANKINGS.length / PAGE_SIZE))
-
-  const pagedRankings = useMemo(() => {
-    const start = (page - 1) * PAGE_SIZE
-    return BRANCH_RANKINGS.slice(start, start + PAGE_SIZE)
-  }, [page])
+  const { page, setPage, pageSize, setPageSize, pageCount, total, slice } =
+    useClientPagination(BRANCH_RANKINGS)
 
   return (
     <SurfaceCard
       title="Branch Performance Ranking (YTD 2026)"
       description="Consolidated financial leaderboard ranking branches by revenue, profit generation & operational efficiency"
-      actions={
-        <span className="text-xs font-medium text-slate-400">
-          {BRANCH_RANKINGS.length} records · {PAGE_SIZE} / page
-        </span>
-      }
     >
       <ResponsiveDataShell
-        mobile={pagedRankings.map((b) => (
+        mobile={slice.map((b) => (
           <DataCard key={b.rank}>
             <div className="flex items-start gap-3">
               <RankBadge rank={b.rank} />
@@ -160,7 +148,7 @@ export function BranchPerformanceRanking() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {pagedRankings.map((b) => (
+              {slice.map((b) => (
                 <TableRow key={b.rank} className="transition-colors hover:bg-slate-50/80">
                   <TableCell className="px-3 py-3">
                     <RankBadge rank={b.rank} />
@@ -194,9 +182,11 @@ export function BranchPerformanceRanking() {
 
       <TablePagination
         page={page}
-        pageCount={totalPages}
-        totalItems={BRANCH_RANKINGS.length}
+        pageCount={pageCount}
+        totalItems={total}
+        pageSize={pageSize}
         onPageChange={setPage}
+        onPageSizeChange={setPageSize}
       />
     </SurfaceCard>
   )

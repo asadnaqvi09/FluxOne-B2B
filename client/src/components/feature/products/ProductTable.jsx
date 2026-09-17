@@ -24,6 +24,7 @@ export function ProductTable({
   pagination,
   statusUpdatingId = null,
   onPageChange,
+  onPageSizeChange,
   onEdit,
   onPrintBarcode,
   onStatusChange,
@@ -35,17 +36,13 @@ export function ProductTable({
   const page = pagination?.page || 1
   const pageCount = Math.max(1, pagination?.pageCount || 1)
   const total = pagination?.total ?? list.length
+  const pageSize = pagination?.limit || 8
 
   return (
     <SurfaceCard
       className={className}
       title="Product catalog"
       description="Single items & bundles for this company"
-      actions={
-        <span className="text-xs font-medium text-slate-400">
-          {total} records · 8 / page
-        </span>
-      }
     >
       {loading ? (
         <TableRowsSkeleton rows={6} />
@@ -279,8 +276,10 @@ export function ProductTable({
             page={page}
             pageCount={pageCount}
             totalItems={total}
+            pageSize={pageSize}
             loading={loading}
             onPageChange={onPageChange}
+            onPageSizeChange={onPageSizeChange}
           />
         </>
       )}

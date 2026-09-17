@@ -8,7 +8,6 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
-import { Badge } from '@/components/ui/badge'
 import { NativeSelect } from '@/components/ui/select'
 import {
   Dialog,
@@ -19,9 +18,9 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog'
-import { DeleteEntityDialog } from '@/components/shared/DeleteEntityDialog'
-import { EmptyState } from '@/components/shared/EmptyState'
+import { ConfirmDialog } from '@/components/shared/ConfirmDialog'
 import { PhoneInput } from '@/components/shared/PhoneInput'
+import { PoliciesTable } from '@/components/feature/admin/company/PoliciesTable'
 import { useAdminCompany } from '@/hooks/useAdminCompany'
 import { useAdminPolicies } from '@/hooks/useAdminPolicies'
 import { BRAND } from '@/lib/constants'
@@ -42,10 +41,7 @@ import {
   ShieldAlert,
   Plus,
   Search,
-  Edit2,
-  Trash2,
   Save,
-  CheckCircle2,
   FileText,
   Store,
   MapPin,
@@ -90,19 +86,6 @@ const CATEGORY_CONFIG = {
   },
 }
 
-function formatPolicyCreatedAt(value) {
-  if (!value) return '—'
-  const date = new Date(value)
-  if (Number.isNaN(date.getTime())) return String(value)
-  return date.toLocaleString(undefined, {
-    year: 'numeric',
-    month: 'short',
-    day: '2-digit',
-    hour: '2-digit',
-    minute: '2-digit',
-  })
-}
-
 const EMPTY_FORM = {
   name: '',
   contactNumbers: '',
@@ -139,6 +122,7 @@ export function CompanyPage() {
   })
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false)
   const [deleteTargetPolicy, setDeleteTargetPolicy] = useState(null)
+  const [viewPolicy, setViewPolicy] = useState(null)
 
   const {
     items: policies,
@@ -609,118 +593,73 @@ export function CompanyPage() {
                   <Loader2 className="size-4 animate-spin" />
                   Loading policies…
                 </div>
-              ) : filteredPolicies.length === 0 ? (
-                <EmptyState
-                  icon={FileText}
-                  title="No corporate policies found"
-                  description="Try searching with a different keyword or create a new policy."
-                  className="rounded-2xl border-border bg-white"
-                />
               ) : (
-                filteredPolicies.map((p) => {
-                  const cfg = CATEGORY_CONFIG[p.category] || CATEGORY_CONFIG['Retail Operations']
-                  const CategoryIcon = cfg.icon
-                  const displayId = referenceFromUuid(p.id, 'POL')
-
-                  return (
-                    <div
-                      key={p.id}
-                      className={`rounded-2xl border border-border bg-white p-5 sm:p-6 shadow-2xs hover:shadow-sm border-l-4 ${cfg.accentBorder} transition-all duration-200 space-y-4`}
-                    >
-                      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                        <div className="flex flex-wrap items-center gap-2.5">
-                          <div
-                            className={`flex size-8 shrink-0 items-center justify-center rounded-lg ${cfg.iconBg} border border-slate-200/60`}
-                          >
-                            <CategoryIcon className="size-4" />
-                          </div>
-
-                          <span className="font-mono text-xs font-bold text-purple-700 bg-purple-50 px-2.5 py-0.5 rounded-md border border-purple-100 whitespace-nowrap">
-                            {displayId}
-                          </span>
-
-                          <Badge variant="outline" className={`text-xs font-semibold ${cfg.badgeClass}`}>
-                            {p.category || 'Uncategorized'}
-                          </Badge>
-
-                          <h4 className="font-bold text-slate-900 text-base sm:text-lg">{p.name}</h4>
-                        </div>
-
-                        <div className="flex items-center gap-2 self-end sm:self-center">
-                          <span className="text-xs text-slate-400 font-medium whitespace-nowrap mr-1">
-                            {formatPolicyCreatedAt(p.createdAt)}
-                          </span>
-
-                          <Button
-                            type="button"
-                            variant="outline"
-                            size="sm"
-                            onClick={() => handleOpenEditPolicy(p)}
-                            className="h-8 px-3 text-xs font-semibold cursor-pointer border-purple-200 text-purple-900 hover:bg-purple-50"
-                          >
-                            <Edit2 className="mr-1.5 size-3.5" />
-                            Edit
-                          </Button>
-
-                          <Button
-                            type="button"
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => handlePromptDelete(p)}
-                            className="h-8 px-3 text-xs font-semibold text-rose-600 hover:bg-rose-50 hover:text-rose-700 cursor-pointer"
-                          >
-                            <Trash2 className="mr-1.5 size-3.5" />
-                            Delete
-                          </Button>
-                        </div>
-                      </div>
-
-                      <div className="rounded-xl border border-slate-100 bg-slate-50/80 p-4 text-xs sm:text-sm text-slate-700 leading-relaxed">
-                        <p className="whitespace-pre-line font-normal">{p.detail}</p>
-                      </div>
-
-                      <div className="flex items-center justify-between text-[11px] text-slate-400 pt-1 border-t border-slate-100">
-                        <span className="flex items-center gap-1.5 text-emerald-700 font-semibold">
-                          <CheckCircle2 className="size-3.5 text-emerald-600" />
-                          {p.isActive
-                            ? 'Active Governance Policy · Enforced across all branches'
-                            : 'Inactive policy'}
-                        </span>
-                        <span className="font-medium text-slate-400">Corporate Protocol</span>
-                      </div>
-                    </div>
-                  )
-                })
+                <PoliciesTable
+                  items={filteredPolicies}
+                  loading={false}
+                  categoryConfig={CATEGORY_CONFIG}
+                  onView={setViewPolicy}
+                  onEdit={handleOpenEditPolicy}
+                  onDelete={handlePromptDelete}
+                />
               )}
             </div>
           </div>
         </MotionReveal>
       )}
 
-      <DeleteEntityDialog
+      <ConfirmDialog
         open={deleteConfirmOpen}
         onOpenChange={(open) => {
           setDeleteConfirmOpen(open)
           if (!open) setDeleteTargetPolicy(null)
         }}
-        entityName={deleteTargetPolicy?.name}
         title="Delete Corporate Policy"
         description={
           deleteTargetPolicy ? (
             <>
-              Permanently remove <strong>“{deleteTargetPolicy.name}”</strong> (
-              {referenceFromUuid(deleteTargetPolicy.id, 'POL')})? Policies have no Inactive state —
-              this unpublishes the rule across all branch portals.
+              Are you sure you want to delete &quot;{deleteTargetPolicy.name}&quot; (
+              {referenceFromUuid(deleteTargetPolicy.id, 'POL')})?
             </>
           ) : null
         }
-        showSoftAction={false}
-        canHardDelete
-        hardLabel="Delete Policy"
-        hardHint="This cannot be undone."
+        warning="This action cannot be undone and will immediately unpublish this policy across all branch portals."
+        confirmLabel="Delete Policy"
+        variant="destructive"
         loading={policiesMutating}
-        onHardDelete={handleConfirmDelete}
+        onConfirm={handleConfirmDelete}
       />
+
+      <Dialog open={Boolean(viewPolicy)} onOpenChange={(open) => !open && setViewPolicy(null)}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle>{viewPolicy?.name || 'Policy details'}</DialogTitle>
+            <DialogDescription>
+              {viewPolicy
+                ? `${referenceFromUuid(viewPolicy.id, 'POL')} · ${viewPolicy.category || 'Uncategorized'}`
+                : null}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="rounded-xl border border-slate-100 bg-slate-50/80 p-4 text-sm leading-relaxed text-slate-700">
+            <p className="whitespace-pre-line">{viewPolicy?.detail}</p>
+          </div>
+          <DialogFooter>
+            <DialogCancelButton />
+            <Button
+              type="button"
+              className="text-white font-semibold"
+              style={{ background: BRAND.purple }}
+              onClick={() => {
+                const policy = viewPolicy
+                setViewPolicy(null)
+                if (policy) handleOpenEditPolicy(policy)
+              }}
+            >
+              Edit Policy
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       <Dialog
         open={policyDialogOpen}

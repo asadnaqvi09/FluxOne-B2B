@@ -50,8 +50,6 @@ import {
   PackageOpen,
 } from 'lucide-react'
 
-const PAGE_SIZE = ADMIN_TAX_PROFIT_PAGE_SIZE
-
 export function TaxProfitPage() {
   const [selectedIds, setSelectedIds] = useState([])
   const [searchQuery, setSearchQuery] = useState('')
@@ -61,6 +59,7 @@ export function TaxProfitPage() {
   const [selectedScale, setSelectedScale] = useState('')
   const [presetFilter, setPresetFilter] = useState('all')
   const [page, setPage] = useState(1)
+  const [limit, setLimit] = useState(ADMIN_TAX_PROFIT_PAGE_SIZE)
 
   const [profitDialogOpen, setProfitDialogOpen] = useState(false)
   const [taxDialogOpen, setTaxDialogOpen] = useState(false)
@@ -116,7 +115,7 @@ export function TaxProfitPage() {
     scale: selectedScale,
     sort: presetFilter,
     page,
-    limit: PAGE_SIZE,
+    limit,
   })
 
   const slowHint = useSlowLoadingHint(loading)
@@ -422,9 +421,6 @@ export function TaxProfitPage() {
                 <Calculator className="mr-1.5 size-3.5" />
                 Set Tax %
               </Button>
-              <span className="text-xs font-medium text-slate-400 ml-1 hidden sm:inline">
-                {totalCatalog} records · {PAGE_SIZE} / page
-              </span>
             </div>
           }
         >
@@ -677,7 +673,12 @@ export function TaxProfitPage() {
                   page={pagination.page || page}
                   pageCount={pagination.pageCount || 1}
                   totalItems={pagination.total || 0}
+                  pageSize={limit}
                   onPageChange={setPage}
+                  onPageSizeChange={(next) => {
+                    setLimit(next)
+                    setPage(1)
+                  }}
                 />
               </div>
             </>

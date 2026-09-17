@@ -7,7 +7,10 @@ import {
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
 
-// Standardized confirm modal — destructive / authorize / warning actions
+/**
+ * Standardized confirm modal (QA TC-ADMIN-011):
+ * red/warning icon + title · confirmation message · muted warning · Cancel + action (right-aligned).
+ */
 export function ConfirmDialog({
   open,
   onOpenChange,
@@ -85,7 +88,7 @@ export function ConfirmDialog({
           ) : null}
 
           {warning ? (
-            <p className="text-xs leading-normal text-slate-500 sm:text-sm">{warning}</p>
+            <p className="text-xs leading-relaxed text-slate-500 sm:text-sm">{warning}</p>
           ) : null}
         </div>
 

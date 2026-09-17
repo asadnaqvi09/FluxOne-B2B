@@ -36,6 +36,7 @@ export function SupplierTable({
   loading = false,
   pagination,
   onPageChange,
+  onPageSizeChange,
   onEdit,
   onStatusChange,
   statusUpdatingId = null,
@@ -46,17 +47,13 @@ export function SupplierTable({
   const page = pagination?.page || 1
   const pageCount = Math.max(1, pagination?.pageCount || 1)
   const total = pagination?.total ?? list.length
+  const pageSize = pagination?.limit || 8
 
   return (
     <SurfaceCard
       className={className}
       title="Supplier list"
       description="Companies you purchase from"
-      actions={
-        <span className="text-xs font-medium text-slate-400">
-          {total} records · 8 / page
-        </span>
-      }
     >
       {loading ? (
         <TableRowsSkeleton rows={5} />
@@ -230,8 +227,10 @@ export function SupplierTable({
           page={page}
           pageCount={pageCount}
           totalItems={total}
+          pageSize={pageSize}
           loading={loading}
           onPageChange={onPageChange}
+          onPageSizeChange={onPageSizeChange}
         />
       ) : null}
     </SurfaceCard>

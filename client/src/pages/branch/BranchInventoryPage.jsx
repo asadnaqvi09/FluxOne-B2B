@@ -20,16 +20,23 @@ import {
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogCancelButton } from '@/components/ui/dialog'
 import { apiClient } from '@/api/api'
 import { useDebouncedValue } from '@/hooks/useDebouncedValue'
+import { useClientPagination } from '@/hooks/useClientPagination'
 import { BRAND } from '@/lib/constants'
 import { toastError, toastSuccess } from '@/lib/toast'
-
-const PAGE_SIZE = 8
 
 export function BranchInventoryPage() {
   const [products, setProducts] = useState([])
   const [categories, setCategories] = useState([])
   const [loading, setLoading] = useState(false)
-  const [page, setPage] = useState(1)
+  const {
+    page,
+    setPage,
+    pageSize,
+    setPageSize,
+    pageCount,
+    total,
+    slice: pagedProducts,
+  } = useClientPagination(products)
 
   // Filters — input instant; list fetch after debounce
   const [searchQuery, setSearchQuery] = useState('')
@@ -207,11 +214,6 @@ export function BranchInventoryPage() {
         <SurfaceCard
           title="Shelf Stock Levels"
           className="min-h-[400px]"
-          actions={
-            <span className="text-xs font-medium text-slate-400">
-              {products.length} records · {PAGE_SIZE} / page
-            </span>
-          }
         >
           {loading ? (
             <p className="py-8 text-center text-sm text-slate-400">Loading shelf stock...</p>
@@ -221,7 +223,7 @@ export function BranchInventoryPage() {
             <>
               {/* Mobile cards — table-fixed was crushing columns on narrow screens */}
               <div className="space-y-3 md:hidden">
-                {products.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE).map((prod) => {
+                {pagedProducts.map((prod) => {
                   const status = getStockStatus(prod.quantity, prod.reorderPoint)
                   const cat = categories.find((c) => c.id === prod.categoryId)?.name || '—'
                   const subcat = subcategories.find((s) => s.id === prod.subcategoryId)?.name || '—'
@@ -297,7 +299,7 @@ export function BranchInventoryPage() {
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {products.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE).map((prod) => {
+                    {pagedProducts.map((prod) => {
                       const status = getStockStatus(prod.quantity, prod.reorderPoint)
                       const cat = categories.find((c) => c.id === prod.categoryId)?.name || '—'
                       const subcat = subcategories.find((s) => s.id === prod.subcategoryId)?.name || '—'
@@ -358,9 +360,11 @@ export function BranchInventoryPage() {
 
           <TablePagination
             page={page}
-            pageCount={Math.max(1, Math.ceil(products.length / PAGE_SIZE))}
-            totalItems={products.length}
+            pageCount={pageCount}
+            totalItems={total}
+            pageSize={pageSize}
             onPageChange={setPage}
+            onPageSizeChange={setPageSize}
           />
 
           <div className="mt-4 flex flex-col gap-2 border-t border-border pt-3 text-xs text-slate-500 sm:flex-row sm:flex-wrap sm:gap-4">

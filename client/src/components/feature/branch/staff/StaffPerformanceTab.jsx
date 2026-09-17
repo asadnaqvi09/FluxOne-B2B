@@ -1,7 +1,8 @@
-import { useEffect, useState, useMemo } from 'react'
+import { useEffect, useState } from 'react'
 import { Award, Settings, ShieldAlert, Star, Sliders, Pencil, Trash2 } from 'lucide-react'
 import { SurfaceCard } from '@/components/shared/SurfaceCard'
 import { ConfirmDialog } from '@/components/shared/ConfirmDialog'
+import { DataCard, ResponsiveDataShell } from '@/components/shared/ResponsiveDataShell'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -18,10 +19,9 @@ import {
 } from '@/components/ui/table'
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogCancelButton } from '@/components/ui/dialog'
 import { apiClient } from '@/api/api'
+import { useClientPagination } from '@/hooks/useClientPagination'
 import { BRAND } from '@/lib/constants'
 import { toastError, toastSuccess } from '@/lib/toast'
-
-const PAGE_SIZE = 8
 
 export function StaffPerformanceTab({ designations = [] }) {
   const [activeSubTab, setActiveSubTab] = useState('roster') // 'roster' | 'scales'
@@ -31,8 +31,6 @@ export function StaffPerformanceTab({ designations = [] }) {
   const [loadingRoster, setLoadingRoster] = useState(false)
   const [searchQuery, setSearchQuery] = useState('')
   const [filterDesignation, setFilterDesignation] = useState('')
-  const [rosterPage, setRosterPage] = useState(1)
-  const [scalesPage, setScalesPage] = useState(1)
 
   // Scoring Modal States
   const [scoringEmployee, setScoringEmployee] = useState(null)
@@ -81,6 +79,9 @@ export function StaffPerformanceTab({ designations = [] }) {
     }
     return true
   })
+
+  const rosterPaging = useClientPagination(filteredRoster)
+  const scalesPaging = useClientPagination(scales)
 
   // Open score modal
   const openScoringModal = (employee) => {
@@ -209,11 +210,6 @@ export function StaffPerformanceTab({ designations = [] }) {
       {activeSubTab === 'roster' ? (
         <SurfaceCard
           title="Staff Scores & Performance Evaluation"
-          actions={
-            <span className="text-xs font-medium text-slate-400">
-              {filteredRoster.length} records · {PAGE_SIZE} / page
-            </span>
-          }
         >
           {/* Filters */}
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-3 mb-4">
@@ -236,58 +232,80 @@ export function StaffPerformanceTab({ designations = [] }) {
             </div>
           </div>
 
-          <Table>
-            <TableHeader>
-              <TableRow className="text-slate-500 text-xs uppercase">
-                <TableHead>Employee</TableHead>
-                <TableHead>Designation</TableHead>
-                <TableHead className="text-center">Score rating</TableHead>
-                <TableHead className="text-right">Actions</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {loadingRoster ? (
-                <TableRow>
-                  <TableCell colSpan={4} className="py-8 text-center text-slate-400">Loading...</TableCell>
-                </TableRow>
-              ) : filteredRoster.length === 0 ? (
-                <TableRow>
-                  <TableCell colSpan={4} className="py-8 text-center text-slate-400">No records found</TableCell>
-                </TableRow>
-              ) : (
-                filteredRoster
-                  .slice((rosterPage - 1) * PAGE_SIZE, rosterPage * PAGE_SIZE)
-                  .map((emp) => (
-                    <TableRow key={emp.staffId}>
-                      <TableCell className="font-semibold text-slate-900">{emp.fullName}</TableCell>
-                      <TableCell className="text-slate-600">{emp.designation || '—'}</TableCell>
-                      <TableCell className="text-center">
-                        <Badge variant="outline" className={getRatingBadgeStyle(emp.rating)}>
-                          <Star className="size-3.5 fill-current mr-1" />
-                          {emp.rating}%
-                        </Badge>
-                      </TableCell>
-                      <TableCell className="text-right">
-                        <Button
-                          size="sm"
-                          style={{ backgroundColor: BRAND.purple }}
-                          className="text-white text-xs h-8"
-                          onClick={() => openScoringModal(emp)}
-                        >
-                          Score Employee
-                        </Button>
-                      </TableCell>
+          {loadingRoster ? (
+            <p className="py-8 text-center text-sm text-slate-400">Loading...</p>
+          ) : filteredRoster.length === 0 ? (
+            <p className="py-8 text-center text-sm text-slate-400">No records found</p>
+          ) : (
+            <ResponsiveDataShell
+              mobile={rosterPaging.slice.map((emp) => (
+                <DataCard key={emp.staffId}>
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="min-w-0">
+                      <p className="truncate text-sm font-semibold text-slate-900">{emp.fullName}</p>
+                      <p className="mt-0.5 text-xs text-slate-500">{emp.designation || '—'}</p>
+                    </div>
+                    <Badge variant="outline" className={getRatingBadgeStyle(emp.rating)}>
+                      <Star className="size-3.5 fill-current mr-1" />
+                      {emp.rating}%
+                    </Badge>
+                  </div>
+                  <Button
+                    size="sm"
+                    style={{ backgroundColor: BRAND.purple }}
+                    className="mt-3 h-8 w-full text-xs text-white"
+                    onClick={() => openScoringModal(emp)}
+                  >
+                    Score Employee
+                  </Button>
+                </DataCard>
+              ))}
+              desktop={
+                <Table>
+                  <TableHeader>
+                    <TableRow className="text-slate-500 text-xs uppercase">
+                      <TableHead>Employee</TableHead>
+                      <TableHead>Designation</TableHead>
+                      <TableHead className="text-center">Score rating</TableHead>
+                      <TableHead className="text-right">Actions</TableHead>
                     </TableRow>
-                  ))
-              )}
-            </TableBody>
-          </Table>
+                  </TableHeader>
+                  <TableBody>
+                    {rosterPaging.slice.map((emp) => (
+                      <TableRow key={emp.staffId}>
+                        <TableCell className="font-semibold text-slate-900">{emp.fullName}</TableCell>
+                        <TableCell className="text-slate-600">{emp.designation || '—'}</TableCell>
+                        <TableCell className="text-center">
+                          <Badge variant="outline" className={getRatingBadgeStyle(emp.rating)}>
+                            <Star className="size-3.5 fill-current mr-1" />
+                            {emp.rating}%
+                          </Badge>
+                        </TableCell>
+                        <TableCell className="text-right">
+                          <Button
+                            size="sm"
+                            style={{ backgroundColor: BRAND.purple }}
+                            className="text-white text-xs h-8"
+                            onClick={() => openScoringModal(emp)}
+                          >
+                            Score Employee
+                          </Button>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              }
+            />
+          )}
 
           <TablePagination
-            page={rosterPage}
-            pageCount={Math.max(1, Math.ceil(filteredRoster.length / PAGE_SIZE))}
-            totalItems={filteredRoster.length}
-            onPageChange={setRosterPage}
+            page={rosterPaging.page}
+            pageCount={rosterPaging.pageCount}
+            totalItems={rosterPaging.total}
+            pageSize={rosterPaging.pageSize}
+            onPageChange={rosterPaging.setPage}
+            onPageSizeChange={rosterPaging.setPageSize}
           />
         </SurfaceCard>
       ) : (
@@ -297,63 +315,86 @@ export function StaffPerformanceTab({ designations = [] }) {
             <SurfaceCard
               title="Configured Scoring Criteria"
               description="Standardized criteria weights used to score shifts"
-              actions={
-                <span className="text-xs font-medium text-slate-400">
-                  {scales.length} records · {PAGE_SIZE} / page
-                </span>
-              }
             >
-              <Table>
-                <TableHeader>
-                  <TableRow className="text-slate-500 text-xs uppercase">
-                    <TableHead>Scale Name</TableHead>
-                    <TableHead>Max Weights/Points</TableHead>
-                    <TableHead className="text-right">Actions</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {loadingScales ? (
-                    <TableRow>
-                      <TableCell colSpan={3} className="py-8 text-center text-slate-400">Loading...</TableCell>
-                    </TableRow>
-                  ) : scales.length === 0 ? (
-                    <TableRow>
-                      <TableCell colSpan={3} className="py-8 text-center text-slate-400">No scales configured</TableCell>
-                    </TableRow>
-                  ) : (
-                    scales
-                      .slice((scalesPage - 1) * PAGE_SIZE, scalesPage * PAGE_SIZE)
-                      .map((s) => (
-                        <TableRow key={s.id}>
-                          <TableCell className="font-semibold text-slate-900">{s.name}</TableCell>
-                          <TableCell className="text-slate-700 font-mono">{s.maxPoints} pts</TableCell>
-                          <TableCell className="text-right space-x-3.5">
-                            <button
-                              type="button"
-                              className="text-slate-500 hover:text-slate-800 transition-colors inline-block align-middle"
-                              onClick={() => setEditingScale(s)}
-                            >
-                              <Pencil className="size-4" />
-                            </button>
-                            <button
-                              type="button"
-                              className="text-slate-500 hover:text-slate-800 transition-colors inline-block align-middle"
-                              onClick={() => setDeleteTargetScale(s)}
-                            >
-                              <Trash2 className="size-4" />
-                            </button>
-                          </TableCell>
+              {loadingScales ? (
+                <p className="py-8 text-center text-sm text-slate-400">Loading...</p>
+              ) : scales.length === 0 ? (
+                <p className="py-8 text-center text-sm text-slate-400">No scales configured</p>
+              ) : (
+                <ResponsiveDataShell
+                  mobile={scalesPaging.slice.map((s) => (
+                    <DataCard key={s.id}>
+                      <div className="flex items-start justify-between gap-2">
+                        <div className="min-w-0">
+                          <p className="truncate text-sm font-semibold text-slate-900">{s.name}</p>
+                          <p className="mt-0.5 font-mono text-xs text-slate-600">{s.maxPoints} pts</p>
+                        </div>
+                        <div className="flex gap-2">
+                          <button
+                            type="button"
+                            className="text-slate-500 transition-colors hover:text-slate-800"
+                            onClick={() => setEditingScale(s)}
+                            aria-label="Edit scale"
+                          >
+                            <Pencil className="size-4" />
+                          </button>
+                          <button
+                            type="button"
+                            className="text-slate-500 transition-colors hover:text-slate-800"
+                            onClick={() => setDeleteTargetScale(s)}
+                            aria-label="Delete scale"
+                          >
+                            <Trash2 className="size-4" />
+                          </button>
+                        </div>
+                      </div>
+                    </DataCard>
+                  ))}
+                  desktop={
+                    <Table>
+                      <TableHeader>
+                        <TableRow className="text-slate-500 text-xs uppercase">
+                          <TableHead>Scale Name</TableHead>
+                          <TableHead>Max Weights/Points</TableHead>
+                          <TableHead className="text-right">Actions</TableHead>
                         </TableRow>
-                      ))
-                  )}
-                </TableBody>
-              </Table>
+                      </TableHeader>
+                      <TableBody>
+                        {scalesPaging.slice.map((s) => (
+                          <TableRow key={s.id}>
+                            <TableCell className="font-semibold text-slate-900">{s.name}</TableCell>
+                            <TableCell className="text-slate-700 font-mono">{s.maxPoints} pts</TableCell>
+                            <TableCell className="text-right space-x-3.5">
+                              <button
+                                type="button"
+                                className="text-slate-500 hover:text-slate-800 transition-colors inline-block align-middle"
+                                onClick={() => setEditingScale(s)}
+                              >
+                                <Pencil className="size-4" />
+                              </button>
+                              <button
+                                type="button"
+                                className="text-slate-500 hover:text-slate-800 transition-colors inline-block align-middle"
+                                onClick={() => setDeleteTargetScale(s)}
+                              >
+                                <Trash2 className="size-4" />
+                              </button>
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  }
+                />
+              )}
 
               <TablePagination
-                page={scalesPage}
-                pageCount={Math.max(1, Math.ceil(scales.length / PAGE_SIZE))}
-                totalItems={scales.length}
-                onPageChange={setScalesPage}
+                page={scalesPaging.page}
+                pageCount={scalesPaging.pageCount}
+                totalItems={scalesPaging.total}
+                pageSize={scalesPaging.pageSize}
+                onPageChange={scalesPaging.setPage}
+                onPageSizeChange={scalesPaging.setPageSize}
               />
             </SurfaceCard>
           </div>

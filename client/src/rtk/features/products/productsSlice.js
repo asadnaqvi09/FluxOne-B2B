@@ -363,7 +363,8 @@ const productsSlice = createSlice({
         patch.type !== undefined ||
         patch.categoryId !== undefined ||
         patch.subcategoryId !== undefined ||
-        patch.status !== undefined
+        patch.status !== undefined ||
+        patch.limit !== undefined
       if (resetsPage && patch.page === undefined) next.page = 1
       state.filters = next
     },

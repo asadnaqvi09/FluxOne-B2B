@@ -111,7 +111,12 @@ const suppliersSlice = createSlice({
     patchSupplierFilters(state, action) {
       const patch = action.payload || {}
       const next = { ...state.filters, ...patch }
-      if (patch.q !== undefined && patch.page === undefined) next.page = 1
+      if (
+        (patch.q !== undefined || patch.limit !== undefined) &&
+        patch.page === undefined
+      ) {
+        next.page = 1
+      }
       state.filters = next
     },
   },

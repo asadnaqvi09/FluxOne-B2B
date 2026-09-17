@@ -17,8 +17,7 @@ import {
 import { apiClient } from '@/api/api'
 import { BRAND } from '@/lib/constants'
 import { toastError, toastSuccess } from '@/lib/toast'
-
-const PAGE_SIZE = 8
+import { useClientPagination } from '@/hooks/useClientPagination'
 
 export function StaffAttendanceTab({ designations = [], staff = [] }) {
   const [logs, setLogs] = useState([])
@@ -32,7 +31,6 @@ export function StaffAttendanceTab({ designations = [], staff = [] }) {
   const [filterDesignation, setFilterDesignation] = useState('')
   const [currentDate, setCurrentDate] = useState(new Date())
   const [localAttendance, setLocalAttendance] = useState({})
-  const [logPage, setLogPage] = useState(1)
 
   const fetchLogs = async () => {
     setLoading(true)
@@ -88,6 +86,16 @@ export function StaffAttendanceTab({ designations = [], staff = [] }) {
     if (filterLogDate && logDate !== filterLogDate) return false
     return true
   })
+
+  const {
+    page: logPage,
+    setPage: setLogPage,
+    pageSize: logPageSize,
+    setPageSize: setLogPageSize,
+    pageCount: logPageCount,
+    total: logTotal,
+    slice: pagedLogs,
+  } = useClientPagination(filteredLogs)
 
   const getLogsForDate = (dayNum) => {
     const dateStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(dayNum).padStart(2, '0')}`
@@ -226,11 +234,6 @@ export function StaffAttendanceTab({ designations = [], staff = [] }) {
           {viewMode === 'list' ? (
             <SurfaceCard
               title="Daily Roster Logs"
-              actions={
-                <span className="text-xs font-medium text-slate-400">
-                  {filteredLogs.length} records · {PAGE_SIZE} / page
-                </span>
-              }
             >
               <div className="mb-4 grid grid-cols-1 gap-3 sm:grid-cols-2 max-w-lg">
                 <div className="space-y-1.5">
@@ -276,9 +279,7 @@ export function StaffAttendanceTab({ designations = [], staff = [] }) {
               ) : (
                 <>
                   <div className="space-y-3 md:hidden">
-                    {filteredLogs
-                      .slice((logPage - 1) * PAGE_SIZE, logPage * PAGE_SIZE)
-                      .map((log) => {
+                    {pagedLogs.map((log) => {
                         const m = staff.find((s) => s.id === log.staffId)
                         const logDateFormatted = new Date(log.workDate).toLocaleDateString('en-GB', {
                           day: '2-digit',
@@ -326,9 +327,7 @@ export function StaffAttendanceTab({ designations = [], staff = [] }) {
                         </TableRow>
                       </TableHeader>
                       <TableBody>
-                        {filteredLogs
-                          .slice((logPage - 1) * PAGE_SIZE, logPage * PAGE_SIZE)
-                          .map((log) => {
+                        {pagedLogs.map((log) => {
                             const m = staff.find((s) => s.id === log.staffId)
                             const logDateFormatted = new Date(log.workDate).toLocaleDateString(
                               'en-GB',
@@ -366,9 +365,11 @@ export function StaffAttendanceTab({ designations = [], staff = [] }) {
 
               <TablePagination
                 page={logPage}
-                pageCount={Math.max(1, Math.ceil(filteredLogs.length / PAGE_SIZE))}
-                totalItems={filteredLogs.length}
+                pageCount={logPageCount}
+                totalItems={logTotal}
+                pageSize={logPageSize}
                 onPageChange={setLogPage}
+                onPageSizeChange={setLogPageSize}
               />
             </SurfaceCard>
           ) : (

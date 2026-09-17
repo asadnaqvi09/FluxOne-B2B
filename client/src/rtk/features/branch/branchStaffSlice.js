@@ -158,7 +158,12 @@ const branchStaffSlice = createSlice({
     patchStaffFilters(state, action) {
       const patch = action.payload || {}
       const next = { ...state.filters, ...patch }
-      if (patch.q !== undefined || patch.status !== undefined || patch.role !== undefined) {
+      if (
+        patch.q !== undefined ||
+        patch.status !== undefined ||
+        patch.role !== undefined ||
+        patch.limit !== undefined
+      ) {
         next.page = patch.page ?? 1
       }
       state.filters = next

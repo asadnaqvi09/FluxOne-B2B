@@ -38,8 +38,7 @@ import {
   validateHardwareForm,
   validateItemScaleForm,
 } from '@/lib/validation/branchForms'
-
-const PAGE_SIZE = 8
+import { useClientPagination } from '@/hooks/useClientPagination'
 
 const actionBtnClass =
   'cursor-pointer text-slate-500 transition-colors hover:text-slate-900 active:scale-95'
@@ -51,8 +50,8 @@ export function ResourcesPage() {
 
   const [hardwareList, setHardwareList] = useState([])
   const [scalesList, setScalesList] = useState([])
-  const [hwPage, setHwPage] = useState(1)
-  const [scalesPage, setScalesPage] = useState(1)
+  const hwPaging = useClientPagination(hardwareList)
+  const scalesPaging = useClientPagination(scalesList)
   const [filterHardware, setFilterHardware] = useState('')
   const [hwSearch, setHwSearch] = useState('')
   const [scaleSearch, setScaleSearch] = useState('')
@@ -117,14 +116,14 @@ export function ResourcesPage() {
   }
 
   useEffect(() => {
-    setHwPage(1)
+    hwPaging.setPage(1)
     setLoading(true)
     void loadHardware(filterHardware, debouncedHwSearch).finally(() => setLoading(false))
   }, [filterHardware, debouncedHwSearch])
 
   useEffect(() => {
     if (activeTab !== 'scales') return
-    setScalesPage(1)
+    scalesPaging.setPage(1)
     setLoading(true)
     void loadScales(debouncedScaleSearch).finally(() => setLoading(false))
   }, [activeTab, debouncedScaleSearch])
@@ -396,11 +395,6 @@ export function ResourcesPage() {
           <MotionReveal delay={0.04}>
             <SurfaceCard
               title="Hardware Assets Registry"
-              actions={
-                <span className="text-xs font-medium text-slate-400">
-                  {hardwareList.length} records · {PAGE_SIZE} / page
-                </span>
-              }
             >
               {loading ? (
                 <p className="py-8 text-center text-sm text-slate-400">Loading hardware…</p>
@@ -409,9 +403,7 @@ export function ResourcesPage() {
               ) : (
                 <>
                   <div className="space-y-3 md:hidden">
-                    {hardwareList
-                      .slice((hwPage - 1) * PAGE_SIZE, hwPage * PAGE_SIZE)
-                      .map((hw) => (
+                    {hwPaging.slice.map((hw) => (
                         <article
                           key={hw.id}
                           className="rounded-xl border border-border bg-slate-50/60 px-3 py-3"
@@ -490,9 +482,7 @@ export function ResourcesPage() {
                         </TableRow>
                       </TableHeader>
                       <TableBody>
-                        {hardwareList
-                          .slice((hwPage - 1) * PAGE_SIZE, hwPage * PAGE_SIZE)
-                          .map((hw) => (
+                        {hwPaging.slice.map((hw) => (
                             <TableRow key={hw.id} className="group">
                               <TableCell className="px-2 py-3">
                                 {hw.image ? (
@@ -568,10 +558,12 @@ export function ResourcesPage() {
               )}
 
               <TablePagination
-                page={hwPage}
-                pageCount={Math.max(1, Math.ceil(hardwareList.length / PAGE_SIZE))}
-                totalItems={hardwareList.length}
-                onPageChange={setHwPage}
+                page={hwPaging.page}
+                pageCount={hwPaging.pageCount}
+                totalItems={hwPaging.total}
+                pageSize={hwPaging.pageSize}
+                onPageChange={hwPaging.setPage}
+                onPageSizeChange={hwPaging.setPageSize}
               />
             </SurfaceCard>
           </MotionReveal>
@@ -599,11 +591,6 @@ export function ResourcesPage() {
             <MotionReveal delay={0.03}>
               <SurfaceCard
                 title="Packaging Weighing Scales"
-                actions={
-                  <span className="text-xs font-medium text-slate-400">
-                    {scalesList.length} records · {PAGE_SIZE} / page
-                  </span>
-                }
               >
                 {loading ? (
                   <p className="py-8 text-center text-sm text-slate-400">Loading scales…</p>
@@ -612,9 +599,7 @@ export function ResourcesPage() {
                 ) : (
                   <>
                     <div className="space-y-3 md:hidden">
-                      {scalesList
-                        .slice((scalesPage - 1) * PAGE_SIZE, scalesPage * PAGE_SIZE)
-                        .map((sc) => (
+                      {scalesPaging.slice.map((sc) => (
                           <article
                             key={sc.id}
                             className="flex items-center justify-between gap-3 rounded-xl border border-border bg-slate-50/60 px-3 py-3"
@@ -663,9 +648,7 @@ export function ResourcesPage() {
                           </TableRow>
                         </TableHeader>
                         <TableBody>
-                          {scalesList
-                            .slice((scalesPage - 1) * PAGE_SIZE, scalesPage * PAGE_SIZE)
-                            .map((sc) => (
+                          {scalesPaging.slice.map((sc) => (
                               <TableRow key={sc.id}>
                                 <TableCell className="px-2 py-3 font-mono font-bold text-slate-900">
                                   {sc.code || String(sc.id).slice(0, 8)}
@@ -703,10 +686,12 @@ export function ResourcesPage() {
                 )}
 
                 <TablePagination
-                  page={scalesPage}
-                  pageCount={Math.max(1, Math.ceil(scalesList.length / PAGE_SIZE))}
-                  totalItems={scalesList.length}
-                  onPageChange={setScalesPage}
+                  page={scalesPaging.page}
+                  pageCount={scalesPaging.pageCount}
+                  totalItems={scalesPaging.total}
+                  pageSize={scalesPaging.pageSize}
+                  onPageChange={scalesPaging.setPage}
+                  onPageSizeChange={scalesPaging.setPageSize}
                 />
               </SurfaceCard>
             </MotionReveal>

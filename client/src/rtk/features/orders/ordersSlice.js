@@ -189,7 +189,8 @@ const ordersSlice = createSlice({
       const resets =
         patch.q !== undefined ||
         patch.supplierId !== undefined ||
-        patch.status !== undefined
+        patch.status !== undefined ||
+        patch.limit !== undefined
       if (resets && patch.page === undefined) next.page = 1
       state.filters = next
     },

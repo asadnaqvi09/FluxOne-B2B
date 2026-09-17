@@ -67,7 +67,11 @@ export function DeleteEntityDialog({
             <p className="text-xs leading-relaxed text-slate-500 sm:text-sm">{hardDisabledReason}</p>
           ) : hardHint ? (
             <p className="text-xs leading-relaxed text-slate-500 sm:text-sm">{hardHint}</p>
-          ) : null}
+          ) : showSoftAction ? null : (
+            <p className="text-xs leading-relaxed text-slate-500 sm:text-sm">
+              This action cannot be undone.
+            </p>
+          )}
         </div>
 
         {/* Stack on phone; wrap on tablet if 3 actions; row on desktop */}

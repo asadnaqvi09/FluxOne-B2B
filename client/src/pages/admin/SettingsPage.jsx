@@ -71,6 +71,7 @@ export function SettingsPage() {
   const debouncedQ = useDebouncedValue(searchQuery.trim(), 300)
   const [statusFilter, setStatusFilter] = useState('all')
   const [page, setPage] = useState(1)
+  const [limit, setLimit] = useState(ADMIN_DEVICES_PAGE_SIZE)
 
   const [confirmDialogOpen, setConfirmDialogOpen] = useState(false)
   const [targetSystem, setTargetSystem] = useState(null)
@@ -91,7 +92,7 @@ export function SettingsPage() {
     q: debouncedQ,
     status: statusFilter,
     page,
-    limit: ADMIN_DEVICES_PAGE_SIZE,
+    limit,
   })
 
   const slowHint = useSlowLoadingHint(loading && activeTab === 'systems')
@@ -424,11 +425,6 @@ export function SettingsPage() {
             <SurfaceCard
               title="List of System Access Terminals"
               description="Hardware signature access, MAC/IP bindings & authorization statuses"
-              actions={
-                <span className="text-xs font-medium text-slate-400">
-                  {pagination.total} records · {ADMIN_DEVICES_PAGE_SIZE} / page
-                </span>
-              }
             >
               {loading && systems.length === 0 ? (
                 <div className="flex items-center justify-center gap-2 py-16 text-sm text-slate-500">
@@ -637,7 +633,13 @@ export function SettingsPage() {
                   <TablePagination
                     page={pagination.page || page}
                     pageCount={pagination.pageCount || 1}
+                    totalItems={pagination.total || 0}
+                    pageSize={limit}
                     onPageChange={setPage}
+                    onPageSizeChange={(next) => {
+                      setLimit(next)
+                      setPage(1)
+                    }}
                     loading={loading}
                   />
                 </>

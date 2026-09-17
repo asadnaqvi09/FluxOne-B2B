@@ -1,14 +1,38 @@
 import { useCallback, useEffect, useState } from 'react'
 import { AnimatePresence, motion } from 'motion/react'
 import { X } from 'lucide-react'
+import { useAuthSession } from '@/hooks/useAuthSession'
 import { BRAND } from '@/lib/constants'
 import { cn } from '@/lib/utils'
 
+function welcomeStorageKey(scope, user, token) {
+  const who = user?.id || user?.email || user?.username || 'anon'
+  const session = token ? String(token).slice(-12) : 'nosession'
+  return `fluxone:welcome-banner:${scope}:${who}:${session}`
+}
+
+function readDismissed(key) {
+  try {
+    return sessionStorage.getItem(key) === '1'
+  } catch {
+    return false
+  }
+}
+
+function writeDismissed(key) {
+  try {
+    sessionStorage.setItem(key, '1')
+  } catch {
+    // ignore quota / private mode
+  }
+}
+
 /**
- * Auto-dismissible welcome strip across all accounts (Admin, Branch Manager, etc.)
- * - Appears every time after login / dashboard load
- * - Automatically disappears after 10 seconds
- * - Can be manually dismissed anytime via the 'X' icon
+ * Welcome strip for all account dashboards.
+ * - Shows once per login session (sessionStorage; survives tab changes, resets on new login)
+ * - Auto-dismisses after 10s
+ * - Manual dismiss via X
+ * Remount via `key={storageKey}` from wrappers when the login session changes.
  */
 export function WelcomeBanner({
   eyebrow,
@@ -17,26 +41,27 @@ export function WelcomeBanner({
   className,
   enabled = true,
   autoDismissSeconds = 10,
+  scope = 'default',
   onDismiss,
 }) {
-  const [visible, setVisible] = useState(Boolean(enabled))
+  const { user, token } = useAuthSession()
+  const storageKey = welcomeStorageKey(scope, user, token)
 
-  useEffect(() => {
-    setVisible(Boolean(enabled))
-  }, [enabled])
+  const [visible, setVisible] = useState(
+    () => Boolean(enabled) && !readDismissed(storageKey),
+  )
 
   const dismiss = useCallback(() => {
     setVisible(false)
+    writeDismissed(storageKey)
     onDismiss?.()
-  }, [onDismiss])
+  }, [onDismiss, storageKey])
 
-  // Auto-dismiss after 10 seconds
   useEffect(() => {
     if (!visible || !autoDismissSeconds || autoDismissSeconds <= 0) return undefined
     const timer = setTimeout(() => {
       dismiss()
     }, autoDismissSeconds * 1000)
-
     return () => clearTimeout(timer)
   }, [visible, autoDismissSeconds, dismiss])
 
@@ -44,7 +69,7 @@ export function WelcomeBanner({
 
   return (
     <AnimatePresence>
-      {visible && (
+      {visible ? (
         <motion.div
           initial={{ opacity: 0, y: -6, scale: 0.99 }}
           animate={{ opacity: 1, y: 0, scale: 1 }}
@@ -62,13 +87,15 @@ export function WelcomeBanner({
             'relative overflow-hidden rounded-2xl border border-border bg-white px-4 py-4 shadow-sm sm:px-5 sm:py-5',
             className,
           )}
+          role="status"
+          aria-live="polite"
         >
           <div
             className="pointer-events-none absolute inset-x-0 top-0 h-1"
             style={{ background: `linear-gradient(90deg, ${BRAND.purple}, ${BRAND.deep})` }}
           />
           <div className="flex items-start justify-between gap-3">
-            <div className="space-y-1">
+            <div className="space-y-1 pr-2">
               {eyebrow ? (
                 <p className="text-xs font-semibold tracking-[0.12em] text-slate-400 uppercase">
                   {eyebrow}
@@ -81,13 +108,13 @@ export function WelcomeBanner({
               type="button"
               aria-label="Dismiss welcome banner"
               onClick={dismiss}
-              className="shrink-0 cursor-pointer rounded-lg p-1.5 text-slate-400 hover:bg-slate-100 hover:text-slate-600 transition-colors"
+              className="shrink-0 cursor-pointer rounded-lg p-1.5 text-slate-400 transition-colors hover:bg-slate-100 hover:text-slate-600"
             >
               <X className="size-4" />
             </button>
           </div>
         </motion.div>
-      )}
+      ) : null}
     </AnimatePresence>
   )
 }

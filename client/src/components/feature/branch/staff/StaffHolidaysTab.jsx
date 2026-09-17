@@ -28,8 +28,7 @@ import { apiClient } from '@/api/api'
 import { BRAND } from '@/lib/constants'
 import { toastError, toastSuccess } from '@/lib/toast'
 import { validateHolidayForm } from '@/lib/validation/branchForms'
-
-const PAGE_SIZE = 8
+import { useClientPagination } from '@/hooks/useClientPagination'
 
 function formatDate(value) {
   if (!value) return '—'
@@ -50,7 +49,6 @@ export function StaffHolidaysTab({ designations = [], staff = [] }) {
   const [holidays, setHolidays] = useState([])
   const [loading, setLoading] = useState(false)
   const [mutating, setMutating] = useState(false)
-  const [page, setPage] = useState(1)
   const [listSearch, setListSearch] = useState('')
 
   const [step, setStep] = useState(1)
@@ -96,9 +94,19 @@ export function StaffHolidaysTab({ designations = [], staff = [] }) {
     return holidays.filter((h) => String(h.name || '').toLowerCase().includes(q))
   }, [holidays, listSearch])
 
+  const {
+    page,
+    setPage,
+    pageSize,
+    setPageSize,
+    pageCount,
+    total,
+    slice: pageRows,
+  } = useClientPagination(filteredList)
+
   useEffect(() => {
     setPage(1)
-  }, [listSearch])
+  }, [listSearch, setPage])
 
   const handleNextStep = () => {
     const validationError = validateHolidayForm({ name, startDate, endDate })
@@ -192,19 +200,12 @@ export function StaffHolidaysTab({ designations = [], staff = [] }) {
     return true
   })
 
-  const pageRows = filteredList.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE)
-
   return (
     <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
       <div className="lg:col-span-2">
         <SurfaceCard
           title="Branch Holiday Schedule"
           description="Scheduled store closures and holidays"
-          actions={
-            <span className="text-xs font-medium text-slate-400">
-              {filteredList.length} records · {PAGE_SIZE} / page
-            </span>
-          }
         >
           <div className="mb-4">
             <Input
@@ -290,9 +291,11 @@ export function StaffHolidaysTab({ designations = [], staff = [] }) {
 
           <TablePagination
             page={page}
-            pageCount={Math.max(1, Math.ceil(filteredList.length / PAGE_SIZE))}
-            totalItems={filteredList.length}
+            pageCount={pageCount}
+            totalItems={total}
+            pageSize={pageSize}
             onPageChange={setPage}
+            onPageSizeChange={setPageSize}
           />
         </SurfaceCard>
       </div>

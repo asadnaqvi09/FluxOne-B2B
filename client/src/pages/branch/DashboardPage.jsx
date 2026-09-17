@@ -1,4 +1,5 @@
-import { FileDown, Calendar } from 'lucide-react'
+import { FileDown, Calendar, Loader2 } from 'lucide-react'
+import { useEffect, useRef, useState } from 'react'
 import { BranchKpiCards } from '@/components/feature/branch/dashboard/BranchKpiCards'
 import { BranchWelcomeBanner } from '@/components/feature/branch/dashboard/BranchWelcomeBanner'
 import { DailySalesSummary } from '@/components/feature/branch/dashboard/DailySalesSummary'
@@ -16,31 +17,74 @@ import { useBranchDashboard } from '@/hooks/useBranchDashboard'
 import { useAuthSession } from '@/hooks/useAuthSession'
 import { BRAND } from '@/lib/constants'
 import { formatCurrency, formatPct } from '@/lib/mapBranchDashboard'
-import { toastSuccess } from '@/lib/toast'
+import { toastError, toastSuccess } from '@/lib/toast'
 import { cn } from '@/lib/utils'
+
+const PDF_WINDOW_NAME = 'fluxone-branch-dashboard-pdf'
+const PDF_COOLDOWN_MS = 4000
 
 export function DashboardPage() {
   const { data, date, setDate, loading } = useBranchDashboard()
   const { user } = useAuthSession()
+  const pdfBusyRef = useRef(false)
+  const pdfCooldownTimerRef = useRef(null)
+  const [pdfBusy, setPdfBusy] = useState(false)
+
+  useEffect(() => {
+    return () => {
+      if (pdfCooldownTimerRef.current) window.clearTimeout(pdfCooldownTimerRef.current)
+    }
+  }, [])
+
+  function releasePdfBusy() {
+    pdfBusyRef.current = false
+    setPdfBusy(false)
+    if (pdfCooldownTimerRef.current) {
+      window.clearTimeout(pdfCooldownTimerRef.current)
+      pdfCooldownTimerRef.current = null
+    }
+  }
+
+  function armPdfCooldown() {
+    if (pdfCooldownTimerRef.current) window.clearTimeout(pdfCooldownTimerRef.current)
+    pdfCooldownTimerRef.current = window.setTimeout(() => {
+      releasePdfBusy()
+    }, PDF_COOLDOWN_MS)
+  }
 
   function handleDownloadPDF() {
-    toastSuccess('Preparing Branch Executive Performance PDF report...')
-    const printWindow = window.open('', '_blank', 'width=850,height=900')
-    if (!printWindow) {
-      window.print()
-      return
-    }
+    // Sync guard — blocks double-clicks before React re-renders the disabled button.
+    if (pdfBusyRef.current) return
+    pdfBusyRef.current = true
+    setPdfBusy(true)
 
-    const branchName = data.branchName || user?.branchName || 'Branch'
-    const managerName = user?.name || 'Branch Manager'
-    const kpis = data.kpis || {}
-    const summary = data.dailySummary || {}
-    const topList = (data.topProducts || []).slice(0, 4)
-    const lowList = (data.lowProducts || []).slice(0, 4)
-    const staffList = (data.staff || []).slice(0, 6)
-    const counters = data.counters || []
+    toastSuccess('Preparing Branch Executive Performance PDF report...', {
+      toastId: 'branch-dashboard-pdf-report',
+    })
 
-    const html = `
+    // Yield to the UI thread so the button disables and toast paints before heavy work.
+    window.setTimeout(() => {
+      try {
+        // Named window: a second click focuses the same tab instead of spawning another print dialog.
+        const printWindow = window.open('', PDF_WINDOW_NAME, 'width=850,height=900')
+        if (!printWindow) {
+          toastError('Allow pop-ups for this site to download the PDF report.', {
+            toastId: 'branch-dashboard-pdf-popup-blocked',
+          })
+          releasePdfBusy()
+          return
+        }
+
+        const branchName = data.branchName || user?.branchName || 'Branch'
+        const managerName = user?.name || 'Branch Manager'
+        const kpis = data.kpis || {}
+        const summary = data.dailySummary || {}
+        const topList = (data.topProducts || []).slice(0, 4)
+        const lowList = (data.lowProducts || []).slice(0, 4)
+        const staffList = (data.staff || []).slice(0, 6)
+        const counters = data.counters || []
+
+        const html = `
       <!DOCTYPE html>
       <html>
         <head>
@@ -259,9 +303,20 @@ export function DashboardPage() {
       </html>
     `
 
-    printWindow.document.open()
-    printWindow.document.write(html)
-    printWindow.document.close()
+        printWindow.document.open()
+        printWindow.document.write(html)
+        printWindow.document.close()
+        printWindow.focus()
+      } catch (err) {
+        toastError(err?.message || 'Failed to prepare PDF report', {
+          toastId: 'branch-dashboard-pdf-error',
+        })
+        releasePdfBusy()
+        return
+      }
+
+      armPdfCooldown()
+    }, 0)
   }
 
   return (
@@ -287,11 +342,17 @@ export function DashboardPage() {
               <Button
                 type="button"
                 onClick={handleDownloadPDF}
-                className="text-white font-semibold cursor-pointer shadow-xs gap-1.5"
+                disabled={pdfBusy}
+                aria-busy={pdfBusy}
+                className="text-white font-semibold cursor-pointer shadow-xs gap-1.5 disabled:cursor-not-allowed disabled:opacity-70"
                 style={{ background: `linear-gradient(90deg, ${BRAND.purple}, ${BRAND.deep})` }}
               >
-                <FileDown className="size-4" />
-                Download Report (PDF)
+                {pdfBusy ? (
+                  <Loader2 className="size-4 animate-spin" />
+                ) : (
+                  <FileDown className="size-4" />
+                )}
+                {pdfBusy ? 'Preparing PDF…' : 'Download Report (PDF)'}
               </Button>
             </div>
           }

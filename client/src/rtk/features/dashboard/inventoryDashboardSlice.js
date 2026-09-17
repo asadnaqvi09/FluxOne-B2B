@@ -22,6 +22,7 @@ const initialState = {
   },
   stockOutPie: [],
   alertsPage: 1,
+  alertsLimit: ALERTS_PAGE_SIZE,
   loading: false,
   alertsLoading: false,
   error: null,
@@ -29,13 +30,14 @@ const initialState = {
 
 export const fetchInventoryDashboard = createAsyncThunk(
   'inventoryDashboard/fetch',
-  async (_, { rejectWithValue }) => {
+  async (_, { getState, rejectWithValue }) => {
     const page = 1
+    const limit = getState().inventoryDashboard.alertsLimit || ALERTS_PAGE_SIZE
     const [overviewRes, alertsRes, graphRes] = await Promise.all([
       apiClient.get(endpoints.dashboard.overview),
       apiClient.get(endpoints.dashboard.alerts, {
         page,
-        limit: ALERTS_PAGE_SIZE,
+        limit,
       }),
       apiClient.get(endpoints.dashboard.stockGraph),
     ])
@@ -51,14 +53,14 @@ export const fetchInventoryDashboard = createAsyncThunk(
     let alerts = []
     let alertsPagination = {
       page,
-      limit: ALERTS_PAGE_SIZE,
+      limit,
       total: 0,
       pageCount: 1,
     }
     if (alertsRes.success) {
       const normalized = normalizeAlertsPayload(alertsRes.data, {
         page,
-        limit: ALERTS_PAGE_SIZE,
+        limit,
       })
       alerts = normalized.items
       alertsPagination = normalized.pagination
@@ -90,23 +92,30 @@ export const fetchInventoryDashboard = createAsyncThunk(
 
 export const fetchInventoryAlertsPage = createAsyncThunk(
   'inventoryDashboard/fetchAlertsPage',
-  async (nextPage, { rejectWithValue }) => {
-    const page = Math.max(1, Number(nextPage) || 1)
+  async (arg, { getState, rejectWithValue }) => {
+    const state = getState().inventoryDashboard
+    const isObj = arg != null && typeof arg === 'object'
+    const page = Math.max(1, Number(isObj ? arg.page : arg) || 1)
+    const limit = Math.max(
+      1,
+      Number(isObj && arg.limit != null ? arg.limit : state.alertsLimit) || ALERTS_PAGE_SIZE,
+    )
     const alertsRes = await apiClient.get(endpoints.dashboard.alerts, {
       page,
-      limit: ALERTS_PAGE_SIZE,
+      limit,
     })
     if (!alertsRes.success) {
       return rejectWithValue(alertsRes.error || 'Failed to load alerts')
     }
     const normalized = normalizeAlertsPayload(alertsRes.data, {
       page,
-      limit: ALERTS_PAGE_SIZE,
+      limit,
     })
     return {
       alerts: normalized.items,
       alertsPagination: normalized.pagination,
       alertsPage: page,
+      alertsLimit: limit,
     }
   },
 )
@@ -117,6 +126,10 @@ const inventoryDashboardSlice = createSlice({
   reducers: {
     clearInventoryDashboardError(state) {
       state.error = null
+    },
+    setAlertsLimit(state, action) {
+      state.alertsLimit = Math.max(1, Number(action.payload) || ALERTS_PAGE_SIZE)
+      state.alertsPage = 1
     },
   },
   extraReducers: (builder) => {
@@ -142,7 +155,12 @@ const inventoryDashboardSlice = createSlice({
         state.error = action.payload || action.error.message
       })
       .addCase(fetchInventoryAlertsPage.pending, (state, action) => {
-        state.alertsPage = Math.max(1, Number(action.meta.arg) || 1)
+        const arg = action.meta.arg
+        const isObj = arg != null && typeof arg === 'object'
+        state.alertsPage = Math.max(1, Number(isObj ? arg.page : arg) || 1)
+        if (isObj && arg.limit != null) {
+          state.alertsLimit = Math.max(1, Number(arg.limit) || ALERTS_PAGE_SIZE)
+        }
         state.alertsLoading = true
       })
       .addCase(fetchInventoryAlertsPage.fulfilled, (state, action) => {
@@ -150,6 +168,9 @@ const inventoryDashboardSlice = createSlice({
         state.alerts = action.payload.alerts
         state.alertsPagination = action.payload.alertsPagination
         state.alertsPage = action.payload.alertsPage
+        if (action.payload.alertsLimit != null) {
+          state.alertsLimit = action.payload.alertsLimit
+        }
       })
       .addCase(fetchInventoryAlertsPage.rejected, (state, action) => {
         state.alertsLoading = false
@@ -158,5 +179,5 @@ const inventoryDashboardSlice = createSlice({
   },
 })
 
-export const { clearInventoryDashboardError } = inventoryDashboardSlice.actions
+export const { clearInventoryDashboardError, setAlertsLimit } = inventoryDashboardSlice.actions
 export default inventoryDashboardSlice.reducer

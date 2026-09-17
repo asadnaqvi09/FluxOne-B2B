@@ -212,6 +212,7 @@ export function StaffPage() {
               loading={loading}
               pagination={pagination}
               onPageChange={setPage}
+              onPageSizeChange={(limit) => updateFilters({ limit })}
               onEdit={openEdit}
               onDelete={setDeleteTarget}
               onStatusChange={handleStatusChange}

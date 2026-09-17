@@ -137,6 +137,7 @@ export function PurchaseOrdersPage() {
           loading={loading}
           pagination={pagination}
           onPageChange={setPage}
+          onPageSizeChange={(limit) => updateFilters({ limit })}
           onView={handleView}
           onHistory={handleHistory}
           onPrint={handlePrint}

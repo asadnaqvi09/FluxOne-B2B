@@ -69,8 +69,6 @@ const MONTHS_OPTIONS = [
   { value: '12', label: 'December' },
 ]
 
-const PAGE_SIZE = ADMIN_INVOICES_PAGE_SIZE
-
 function formatRenewal(dateValue) {
   if (!dateValue) return 'Not scheduled'
   const d = new Date(dateValue)
@@ -90,6 +88,7 @@ export function InvoicesPage() {
   const [selectedInvoice, setSelectedInvoice] = useState(null)
   const [previewOpen, setPreviewOpen] = useState(false)
   const [page, setPage] = useState(1)
+  const [limit, setLimit] = useState(ADMIN_INVOICES_PAGE_SIZE)
 
   useEffect(() => {
     setPage(1)
@@ -107,7 +106,7 @@ export function InvoicesPage() {
     month: selectedMonth,
     year: selectedYear,
     page,
-    limit: PAGE_SIZE,
+    limit,
   })
 
   const { company } = useAdminCompany()
@@ -312,9 +311,6 @@ export function InvoicesPage() {
           description="SaaS platform billing records (not POS sales)"
           actions={
             <div className="flex flex-wrap items-center gap-2">
-              <span className="text-xs font-medium text-slate-400 mr-1 hidden sm:inline">
-                {pagination.total} records · {PAGE_SIZE} / page
-              </span>
               <Button
                 type="button"
                 variant="outline"
@@ -509,7 +505,13 @@ export function InvoicesPage() {
               <TablePagination
                 page={pagination.page || page}
                 pageCount={pagination.pageCount || 1}
+                totalItems={pagination.total || 0}
+                pageSize={limit}
                 onPageChange={setPage}
+                onPageSizeChange={(next) => {
+                  setLimit(next)
+                  setPage(1)
+                }}
                 loading={loading}
               />
             </>

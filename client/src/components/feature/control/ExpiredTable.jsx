@@ -9,6 +9,7 @@ export function ExpiredTable({
   loading,
   pagination,
   onPageChange,
+  onPageSizeChange,
   className,
 }) {
   const columns = [
@@ -50,6 +51,7 @@ export function ExpiredTable({
       pagination={pagination}
       columns={columns}
       onPageChange={onPageChange}
+      onPageSizeChange={onPageSizeChange}
       emptyTitle="No expired records"
       emptyHint="When stock-in lots pass their expiry date, they appear here automatically."
       className={className}

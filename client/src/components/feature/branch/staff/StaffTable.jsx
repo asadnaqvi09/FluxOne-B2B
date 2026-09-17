@@ -94,6 +94,7 @@ export function StaffTable({
   loading = false,
   pagination,
   onPageChange,
+  onPageSizeChange,
   onEdit,
   onDelete,
   onStatusChange,
@@ -104,17 +105,14 @@ export function StaffTable({
   const isEmpty = !loading && list.length === 0
   const page = pagination?.page || 1
   const pageCount = pagination?.pageCount || 1
+  const pageSize = pagination?.limit || 8
+  const totalItems = pagination?.total ?? list.length
 
   return (
     <SurfaceCard
       className={className}
       title="Team roster"
       description="Branch staff roles for this location"
-      actions={
-        <span className="text-xs font-medium text-slate-400">
-          {pagination?.total ?? list.length} records · {pagination?.limit || 8} / page
-        </span>
-      }
     >
       {loading ? (
         <TableRowsSkeleton rows={5} />
@@ -261,10 +259,12 @@ export function StaffTable({
           <TablePagination
             page={page}
             pageCount={pageCount}
-            totalItems={pagination?.total ?? list.length}
+            totalItems={totalItems}
+            pageSize={pageSize}
             loading={loading}
             onPageChange={onPageChange}
-            alwaysShow={(pagination?.total || 0) > (pagination?.limit || 8)}
+            onPageSizeChange={onPageSizeChange}
+            alwaysShow={totalItems > 0}
           />
         </>
       )}

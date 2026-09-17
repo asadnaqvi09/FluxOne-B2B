@@ -31,17 +31,24 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { apiClient } from '@/api/api'
 import { endpoints } from '@/api/endpoints'
 import { useDebouncedValue } from '@/hooks/useDebouncedValue'
+import { useClientPagination } from '@/hooks/useClientPagination'
 import { BRAND } from '@/lib/constants'
 import { toastError, toastSuccess } from '@/lib/toast'
-
-const PAGE_SIZE = 8
 
 export function SalesPage() {
   const [sales, setSales] = useState([])
   const [kpis, setKpis] = useState({ totalSales: 0, totalRefunds: 0, transactionCount: 0, totalPaid: 0, totalReturns: 0 })
   const [loading, setLoading] = useState(false)
   const [categories, setCategories] = useState([])
-  const [page, setPage] = useState(1)
+  const {
+    page,
+    setPage,
+    pageSize,
+    setPageSize,
+    pageCount,
+    total,
+    slice: pagedSales,
+  } = useClientPagination(sales)
 
   // Filters — input is instant; API uses debounced query
   const [searchQuery, setSearchQuery] = useState('')
@@ -231,11 +238,6 @@ export function SalesPage() {
           title="Sales Transactions"
           description="POS and register transactions history"
           className="min-h-[400px]"
-          actions={
-            <span className="text-xs font-medium text-slate-400">
-              {sales.length} records · {PAGE_SIZE} / page
-            </span>
-          }
         >
           {loading ? (
             <p className="py-8 text-center text-sm text-slate-400">Loading transactions...</p>
@@ -244,7 +246,7 @@ export function SalesPage() {
           ) : (
             <>
               <div className="space-y-3 md:hidden">
-                {sales.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE).map((sale) => {
+                {pagedSales.map((sale) => {
                   const soldItems = (sale.items || []).filter((i) => !i.isExchange)
                   const exchangeItems = (sale.items || []).filter((i) => i.isExchange)
                   const indexStr = String(sale.saleNumber || sale.id.slice(0, 4))
@@ -357,7 +359,7 @@ export function SalesPage() {
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {sales.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE).map((sale) => {
+                    {pagedSales.map((sale) => {
                       const soldItems = (sale.items || []).filter((i) => !i.isExchange)
                       const exchangeItems = (sale.items || []).filter((i) => i.isExchange)
                       const indexStr = String(sale.saleNumber || sale.id.slice(0, 4))
@@ -448,9 +450,11 @@ export function SalesPage() {
 
           <TablePagination
             page={page}
-            pageCount={Math.max(1, Math.ceil(sales.length / PAGE_SIZE))}
-            totalItems={sales.length}
+            pageCount={pageCount}
+            totalItems={total}
+            pageSize={pageSize}
             onPageChange={setPage}
+            onPageSizeChange={setPageSize}
           />
         </SurfaceCard>
       </MotionReveal>

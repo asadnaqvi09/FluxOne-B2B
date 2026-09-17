@@ -1,8 +1,10 @@
 import { useEffect, useState } from 'react'
-import { Award, Settings, ShieldAlert, Star, Sliders, Pencil, Trash2 } from 'lucide-react'
+import { Settings, Star } from 'lucide-react'
 import { SurfaceCard } from '@/components/shared/SurfaceCard'
 import { ConfirmDialog } from '@/components/shared/ConfirmDialog'
 import { DataCard, ResponsiveDataShell } from '@/components/shared/ResponsiveDataShell'
+import { RowActionButtons } from '@/components/shared/ActionIconButton'
+import { ScaleFormDialog } from '@/components/feature/branch/staff/ScaleFormDialog'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -17,58 +19,76 @@ import {
   TableCell,
   TablePagination,
 } from '@/components/ui/table'
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogCancelButton } from '@/components/ui/dialog'
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  DialogCancelButton,
+} from '@/components/ui/dialog'
 import { apiClient } from '@/api/api'
 import { useClientPagination } from '@/hooks/useClientPagination'
+import {
+  SCALE_POINTS_BUDGET,
+  remainingScalePoints,
+  sumScalePoints,
+} from '@/lib/performanceScales'
 import { BRAND } from '@/lib/constants'
 import { toastError, toastSuccess } from '@/lib/toast'
 
-export function StaffPerformanceTab({ designations = [] }) {
+export function StaffPerformanceTab({
+  designations = [],
+  createOpen = false,
+  onCreateOpenChange,
+  onSubTabChange,
+}) {
   const [activeSubTab, setActiveSubTab] = useState('roster') // 'roster' | 'scales'
-  
-  // Roster States
+
+  // Roster
   const [roster, setRoster] = useState([])
   const [loadingRoster, setLoadingRoster] = useState(false)
   const [searchQuery, setSearchQuery] = useState('')
   const [filterDesignation, setFilterDesignation] = useState('')
 
-  // Scoring Modal States
+  // Score employee modal
   const [scoringEmployee, setScoringEmployee] = useState(null)
   const [scales, setScales] = useState([])
-  const [scores, setScores] = useState({}) // scaleId -> points selection
+  const [scores, setScores] = useState({})
   const [mutatingScore, setMutatingScore] = useState(false)
 
-  // Scales CRUD States
+  // Scales CRUD
   const [loadingScales, setLoadingScales] = useState(false)
-  const [newScaleName, setNewScaleName] = useState('')
-  const [newScalePoints, setNewScalePoints] = useState(50)
   const [editingScale, setEditingScale] = useState(null)
+  const [editOpen, setEditOpen] = useState(false)
   const [deleteTargetScale, setDeleteTargetScale] = useState(null)
+
+  const switchSubTab = (next) => {
+    setActiveSubTab(next)
+    onSubTabChange?.(next)
+  }
 
   const fetchRoster = async () => {
     setLoadingRoster(true)
     const res = await apiClient.get('/branch/performance/scores')
     setLoadingRoster(false)
-    if (res.success) {
-      setRoster(res.data || [])
-    }
+    if (res.success) setRoster(res.data || [])
   }
 
   const fetchScales = async () => {
     setLoadingScales(true)
     const res = await apiClient.get('/branch/performance/scales')
     setLoadingScales(false)
-    if (res.success) {
-      setScales(res.data || [])
-    }
+    if (res.success) setScales(res.data || [])
   }
 
   useEffect(() => {
     void fetchRoster()
     void fetchScales()
+    onSubTabChange?.('roster')
   }, [])
 
-  // Roster filters
   const filteredRoster = roster.filter((emp) => {
     if (filterDesignation && emp.designationId !== filterDesignation) return false
     if (searchQuery) {
@@ -83,12 +103,14 @@ export function StaffPerformanceTab({ designations = [] }) {
   const rosterPaging = useClientPagination(filteredRoster)
   const scalesPaging = useClientPagination(scales)
 
-  // Open score modal
+  const pointsUsed = sumScalePoints(scales)
+  const pointsRemaining = remainingScalePoints(scales)
+
   const openScoringModal = (employee) => {
     setScoringEmployee(employee)
     const initialScores = {}
     scales.forEach((s) => {
-      initialScores[s.id] = Math.round(s.maxPoints / 2) // default mid point
+      initialScores[s.id] = Math.round(s.maxPoints / 2)
     })
     setScores(initialScores)
   }
@@ -103,7 +125,6 @@ export function StaffPerformanceTab({ designations = [] }) {
   const submitScores = async () => {
     setMutatingScore(true)
     let successCount = 0
-    // Submit scores sequentially
     for (const scaleId of Object.keys(scores)) {
       const pts = scores[scaleId]
       const res = await apiClient.post('/branch/performance/scores', {
@@ -121,41 +142,18 @@ export function StaffPerformanceTab({ designations = [] }) {
     }
   }
 
-  // Scales CRUD
-  const handleAddScale = async (e) => {
-    e.preventDefault()
-    if (!newScaleName.trim() || !newScalePoints) return toastError('All fields required')
-
-    const res = await apiClient.post('/branch/performance/scales', {
-      name: newScaleName,
-      maxPoints: newScalePoints,
-    })
-    if (res.success) {
-      toastSuccess('Scoring scale added')
-      setNewScaleName('')
-      setNewScalePoints(50)
-      void fetchScales()
-    } else {
-      toastError(res.error || 'Failed to add scale')
-    }
+  const openEditScale = (scale) => {
+    setEditingScale(scale)
+    setEditOpen(true)
   }
 
-  const handleUpdateScale = async (e) => {
-    e.preventDefault()
-    if (!editingScale.name.trim() || !editingScale.maxPoints) return toastError('All fields required')
-
-    const res = await apiClient.put(`/branch/performance/scales/${editingScale.id}`, {
-      name: editingScale.name,
-      maxPoints: editingScale.maxPoints,
-    })
-    if (res.success) {
-      toastSuccess('Scoring scale updated')
-      setEditingScale(null)
-      void fetchScales()
-    } else {
-      toastError(res.error || 'Failed to update scale')
-    }
-  }
+  // Block Add Scale when the 100-point budget is already full
+  useEffect(() => {
+    if (!createOpen) return
+    if (pointsRemaining > 0) return
+    toastError(`All ${SCALE_POINTS_BUDGET} points are already allocated across criteria.`)
+    onCreateOpenChange?.(false)
+  }, [createOpen, pointsRemaining, onCreateOpenChange])
 
   const confirmDeleteScale = async () => {
     if (!deleteTargetScale) return
@@ -171,7 +169,6 @@ export function StaffPerformanceTab({ designations = [] }) {
     }
   }
 
-  // Helper to color performance score badges
   const getRatingBadgeStyle = (rating) => {
     if (rating >= 75) {
       return 'bg-emerald-50 text-emerald-800 hover:bg-emerald-100 border-none font-bold rounded-lg px-2.5 py-1 text-sm'
@@ -184,12 +181,11 @@ export function StaffPerformanceTab({ designations = [] }) {
 
   return (
     <div className="space-y-4">
-      {/* Sub tabs */}
       <div className="flex gap-2 border-b border-border pb-3">
         <Button
           size="sm"
           variant={activeSubTab === 'roster' ? 'default' : 'outline'}
-          onClick={() => setActiveSubTab('roster')}
+          onClick={() => switchSubTab('roster')}
           style={activeSubTab === 'roster' ? { backgroundColor: BRAND.purple } : {}}
           className={activeSubTab === 'roster' ? 'text-white' : ''}
         >
@@ -198,7 +194,7 @@ export function StaffPerformanceTab({ designations = [] }) {
         <Button
           size="sm"
           variant={activeSubTab === 'scales' ? 'default' : 'outline'}
-          onClick={() => setActiveSubTab('scales')}
+          onClick={() => switchSubTab('scales')}
           style={activeSubTab === 'scales' ? { backgroundColor: BRAND.purple } : {}}
           className={activeSubTab === 'scales' ? 'text-white' : ''}
         >
@@ -208,11 +204,8 @@ export function StaffPerformanceTab({ designations = [] }) {
       </div>
 
       {activeSubTab === 'roster' ? (
-        <SurfaceCard
-          title="Staff Scores & Performance Evaluation"
-        >
-          {/* Filters */}
-          <div className="grid grid-cols-1 gap-3 sm:grid-cols-3 mb-4">
+        <SurfaceCard title="Staff Scores & Performance Evaluation">
+          <div className="mb-4 grid grid-cols-1 gap-3 sm:grid-cols-3">
             <div className="space-y-1.5">
               <Label>Search Employee</Label>
               <Input
@@ -223,10 +216,15 @@ export function StaffPerformanceTab({ designations = [] }) {
             </div>
             <div className="space-y-1.5">
               <Label>Filter Designation</Label>
-              <NativeSelect value={filterDesignation} onChange={(e) => setFilterDesignation(e.target.value)}>
+              <NativeSelect
+                value={filterDesignation}
+                onChange={(e) => setFilterDesignation(e.target.value)}
+              >
                 <option value="">All Designations</option>
                 {designations.map((d) => (
-                  <option key={d.id} value={d.id}>{d.name}</option>
+                  <option key={d.id} value={d.id}>
+                    {d.name}
+                  </option>
                 ))}
               </NativeSelect>
             </div>
@@ -246,14 +244,14 @@ export function StaffPerformanceTab({ designations = [] }) {
                       <p className="mt-0.5 text-xs text-slate-500">{emp.designation || '—'}</p>
                     </div>
                     <Badge variant="outline" className={getRatingBadgeStyle(emp.rating)}>
-                      <Star className="size-3.5 fill-current mr-1" />
+                      <Star className="mr-1 size-3.5 fill-current" />
                       {emp.rating}%
                     </Badge>
                   </div>
                   <Button
                     size="sm"
-                    style={{ backgroundColor: BRAND.purple }}
-                    className="mt-3 h-8 w-full text-xs text-white"
+                    variant="brand"
+                    className="mt-3 h-8 w-full text-xs"
                     onClick={() => openScoringModal(emp)}
                   >
                     Score Employee
@@ -263,7 +261,7 @@ export function StaffPerformanceTab({ designations = [] }) {
               desktop={
                 <Table>
                   <TableHeader>
-                    <TableRow className="text-slate-500 text-xs uppercase">
+                    <TableRow className="text-xs text-slate-500 uppercase">
                       <TableHead>Employee</TableHead>
                       <TableHead>Designation</TableHead>
                       <TableHead className="text-center">Score rating</TableHead>
@@ -277,15 +275,15 @@ export function StaffPerformanceTab({ designations = [] }) {
                         <TableCell className="text-slate-600">{emp.designation || '—'}</TableCell>
                         <TableCell className="text-center">
                           <Badge variant="outline" className={getRatingBadgeStyle(emp.rating)}>
-                            <Star className="size-3.5 fill-current mr-1" />
+                            <Star className="mr-1 size-3.5 fill-current" />
                             {emp.rating}%
                           </Badge>
                         </TableCell>
                         <TableCell className="text-right">
                           <Button
                             size="sm"
-                            style={{ backgroundColor: BRAND.purple }}
-                            className="text-white text-xs h-8"
+                            variant="brand"
+                            className="h-8 text-xs"
                             onClick={() => openScoringModal(emp)}
                           >
                             Score Employee
@@ -309,167 +307,104 @@ export function StaffPerformanceTab({ designations = [] }) {
           />
         </SurfaceCard>
       ) : (
-        // Scales configurations using Shadcn Table component
-        <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
-          <div className="lg:col-span-2">
-            <SurfaceCard
-              title="Configured Scoring Criteria"
-              description="Standardized criteria weights used to score shifts"
-            >
-              {loadingScales ? (
-                <p className="py-8 text-center text-sm text-slate-400">Loading...</p>
-              ) : scales.length === 0 ? (
-                <p className="py-8 text-center text-sm text-slate-400">No scales configured</p>
-              ) : (
-                <ResponsiveDataShell
-                  mobile={scalesPaging.slice.map((s) => (
+        <SurfaceCard
+          title="Configured Scoring Criteria"
+          description={`Total Score: ${pointsUsed} / ${SCALE_POINTS_BUDGET}`}
+        >
+          {loadingScales ? (
+            <p className="py-8 text-center text-sm text-slate-400">Loading...</p>
+          ) : scales.length === 0 ? (
+            <p className="py-8 text-center text-sm text-slate-400">No scales configured</p>
+          ) : (
+            <ResponsiveDataShell
+              mobile={scalesPaging.slice.map((s) => (
                     <DataCard key={s.id}>
                       <div className="flex items-start justify-between gap-2">
                         <div className="min-w-0">
                           <p className="truncate text-sm font-semibold text-slate-900">{s.name}</p>
                           <p className="mt-0.5 font-mono text-xs text-slate-600">{s.maxPoints} pts</p>
                         </div>
-                        <div className="flex gap-2">
-                          <button
-                            type="button"
-                            className="text-slate-500 transition-colors hover:text-slate-800"
-                            onClick={() => setEditingScale(s)}
-                            aria-label="Edit scale"
-                          >
-                            <Pencil className="size-4" />
-                          </button>
-                          <button
-                            type="button"
-                            className="text-slate-500 transition-colors hover:text-slate-800"
-                            onClick={() => setDeleteTargetScale(s)}
-                            aria-label="Delete scale"
-                          >
-                            <Trash2 className="size-4" />
-                          </button>
-                        </div>
+                        <RowActionButtons
+                          onEdit={() => openEditScale(s)}
+                          onDelete={() => setDeleteTargetScale(s)}
+                        />
                       </div>
                     </DataCard>
-                  ))}
-                  desktop={
-                    <Table>
-                      <TableHeader>
-                        <TableRow className="text-slate-500 text-xs uppercase">
-                          <TableHead>Scale Name</TableHead>
-                          <TableHead>Max Weights/Points</TableHead>
-                          <TableHead className="text-right">Actions</TableHead>
-                        </TableRow>
-                      </TableHeader>
-                      <TableBody>
-                        {scalesPaging.slice.map((s) => (
-                          <TableRow key={s.id}>
-                            <TableCell className="font-semibold text-slate-900">{s.name}</TableCell>
-                            <TableCell className="text-slate-700 font-mono">{s.maxPoints} pts</TableCell>
-                            <TableCell className="text-right space-x-3.5">
-                              <button
-                                type="button"
-                                className="text-slate-500 hover:text-slate-800 transition-colors inline-block align-middle"
-                                onClick={() => setEditingScale(s)}
-                              >
-                                <Pencil className="size-4" />
-                              </button>
-                              <button
-                                type="button"
-                                className="text-slate-500 hover:text-slate-800 transition-colors inline-block align-middle"
-                                onClick={() => setDeleteTargetScale(s)}
-                              >
-                                <Trash2 className="size-4" />
-                              </button>
+              ))}
+              desktop={
+                <Table>
+                  <TableHeader>
+                    <TableRow className="text-xs text-slate-500 uppercase">
+                      <TableHead>Scale Name</TableHead>
+                      <TableHead>Max Weights/Points</TableHead>
+                      <TableHead className="text-right">Actions</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {scalesPaging.slice.map((s) => (
+                      <TableRow key={s.id}>
+                        <TableCell className="font-semibold text-slate-900">{s.name}</TableCell>
+                        <TableCell className="font-mono text-slate-700">{s.maxPoints} pts</TableCell>
+                            <TableCell className="text-right">
+                              <RowActionButtons
+                                onEdit={() => openEditScale(s)}
+                                onDelete={() => setDeleteTargetScale(s)}
+                              />
                             </TableCell>
-                          </TableRow>
-                        ))}
-                      </TableBody>
-                    </Table>
-                  }
-                />
-              )}
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              }
+            />
+          )}
 
-              <TablePagination
-                page={scalesPaging.page}
-                pageCount={scalesPaging.pageCount}
-                totalItems={scalesPaging.total}
-                pageSize={scalesPaging.pageSize}
-                onPageChange={scalesPaging.setPage}
-                onPageSizeChange={scalesPaging.setPageSize}
-              />
-            </SurfaceCard>
-          </div>
-
-          <div>
-            <SurfaceCard
-              title={editingScale ? 'Edit Scoring Scale' : 'Add Scoring Scale'}
-              description="Define max weights for evaluations"
-            >
-              {editingScale ? (
-                <form className="space-y-4" onSubmit={handleUpdateScale}>
-                  <div className="space-y-1.5">
-                    <Label htmlFor="edit-scale-name">Criteria Name</Label>
-                    <Input
-                      id="edit-scale-name"
-                      value={editingScale.name}
-                      onChange={(e) => setEditingScale({ ...editingScale, name: e.target.value })}
-                      required
-                    />
-                  </div>
-                  <div className="space-y-1.5">
-                    <Label htmlFor="edit-scale-points">Maximum Score Points</Label>
-                    <Input
-                      id="edit-scale-points"
-                      type="number"
-                      value={editingScale.maxPoints}
-                      onChange={(e) => setEditingScale({ ...editingScale, maxPoints: parseInt(e.target.value, 10) })}
-                      required
-                    />
-                  </div>
-                  <div className="flex gap-2">
-                    <Button variant="outline" className="w-1/2" onClick={() => setEditingScale(null)}>Cancel</Button>
-                    <Button type="submit" className="w-1/2 text-white" style={{ backgroundColor: BRAND.purple }}>Update</Button>
-                  </div>
-                </form>
-              ) : (
-                <form className="space-y-4" onSubmit={handleAddScale}>
-                  <div className="space-y-1.5">
-                    <Label htmlFor="add-scale-name">Criteria Name</Label>
-                    <Input
-                      id="add-scale-name"
-                      placeholder="e.g. Communication points"
-                      value={newScaleName}
-                      onChange={(e) => setNewScaleName(e.target.value)}
-                      required
-                    />
-                  </div>
-                  <div className="space-y-1.5">
-                    <Label htmlFor="add-scale-points">Maximum Score Points</Label>
-                    <Input
-                      id="add-scale-points"
-                      type="number"
-                      placeholder="e.g. 50"
-                      value={newScalePoints}
-                      onChange={(e) => setNewScalePoints(parseInt(e.target.value, 10))}
-                      required
-                    />
-                  </div>
-                  <Button type="submit" className="w-full text-white" style={{ backgroundColor: BRAND.purple }}>
-                    Add Scale
-                  </Button>
-                </form>
-              )}
-            </SurfaceCard>
-          </div>
-        </div>
+          <TablePagination
+            page={scalesPaging.page}
+            pageCount={scalesPaging.pageCount}
+            totalItems={scalesPaging.total}
+            pageSize={scalesPaging.pageSize}
+            onPageChange={scalesPaging.setPage}
+            onPageSizeChange={scalesPaging.setPageSize}
+          />
+        </SurfaceCard>
       )}
 
-      {/* Scoring Modal Dialog */}
-      <Dialog open={Boolean(scoringEmployee)} onOpenChange={(open) => { if (!open) setScoringEmployee(null) }}>
+      {/* Add Scale — page header CTA */}
+      <ScaleFormDialog
+        open={createOpen && pointsRemaining > 0}
+        onOpenChange={onCreateOpenChange}
+        mode="create"
+        scales={scales}
+        onSuccess={fetchScales}
+      />
+
+      {/* Edit Scale */}
+      <ScaleFormDialog
+        open={editOpen}
+        onOpenChange={(open) => {
+          setEditOpen(open)
+          if (!open) setEditingScale(null)
+        }}
+        mode="edit"
+        initialScale={editingScale}
+        scales={scales}
+        onSuccess={fetchScales}
+      />
+
+      {/* Score employee */}
+      <Dialog
+        open={Boolean(scoringEmployee)}
+        onOpenChange={(open) => {
+          if (!open) setScoringEmployee(null)
+        }}
+      >
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
             <DialogTitle>Evaluate Performance: {scoringEmployee?.fullName}</DialogTitle>
             <DialogDescription>
-              Assign scores based on bar/slider selections. Maximum points are defined by active scales.
+              Assign scores based on bar/slider selections. Maximum points are defined by active
+              scales.
             </DialogDescription>
           </DialogHeader>
 
@@ -480,10 +415,15 @@ export function StaffPerformanceTab({ designations = [] }) {
               {scales.map((s) => {
                 const currentVal = scores[s.id] || 0
                 return (
-                  <div key={s.id} className="space-y-1.5 p-2 bg-slate-50 rounded-lg border border-slate-200">
+                  <div
+                    key={s.id}
+                    className="space-y-1.5 rounded-lg border border-slate-200 bg-slate-50 p-2"
+                  >
                     <div className="flex justify-between text-xs font-bold text-slate-700">
                       <span>{s.name}</span>
-                      <span className="text-purple-700">{currentVal} / {s.maxPoints} pts</span>
+                      <span className="text-purple-700">
+                        {currentVal} / {s.maxPoints} pts
+                      </span>
                     </div>
                     <input
                       type="range"
@@ -491,7 +431,7 @@ export function StaffPerformanceTab({ designations = [] }) {
                       max={s.maxPoints}
                       value={currentVal}
                       onChange={(e) => handleScoreSliderChange(s.id, e.target.value)}
-                      className="w-full h-2 bg-slate-200 rounded-lg appearance-none cursor-pointer accent-purple-600"
+                      className="h-2 w-full cursor-pointer appearance-none rounded-lg bg-slate-200 accent-purple-600"
                     />
                   </div>
                 )
@@ -504,8 +444,8 @@ export function StaffPerformanceTab({ designations = [] }) {
             <Button
               onClick={submitScores}
               disabled={mutatingScore || scales.length === 0}
-              className="text-white w-full sm:w-auto"
-              style={{ backgroundColor: BRAND.purple }}
+              variant="brand"
+              className="w-full sm:w-auto"
             >
               {mutatingScore ? 'Saving…' : 'Record Scores'}
             </Button>
@@ -515,7 +455,9 @@ export function StaffPerformanceTab({ designations = [] }) {
 
       <ConfirmDialog
         open={Boolean(deleteTargetScale)}
-        onOpenChange={(open) => { if (!open) setDeleteTargetScale(null) }}
+        onOpenChange={(open) => {
+          if (!open) setDeleteTargetScale(null)
+        }}
         title="Delete scoring scale?"
         description="Delete this scoring scale? This action cannot be undone."
         confirmLabel="Delete"
@@ -525,4 +467,5 @@ export function StaffPerformanceTab({ designations = [] }) {
     </div>
   )
 }
+
 export default StaffPerformanceTab

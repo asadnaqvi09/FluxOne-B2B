@@ -16,6 +16,8 @@ import {
   TableHead,
   TableRow,
   TableCell,
+  TableActionsHead,
+  TableActionsCell,
   TablePagination,
 } from '@/components/ui/table'
 import {
@@ -346,49 +348,49 @@ export function ResourcesPage() {
       {activeTab === 'hardware' ? (
         <>
           <MotionReveal delay={0.02}>
-            <SurfaceCard
-              padding="compact"
-              className="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between"
-            >
-              <div className="grid w-full flex-1 gap-3 sm:grid-cols-2">
-                <div className="space-y-1.5">
-                  <Label htmlFor="hw-search">Search by Name / ID</Label>
-                  <div className="relative">
-                    <Search className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-slate-400" />
-                    <Input
-                      id="hw-search"
-                      value={hwSearch}
-                      placeholder="Search hardware name or ID…"
-                      className="pl-9"
-                      onChange={(e) => setHwSearch(e.target.value)}
-                    />
+            <SurfaceCard padding="compact">
+              {/* Flex must live inside body — SurfaceCard wraps children in its own div */}
+              <div className="flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
+                <div className="grid w-full min-w-0 flex-1 gap-3 sm:grid-cols-2">
+                  <div className="space-y-1.5">
+                    <Label htmlFor="hw-search">Search by Name / ID</Label>
+                    <div className="relative">
+                      <Search className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-slate-400" />
+                      <Input
+                        id="hw-search"
+                        value={hwSearch}
+                        placeholder="Search hardware name or ID…"
+                        className="pl-9"
+                        onChange={(e) => setHwSearch(e.target.value)}
+                      />
+                    </div>
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label htmlFor="hw-filter">Filter by Hardware Type</Label>
+                    <NativeSelect
+                      id="hw-filter"
+                      value={filterHardware}
+                      onChange={(e) => setFilterHardware(e.target.value)}
+                      className="cursor-pointer"
+                    >
+                      <option value="">All Hardware</option>
+                      <option value="Computers">Computers</option>
+                      <option value="Scanners">Scanners</option>
+                      <option value="Printers">Printers</option>
+                      <option value="Telephone">Telephone</option>
+                      <option value="Other">Other</option>
+                    </NativeSelect>
                   </div>
                 </div>
-                <div className="space-y-1.5">
-                  <Label htmlFor="hw-filter">Filter by Hardware Type</Label>
-                  <NativeSelect
-                    id="hw-filter"
-                    value={filterHardware}
-                    onChange={(e) => setFilterHardware(e.target.value)}
-                    className="cursor-pointer"
-                  >
-                    <option value="">All Hardware</option>
-                    <option value="Computers">Computers</option>
-                    <option value="Scanners">Scanners</option>
-                    <option value="Printers">Printers</option>
-                    <option value="Telephone">Telephone</option>
-                    <option value="Other">Other</option>
-                  </NativeSelect>
-                </div>
-              </div>
 
-              <Button
-                style={{ backgroundColor: BRAND.purple }}
-                className="cursor-pointer text-white hover:opacity-90"
-                onClick={handleOpenHardwareCreate}
-              >
-                <Plus className="size-4 mr-1.5" /> Add Hardware
-              </Button>
+                <Button
+                  variant="brand"
+                  className="w-full shrink-0 md:w-auto"
+                  onClick={handleOpenHardwareCreate}
+                >
+                  <Plus className="mr-1.5 size-4" /> Add Hardware
+                </Button>
+              </div>
             </SurfaceCard>
           </MotionReveal>
 
@@ -476,9 +478,7 @@ export function ResourcesPage() {
                           <TableHead className="hidden px-2 py-3 text-center lg:table-cell">
                             Assignee
                           </TableHead>
-                          <TableHead className="sticky right-0 z-[1] bg-white px-2 py-3 text-right">
-                            Actions
-                          </TableHead>
+                          <TableActionsHead sticky />
                         </TableRow>
                       </TableHeader>
                       <TableBody>
@@ -533,22 +533,24 @@ export function ResourcesPage() {
                                   <span className="text-xs italic text-slate-400">Unassigned</span>
                                 )}
                               </TableCell>
-                              <TableCell className="sticky right-0 z-[1] space-x-3.5 bg-white px-2 py-3 text-right group-hover:bg-slate-50/80">
+                              <TableActionsCell sticky>
                                 <button
                                   type="button"
-                                  className="inline-block cursor-pointer align-middle text-slate-500 transition-colors hover:text-slate-900"
+                                  className="cursor-pointer text-slate-500 transition-colors hover:text-slate-900"
                                   onClick={() => handleOpenHardwareEdit(hw)}
+                                  aria-label="Edit hardware"
                                 >
                                   <Edit3 className="size-4" />
                                 </button>
                                 <button
                                   type="button"
-                                  className="inline-block cursor-pointer align-middle text-slate-500 transition-colors hover:text-slate-900"
+                                  className="cursor-pointer text-slate-500 transition-colors hover:text-slate-900"
                                   onClick={() => handleDeleteHardware(hw)}
+                                  aria-label="Delete hardware"
                                 >
                                   <Trash2 className="size-4" />
                                 </button>
-                              </TableCell>
+                              </TableActionsCell>
                             </TableRow>
                           ))}
                       </TableBody>
@@ -557,6 +559,7 @@ export function ResourcesPage() {
                 </>
               )}
 
+              {/* Standard pagination below table (tc-Resources-02q) */}
               <TablePagination
                 page={hwPaging.page}
                 pageCount={hwPaging.pageCount}
@@ -564,6 +567,7 @@ export function ResourcesPage() {
                 pageSize={hwPaging.pageSize}
                 onPageChange={hwPaging.setPage}
                 onPageSizeChange={hwPaging.setPageSize}
+                alwaysShow={hwPaging.total > 0}
               />
             </SurfaceCard>
           </MotionReveal>
@@ -644,12 +648,12 @@ export function ResourcesPage() {
                             <TableHead className="px-2 py-3">Scale ID</TableHead>
                             <TableHead className="px-2 py-3">Created Date</TableHead>
                             <TableHead className="px-2 py-3">Scale unit</TableHead>
-                            <TableHead className="px-2 py-3 text-right">Actions</TableHead>
+                            <TableActionsHead />
                           </TableRow>
                         </TableHeader>
                         <TableBody>
                           {scalesPaging.slice.map((sc) => (
-                              <TableRow key={sc.id}>
+                              <TableRow key={sc.id} className="group">
                                 <TableCell className="px-2 py-3 font-mono font-bold text-slate-900">
                                   {sc.code || String(sc.id).slice(0, 8)}
                                 </TableCell>
@@ -661,22 +665,24 @@ export function ResourcesPage() {
                                 <TableCell className="px-2 py-3 font-semibold text-slate-800">
                                   {sc.name}
                                 </TableCell>
-                                <TableCell className="space-x-3.5 px-2 py-3 text-right">
+                                <TableActionsCell>
                                   <button
                                     type="button"
-                                    className="inline-block cursor-pointer align-middle text-slate-500 transition-colors hover:text-slate-900"
+                                    className="cursor-pointer text-slate-500 transition-colors hover:text-slate-900"
                                     onClick={() => handleOpenScaleEdit(sc)}
+                                    aria-label="Edit scale"
                                   >
                                     <Edit3 className="size-4" />
                                   </button>
                                   <button
                                     type="button"
-                                    className="inline-block cursor-pointer align-middle text-slate-500 transition-colors hover:text-slate-900"
+                                    className="cursor-pointer text-slate-500 transition-colors hover:text-slate-900"
                                     onClick={() => handleDeleteScale(sc)}
+                                    aria-label="Delete scale"
                                   >
                                     <Trash2 className="size-4" />
                                   </button>
-                                </TableCell>
+                                </TableActionsCell>
                               </TableRow>
                             ))}
                         </TableBody>
@@ -685,6 +691,7 @@ export function ResourcesPage() {
                   </>
                 )}
 
+                {/* Standard pagination below table (tc-Resources-02q) */}
                 <TablePagination
                   page={scalesPaging.page}
                   pageCount={scalesPaging.pageCount}
@@ -692,6 +699,7 @@ export function ResourcesPage() {
                   pageSize={scalesPaging.pageSize}
                   onPageChange={scalesPaging.setPage}
                   onPageSizeChange={scalesPaging.setPageSize}
+                  alwaysShow={scalesPaging.total > 0}
                 />
               </SurfaceCard>
             </MotionReveal>
@@ -730,8 +738,8 @@ export function ResourcesPage() {
                     <Button
                       type="submit"
                       disabled={saving}
-                      className="w-full cursor-pointer text-white hover:opacity-90"
-                      style={{ backgroundColor: BRAND.purple }}
+                      variant="brand"
+                      className="w-full"
                     >
                       {saving ? 'Saving…' : 'Save Scale'}
                     </Button>

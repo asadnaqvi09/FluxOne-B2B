@@ -293,7 +293,7 @@ export function BranchInventoryPage() {
                       </TableHead>
                       <TableHead className="px-2 py-3 text-right whitespace-nowrap">In Stock</TableHead>
                       <TableHead className="px-2 py-3 text-center whitespace-nowrap">Status</TableHead>
-                      <TableHead className="sticky right-0 z-[1] bg-white px-2 py-3 text-right whitespace-nowrap">
+                      <TableHead className="sticky right-0 z-[1] bg-slate-200/80 px-2 py-3 text-right whitespace-nowrap">
                         Actions
                       </TableHead>
                     </TableRow>

@@ -228,8 +228,7 @@ export function CategoriesPage() {
               </div>
               <Button
                 type="button"
-                className="cursor-pointer text-white"
-                style={{ background: BRAND.purple }}
+                variant="brand"
                 onClick={openCreateCategory}
               >
                 <Plus className="size-4" />
@@ -327,7 +326,7 @@ export function CategoriesPage() {
                         type="button"
                         size="icon"
                         variant="ghost"
-                        className="cursor-pointer"
+                        className="cursor-pointer text-slate-500 hover:bg-slate-100 hover:text-slate-900 hover:scale-110"
                         title="Edit"
                         onClick={() => openEdit(parent, 'category')}
                       >
@@ -337,7 +336,7 @@ export function CategoriesPage() {
                         type="button"
                         size="icon"
                         variant="ghost"
-                        className="cursor-pointer text-red-600 hover:text-red-700"
+                        className="cursor-pointer text-slate-500 hover:bg-rose-50 hover:text-rose-700 hover:scale-110"
                         title="Delete"
                         aria-label={`Delete ${parent.name || 'category'}`}
                         onClick={() => setDeleteTarget(parent)}
@@ -378,7 +377,7 @@ export function CategoriesPage() {
                               type="button"
                               size="icon"
                               variant="ghost"
-                              className="cursor-pointer"
+                              className="cursor-pointer text-slate-500 hover:bg-slate-100 hover:text-slate-900 hover:scale-110"
                               title="Edit"
                               onClick={() => openEdit(child, 'subcategory')}
                             >
@@ -388,7 +387,7 @@ export function CategoriesPage() {
                               type="button"
                               size="icon"
                               variant="ghost"
-                              className="cursor-pointer text-red-600 hover:text-red-700"
+                              className="cursor-pointer text-slate-500 hover:bg-rose-50 hover:text-rose-700 hover:scale-110"
                               title="Delete"
                               aria-label={`Delete ${child.name || 'sub category'}`}
                               onClick={() => setDeleteTarget(child)}

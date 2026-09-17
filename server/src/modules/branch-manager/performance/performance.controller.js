@@ -10,6 +10,34 @@ function slugify(text) {
     .replace(/^-+|-+$/g, '')
 }
 
+// All scoring criteria for a tenant share a fixed 100-point budget.
+const SCALE_POINTS_BUDGET = 100
+const SCALE_SCORE_RANGE_MSG = 'Score must be between 0 and 100.'
+const SCALE_TOTAL_LIMIT_MSG =
+  'Total scoring points cannot exceed 100. Please reduce the score points before saving.'
+
+function parseMaxPoints(raw) {
+  const points = Number(raw)
+  if (!Number.isFinite(points) || !Number.isInteger(points) || points < 0 || points > 100) {
+    return { ok: false, error: SCALE_SCORE_RANGE_MSG }
+  }
+  return { ok: true, value: points }
+}
+
+async function getAllocatedPoints(tenantId, excludeId = null) {
+  const { rows } = await tenantQuery(
+    tenantId,
+    `
+      SELECT COALESCE(SUM(max_points), 0)::int AS total
+      FROM scoring_scales
+      WHERE tenant_id = $1
+        AND ($2::uuid IS NULL OR id <> $2::uuid)
+    `,
+    [excludeId],
+  )
+  return Number(rows[0]?.total) || 0
+}
+
 export async function listScales(req, res) {
   const { rows } = await tenantQuery(
     req.tenantId,
@@ -20,11 +48,28 @@ export async function listScales(req, res) {
 
 export async function createScale(req, res) {
   const { name, maxPoints } = req.body
-  if (!name || !maxPoints) {
+  if (!name || maxPoints === undefined || maxPoints === null || maxPoints === '') {
     return fail(res, 'Scale name and max points are required', 400)
   }
 
+  const parsed = parseMaxPoints(maxPoints)
+  if (!parsed.ok) return fail(res, parsed.error, 400)
+  const points = parsed.value
+
   const code = slugify(name)
+
+  // If code already exists, upsert updates that row — exclude it from the budget sum
+  const { rows: existingRows } = await tenantQuery(
+    req.tenantId,
+    `SELECT id FROM scoring_scales WHERE tenant_id = $1 AND code = $2 LIMIT 1`,
+    [code],
+  )
+  const excludeId = existingRows[0]?.id || null
+
+  const allocated = await getAllocatedPoints(req.tenantId, excludeId)
+  if (allocated + points > SCALE_POINTS_BUDGET) {
+    return fail(res, SCALE_TOTAL_LIMIT_MSG, 400)
+  }
 
   try {
     const { rows } = await tenantQuery(
@@ -35,7 +80,7 @@ export async function createScale(req, res) {
         ON CONFLICT (tenant_id, code) DO UPDATE SET name = EXCLUDED.name, max_points = EXCLUDED.max_points
         RETURNING id, code, name, max_points AS "maxPoints"
       `,
-      [code, name.trim(), parseInt(maxPoints, 10)],
+      [code, name.trim(), points],
     )
     return success(res, rows[0], 201)
   } catch (err) {
@@ -47,22 +92,33 @@ export async function updateScale(req, res) {
   const { id } = req.params
   const { name, maxPoints } = req.body
 
-  if (!name || !maxPoints) {
+  if (!name || maxPoints === undefined || maxPoints === null || maxPoints === '') {
     return fail(res, 'Scale name and max points are required', 400)
+  }
+
+  const parsed = parseMaxPoints(maxPoints)
+  if (!parsed.ok) return fail(res, parsed.error, 400)
+  const points = parsed.value
+
+  // Exclude current scale so its points can be redistributed within the 100 budget
+  const allocated = await getAllocatedPoints(req.tenantId, id)
+  if (allocated + points > SCALE_POINTS_BUDGET) {
+    return fail(res, SCALE_TOTAL_LIMIT_MSG, 400)
   }
 
   const code = slugify(name)
 
   try {
+    // tenantQuery prepends tenantId as $1 — do not pass it again in params
     const { rows } = await tenantQuery(
       req.tenantId,
       `
         UPDATE scoring_scales
-        SET name = $1, max_points = $2, code = $3
-        WHERE tenant_id = $4 AND id = $5
+        SET name = $2, max_points = $3, code = $4
+        WHERE tenant_id = $1 AND id = $5
         RETURNING id, code, name, max_points AS "maxPoints"
       `,
-      [name.trim(), parseInt(maxPoints, 10), code, req.tenantId, id],
+      [name.trim(), points, code, id],
     )
     if (rows.length === 0) {
       return fail(res, 'Scale not found', 404)

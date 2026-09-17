@@ -106,8 +106,7 @@ export function PurchaseOrdersPage() {
           actions={
             <Button
               type="button"
-              className="cursor-pointer text-white"
-              style={{ background: BRAND.purple }}
+              variant="brand"
               onClick={openGenerate}
             >
               <Plus className="size-4" />

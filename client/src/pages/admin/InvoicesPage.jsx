@@ -428,7 +428,7 @@ export function InvoicesPage() {
                       <TableHead className="px-4 py-3 font-medium">Name of Source / Plan</TableHead>
                       <TableHead className="px-4 py-3 font-medium">Price</TableHead>
                       <TableHead className="hidden px-4 py-3 font-medium sm:table-cell">Status</TableHead>
-                      <TableHead className="sticky right-0 z-[1] bg-white px-4 py-3 text-right font-medium">
+                      <TableHead className="sticky right-0 z-[1] bg-slate-200/80 px-4 py-3 text-right font-medium">
                         Actions
                       </TableHead>
                     </TableRow>

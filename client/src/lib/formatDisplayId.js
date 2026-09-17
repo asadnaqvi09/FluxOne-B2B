@@ -18,6 +18,12 @@ export function displayStaffRef(row = {}) {
   return id ? referenceFromUuid(id, 'STF') : '—'
 }
 
+// Human-readable branch ref (BRN-XXXXXXXX) — UI only, not stored in DB.
+export function displayBranchRef(row = {}) {
+  const id = row?.id || row?.branchId
+  return id ? referenceFromUuid(id, 'BRN') : '—'
+}
+
 export function displayDiscountRef(row = {}) {
   return row.id ? referenceFromUuid(row.id, 'OFF') : '—'
 }

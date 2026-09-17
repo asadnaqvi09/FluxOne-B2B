@@ -1,8 +1,8 @@
-import { Package, Pencil, Trash2 } from 'lucide-react'
+import { Package } from 'lucide-react'
 import { ProductImageCell } from '@/components/feature/products/ProductStatusToggle'
 import { EmptyState } from '@/components/shared/EmptyState'
 import { SurfaceCard } from '@/components/shared/SurfaceCard'
-import { Button } from '@/components/ui/button'
+import { RowActionButtons } from '@/components/shared/ActionIconButton'
 import {
   Table,
   TableHeader,
@@ -19,32 +19,10 @@ import { cn } from '@/lib/utils'
 
 function MovementRowActions({ row, onEdit, onDelete }) {
   return (
-    <div className="inline-flex items-center gap-1">
-      {onEdit ? (
-        <Button
-          type="button"
-          variant="ghost"
-          size="sm"
-          className="cursor-pointer"
-          onClick={() => onEdit(row)}
-          title="Edit"
-        >
-          <Pencil className="size-4" />
-        </Button>
-      ) : null}
-      {onDelete ? (
-        <Button
-          type="button"
-          variant="ghost"
-          size="sm"
-          className="cursor-pointer text-red-600 hover:text-red-700"
-          onClick={() => onDelete(row)}
-          title="Delete"
-        >
-          <Trash2 className="size-4" />
-        </Button>
-      ) : null}
-    </div>
+    <RowActionButtons
+      onEdit={onEdit ? () => onEdit(row) : undefined}
+      onDelete={onDelete ? () => onDelete(row) : undefined}
+    />
   )
 }
 

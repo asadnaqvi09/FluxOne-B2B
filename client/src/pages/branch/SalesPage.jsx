@@ -25,6 +25,8 @@ import {
   TableHead,
   TableRow,
   TableCell,
+  TableActionsHead,
+  TableActionsCell,
   TablePagination,
 } from '@/components/ui/table'
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogCancelButton } from '@/components/ui/dialog'
@@ -350,12 +352,12 @@ export function SalesPage() {
                       <TableHead>Date / Time</TableHead>
                       <TableHead>Sale items</TableHead>
                       <TableHead className="hidden lg:table-cell">Exchange item</TableHead>
-                      <TableHead className="hidden xl:table-cell">Tax</TableHead>
-                      <TableHead className="hidden xl:table-cell">Discount</TableHead>
-                      <TableHead>Final</TableHead>
-                      <TableHead>Paid</TableHead>
-                      <TableHead className="hidden lg:table-cell">Return</TableHead>
-                      <TableHead className="sticky right-0 z-[1] bg-white text-right">Actions</TableHead>
+                      <TableHead className="hidden text-right xl:table-cell">Tax</TableHead>
+                      <TableHead className="hidden text-right xl:table-cell">Discount</TableHead>
+                      <TableHead className="text-right">Final</TableHead>
+                      <TableHead className="text-right">Paid</TableHead>
+                      <TableHead className="hidden text-right lg:table-cell">Return</TableHead>
+                      <TableActionsHead sticky />
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -398,27 +400,29 @@ export function SalesPage() {
                           <TableCell className="hidden text-slate-500 lg:table-cell">
                             {exchangeItems.map((i) => i.name).join(', ') || '—'}
                           </TableCell>
-                          <TableCell className="hidden text-slate-600 xl:table-cell">
+                          <TableCell className="hidden text-right text-slate-600 xl:table-cell">
                             Rs. {formatPrice(sale.tax_amount || sale.taxAmount)}
                           </TableCell>
-                          <TableCell className="hidden text-slate-600 xl:table-cell">
+                          <TableCell className="hidden text-right text-slate-600 xl:table-cell">
                             Rs. {formatPrice(sale.discount_amount || sale.discountAmount)}
                           </TableCell>
-                          <TableCell className="font-bold text-slate-900">
+                          <TableCell className="text-right font-bold text-slate-900">
                             Rs. {formatPrice(sale.finalAmount)}
                           </TableCell>
-                          <TableCell className="text-slate-600">Rs. {formatPrice(sale.paidAmount)}</TableCell>
-                          <TableCell className="hidden text-slate-600 lg:table-cell">
+                          <TableCell className="text-right text-slate-600">
+                            Rs. {formatPrice(sale.paidAmount)}
+                          </TableCell>
+                          <TableCell className="hidden text-right text-slate-600 lg:table-cell">
                             {parseFloat(sale.returnAmount) > 0
                               ? `Rs. ${formatPrice(sale.returnAmount)}`
                               : '—'}
                           </TableCell>
-                          <TableCell className="sticky right-0 z-[1] space-x-2.5 bg-white text-right group-hover:bg-slate-50/80">
+                          <TableActionsCell sticky>
                             {sale.status !== 'refunded' ? (
                               <Button
                                 size="xs"
                                 variant="outline"
-                                className="h-7 border-slate-200 px-2 text-xs font-semibold text-slate-700 align-middle hover:bg-slate-50"
+                                className="h-7 border-slate-200 px-2 text-xs font-semibold text-slate-700 hover:bg-slate-50"
                                 onClick={() => setRefundTarget(sale)}
                               >
                                 Refund
@@ -426,19 +430,20 @@ export function SalesPage() {
                             ) : (
                               <Badge
                                 variant="destructive"
-                                className="rounded border-none bg-rose-50 font-semibold text-rose-700 align-middle hover:bg-rose-100"
+                                className="rounded border-none bg-rose-50 font-semibold text-rose-700 hover:bg-rose-100"
                               >
                                 Refunded
                               </Badge>
                             )}
                             <button
                               type="button"
-                              className="inline-block align-middle text-slate-500 transition-colors hover:text-slate-800"
+                              className="cursor-pointer text-slate-500 transition-colors hover:text-slate-800"
                               onClick={() => handlePrint(sale)}
+                              aria-label="Print invoice"
                             >
                               <Printer className="size-4" />
                             </button>
-                          </TableCell>
+                          </TableActionsCell>
                         </TableRow>
                       )
                     })}

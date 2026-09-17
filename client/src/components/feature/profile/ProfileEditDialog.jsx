@@ -12,7 +12,6 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { ImageUploadField } from '@/components/shared/ImageUploadField'
-import { BRAND } from '@/lib/constants'
 import { useFormBaseline } from '@/hooks/useFormBaseline'
 
 // Shared edit profile modal (Admin / BM / IM / etc.).
@@ -183,8 +182,8 @@ export function ProfileEditDialog({
             <Button
               type="submit"
               disabled={loading}
-              style={{ background: BRAND.purple }}
-              className="w-full text-white hover:opacity-90 sm:w-auto"
+              variant="brand"
+              className="w-full sm:w-auto"
             >
               {loading ? 'Saving…' : 'Save changes'}
             </Button>

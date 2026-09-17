@@ -11,7 +11,6 @@ import {
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { BRAND } from '@/lib/constants'
 import { useFormBaseline } from '@/hooks/useFormBaseline'
 import { apiClient } from '@/api/api'
 import { endpoints } from '@/api/endpoints'
@@ -101,8 +100,8 @@ export function DesignationFormDialog({
             <Button
               type="submit"
               disabled={loading}
-              style={{ background: BRAND.purple }}
-              className="w-full text-white hover:opacity-90 sm:w-auto"
+              variant="brand"
+              className="w-full sm:w-auto"
             >
               {loading ? 'Saving…' : 'Create Designation'}
             </Button>

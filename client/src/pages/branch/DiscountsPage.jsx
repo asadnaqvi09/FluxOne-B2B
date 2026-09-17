@@ -1,9 +1,10 @@
 import { useEffect, useState } from 'react'
-import { Plus, Tag, Pencil, Trash2 } from 'lucide-react'
+import { Plus, Tag } from 'lucide-react'
 import { PageHeader } from '@/components/shared/PageHeader'
 import { MotionHeader, MotionReveal } from '@/components/shared/MotionReveal'
 import { SurfaceCard } from '@/components/shared/SurfaceCard'
 import { DeleteEntityDialog } from '@/components/shared/DeleteEntityDialog'
+import { RowActionButtons } from '@/components/shared/ActionIconButton'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -16,12 +17,13 @@ import {
   TableHead,
   TableRow,
   TableCell,
+  TableActionsHead,
+  TableActionsCell,
   TablePagination,
 } from '@/components/ui/table'
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogCancelButton } from '@/components/ui/dialog'
 import { apiClient } from '@/api/api'
 import { endpoints } from '@/api/endpoints'
-import { BRAND } from '@/lib/constants'
 import { displayDiscountRef } from '@/lib/formatDisplayId'
 import { toastError, toastSuccess } from '@/lib/toast'
 import { validateDiscountForm } from '@/lib/validation/branchForms'
@@ -171,12 +173,8 @@ export function DiscountsPage() {
           title="Discount Management"
           description="Manage promotional campaigns, store-wide sales, and percentage offers. Staff scoring scales live under Staff → Performance."
           actions={
-            <Button
-              style={{ backgroundColor: BRAND.purple }}
-              className="text-white"
-              onClick={handleOpenCreate}
-            >
-              <Plus className="size-4 mr-1.5" /> Add Discount
+            <Button variant="brand" onClick={handleOpenCreate}>
+              <Plus className="mr-1.5 size-4" /> Add Discount
             </Button>
           }
         />
@@ -237,23 +235,11 @@ export function DiscountsPage() {
                           {parseFloat(disc.percent)}% OFF
                         </Badge>
                       </div>
-                      <div className="mt-3 flex justify-end gap-3">
-                        <button
-                          type="button"
-                          className="text-slate-500 transition-colors hover:text-slate-800"
-                          onClick={() => handleOpenEdit(disc)}
-                          aria-label="Edit discount"
-                        >
-                          <Pencil className="size-4" />
-                        </button>
-                        <button
-                          type="button"
-                          className="text-slate-500 transition-colors hover:text-slate-800"
-                          onClick={() => handleDeleteDiscount(disc.id)}
-                          aria-label="Delete discount"
-                        >
-                          <Trash2 className="size-4" />
-                        </button>
+                      <div className="mt-3 flex justify-end">
+                        <RowActionButtons
+                          onEdit={() => handleOpenEdit(disc)}
+                          onDelete={() => handleDeleteDiscount(disc.id)}
+                        />
                       </div>
                     </article>
                   ))}
@@ -267,9 +253,7 @@ export function DiscountsPage() {
                       <TableHead className="px-2 py-3">Campaign Name / Explanation</TableHead>
                       <TableHead className="px-2 py-3">Category</TableHead>
                       <TableHead className="px-2 py-3 text-center">Discount Percentage</TableHead>
-                      <TableHead className="sticky right-0 z-[1] bg-white px-2 py-3 text-right">
-                        Actions
-                      </TableHead>
+                      <TableActionsHead sticky />
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -293,22 +277,12 @@ export function DiscountsPage() {
                               {parseFloat(disc.percent)}% OFF
                             </Badge>
                           </TableCell>
-                          <TableCell className="sticky right-0 z-[1] space-x-3.5 bg-white px-2 py-3 text-right group-hover:bg-slate-50/80">
-                            <button
-                              type="button"
-                              className="inline-block align-middle text-slate-500 transition-colors hover:text-slate-800"
-                              onClick={() => handleOpenEdit(disc)}
-                            >
-                              <Pencil className="size-4" />
-                            </button>
-                            <button
-                              type="button"
-                              className="inline-block align-middle text-slate-500 transition-colors hover:text-slate-800"
-                              onClick={() => handleDeleteDiscount(disc.id)}
-                            >
-                              <Trash2 className="size-4" />
-                            </button>
-                          </TableCell>
+                          <TableActionsCell sticky>
+                            <RowActionButtons
+                              onEdit={() => handleOpenEdit(disc)}
+                              onDelete={() => handleDeleteDiscount(disc.id)}
+                            />
+                          </TableActionsCell>
                         </TableRow>
                       ))}
                   </TableBody>
@@ -382,8 +356,8 @@ export function DiscountsPage() {
               <Button
                 type="submit"
                 disabled={saving}
-                className="text-white w-full sm:w-auto"
-                style={{ backgroundColor: BRAND.purple }}
+                variant="brand"
+                className="w-full sm:w-auto"
               >
                 {saving ? 'Saving…' : 'Save Discount'}
               </Button>

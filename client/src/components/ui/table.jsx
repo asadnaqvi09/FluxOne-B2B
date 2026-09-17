@@ -12,8 +12,17 @@ function Table({ className, ...props }) {
   )
 }
 
+// Contrasting header band (TC-table header row colour-22a) — applies system-wide
 function TableHeader({ className, ...props }) {
-  return <thead className={cn('[&_tr]:border-b', className)} {...props} />
+  return (
+    <thead
+      className={cn(
+        '[&_tr]:border-b [&_tr]:bg-slate-200/80 [&_tr]:hover:bg-slate-200/80 [&_th]:bg-slate-200/80',
+        className,
+      )}
+      {...props}
+    />
+  )
 }
 
 function TableBody({ className, ...props }) {
@@ -29,7 +38,15 @@ function TableRow({ className, ...props }) {
 }
 
 function TableHead({ className, ...props }) {
-  return <th className={cn('h-12 px-4 text-left align-middle font-medium text-muted-foreground', className)} {...props} />
+  return (
+    <th
+      className={cn(
+        'h-12 bg-slate-200/80 px-4 text-left align-middle font-semibold text-slate-600',
+        className,
+      )}
+      {...props}
+    />
+  )
 }
 
 function TableCell({ className, ...props }) {
@@ -38,6 +55,38 @@ function TableCell({ className, ...props }) {
 
 function TableCaption({ className, ...props }) {
   return <caption className={cn('mt-4 text-sm text-muted-foreground', className)} {...props} />
+}
+
+// Actions column — shrink-to-fit + text-right so header & controls share the same edge
+// (avoids a stretched sticky column pushing icons to the far viewport end)
+function TableActionsHead({ className, sticky = false, children = 'Actions', ...props }) {
+  return (
+    <TableHead
+      className={cn(
+        'w-[1%] whitespace-nowrap px-2 py-3 text-right',
+        sticky && 'sticky right-0 z-[1]',
+        className,
+      )}
+      {...props}
+    >
+      {children}
+    </TableHead>
+  )
+}
+
+function TableActionsCell({ className, sticky = false, children, ...props }) {
+  return (
+    <TableCell
+      className={cn(
+        'w-[1%] whitespace-nowrap px-2 py-3 text-right',
+        sticky && 'sticky right-0 z-[1] bg-white group-hover:bg-slate-50/80',
+        className,
+      )}
+      {...props}
+    >
+      <div className="inline-flex items-center justify-end gap-2.5">{children}</div>
+    </TableCell>
+  )
 }
 
 /**
@@ -156,6 +205,8 @@ export {
   TableRow,
   TableCell,
   TableCaption,
+  TableActionsHead,
+  TableActionsCell,
   TablePagination,
   TablePagination as Pagination,
 }

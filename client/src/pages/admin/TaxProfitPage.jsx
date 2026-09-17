@@ -555,7 +555,7 @@ export function TaxProfitPage() {
                         <TableHead className="px-3 py-3 font-medium">Tax %</TableHead>
                       )}
                       {visibleColumns.finalPrice && (
-                        <TableHead className="sticky right-0 z-[1] bg-white px-3 py-3 text-right font-bold text-slate-900">
+                        <TableHead className="sticky right-0 z-[1] bg-slate-200/80 px-3 py-3 text-right font-bold text-slate-900">
                           Final Price
                         </TableHead>
                       )}

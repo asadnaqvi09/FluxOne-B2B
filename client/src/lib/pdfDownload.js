@@ -253,6 +253,8 @@ export function downloadBranchDashboardPdf({
   branchName = 'Branch',
   managerName = 'Branch Manager',
   date,
+  from,
+  to,
   kpis = {},
   dailySummary = {},
   topProducts = [],
@@ -266,7 +268,10 @@ export function downloadBranchDashboardPdf({
   const margin = 14
   let y = 18
 
-  const reportDate = date || new Date().toISOString().slice(0, 10)
+  const reportFrom = from || date || new Date().toISOString().slice(0, 10)
+  const reportTo = to || date || reportFrom
+  const rangeLabel =
+    reportFrom === reportTo ? reportFrom : `${reportFrom} → ${reportTo}`
   const generatedAt = new Date().toLocaleString()
   const company = String(companyName || 'Company').trim() || 'Company'
   const branch = String(branchName || 'Branch').trim() || 'Branch'
@@ -289,7 +294,7 @@ export function downloadBranchDashboardPdf({
   y += 5
   doc.text(`Branch Manager: ${managerName}`, margin, y)
   y += 5
-  doc.text(`Report date: ${reportDate}  |  Generated: ${generatedAt}`, margin, y)
+  doc.text(`Report range: ${rangeLabel}  |  Generated: ${generatedAt}`, margin, y)
   y += 4
   doc.setDrawColor(0, 0, 0)
   doc.setLineWidth(0.5)
@@ -427,7 +432,7 @@ export function downloadBranchDashboardPdf({
     { align: 'center' },
   )
 
-  const filename = `${safeFilename(`${company}_${branch}_Report_${reportDate}`)}.pdf`
+  const filename = `${safeFilename(`${company}_${branch}_Report_${reportFrom === reportTo ? reportFrom : `${reportFrom}_to_${reportTo}`}`)}.pdf`
   doc.save(filename)
   return { filename }
 }

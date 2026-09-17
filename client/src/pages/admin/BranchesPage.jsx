@@ -44,6 +44,7 @@ import { useAuthSession } from '@/hooks/useAuthSession'
 import { useDebouncedValue } from '@/hooks/useDebouncedValue'
 import { useFormBaseline } from '@/hooks/useFormBaseline'
 import { useClientPagination } from '@/hooks/useClientPagination'
+import { displayBranchRef } from '@/lib/formatDisplayId'
 import {
   Plus,
   Search,
@@ -57,7 +58,7 @@ import {
   KeyRound,
   Loader2,
   Trash2,
-  Eye,
+  Unlock,
   Pencil,
 } from 'lucide-react'
 
@@ -79,13 +80,6 @@ function formatCreatedAt(value) {
     hour: '2-digit',
     minute: '2-digit',
   })
-}
-
-function shortId(id) {
-  if (!id) return '—'
-  const raw = String(id).trim()
-  if (raw.length <= 20) return raw
-  return `${raw.slice(0, 8)}…${raw.slice(-6)}`
 }
 
 function managerAvatar(manager) {
@@ -153,14 +147,15 @@ function BranchRowActions({
 }) {
   const isOpen = b.status === 'open'
   return (
-    <div className="inline-flex items-center justify-end gap-0.5 sm:gap-1">
+    // Centered action icons with even spacing (TC--MANAGE BRANCH-0A1)
+    <div className="inline-flex items-center justify-center gap-1">
       <Button
         type="button"
         variant="ghost"
         size="icon"
         onClick={() => onEdit(b)}
         disabled={mutating}
-        title="Edit branch"
+        title="Edit"
         aria-label={`Edit ${b.name}`}
         className="size-8 text-purple-800 hover:bg-purple-50 hover:text-purple-950"
       >
@@ -173,8 +168,8 @@ function BranchRowActions({
           size="icon"
           onClick={() => onResetPassword(b)}
           disabled={mutating}
-          title="Email failed — reset & resend credentials"
-          aria-label={`Resend credentials for ${b.name}`}
+          title="Manage credentials"
+          aria-label={`Manage credentials for ${b.name}`}
           className="size-8 text-amber-700 hover:bg-amber-50 hover:text-amber-900"
         >
           <KeyRound className="size-4" />
@@ -186,15 +181,15 @@ function BranchRowActions({
         size="icon"
         onClick={() => onToggleStatus(b)}
         disabled={mutating}
-        title={isOpen ? 'Block (soft) — keeps data' : 'Open branch'}
-        aria-label={isOpen ? `Block ${b.name}` : `Open ${b.name}`}
+        title={isOpen ? 'Block' : 'Unblock'}
+        aria-label={isOpen ? `Block ${b.name}` : `Unblock ${b.name}`}
         className={`size-8 ${
           isOpen
             ? 'text-rose-600 hover:bg-rose-50 hover:text-rose-800'
             : 'text-emerald-700 hover:bg-emerald-50 hover:text-emerald-900'
         }`}
       >
-        {isOpen ? <Ban className="size-4" /> : <Eye className="size-4" />}
+        {isOpen ? <Ban className="size-4" /> : <Unlock className="size-4" />}
       </Button>
       <Button
         type="button"
@@ -202,7 +197,7 @@ function BranchRowActions({
         size="icon"
         onClick={() => onDelete(b)}
         disabled={mutating}
-        title="Delete permanently…"
+        title="Delete"
         aria-label={`Delete ${b.name}`}
         className="size-8 text-slate-500 hover:bg-slate-100 hover:text-slate-900"
       >
@@ -588,12 +583,13 @@ export function BranchesPage() {
                         <div className="flex items-start justify-between gap-2">
                           <div className="min-w-0">
                             <p className="truncate text-sm font-bold text-slate-900">{b.name}</p>
-                            <span
-                              title={b.id}
-                              className="mt-0.5 inline-flex items-center rounded border border-slate-200/80 bg-slate-100/80 px-2 py-0.5 font-mono text-[10px] font-medium text-slate-800"
+                            {/* Human-readable ID; title shows full UUID on hover */}
+                            <p
+                              title={b.id || undefined}
+                              className="mt-0.5 font-mono text-[11px] font-semibold text-purple-800"
                             >
-                              {shortId(b.id)}
-                            </span>
+                              {displayBranchRef(b)}
+                            </p>
                           </div>
                           <Badge
                             variant="outline"
@@ -664,7 +660,7 @@ export function BranchesPage() {
                         Manager
                       </TableHead>
                       <TableHead className="px-2 py-3 font-medium whitespace-nowrap sm:px-3">Status</TableHead>
-                      <TableHead className="sticky right-0 z-[1] bg-white px-2 py-3 text-right font-medium whitespace-nowrap sm:px-3">
+                      <TableHead className="sticky right-0 z-[1] bg-slate-200/80 px-2 py-3 text-center font-medium whitespace-nowrap sm:px-3">
                         Action
                       </TableHead>
                     </TableRow>
@@ -675,12 +671,13 @@ export function BranchesPage() {
                       const imageSrc = b.image || DEFAULT_BRANCH_IMAGE
                       return (
                         <TableRow key={b.id} className="group hover:bg-slate-50/80">
-                          <TableCell className="px-2 py-3 font-mono text-xs whitespace-nowrap sm:px-3">
+                          {/* Compact ID cell — aligned with other modules (no pill / truncation) */}
+                          <TableCell className="px-2 py-3 align-middle whitespace-nowrap sm:px-3">
                             <span
-                              title={b.id}
-                              className="inline-flex items-center font-mono text-xs font-medium text-slate-800 bg-slate-100/80 border border-slate-200/80 px-2 py-0.5 rounded select-all hover:bg-slate-200/60 transition-colors"
+                              title={b.id || undefined}
+                              className="font-mono text-xs font-bold text-purple-800 select-all"
                             >
-                              {shortId(b.id)}
+                              {displayBranchRef(b)}
                             </span>
                           </TableCell>
                           <TableCell className="px-2 py-3 whitespace-nowrap sm:px-3">
@@ -753,7 +750,7 @@ export function BranchesPage() {
                               {isOpen ? 'Open' : 'Blocked'}
                             </Badge>
                           </TableCell>
-                          <TableCell className="sticky right-0 z-[1] bg-white px-1.5 py-3 text-right whitespace-nowrap sm:px-3 group-hover:bg-slate-50/80">
+                          <TableCell className="sticky right-0 z-[1] bg-white px-1.5 py-3 text-center whitespace-nowrap sm:px-3 group-hover:bg-slate-50/80">
                             <BranchRowActions
                               branch={b}
                               mutating={mutating}

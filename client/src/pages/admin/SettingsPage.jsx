@@ -530,7 +530,7 @@ export function SettingsPage() {
                               Assigned User
                             </TableHead>
                             <TableHead className="px-4 py-3 font-medium">Status & Activity</TableHead>
-                            <TableHead className="sticky right-0 z-[1] bg-white px-4 py-3 text-right font-medium">
+                            <TableHead className="sticky right-0 z-[1] bg-slate-200/80 px-4 py-3 text-right font-medium">
                               Action
                             </TableHead>
                           </TableRow>

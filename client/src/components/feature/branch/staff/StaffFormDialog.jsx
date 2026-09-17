@@ -14,7 +14,6 @@ import { Label } from '@/components/ui/label'
 import { NativeSelect } from '@/components/ui/select'
 import { ImageUploadField } from '@/components/shared/ImageUploadField'
 import { TimePicker } from '@/components/shared/TimePicker'
-import { BRAND } from '@/lib/constants'
 import {
   getBranchHoursSoftWarning,
   validateStaffForm,
@@ -327,8 +326,8 @@ export function StaffFormDialog({
             <Button
               type="submit"
               disabled={loading}
-              style={{ background: BRAND.purple }}
-              className="w-full text-white hover:opacity-90 sm:w-auto"
+              variant="brand"
+              className="w-full sm:w-auto"
             >
               {loading ? 'Saving…' : isEdit ? 'Save changes' : 'Add Staff'}
             </Button>

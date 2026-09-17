@@ -106,9 +106,9 @@ export function ConfirmDialog({
             type="button"
             disabled={loading}
             className={cn(
-              'h-11 w-full cursor-pointer px-4 font-semibold text-white shadow-xs transition-colors sm:h-10 sm:w-auto sm:min-w-[7.5rem]',
+              'h-11 w-full cursor-pointer px-4 font-semibold text-white shadow-sm transition-all duration-200 ease-out hover:-translate-y-0.5 hover:shadow-md hover:brightness-110 active:translate-y-0 active:scale-[0.98] sm:h-10 sm:w-auto sm:min-w-[7.5rem]',
               variant === 'destructive'
-                ? 'bg-red-600 hover:bg-red-700 active:bg-red-800'
+                ? 'bg-red-600 hover:bg-red-700'
                 : 'bg-purple-700 hover:bg-purple-800',
             )}
             onClick={() => onConfirm?.()}

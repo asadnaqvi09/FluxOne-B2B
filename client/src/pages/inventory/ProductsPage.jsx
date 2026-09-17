@@ -219,8 +219,7 @@ export function ProductsPage() {
             <>
               <Button
                 type="button"
-                className="cursor-pointer text-white"
-                style={{ background: BRAND.purple }}
+                variant="brand"
                 onClick={() => openCreate(PRODUCT_TYPES.SINGLE)}
               >
                 <Plus className="size-4" />
@@ -228,8 +227,7 @@ export function ProductsPage() {
               </Button>
               <Button
                 type="button"
-                className="cursor-pointer text-white"
-                style={{ background: BRAND.purple }}
+                variant="brand"
                 onClick={() => openCreate(PRODUCT_TYPES.BUNDLE)}
               >
                 <Plus className="size-4" />

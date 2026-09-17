@@ -11,8 +11,6 @@ import { StaffAttendanceTab } from '@/components/feature/branch/staff/StaffAtten
 import { StaffHolidaysTab } from '@/components/feature/branch/staff/StaffHolidaysTab'
 import { StaffLeavesTab } from '@/components/feature/branch/staff/StaffLeavesTab'
 import { StaffPerformanceTab } from '@/components/feature/branch/staff/StaffPerformanceTab'
-// Phase 1 deferred — restore Create Designation when custom designation assignment ships
-// import { DesignationFormDialog } from '@/components/feature/branch/designations/DesignationFormDialog'
 import { Button } from '@/components/ui/button'
 import { useBranchStaff } from '@/hooks/useBranchStaff'
 import { useDebouncedSearch } from '@/hooks/useDebouncedSearch'
@@ -47,8 +45,13 @@ export function StaffPage() {
   const [statusTarget, setStatusTarget] = useState(null)
   const [statusUpdatingId, setStatusUpdatingId] = useState(null)
   const [designations, setDesignations] = useState([])
-  // const [designationOpen, setDesignationOpen] = useState(false)
   const [activeTab, setActiveTab] = useState('list')
+
+  // Tab-specific create modals (header CTA opens these)
+  const [holidayCreateOpen, setHolidayCreateOpen] = useState(false)
+  const [leaveCreateOpen, setLeaveCreateOpen] = useState(false)
+  const [scaleCreateOpen, setScaleCreateOpen] = useState(false)
+  const [performanceSubTab, setPerformanceSubTab] = useState('roster')
 
   async function loadDesignations() {
     const res = await apiClient.get(endpoints.branch.designations.list, {
@@ -63,6 +66,14 @@ export function StaffPage() {
   useEffect(() => {
     void loadDesignations()
   }, [])
+
+  // Close create dialogs when leaving their tab
+  useEffect(() => {
+    setHolidayCreateOpen(false)
+    setLeaveCreateOpen(false)
+    setScaleCreateOpen(false)
+    if (activeTab !== 'performance') setPerformanceSubTab('roster')
+  }, [activeTab])
 
   function openCreate() {
     setFormMode('create')
@@ -95,7 +106,7 @@ export function StaffPage() {
     try {
       const result = await setStaffStatus(row.id, status)
       if (!result.success) toastError(result.error || 'Status update failed')
-      else toastSuccess(status === 'inactive' ? 'Staff deactivated' : 'Staff activated')
+      else toastSuccess(status === 'inactive' ? 'Staff blocked' : 'Staff opened')
     } finally {
       setStatusUpdatingId(null)
     }
@@ -135,6 +146,62 @@ export function StaffPage() {
   const deleteStaffIsActive =
     deleteTarget?.status === 'active' || deleteTarget?.status === 'open'
 
+  function renderHeaderActions() {
+    if (activeTab === 'list') {
+      return (
+        <Button type="button" variant="brand" onClick={openCreate} className="w-full sm:w-auto">
+          <Plus className="size-4" />
+          Add Staff
+        </Button>
+      )
+    }
+
+    if (activeTab === 'holidays') {
+      return (
+        <Button
+          type="button"
+          variant="brand"
+          onClick={() => setHolidayCreateOpen(true)}
+          className="w-full sm:w-auto"
+        >
+          <Plus className="size-4" />
+          Add Holidays
+        </Button>
+      )
+    }
+
+    if (activeTab === 'leaves') {
+      return (
+        <Button
+          type="button"
+          variant="brand"
+          onClick={() => setLeaveCreateOpen(true)}
+          className="w-full sm:w-auto"
+        >
+          <Plus className="size-4" />
+          Add Leaves
+        </Button>
+      )
+    }
+
+    if (activeTab === 'performance' && performanceSubTab === 'scales') {
+      return (
+        <Button
+          type="button"
+          variant="brand"
+          onClick={() => setScaleCreateOpen(true)}
+          className="w-full sm:w-auto"
+        >
+          <Plus className="size-4" />
+          Add Scale
+        </Button>
+      )
+    }
+
+    // Attendance + Performance Roster: no header CTA
+    return null
+  }
+
   return (
     <div className="space-y-5 pb-8 sm:space-y-6">
       <MotionHeader>
@@ -142,17 +209,7 @@ export function StaffPage() {
           eyebrow="Branch Team"
           title="Staff Management"
           description="Manage branch staff roles for this location (Inventory Manager, Cashier, Website Manager, and more)."
-          actions={
-            <Button
-              type="button"
-              onClick={openCreate}
-              style={{ background: BRAND.purple }}
-              className="w-full text-white hover:opacity-90 sm:w-auto"
-            >
-              <Plus className="size-4" />
-              Add Staff
-            </Button>
-          }
+          actions={renderHeaderActions()}
         />
       </MotionHeader>
 
@@ -162,13 +219,12 @@ export function StaffPage() {
         </p>
       ) : null}
 
-      <div className="flex flex-wrap items-center gap-2 mb-6">
+      <div className="mb-6 flex flex-wrap items-center gap-2">
         {[
           { id: 'list', label: 'Staff Roster' },
           { id: 'attendance', label: 'Attendance' },
           { id: 'holidays', label: 'Holidays' },
           { id: 'leaves', label: 'Leaves' },
-          // Hidden for now — restore when Performance scoring is ready for demo
           { id: 'performance', label: 'Performance' },
         ].map((tab) => {
           const active = activeTab === tab.id
@@ -230,23 +286,36 @@ export function StaffPage() {
 
       {activeTab === 'holidays' && (
         <MotionReveal delay={0.04}>
-          <StaffHolidaysTab designations={designations} staff={items} />
+          <StaffHolidaysTab
+            designations={designations}
+            staff={items}
+            createOpen={holidayCreateOpen}
+            onCreateOpenChange={setHolidayCreateOpen}
+          />
         </MotionReveal>
       )}
 
       {activeTab === 'leaves' && (
         <MotionReveal delay={0.04}>
-          <StaffLeavesTab designations={designations} staff={items} />
+          <StaffLeavesTab
+            designations={designations}
+            staff={items}
+            createOpen={leaveCreateOpen}
+            onCreateOpenChange={setLeaveCreateOpen}
+          />
         </MotionReveal>
       )}
 
-      {/* Hidden for now — restore with Performance tab above when ready */}
       {activeTab === 'performance' && (
         <MotionReveal delay={0.04}>
-          <StaffPerformanceTab designations={designations} />
+          <StaffPerformanceTab
+            designations={designations}
+            createOpen={scaleCreateOpen}
+            onCreateOpenChange={setScaleCreateOpen}
+            onSubTabChange={setPerformanceSubTab}
+          />
         </MotionReveal>
       )}
-     
 
       <StaffFormDialog
         open={formOpen}
@@ -257,28 +326,18 @@ export function StaffPage() {
         onSubmit={handleSubmit}
       />
 
-      {/* Phase 1 deferred — restore with Create Designation button when ready
-      <DesignationFormDialog
-        open={designationOpen}
-        onOpenChange={setDesignationOpen}
-        onSubmitSuccess={() => {
-          void loadDesignations()
-        }}
-      />
-      */}
-
       <ConfirmDialog
         open={Boolean(statusTarget)}
         onOpenChange={(open) => {
           if (!open) setStatusTarget(null)
         }}
-        title="Deactivate staff?"
+        title="Block staff?"
         description={
           statusTarget
-            ? `${statusTarget.fullName || statusTarget.email} will be blocked from logging in. You can reactivate them later.`
+            ? `${statusTarget.fullName || statusTarget.email} will be blocked from logging in. You can open access again later.`
             : undefined
         }
-        confirmLabel="Deactivate"
+        confirmLabel="Block"
         loading={mutating}
         onConfirm={handleConfirmDeactivate}
       />

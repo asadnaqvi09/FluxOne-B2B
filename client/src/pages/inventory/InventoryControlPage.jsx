@@ -158,8 +158,7 @@ function ControlTabPanel({ tab }) {
         {canAdd ? (
           <Button
             type="button"
-            className="cursor-pointer text-white"
-            style={{ background: BRAND.purple }}
+            variant="brand"
             onClick={() => setAddOpen(true)}
           >
             <Plus className="size-4" />

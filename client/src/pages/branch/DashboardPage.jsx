@@ -22,10 +22,13 @@ import { toastError, toastSuccess } from '@/lib/toast'
 import { cn } from '@/lib/utils'
 
 export function DashboardPage() {
-  const { data, date, setDate, loading } = useBranchDashboard()
+  const { data, date, from, to, setRange, loading } = useBranchDashboard()
   const { user } = useAuthSession()
   const pdfBusyRef = useRef(false)
   const [pdfBusy, setPdfBusy] = useState(false)
+
+  // Max selectable day = today (no future dates)
+  const today = new Date().toISOString().slice(0, 10)
 
   async function handleDownloadPDF() {
     if (pdfBusyRef.current) return
@@ -38,6 +41,8 @@ export function DashboardPage() {
         branchName: data.branchName || user?.branchName || 'Branch',
         managerName: user?.name || 'Branch Manager',
         date,
+        from,
+        to,
         kpis: data.kpis || {},
         dailySummary: data.dailySummary || {},
         topProducts: data.topProducts || [],
@@ -69,16 +74,32 @@ export function DashboardPage() {
           description="Sales, profit, staff & inventory overview"
           actions={
             <div className="flex flex-wrap items-center gap-2.5">
-              <label className="flex items-center gap-2 rounded-xl border border-border bg-white px-3 py-2 text-xs sm:text-sm shadow-2xs">
+              {/* From / To — same day allowed; future dates blocked */}
+              <div className="flex flex-wrap items-center gap-2 rounded-xl border border-border bg-white px-3 py-2 text-xs sm:text-sm shadow-2xs">
                 <Calendar className="size-4 text-purple-700 shrink-0" />
-                <span className="shrink-0 text-slate-500 font-medium">Date</span>
-                <input
-                  type="date"
-                  value={date}
-                  onChange={(event) => setDate(event.target.value)}
-                  className="min-w-0 border-0 bg-transparent font-semibold text-slate-900 outline-none"
-                />
-              </label>
+                <label className="inline-flex items-center gap-1.5">
+                  <span className="shrink-0 text-slate-500 font-medium">From</span>
+                  <input
+                    type="date"
+                    value={from}
+                    max={to || today}
+                    onChange={(event) => setRange({ from: event.target.value })}
+                    className="min-w-0 border-0 bg-transparent font-semibold text-slate-900 outline-none"
+                  />
+                </label>
+                <span className="text-slate-300">–</span>
+                <label className="inline-flex items-center gap-1.5">
+                  <span className="shrink-0 text-slate-500 font-medium">To</span>
+                  <input
+                    type="date"
+                    value={to}
+                    min={from || undefined}
+                    max={today}
+                    onChange={(event) => setRange({ to: event.target.value })}
+                    className="min-w-0 border-0 bg-transparent font-semibold text-slate-900 outline-none"
+                  />
+                </label>
+              </div>
 
               <Button
                 type="button"

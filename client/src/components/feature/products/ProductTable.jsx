@@ -248,7 +248,7 @@ export function ProductTable({
                           type="button"
                           size="icon"
                           variant="ghost"
-                          className="cursor-pointer"
+                          className="cursor-pointer text-slate-500 hover:bg-slate-100 hover:text-slate-900 hover:scale-110"
                           title="Edit"
                           onClick={() => onEdit?.(row)}
                         >
@@ -258,7 +258,7 @@ export function ProductTable({
                           type="button"
                           size="icon"
                           variant="ghost"
-                          className="cursor-pointer text-red-600 hover:text-red-700"
+                          className="cursor-pointer text-slate-500 hover:bg-rose-50 hover:text-rose-700 hover:scale-110"
                           title="Delete"
                           onClick={() => onDelete?.(row)}
                         >

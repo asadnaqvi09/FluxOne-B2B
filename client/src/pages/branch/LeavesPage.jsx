@@ -1,7 +1,9 @@
 import { useEffect, useState } from 'react'
+import { Plus } from 'lucide-react'
 import { PageHeader } from '@/components/shared/PageHeader'
 import { MotionHeader, MotionReveal } from '@/components/shared/MotionReveal'
 import { StaffLeavesTab } from '@/components/feature/branch/staff/StaffLeavesTab'
+import { Button } from '@/components/ui/button'
 import { apiClient } from '@/api/api'
 import { endpoints } from '@/api/endpoints'
 
@@ -9,6 +11,7 @@ export function LeavesPage() {
   const [designations, setDesignations] = useState([])
   const [staff, setStaff] = useState([])
   const [loading, setLoading] = useState(false)
+  const [createOpen, setCreateOpen] = useState(false)
 
   const loadData = async () => {
     setLoading(true)
@@ -37,17 +40,34 @@ export function LeavesPage() {
           eyebrow="Roster Operations"
           title="Leave Management"
           description="Approve and record leave requests for single or multiple employees."
+          actions={
+            <Button
+              type="button"
+              variant="brand"
+              onClick={() => setCreateOpen(true)}
+              className="w-full sm:w-auto"
+            >
+              <Plus className="size-4" />
+              Add Leaves
+            </Button>
+          }
         />
       </MotionHeader>
 
       <MotionReveal>
         {loading ? (
-          <p className="text-center py-8 text-slate-400">Loading leave roster...</p>
+          <p className="py-8 text-center text-slate-400">Loading leave roster...</p>
         ) : (
-          <StaffLeavesTab designations={designations} staff={staff} />
+          <StaffLeavesTab
+            designations={designations}
+            staff={staff}
+            createOpen={createOpen}
+            onCreateOpenChange={setCreateOpen}
+          />
         )}
       </MotionReveal>
     </div>
   )
 }
+
 export default LeavesPage

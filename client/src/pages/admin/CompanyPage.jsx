@@ -8,6 +8,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
+import { Checkbox } from '@/components/ui/checkbox'
 import { NativeSelect } from '@/components/ui/select'
 import {
   Dialog,
@@ -119,6 +120,7 @@ export function CompanyPage() {
     name: '',
     detail: '',
     category: 'Retail Operations',
+    printOnSlip: false,
   })
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false)
   const [deleteTargetPolicy, setDeleteTargetPolicy] = useState(null)
@@ -131,6 +133,7 @@ export function CompanyPage() {
     error: policiesError,
     createPolicy,
     updatePolicy,
+    setPrintOnSlip,
     deletePolicy,
   } = useAdminPolicies({ limit: 100 })
 
@@ -227,7 +230,12 @@ export function CompanyPage() {
 
   function handleOpenAddPolicy() {
     setEditingPolicy(null)
-    setPolicyForm({ name: '', detail: '', category: 'Retail Operations' })
+    setPolicyForm({
+      name: '',
+      detail: '',
+      category: 'Retail Operations',
+      printOnSlip: false,
+    })
     setPolicyDialogOpen(true)
   }
 
@@ -237,6 +245,7 @@ export function CompanyPage() {
       name: policy.name,
       detail: policy.detail,
       category: policy.category || 'Retail Operations',
+      printOnSlip: Boolean(policy.printOnSlip),
     })
     setPolicyDialogOpen(true)
   }
@@ -256,6 +265,19 @@ export function CompanyPage() {
     toastSuccess(`Policy "${deleteTargetPolicy.name}" deleted successfully`)
     setDeleteTargetPolicy(null)
     setDeleteConfirmOpen(false)
+  }
+
+  async function handleTogglePrintOnSlip(policy, next) {
+    const result = await setPrintOnSlip(policy.id, next)
+    if (!result.success) {
+      toastError(result.error || 'Failed to update print-on-slip setting')
+      return
+    }
+    toastSuccess(
+      next
+        ? `"${policy.name}" will print on POS slips`
+        : `"${policy.name}" removed from POS slips`,
+    )
   }
 
   async function handleSubmitPolicy(e) {
@@ -597,10 +619,12 @@ export function CompanyPage() {
                 <PoliciesTable
                   items={filteredPolicies}
                   loading={false}
+                  mutating={policiesMutating}
                   categoryConfig={CATEGORY_CONFIG}
                   onView={setViewPolicy}
                   onEdit={handleOpenEditPolicy}
                   onDelete={handlePromptDelete}
+                  onTogglePrintOnSlip={handleTogglePrintOnSlip}
                 />
               )}
             </div>
@@ -643,6 +667,14 @@ export function CompanyPage() {
           <div className="rounded-xl border border-slate-100 bg-slate-50/80 p-4 text-sm leading-relaxed text-slate-700">
             <p className="whitespace-pre-line">{viewPolicy?.detail}</p>
           </div>
+          {viewPolicy ? (
+            <p className="text-xs text-slate-500">
+              Print on slip:{' '}
+              <strong className={viewPolicy.printOnSlip ? 'text-emerald-700' : 'text-slate-600'}>
+                {viewPolicy.printOnSlip ? 'On' : 'Off'}
+              </strong>
+            </p>
+          ) : null}
           <DialogFooter>
             <DialogCancelButton />
             <Button
@@ -720,6 +752,28 @@ export function CompanyPage() {
                 required
               />
             </div>
+
+            <label
+              htmlFor="polPrintOnSlip"
+              className="flex cursor-pointer items-start gap-3 rounded-xl border border-slate-200 bg-slate-50/80 px-3 py-3"
+            >
+              <Checkbox
+                id="polPrintOnSlip"
+                checked={Boolean(policyForm.printOnSlip)}
+                onChange={(e) =>
+                  setPolicyForm({ ...policyForm, printOnSlip: e.target.checked })
+                }
+                className="mt-0.5"
+              />
+              <span className="min-w-0">
+                <span className="block text-sm font-semibold text-slate-900">
+                  Print on slip / invoice
+                </span>
+                <span className="mt-0.5 block text-xs text-slate-500">
+                  When enabled, this policy syncs to POS and prints on the customer receipt after a sale.
+                </span>
+              </span>
+            </label>
 
             <DialogFooter className="pt-2">
               <DialogCancelButton disabled={policiesMutating} />

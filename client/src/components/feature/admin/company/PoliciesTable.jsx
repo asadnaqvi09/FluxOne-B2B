@@ -6,9 +6,11 @@ import {
   Trash2,
   FileText,
   ArrowDownUp,
+  Printer,
 } from 'lucide-react'
 import { DataCard, ResponsiveDataShell } from '@/components/shared/ResponsiveDataShell'
 import { EmptyState } from '@/components/shared/EmptyState'
+import { EntityStatusToggle } from '@/components/shared/EntityStatusToggle'
 import { SurfaceCard } from '@/components/shared/SurfaceCard'
 import { Badge } from '@/components/ui/badge'
 import {
@@ -139,13 +141,16 @@ function SortableHead({ label, active, direction, onClick, className }) {
 export function PoliciesTable({
   items = [],
   loading = false,
+  mutating = false,
   categoryConfig = {},
   onView,
   onEdit,
   onDelete,
+  onTogglePrintOnSlip,
 }) {
   const [sortKey, setSortKey] = useState('updatedAt')
   const [sortDir, setSortDir] = useState('desc')
+  const [togglingId, setTogglingId] = useState(null)
 
   const sorted = useMemo(() => {
     const list = [...(items || [])]
@@ -165,6 +170,11 @@ export function PoliciesTable({
       if (sortKey === 'status') {
         const av = a.isActive === false ? 0 : 1
         const bv = b.isActive === false ? 0 : 1
+        return (av - bv) * dir
+      }
+      if (sortKey === 'printOnSlip') {
+        const av = a.printOnSlip ? 1 : 0
+        const bv = b.printOnSlip ? 1 : 0
         return (av - bv) * dir
       }
       const at = new Date(a.updatedAt || a.createdAt || 0).getTime()
@@ -187,12 +197,19 @@ export function PoliciesTable({
     setPage(1)
   }
 
+  async function handleTogglePrint(policy, next) {
+    if (!onTogglePrintOnSlip) return
+    setTogglingId(policy.id)
+    await onTogglePrintOnSlip(policy, next)
+    setTogglingId(null)
+  }
+
   const isEmpty = !loading && total === 0
 
   return (
     <SurfaceCard
       title="Policies & Governance"
-      description="Corporate protocols enforced across branch portals"
+      description="Corporate protocols enforced across branch portals. Toggle Print on Slip to show a policy on POS invoices."
     >
       {loading ? (
         <p className="py-10 text-center text-sm text-slate-400">Loading policies…</p>
@@ -226,13 +243,22 @@ export function PoliciesTable({
                   </div>
                   <div className="mt-3 flex flex-wrap items-center gap-2 text-xs text-slate-500">
                     <StatusBadge active={p.isActive} />
+                    <EntityStatusToggle
+                      active={Boolean(p.printOnSlip)}
+                      loading={mutating && togglingId === p.id}
+                      onChange={(next) => handleTogglePrint(p, next)}
+                      activeLabel="Print on slip"
+                      inactiveLabel="Slip off"
+                      activeTitle="Click to hide this policy on POS invoices"
+                      inactiveTitle="Click to print this policy on POS invoices"
+                    />
                     <span>{formatPolicyUpdatedAt(p.updatedAt || p.createdAt)}</span>
                   </div>
                 </DataCard>
               )
             })}
             desktop={
-              <Table className="min-w-[52rem] text-left text-sm">
+              <Table className="min-w-[58rem] text-left text-sm">
                 <TableHeader>
                   <TableRow className="text-xs tracking-wide text-slate-500 uppercase">
                     <SortableHead
@@ -258,6 +284,12 @@ export function PoliciesTable({
                       active={sortKey === 'status'}
                       direction={sortDir}
                       onClick={() => toggleSort('status')}
+                    />
+                    <SortableHead
+                      label="Print on Slip"
+                      active={sortKey === 'printOnSlip'}
+                      direction={sortDir}
+                      onClick={() => toggleSort('printOnSlip')}
                     />
                     <SortableHead
                       label="Last Updated"
@@ -286,6 +318,25 @@ export function PoliciesTable({
                         </TableCell>
                         <TableCell className="px-3 py-3">
                           <StatusBadge active={p.isActive} />
+                        </TableCell>
+                        <TableCell className="px-3 py-3">
+                          <div className="inline-flex items-center gap-1.5">
+                            <Printer
+                              className={cn(
+                                'size-3.5',
+                                p.printOnSlip ? 'text-emerald-600' : 'text-slate-300',
+                              )}
+                            />
+                            <EntityStatusToggle
+                              active={Boolean(p.printOnSlip)}
+                              loading={mutating && togglingId === p.id}
+                              onChange={(next) => handleTogglePrint(p, next)}
+                              activeLabel="On"
+                              inactiveLabel="Off"
+                              activeTitle="Click to hide this policy on POS invoices"
+                              inactiveTitle="Click to print this policy on POS invoices"
+                            />
+                          </div>
                         </TableCell>
                         <TableCell className="px-3 py-3 whitespace-nowrap text-slate-600">
                           {formatPolicyUpdatedAt(p.updatedAt || p.createdAt)}

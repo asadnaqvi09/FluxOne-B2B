@@ -46,6 +46,10 @@ export function mapSnapshotForPos(snapshot) {
         ...snapshot.company,
         phone: snapshot.company.contactPhone ?? snapshot.company.phone ?? null,
         address: snapshot.company.address ?? null,
+        // Pass through slip policies for POS invoice footer
+        slipPolicies: Array.isArray(snapshot.company.slipPolicies)
+          ? snapshot.company.slipPolicies
+          : snapshot.policies || [],
       }
     : snapshot.company
 
@@ -55,6 +59,7 @@ export function mapSnapshotForPos(snapshot) {
     products,
     taxes,
     productTaxes,
+    policies: snapshot.policies || company?.slipPolicies || [],
     company,
   }
 }

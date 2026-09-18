@@ -24,44 +24,32 @@ export function ConfirmDialog({
   variant = 'destructive',
   icon: CustomIcon,
 }) {
-  function renderIcon() {
-    if (CustomIcon) {
-      return (
-        <div className="flex size-9 shrink-0 items-center justify-center rounded-full bg-red-600 text-white shadow-xs sm:size-11">
-          <CustomIcon className="size-4 sm:size-5.5" />
-        </div>
-      )
-    }
-
-    if (variant === 'destructive') {
-      return (
-        <div className="flex size-9 shrink-0 items-center justify-center rounded-full bg-red-600 text-white shadow-xs sm:size-11">
-          <Trash2 className="size-4 sm:size-5.5" />
-        </div>
-      )
-    }
-
-    if (variant === 'warning') {
-      return (
-        <div className="flex size-9 shrink-0 items-center justify-center rounded-full bg-amber-500 text-white shadow-xs sm:size-11">
-          <AlertTriangle className="size-4 sm:size-5.5" />
-        </div>
-      )
-    }
-
-    if (variant === 'success') {
-      return (
-        <div className="flex size-9 shrink-0 items-center justify-center rounded-full bg-emerald-600 text-white shadow-xs sm:size-11">
-          <CheckCircle2 className="size-4 sm:size-5.5" />
-        </div>
-      )
-    }
-
+  function iconShell(toneClass, Icon) {
     return (
-      <div className="flex size-9 shrink-0 items-center justify-center rounded-full bg-purple-600 text-white shadow-xs sm:size-11">
-        <HelpCircle className="size-4 sm:size-5.5" />
+      <div
+        className={cn(
+          'flex size-9 shrink-0 items-center justify-center rounded-full text-white shadow-xs sm:size-11',
+          toneClass,
+        )}
+      >
+        <Icon className="size-4 sm:size-5.5" />
       </div>
     )
+  }
+
+  function renderIcon() {
+    // Custom icon keeps the variant tone (e.g. Ban for block = red, Unlock = purple)
+    if (CustomIcon) {
+      if (variant === 'destructive') return iconShell('bg-red-600', CustomIcon)
+      if (variant === 'warning') return iconShell('bg-amber-500', CustomIcon)
+      if (variant === 'success') return iconShell('bg-emerald-600', CustomIcon)
+      return iconShell('bg-purple-600', CustomIcon)
+    }
+
+    if (variant === 'destructive') return iconShell('bg-red-600', Trash2)
+    if (variant === 'warning') return iconShell('bg-amber-500', AlertTriangle)
+    if (variant === 'success') return iconShell('bg-emerald-600', CheckCircle2)
+    return iconShell('bg-purple-600', HelpCircle)
   }
 
   return (

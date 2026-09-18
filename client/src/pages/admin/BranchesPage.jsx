@@ -1041,6 +1041,8 @@ export function BranchesPage() {
           )
         }
         confirmLabel={targetBranch?.status === 'open' ? 'Yes, Block Branch' : 'Yes, Open Branch'}
+        // Block uses Ban (not trash); open uses Unlock
+        icon={targetBranch?.status === 'open' ? Ban : Unlock}
         variant={targetBranch?.status === 'open' ? 'destructive' : 'default'}
         loading={mutating}
         onConfirm={handleConfirmToggleStatus}

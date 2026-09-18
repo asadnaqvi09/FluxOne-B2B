@@ -1,16 +1,24 @@
-import { Pencil, Trash2 } from 'lucide-react'
+import { Eye, Pencil, Trash2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
 
 // Reusable row action CTAs with hover scale / color feedback.
 const ACTION_STYLES = {
+  view: 'text-slate-500 hover:bg-slate-100 hover:text-slate-900 hover:scale-110 active:scale-95',
   edit: 'text-slate-500 hover:bg-slate-100 hover:text-slate-900 hover:scale-110 active:scale-95',
   delete: 'text-slate-500 hover:bg-rose-50 hover:text-rose-700 hover:scale-110 active:scale-95',
 }
 
 const ACTION_ICONS = {
+  view: Eye,
   edit: Pencil,
   delete: Trash2,
+}
+
+const ACTION_LABELS = {
+  view: 'View',
+  edit: 'Edit',
+  delete: 'Delete',
 }
 
 export function ActionIconButton({
@@ -25,6 +33,7 @@ export function ActionIconButton({
 }) {
   const Icon = ACTION_ICONS[action] || Pencil
   const tone = ACTION_STYLES[action] || ACTION_STYLES.edit
+  const resolvedLabel = label || ACTION_LABELS[action] || 'Edit'
 
   return (
     <Button
@@ -32,8 +41,8 @@ export function ActionIconButton({
       variant="ghost"
       size="icon"
       disabled={disabled}
-      aria-label={label || (action === 'delete' ? 'Delete' : 'Edit')}
-      title={label || (action === 'delete' ? 'Delete' : 'Edit')}
+      aria-label={resolvedLabel}
+      title={resolvedLabel}
       onClick={onClick}
       className={cn('cursor-pointer', tone, className)}
       {...props}

@@ -10,32 +10,41 @@ function slugify(text) {
     .replace(/^-+|-+$/g, '')
 }
 
-// All scoring criteria for a tenant share a fixed 100-point budget.
-const SCALE_POINTS_BUDGET = 100
-const SCALE_SCORE_RANGE_MSG = 'Score must be between 0 and 100.'
-const SCALE_TOTAL_LIMIT_MSG =
-  'Total scoring points cannot exceed 100. Please reduce the score points before saving.'
+const SCALE_MAX_POINTS_MSG = 'Maximum points must be a whole number greater than 0.'
+
+// Final % = (Σ actual / Σ max) × 100 — missing actual treated as 0 via numerator.
+const WEIGHTED_RATING_SQL = `
+  COALESCE(
+    ROUND(
+      (
+        COALESCE((
+          SELECT SUM(lp.points)::numeric
+          FROM (
+            SELECT DISTINCT ON (ps.scale_id) ps.points
+            FROM performance_scores ps
+            INNER JOIN scoring_scales ss_live
+              ON ss_live.id = ps.scale_id AND ss_live.tenant_id = ps.tenant_id
+            WHERE ps.staff_id = s.id AND ps.tenant_id = s.tenant_id
+            ORDER BY ps.scale_id, ps.scored_on DESC, ps.id DESC
+          ) lp
+        ), 0)
+        /
+        NULLIF((
+          SELECT SUM(ss_all.max_points)::numeric
+          FROM scoring_scales ss_all
+          WHERE ss_all.tenant_id = s.tenant_id
+        ), 0)
+      ) * 100
+    , 2)
+  , 0)
+`
 
 function parseMaxPoints(raw) {
   const points = Number(raw)
-  if (!Number.isFinite(points) || !Number.isInteger(points) || points < 0 || points > 100) {
-    return { ok: false, error: SCALE_SCORE_RANGE_MSG }
+  if (!Number.isFinite(points) || !Number.isInteger(points) || points < 1) {
+    return { ok: false, error: SCALE_MAX_POINTS_MSG }
   }
   return { ok: true, value: points }
-}
-
-async function getAllocatedPoints(tenantId, excludeId = null) {
-  const { rows } = await tenantQuery(
-    tenantId,
-    `
-      SELECT COALESCE(SUM(max_points), 0)::int AS total
-      FROM scoring_scales
-      WHERE tenant_id = $1
-        AND ($2::uuid IS NULL OR id <> $2::uuid)
-    `,
-    [excludeId],
-  )
-  return Number(rows[0]?.total) || 0
 }
 
 export async function listScales(req, res) {
@@ -55,21 +64,7 @@ export async function createScale(req, res) {
   const parsed = parseMaxPoints(maxPoints)
   if (!parsed.ok) return fail(res, parsed.error, 400)
   const points = parsed.value
-
   const code = slugify(name)
-
-  // If code already exists, upsert updates that row — exclude it from the budget sum
-  const { rows: existingRows } = await tenantQuery(
-    req.tenantId,
-    `SELECT id FROM scoring_scales WHERE tenant_id = $1 AND code = $2 LIMIT 1`,
-    [code],
-  )
-  const excludeId = existingRows[0]?.id || null
-
-  const allocated = await getAllocatedPoints(req.tenantId, excludeId)
-  if (allocated + points > SCALE_POINTS_BUDGET) {
-    return fail(res, SCALE_TOTAL_LIMIT_MSG, 400)
-  }
 
   try {
     const { rows } = await tenantQuery(
@@ -99,13 +94,6 @@ export async function updateScale(req, res) {
   const parsed = parseMaxPoints(maxPoints)
   if (!parsed.ok) return fail(res, parsed.error, 400)
   const points = parsed.value
-
-  // Exclude current scale so its points can be redistributed within the 100 budget
-  const allocated = await getAllocatedPoints(req.tenantId, id)
-  if (allocated + points > SCALE_POINTS_BUDGET) {
-    return fail(res, SCALE_TOTAL_LIMIT_MSG, 400)
-  }
-
   const code = slugify(name)
 
   try {
@@ -132,6 +120,7 @@ export async function updateScale(req, res) {
 export async function deleteScale(req, res) {
   const { id } = req.params
   try {
+    // Drop related scores so deleted factors leave the weighted calc
     await tenantQuery(
       req.tenantId,
       `DELETE FROM performance_scores WHERE tenant_id = $1 AND scale_id = $2`,
@@ -157,7 +146,33 @@ export async function scoreStaff(req, res) {
     return fail(res, 'Staff ID, scale ID, and points are required', 400)
   }
 
+  const numericPoints = Number(points)
+  if (!Number.isFinite(numericPoints) || numericPoints < 0) {
+    return fail(res, 'Points must be a non-negative number', 400)
+  }
+
   try {
+    const { rows: scaleRows } = await tenantQuery(
+      req.tenantId,
+      `SELECT max_points AS "maxPoints" FROM scoring_scales WHERE tenant_id = $1 AND id = $2 LIMIT 1`,
+      [scaleId],
+    )
+    if (scaleRows.length === 0) {
+      return fail(res, 'Scoring scale not found', 404)
+    }
+
+    const maxPoints = Number(scaleRows[0].maxPoints)
+    if (numericPoints > maxPoints) {
+      return fail(res, `Points cannot exceed the factor maximum of ${maxPoints}`, 400)
+    }
+
+    // Keep one score row per staff + factor (replace prior value)
+    await tenantQuery(
+      req.tenantId,
+      `DELETE FROM performance_scores WHERE tenant_id = $1 AND staff_id = $2 AND scale_id = $3`,
+      [staffId, scaleId],
+    )
+
     const { rows } = await tenantQuery(
       req.tenantId,
       `
@@ -165,7 +180,7 @@ export async function scoreStaff(req, res) {
         VALUES ($1, $2, $3, $4, $5)
         RETURNING id, points
       `,
-      [staffId, scaleId, parseFloat(points), req.user.id],
+      [staffId, scaleId, numericPoints, req.user.id],
     )
     return success(res, rows[0], 201)
   } catch (err) {
@@ -173,7 +188,7 @@ export async function scoreStaff(req, res) {
   }
 }
 
-// Aggregated scores for all staff
+// Aggregated scores for all staff — weighted % out of 100
 export async function getStaffScores(req, res) {
   try {
     const { rows } = await tenantQuery(
@@ -185,14 +200,11 @@ export async function getStaffScores(req, res) {
           s.image_url AS "imageUrl",
           s.designation_id AS "designationId",
           d.name AS "designation",
-          COALESCE(ROUND(AVG((ps.points / ss.max_points) * 100), 2), 0) AS "rating"
+          ${WEIGHTED_RATING_SQL} AS "rating"
         FROM staff s
         LEFT JOIN users u ON u.id = s.user_id AND u.tenant_id = s.tenant_id
         LEFT JOIN designations d ON d.id = s.designation_id
-        LEFT JOIN performance_scores ps ON ps.staff_id = s.id AND ps.tenant_id = s.tenant_id
-        LEFT JOIN scoring_scales ss ON ss.id = ps.scale_id AND ss.tenant_id = s.tenant_id
         WHERE s.tenant_id = $1 AND s.status = 'active'
-        GROUP BY s.id, u.full_name, s.image_url, s.designation_id, d.name
         ORDER BY u.full_name ASC
       `,
     )
@@ -201,3 +213,5 @@ export async function getStaffScores(req, res) {
     return fail(res, err.message || 'Failed to fetch performance scores', 500)
   }
 }
+
+export { WEIGHTED_RATING_SQL }

@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { SurfaceCard } from '@/components/shared/SurfaceCard'
 import { ConfirmDialog } from '@/components/shared/ConfirmDialog'
-import { RowActionButtons } from '@/components/shared/ActionIconButton'
+import { ActionIconButton, RowActionButtons } from '@/components/shared/ActionIconButton'
 import { MyLeaveFormDialog } from '@/components/feature/branch/staff/MyLeaveFormDialog'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -68,12 +68,18 @@ function statusStyles(status) {
   return 'bg-emerald-50 text-emerald-700 ring-emerald-200'
 }
 
+// Decided leaves expose Admin note via view action
+function canViewLeave(status) {
+  return status === 'approved' || status === 'rejected'
+}
+
 // BM personal leave history — pending until Admin decides
 export function MyLeavesTab({ createOpen = false, onCreateOpenChange }) {
   const [leaves, setLeaves] = useState([])
   const [loading, setLoading] = useState(false)
   const [mutating, setMutating] = useState(false)
 
+  const [viewing, setViewing] = useState(null)
   const [editing, setEditing] = useState(null)
   const [editStart, setEditStart] = useState('')
   const [editEnd, setEditEnd] = useState('')
@@ -198,6 +204,8 @@ export function MyLeavesTab({ createOpen = false, onCreateOpenChange }) {
                           onEdit={() => openEdit(l)}
                           onDelete={() => setDeleteTarget(l)}
                         />
+                      ) : canViewLeave(l.status) ? (
+                        <ActionIconButton action="view" onClick={() => setViewing(l)} />
                       ) : null}
                     </div>
                   </div>
@@ -241,6 +249,8 @@ export function MyLeavesTab({ createOpen = false, onCreateOpenChange }) {
                             onEdit={() => openEdit(l)}
                             onDelete={() => setDeleteTarget(l)}
                           />
+                        ) : canViewLeave(l.status) ? (
+                          <ActionIconButton action="view" onClick={() => setViewing(l)} />
                         ) : (
                           <span className="text-xs text-slate-400">—</span>
                         )}
@@ -268,6 +278,55 @@ export function MyLeavesTab({ createOpen = false, onCreateOpenChange }) {
         onOpenChange={onCreateOpenChange}
         onSuccess={fetchLeaves}
       />
+
+      // View Admin decision + note for decided leaves
+      <Dialog open={!!viewing} onOpenChange={(open) => !open && setViewing(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Leave Details</DialogTitle>
+            <DialogDescription>
+              Review your leave request and Admin decision comments.
+            </DialogDescription>
+          </DialogHeader>
+          {viewing ? (
+            <div className="space-y-2 py-2 text-sm">
+              <p>
+                <span className="text-slate-500">Reason:</span>{' '}
+                <strong>{viewing.reason || 'Leave'}</strong>
+              </p>
+              <p>
+                <span className="text-slate-500">Leave dates:</span>{' '}
+                {formatRange(viewing.startDate, viewing.endDate)}
+              </p>
+              <p>
+                <span className="text-slate-500">Applied:</span>{' '}
+                {formatDateTime(viewing.createdAt)}
+              </p>
+              <p>
+                <span className="text-slate-500">Status:</span>{' '}
+                <span
+                  className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-semibold ring-1 ring-inset ${statusStyles(viewing.status)}`}
+                >
+                  {viewing.status}
+                </span>
+              </p>
+              {viewing.decidedAt ? (
+                <p>
+                  <span className="text-slate-500">Decided:</span>{' '}
+                  {formatDateTime(viewing.decidedAt)}
+                </p>
+              ) : null}
+              <p>
+                <span className="text-slate-500">Admin note:</span>{' '}
+                {viewing.decisionReason || '—'}
+              </p>
+            </div>
+          ) : null}
+          <DialogFooter>
+            <DialogCancelButton onClick={() => setViewing(null)}>Close</DialogCancelButton>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       <Dialog open={!!editing} onOpenChange={(open) => !open && setEditing(null)}>
         <DialogContent>

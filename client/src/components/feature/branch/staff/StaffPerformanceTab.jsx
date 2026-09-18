@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { Settings, Star } from 'lucide-react'
 import { SurfaceCard } from '@/components/shared/SurfaceCard'
 import { ConfirmDialog } from '@/components/shared/ConfirmDialog'
@@ -31,8 +31,9 @@ import {
 import { apiClient } from '@/api/api'
 import { useClientPagination } from '@/hooks/useClientPagination'
 import {
-  SCALE_POINTS_BUDGET,
-  remainingScalePoints,
+  calcWeightedScorePercent,
+  formatScorePercent,
+  sumActualPoints,
   sumScalePoints,
 } from '@/lib/performanceScales'
 import { BRAND } from '@/lib/constants'
@@ -106,11 +107,20 @@ export function StaffPerformanceTab({
   const rosterPaging = useClientPagination(filteredRoster)
   const scalesPaging = useClientPagination(scales)
 
+  // Running total of all factor max points (reference for BM)
   const pointsUsed = sumScalePoints(scales)
-  const pointsRemaining = remainingScalePoints(scales)
+
+  // Live evaluation summary while scoring
+  const evaluationSummary = useMemo(() => {
+    const actualTotal = sumActualPoints(scores, scales)
+    const maxTotal = sumScalePoints(scales)
+    const percent = calcWeightedScorePercent(scores, scales)
+    return { actualTotal, maxTotal, percent }
+  }, [scores, scales])
 
   const openScoringModal = (employee) => {
     setScoringEmployee(employee)
+    // Default each factor mid-range; missing values still count as 0 on submit
     const initialScores = {}
     scales.forEach((s) => {
       initialScores[s.id] = Math.round(s.maxPoints / 2)
@@ -126,22 +136,32 @@ export function StaffPerformanceTab({
   }
 
   const submitScores = async () => {
+    if (scales.length === 0) {
+      return toastError('At least one scoring factor must be configured before evaluating')
+    }
+
     setMutatingScore(true)
     let successCount = 0
-    for (const scaleId of Object.keys(scores)) {
-      const pts = scores[scaleId]
+    for (const scale of scales) {
+      // Treat unset factors as 0
+      const pts = Number(scores[scale.id])
+      const safePts = Number.isFinite(pts) && pts >= 0 ? pts : 0
       const res = await apiClient.post('/branch/performance/scores', {
         staffId: scoringEmployee.staffId,
-        scaleId,
-        points: pts,
+        scaleId: scale.id,
+        points: Math.min(safePts, scale.maxPoints),
       })
       if (res.success) successCount++
     }
     setMutatingScore(false)
     if (successCount > 0) {
-      toastSuccess('Performance scores recorded')
+      toastSuccess(
+        `Performance scores recorded — final score ${formatScorePercent(evaluationSummary.percent)}`,
+      )
       setScoringEmployee(null)
       void fetchRoster()
+    } else {
+      toastError('Failed to record performance scores')
     }
   }
 
@@ -149,14 +169,6 @@ export function StaffPerformanceTab({
     setEditingScale(scale)
     setEditOpen(true)
   }
-
-  // Block Add Scale when the 100-point budget is already full
-  useEffect(() => {
-    if (!createOpen) return
-    if (pointsRemaining > 0) return
-    toastError(`All ${SCALE_POINTS_BUDGET} points are already allocated across criteria.`)
-    onCreateOpenChange?.(false)
-  }, [createOpen, pointsRemaining, onCreateOpenChange])
 
   const confirmDeleteScale = async () => {
     if (!deleteTargetScale) return
@@ -167,6 +179,7 @@ export function StaffPerformanceTab({
       toastSuccess('Scoring scale deleted')
       setDeleteTargetScale(null)
       void fetchScales()
+      void fetchRoster()
     } else {
       toastError(res.error || 'Failed to delete scale')
     }
@@ -254,7 +267,7 @@ export function StaffPerformanceTab({
                     </div>
                     <Badge variant="outline" className={getRatingBadgeStyle(emp.rating)}>
                       <Star className="mr-1 size-3.5 fill-current" />
-                      {emp.rating}%
+                      {formatScorePercent(emp.rating)}
                     </Badge>
                   </div>
                   <Button
@@ -294,7 +307,7 @@ export function StaffPerformanceTab({
                         <TableCell>
                           <Badge variant="outline" className={getRatingBadgeStyle(emp.rating)}>
                             <Star className="mr-1 size-3.5 fill-current" />
-                            {emp.rating}%
+                            {formatScorePercent(emp.rating)}
                           </Badge>
                         </TableCell>
                         <TableCell>
@@ -327,7 +340,7 @@ export function StaffPerformanceTab({
       ) : (
         <SurfaceCard
           title="Configured Scoring Criteria"
-          description={`Total Score: ${pointsUsed} / ${SCALE_POINTS_BUDGET}`}
+          description={`Total maximum points: ${pointsUsed}`}
         >
           {loadingScales ? (
             <p className="py-8 text-center text-sm text-slate-400">Loading...</p>
@@ -336,18 +349,18 @@ export function StaffPerformanceTab({
           ) : (
             <ResponsiveDataShell
               mobile={scalesPaging.slice.map((s) => (
-                    <DataCard key={s.id}>
-                      <div className="flex items-start justify-between gap-2">
-                        <div className="min-w-0">
-                          <p className="truncate text-sm font-semibold text-slate-900">{s.name}</p>
-                          <p className="mt-0.5 font-mono text-xs text-slate-600">{s.maxPoints} pts</p>
-                        </div>
-                        <RowActionButtons
-                          onEdit={() => openEditScale(s)}
-                          onDelete={() => setDeleteTargetScale(s)}
-                        />
-                      </div>
-                    </DataCard>
+                <DataCard key={s.id}>
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="min-w-0">
+                      <p className="truncate text-sm font-semibold text-slate-900">{s.name}</p>
+                      <p className="mt-0.5 font-mono text-xs text-slate-600">{s.maxPoints} pts</p>
+                    </div>
+                    <RowActionButtons
+                      onEdit={() => openEditScale(s)}
+                      onDelete={() => setDeleteTargetScale(s)}
+                    />
+                  </div>
+                </DataCard>
               ))}
               desktop={
                 <Table>
@@ -363,12 +376,12 @@ export function StaffPerformanceTab({
                       <TableRow key={s.id}>
                         <TableCell className="font-semibold text-slate-900">{s.name}</TableCell>
                         <TableCell className="font-mono text-slate-700">{s.maxPoints} pts</TableCell>
-                            <TableCell>
-                              <RowActionButtons
-                                onEdit={() => openEditScale(s)}
-                                onDelete={() => setDeleteTargetScale(s)}
-                              />
-                            </TableCell>
+                        <TableCell>
+                          <RowActionButtons
+                            onEdit={() => openEditScale(s)}
+                            onDelete={() => setDeleteTargetScale(s)}
+                          />
+                        </TableCell>
                       </TableRow>
                     ))}
                   </TableBody>
@@ -388,16 +401,14 @@ export function StaffPerformanceTab({
         </SurfaceCard>
       )}
 
-      {/* Add Scale — page header CTA */}
       <ScaleFormDialog
-        open={createOpen && pointsRemaining > 0}
+        open={createOpen}
         onOpenChange={onCreateOpenChange}
         mode="create"
         scales={scales}
         onSuccess={fetchScales}
       />
 
-      {/* Edit Scale */}
       <ScaleFormDialog
         open={editOpen}
         onOpenChange={(open) => {
@@ -410,7 +421,6 @@ export function StaffPerformanceTab({
         onSuccess={fetchScales}
       />
 
-      {/* Score employee */}
       <Dialog
         open={Boolean(scoringEmployee)}
         onOpenChange={(open) => {
@@ -421,8 +431,7 @@ export function StaffPerformanceTab({
           <DialogHeader>
             <DialogTitle>Evaluate Performance: {scoringEmployee?.fullName}</DialogTitle>
             <DialogDescription>
-              Assign scores based on bar/slider selections. Maximum points are defined by active
-              scales.
+              Assign actual points per factor (0 to max). Final score is normalized to 100%.
             </DialogDescription>
           </DialogHeader>
 
@@ -431,7 +440,7 @@ export function StaffPerformanceTab({
           ) : (
             <div className="space-y-4 py-2">
               {scales.map((s) => {
-                const currentVal = scores[s.id] || 0
+                const currentVal = scores[s.id] ?? 0
                 return (
                   <div
                     key={s.id}
@@ -454,6 +463,17 @@ export function StaffPerformanceTab({
                   </div>
                 )
               })}
+
+              <div className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs text-slate-600">
+                <p className="font-semibold text-slate-800">Evaluation summary</p>
+                <p className="mt-1">
+                  Raw total: <strong>{evaluationSummary.actualTotal}</strong> /{' '}
+                  <strong>{evaluationSummary.maxTotal}</strong> pts
+                </p>
+                <p className="mt-1 text-sm font-bold text-purple-800">
+                  Final score: {formatScorePercent(evaluationSummary.percent)}
+                </p>
+              </div>
             </div>
           )}
 
@@ -477,7 +497,7 @@ export function StaffPerformanceTab({
           if (!open) setDeleteTargetScale(null)
         }}
         title="Delete scoring scale?"
-        description="Delete this scoring scale? This action cannot be undone."
+        description="Delete this scoring scale? Related scores are removed and ratings recalculate from remaining factors."
         confirmLabel="Delete"
         onConfirm={confirmDeleteScale}
         loading={loadingScales}

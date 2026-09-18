@@ -3,18 +3,13 @@ import { FormDialog, DialogCancelButton } from '@/components/shared/FormDialog'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import {
-  SCALE_POINTS_BUDGET,
-  parseScaleMaxPoints,
-  sumScalePoints,
-  validateScaleTotal,
-} from '@/lib/performanceScales'
+import { parseScaleMaxPoints, sumScalePoints } from '@/lib/performanceScales'
 import { toastError, toastSuccess } from '@/lib/toast'
 import { apiClient } from '@/api/api'
 
 const EMPTY = { name: '', maxPoints: '' }
 
-// Add / Edit scoring scale — per-criterion 0–100 and combined total ≤ 100.
+// Add / Edit scoring factor — dynamic max points, no fixed 100 budget.
 export function ScaleFormDialog({
   open,
   onOpenChange,
@@ -30,7 +25,7 @@ export function ScaleFormDialog({
 
   const excludeId = isEdit ? initialScale?.id : null
 
-  // Other criteria already allocated (excludes the row being edited).
+  // Other factors already allocated (excludes the row being edited).
   const otherUsed = useMemo(() => sumScalePoints(scales, excludeId), [scales, excludeId])
 
   useEffect(() => {
@@ -46,28 +41,22 @@ export function ScaleFormDialog({
         maxPoints: String(initialScale.maxPoints ?? ''),
       })
     } else {
-      const remaining = Math.max(0, SCALE_POINTS_BUDGET - otherUsed)
-      setForm({
-        name: '',
-        maxPoints: remaining > 0 ? String(Math.min(25, remaining)) : '',
-      })
+      setForm({ name: '', maxPoints: '' })
     }
-  }, [open, isEdit, initialScale, otherUsed])
+  }, [open, isEdit, initialScale])
 
   const parsed = parseScaleMaxPoints(form.maxPoints)
   const pointsValue = parsed.ok ? parsed.value : null
   const rangeError =
-    form.maxPoints !== '' && !parsed.ok ? parsed.error : touchedPoints && form.maxPoints === '' ? parsed.error : null
+    form.maxPoints !== '' && !parsed.ok
+      ? parsed.error
+      : touchedPoints && form.maxPoints === ''
+        ? parsed.error
+        : null
 
-  const totalCheck =
-    pointsValue == null
-      ? { ok: true, used: otherUsed, projected: otherUsed, error: null }
-      : validateScaleTotal(scales, pointsValue, excludeId)
-
-  const overBudget = Boolean(totalCheck.error)
-  const projectedTotal = pointsValue == null ? otherUsed : totalCheck.projected
-  const canSubmit =
-    Boolean(form.name.trim()) && parsed.ok && totalCheck.ok && !mutating && !( !isEdit && otherUsed >= SCALE_POINTS_BUDGET )
+  // Live total max points reference for the Branch Manager.
+  const projectedTotal = pointsValue == null ? otherUsed : otherUsed + pointsValue
+  const canSubmit = Boolean(form.name.trim()) && parsed.ok && !mutating
 
   const dirty =
     isEdit && initialScale
@@ -84,9 +73,6 @@ export function ScaleFormDialog({
 
     const check = parseScaleMaxPoints(form.maxPoints)
     if (!check.ok) return toastError(check.error)
-
-    const budget = validateScaleTotal(scales, check.value, excludeId)
-    if (!budget.ok) return toastError(budget.error)
 
     setMutating(true)
     const payload = { name, maxPoints: check.value }
@@ -110,47 +96,33 @@ export function ScaleFormDialog({
       onOpenChange={onOpenChange}
       dirty={dirty}
       title={isEdit ? 'Edit Scoring Scale' : 'Add Scoring Scale'}
-      description="Each criterion is scored 0–100. Combined maximum across all criteria cannot exceed 100."
+      description="Assign any maximum points per factor. Final employee scores are always normalized to 100%."
       contentClassName="sm:max-w-md"
       footer={
         <>
           <DialogCancelButton disabled={mutating} />
-          <Button
-            type="submit"
-            form="scale-form"
-            disabled={!canSubmit}
-            variant="brand"
-          >
+          <Button type="submit" form="scale-form" disabled={!canSubmit} variant="brand">
             {mutating ? 'Saving…' : isEdit ? 'Update Scale' : 'Add Scale'}
           </Button>
         </>
       }
     >
       <form id="scale-form" className="space-y-4 py-1" onSubmit={handleSubmit}>
-        {/* Real-time projected total including the value being typed */}
         <div
           className={`rounded-lg border px-3 py-2 text-xs ${
-            overBudget || rangeError
+            rangeError
               ? 'border-rose-200 bg-rose-50 text-rose-700'
-              : projectedTotal === SCALE_POINTS_BUDGET
-                ? 'border-amber-200 bg-amber-50 text-amber-800'
-                : 'border-slate-200 bg-slate-50 text-slate-600'
+              : 'border-slate-200 bg-slate-50 text-slate-600'
           }`}
         >
-          Total Score:{' '}
-          <strong>
-            {projectedTotal} / {SCALE_POINTS_BUDGET}
-          </strong>
-          {overBudget ? (
-            <p className="mt-1 font-medium">{totalCheck.error}</p>
-          ) : null}
+          Total maximum points: <strong>{projectedTotal}</strong>
         </div>
 
         <div className="space-y-1.5">
           <Label htmlFor="scale-name">Criteria Name</Label>
           <Input
             id="scale-name"
-            placeholder="e.g. Communication points"
+            placeholder="e.g. Punctuality, Teamwork"
             value={form.name}
             onChange={(e) => setForm((prev) => ({ ...prev, name: e.target.value }))}
             required
@@ -162,20 +134,16 @@ export function ScaleFormDialog({
           <Input
             id="scale-points"
             type="number"
-            min={0}
-            max={100}
+            min={1}
             step={1}
-            placeholder="0 – 100"
+            placeholder="e.g. 50"
             value={form.maxPoints}
             onChange={(e) => setForm((prev) => ({ ...prev, maxPoints: e.target.value }))}
             onBlur={() => setTouchedPoints(true)}
-            className={rangeError || overBudget ? 'border-red-500 focus-visible:ring-red-500' : ''}
+            className={rangeError ? 'border-red-500 focus-visible:ring-red-500' : ''}
             required
           />
           {rangeError ? <p className="text-xs font-medium text-rose-600">{rangeError}</p> : null}
-          {!rangeError && overBudget ? (
-            <p className="text-xs font-medium text-rose-600">{totalCheck.error}</p>
-          ) : null}
         </div>
       </form>
     </FormDialog>

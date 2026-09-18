@@ -1,9 +1,8 @@
-// Scoring scales share a fixed 100-point budget across all criteria.
-export const SCALE_POINTS_BUDGET = 100
+// Dynamic scoring factors — final score is always normalized to 100%.
+// Final % = (Σ actual points / Σ maximum points) × 100
 
-export const SCALE_SCORE_RANGE_MSG = 'Score must be between 0 and 100.'
-export const SCALE_TOTAL_LIMIT_MSG =
-  'Total scoring points cannot exceed 100. Please reduce the score points before saving.'
+export const SCALE_MAX_POINTS_MSG =
+  'Maximum points must be a whole number greater than 0.'
 
 export function sumScalePoints(scales = [], excludeId = null) {
   return scales.reduce((sum, scale) => {
@@ -12,26 +11,36 @@ export function sumScalePoints(scales = [], excludeId = null) {
   }, 0)
 }
 
-export function remainingScalePoints(scales = [], excludeId = null) {
-  return Math.max(0, SCALE_POINTS_BUDGET - sumScalePoints(scales, excludeId))
-}
-
-// Individual criterion: whole numbers only, inclusive 0–100.
+// Individual criterion: whole numbers only, min 1, no fixed upper cap.
 export function parseScaleMaxPoints(rawValue) {
-  if (rawValue === '' || rawValue == null) return { ok: false, value: null, error: SCALE_SCORE_RANGE_MSG }
+  if (rawValue === '' || rawValue == null) {
+    return { ok: false, value: null, error: SCALE_MAX_POINTS_MSG }
+  }
   const asNumber = Number(rawValue)
-  if (!Number.isFinite(asNumber) || !Number.isInteger(asNumber) || asNumber < 0 || asNumber > 100) {
-    return { ok: false, value: null, error: SCALE_SCORE_RANGE_MSG }
+  if (!Number.isFinite(asNumber) || !Number.isInteger(asNumber) || asNumber < 1) {
+    return { ok: false, value: null, error: SCALE_MAX_POINTS_MSG }
   }
   return { ok: true, value: asNumber, error: null }
 }
 
-// Combined budget check after excluding the row being edited (if any).
-export function validateScaleTotal(scales, points, excludeId = null) {
-  const used = sumScalePoints(scales, excludeId)
-  const projected = used + points
-  if (projected > SCALE_POINTS_BUDGET) {
-    return { ok: false, used, projected, error: SCALE_TOTAL_LIMIT_MSG }
-  }
-  return { ok: true, used, projected, error: null }
+// Missing actual scores count as 0 for that factor.
+export function sumActualPoints(scoresByScaleId = {}, scales = []) {
+  return scales.reduce((sum, scale) => {
+    const raw = scoresByScaleId?.[scale.id]
+    const points = Number(raw)
+    if (!Number.isFinite(points) || points < 0) return sum
+    return sum + points
+  }, 0)
+}
+
+// Weighted aggregate out of 100 — defaults to 0 when no factors exist.
+export function calcWeightedScorePercent(scoresByScaleId = {}, scales = []) {
+  const maxTotal = sumScalePoints(scales)
+  if (maxTotal <= 0) return 0
+  const actualTotal = sumActualPoints(scoresByScaleId, scales)
+  return Math.round((actualTotal / maxTotal) * 10000) / 100
+}
+
+export function formatScorePercent(value) {
+  return `${Number(value || 0).toFixed(2)}%`
 }

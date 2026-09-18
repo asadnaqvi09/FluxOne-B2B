@@ -40,11 +40,13 @@ import { AdminLayout } from '@/layouts/AdminLayout'
 import { DashboardPage as AdminDashboardPage } from '@/pages/admin/DashboardPage'
 import { ReportsPage as AdminReportsPage } from '@/pages/admin/ReportsPage'
 import { BranchesPage as AdminBranchesPage } from '@/pages/admin/BranchesPage'
+import { LeavesPage as AdminLeavesPage } from '@/pages/admin/LeavesPage'
 import { InvoicesPage as AdminInvoicesPage } from '@/pages/admin/InvoicesPage'
 import { TaxProfitPage as AdminTaxProfitPage } from '@/pages/admin/TaxProfitPage'
 import { CompanyPage as AdminCompanyPage } from '@/pages/admin/CompanyPage'
 import { SettingsPage as AdminSettingsPage } from '@/pages/admin/SettingsPage'
 import { AdminProfilePage } from '@/pages/admin/AdminProfilePage'
+import { NotificationsPage } from '@/pages/shared/NotificationsPage'
 import { useAuthSession } from '@/hooks/useAuthSession'
 import CategoriesPage from '@/pages/inventory/CategoriesPage'
 
@@ -67,6 +69,8 @@ const router = createBrowserRouter([
           { path: 'dashboard', element: <AdminDashboardPage /> },
           { path: 'reports', element: <AdminReportsPage /> },
           { path: 'branches', element: <AdminBranchesPage /> },
+          { path: 'leaves', element: <AdminLeavesPage /> },
+          { path: 'notifications', element: <NotificationsPage /> },
           { path: 'invoices', element: <AdminInvoicesPage /> },
           { path: 'tax-profit', element: <AdminTaxProfitPage /> },
           { path: 'company', element: <AdminCompanyPage /> },
@@ -120,6 +124,7 @@ const router = createBrowserRouter([
               { path: 'resources', element: <ResourcesPage /> },
               { path: 'discounts', element: <DiscountsPage /> },
               { path: 'logs', element: <ActivityLogsPage /> },
+              { path: 'notifications', element: <NotificationsPage /> },
               { path: 'profile', element: <ProfilePage /> },
             ],
           },

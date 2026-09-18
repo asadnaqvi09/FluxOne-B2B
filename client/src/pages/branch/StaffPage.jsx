@@ -9,8 +9,8 @@ import { StaffFormDialog } from '@/components/feature/branch/staff/StaffFormDial
 import { StaffTable } from '@/components/feature/branch/staff/StaffTable'
 import { StaffAttendanceTab } from '@/components/feature/branch/staff/StaffAttendanceTab'
 import { StaffHolidaysTab } from '@/components/feature/branch/staff/StaffHolidaysTab'
-import { StaffLeavesTab } from '@/components/feature/branch/staff/StaffLeavesTab'
 import { StaffPerformanceTab } from '@/components/feature/branch/staff/StaffPerformanceTab'
+import { LeavesPanel } from '@/components/feature/branch/staff/LeavesPanel'
 import { Button } from '@/components/ui/button'
 import { useBranchStaff } from '@/hooks/useBranchStaff'
 import { useDebouncedSearch } from '@/hooks/useDebouncedSearch'
@@ -52,6 +52,7 @@ export function StaffPage() {
   const [leaveCreateOpen, setLeaveCreateOpen] = useState(false)
   const [scaleCreateOpen, setScaleCreateOpen] = useState(false)
   const [performanceSubTab, setPerformanceSubTab] = useState('roster')
+  const [leaveSubTab, setLeaveSubTab] = useState('mine') // 'mine' | 'staff'
 
   async function loadDesignations() {
     const res = await apiClient.get(endpoints.branch.designations.list, {
@@ -73,6 +74,7 @@ export function StaffPage() {
     setLeaveCreateOpen(false)
     setScaleCreateOpen(false)
     if (activeTab !== 'performance') setPerformanceSubTab('roster')
+    if (activeTab !== 'leaves') setLeaveSubTab('mine')
   }, [activeTab])
 
   function openCreate() {
@@ -171,6 +173,7 @@ export function StaffPage() {
     }
 
     if (activeTab === 'leaves') {
+      const isMine = leaveSubTab === 'mine'
       return (
         <Button
           type="button"
@@ -179,7 +182,7 @@ export function StaffPage() {
           className="w-full sm:w-auto"
         >
           <Plus className="size-4" />
-          Add Leaves
+          {isMine ? 'Apply for Leave' : 'Add Leaves'}
         </Button>
       )
     }
@@ -297,11 +300,12 @@ export function StaffPage() {
 
       {activeTab === 'leaves' && (
         <MotionReveal delay={0.04}>
-          <StaffLeavesTab
+          <LeavesPanel
             designations={designations}
             staff={items}
             createOpen={leaveCreateOpen}
             onCreateOpenChange={setLeaveCreateOpen}
+            onSubTabChange={setLeaveSubTab}
           />
         </MotionReveal>
       )}

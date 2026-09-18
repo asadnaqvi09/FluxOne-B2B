@@ -13,7 +13,24 @@ import {
   getStaffScores,
 } from './performance/performance.controller.js'
 import { holidaysList, addHoliday, editHoliday, removeHoliday } from './holidays/holidays.controller.js'
-import { leavesList, addLeave, editLeave, removeLeave } from './leaves/leaves.controller.js'
+import {
+  leavesList,
+  addLeave,
+  editLeave,
+  removeLeave,
+  myLeavesList,
+  addMyLeave,
+  editMyLeave,
+  removeMyLeave,
+} from './leaves/leaves.controller.js'
+import {
+  createStaffLeaveSchema,
+  createMyLeaveSchema,
+  updateStaffLeaveSchema,
+  updateMyLeaveSchema,
+  listStaffLeavesSchema,
+  leaveIdParamsSchema,
+} from './leaves/leaves.validator.js'
 import { salesList, processRefund } from './sales/sales.controller.js'
 import { getDiscounts, addDiscount, editDiscount, removeDiscount } from './discounts/discounts.controller.js'
 import { addStockRequest, stockRequestList } from './stock/stock_request.controller.js'
@@ -57,11 +74,52 @@ router.post('/holidays', requirePermission('staff:write'), asyncHandler(addHolid
 router.put('/holidays/:id', requirePermission('staff:write'), asyncHandler(editHoliday))
 router.delete('/holidays/:id', requirePermission('staff:write'), asyncHandler(removeHoliday))
 
-// Leaves
-router.get('/leaves', requirePermission('staff:read'), asyncHandler(leavesList))
-router.post('/leaves', requirePermission('staff:write'), asyncHandler(addLeave))
-router.put('/leaves/:id', requirePermission('staff:write'), asyncHandler(editLeave))
-router.delete('/leaves/:id', requirePermission('staff:write'), asyncHandler(removeLeave))
+// Leaves — My Leave (BM self) must be registered before /leaves/:id
+router.get('/leaves/me', requirePermission('staff:read'), asyncHandler(myLeavesList))
+router.post(
+  '/leaves/me',
+  requirePermission('staff:write'),
+  validate(createMyLeaveSchema),
+  asyncHandler(addMyLeave),
+)
+router.put(
+  '/leaves/me/:id',
+  requirePermission('staff:write'),
+  validate(updateMyLeaveSchema),
+  asyncHandler(editMyLeave),
+)
+router.delete(
+  '/leaves/me/:id',
+  requirePermission('staff:write'),
+  validate(leaveIdParamsSchema),
+  asyncHandler(removeMyLeave),
+)
+
+// Leaves — Staff Leave (BM appoints employees)
+router.get(
+  '/leaves',
+  requirePermission('staff:read'),
+  validate(listStaffLeavesSchema),
+  asyncHandler(leavesList),
+)
+router.post(
+  '/leaves',
+  requirePermission('staff:write'),
+  validate(createStaffLeaveSchema),
+  asyncHandler(addLeave),
+)
+router.put(
+  '/leaves/:id',
+  requirePermission('staff:write'),
+  validate(updateStaffLeaveSchema),
+  asyncHandler(editLeave),
+)
+router.delete(
+  '/leaves/:id',
+  requirePermission('staff:write'),
+  validate(leaveIdParamsSchema),
+  asyncHandler(removeLeave),
+)
 
 // Sales
 router.get('/sales', requirePermission('branch-dashboard:read'), asyncHandler(salesList))

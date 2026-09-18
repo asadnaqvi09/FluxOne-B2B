@@ -27,6 +27,7 @@ export const PATHS = {
     resources: '/branch/resources',
     discounts: '/branch/discounts',
     logs: '/branch/logs',
+    notifications: '/branch/notifications',
     profile: '/branch/profile',
   },
   // Phase 2 roles — shell only (logo + profile + logout)
@@ -40,6 +41,8 @@ export const PATHS = {
     dashboard: '/admin/dashboard',
     reports: '/admin/reports',
     branches: '/admin/branches',
+    leaves: '/admin/leaves',
+    notifications: '/admin/notifications',
     invoices: '/admin/invoices',
     taxProfit: '/admin/tax-profit',
     company: '/admin/company',

@@ -2,9 +2,10 @@ import { NavLink } from 'react-router-dom'
 import { BrandLogo } from '@/components/shared/BrandLogo'
 import { MobileNav } from '@/layouts/Navbar/MobileNav'
 import { UserMenu } from '@/layouts/Navbar/UserMenu'
+import { NotificationBell } from '@/layouts/Navbar/NotificationBell'
 import { useAuthSession } from '@/hooks/useAuthSession'
 import { BRAND, ROLES } from '@/lib/constants'
-import { getNavItemsForRole, roleDisplayName } from '@/lib/nav'
+import { getNavItemsForRole } from '@/lib/nav'
 import { cn } from '@/lib/utils'
 
 function DesktopNavLinks({ items }) {
@@ -42,6 +43,7 @@ function DesktopNavLinks({ items }) {
 export function AppTopNav({ className }) {
   const { role } = useAuthSession()
   const items = getNavItemsForRole(role)
+  const showBell = role === ROLES.B2B_ADMIN || role === ROLES.BRANCH_MANAGER
 
   return (
     <header
@@ -54,6 +56,7 @@ export function AppTopNav({ className }) {
         <BrandLogo size="sm" className="size-10 shrink-0 sm:size-12" />
         <DesktopNavLinks items={items} />
         <div className="ml-auto flex shrink-0 items-center gap-1.5 sm:gap-3">
+          {showBell ? <NotificationBell /> : null}
           <UserMenu className="hidden md:block" />
           <MobileNav items={items} />
         </div>

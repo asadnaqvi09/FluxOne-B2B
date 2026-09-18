@@ -2,11 +2,10 @@ import { useEffect, useState } from 'react'
 import { SurfaceCard } from '@/components/shared/SurfaceCard'
 import { ConfirmDialog } from '@/components/shared/ConfirmDialog'
 import { RowActionButtons } from '@/components/shared/ActionIconButton'
-import { LeaveFormDialog } from '@/components/feature/branch/staff/LeaveFormDialog'
+import { MyLeaveFormDialog } from '@/components/feature/branch/staff/MyLeaveFormDialog'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { NativeSelect } from '@/components/ui/select'
 import {
   Table,
   TableHeader,
@@ -42,6 +41,17 @@ function formatRange(start, end) {
   return `${formatDate(start)} — ${formatDate(end)}`
 }
 
+function formatDateTime(value) {
+  if (!value) return '—'
+  return new Date(value).toLocaleString('en-GB', {
+    day: 'numeric',
+    month: 'short',
+    year: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+  })
+}
+
 function toInputDate(value) {
   if (!value) return ''
   if (typeof value === 'string') return value.slice(0, 10)
@@ -58,37 +68,28 @@ function statusStyles(status) {
   return 'bg-emerald-50 text-emerald-700 ring-emerald-200'
 }
 
-export function StaffLeavesTab({
-  designations = [],
-  staff = [],
-  createOpen = false,
-  onCreateOpenChange,
-}) {
+// BM personal leave history — pending until Admin decides
+export function MyLeavesTab({ createOpen = false, onCreateOpenChange }) {
   const [leaves, setLeaves] = useState([])
   const [loading, setLoading] = useState(false)
   const [mutating, setMutating] = useState(false)
-  const [listDesignation, setListDesignation] = useState('')
 
-  // Edit modal state
   const [editing, setEditing] = useState(null)
   const [editStart, setEditStart] = useState('')
   const [editEnd, setEditEnd] = useState('')
   const [editReason, setEditReason] = useState('')
-  const [editStatus, setEditStatus] = useState('approved')
   const [deleteTarget, setDeleteTarget] = useState(null)
 
   const fetchLeaves = async () => {
     setLoading(true)
-    const res = await apiClient.get('/branch/leaves', {
-      designationId: listDesignation || undefined,
-    })
+    const res = await apiClient.get('/branch/leaves/me')
     setLoading(false)
     if (res.success) setLeaves(res.data || [])
   }
 
   useEffect(() => {
     void fetchLeaves()
-  }, [listDesignation])
+  }, [])
 
   const {
     page,
@@ -102,7 +103,7 @@ export function StaffLeavesTab({
 
   useEffect(() => {
     setPage(1)
-  }, [listDesignation, leaves.length, setPage])
+  }, [leaves.length, setPage])
 
   const editDateError =
     editStart && editEnd && new Date(editStart) > new Date(editEnd)
@@ -110,73 +111,62 @@ export function StaffLeavesTab({
       : ''
 
   const openEdit = (row) => {
+    if (row.status !== 'pending') {
+      return toastError('Only pending leave requests can be edited')
+    }
     setEditing(row)
     setEditStart(toInputDate(row.startDate))
     setEditEnd(toInputDate(row.endDate))
     setEditReason(row.reason || '')
-    setEditStatus(row.status || 'approved')
   }
 
   const handleUpdateLeave = async () => {
     if (!editing) return
     if (!editStart || !editEnd) return toastError('Please select both dates')
     if (editDateError) return
+
     setMutating(true)
-    const res = await apiClient.put(`/branch/leaves/${editing.id}`, {
+    const res = await apiClient.put(`/branch/leaves/me/${editing.id}`, {
       startDate: editStart,
       endDate: editEnd,
       reason: editReason,
-      status: editStatus,
     })
     setMutating(false)
+
     if (res.success) {
-      toastSuccess('Leave updated')
+      toastSuccess('Leave request updated')
       setEditing(null)
       void fetchLeaves()
     } else {
-      toastError(res.error || 'Failed to update leave')
+      toastError(res.error || 'Failed to update leave request')
     }
   }
 
   const handleDeleteLeave = async () => {
     if (!deleteTarget) return
     setMutating(true)
-    const res = await apiClient.delete(`/branch/leaves/${deleteTarget.id}`)
+    const res = await apiClient.delete(`/branch/leaves/me/${deleteTarget.id}`)
     setMutating(false)
+
     if (res.success) {
-      toastSuccess('Leave deleted')
+      toastSuccess('Leave request deleted')
       setDeleteTarget(null)
       void fetchLeaves()
     } else {
-      toastError(res.error || 'Failed to delete leave')
+      toastError(res.error || 'Failed to delete leave request')
     }
   }
 
   return (
     <div className="space-y-4">
       <SurfaceCard
-        title="Staff Leave Records"
-        description="Leaves you appoint for branch employees (auto-approved)"
+        title="My Leave Records"
+        description="Your personal leave requests and Admin decisions"
       >
-        <div className="mb-4 max-w-xs">
-          <Label className="mb-1.5 block text-xs text-slate-500">Filter by Designation</Label>
-          <NativeSelect
-            value={listDesignation}
-            onChange={(e) => setListDesignation(e.target.value)}
-          >
-            <option value="">All Designations</option>
-            {designations.map((d) => (
-              <option key={d.id} value={d.id}>
-                {d.name}
-              </option>
-            ))}
-          </NativeSelect>
-        </div>
-
         {loading ? (
           <p className="py-8 text-center text-sm text-slate-400">Loading...</p>
         ) : leaves.length === 0 ? (
-          <p className="py-8 text-center text-sm text-slate-400">No active leave records found</p>
+          <p className="py-8 text-center text-sm text-slate-400">No leave requests yet</p>
         ) : (
           <>
             <div className="space-y-3 md:hidden">
@@ -187,41 +177,41 @@ export function StaffLeavesTab({
                 >
                   <div className="flex items-start justify-between gap-2">
                     <div className="min-w-0">
-                      <p className="truncate text-sm font-semibold text-slate-900">
-                        {l.fullName || 'Employee'}
+                      <p className="text-sm font-semibold text-slate-900">
+                        {l.reason || 'Leave'}
                       </p>
-                      <p className="text-[11px] text-slate-500">{l.designation || '—'}</p>
                       <p className="mt-1 text-xs text-slate-600">
                         {formatRange(l.startDate, l.endDate)}
                       </p>
-                      <p className="mt-1 truncate text-xs italic text-slate-500">
-                        {l.reason || 'Leave'}
+                      <p className="mt-1 text-[11px] text-slate-500">
+                        Applied {formatDateTime(l.createdAt)}
                       </p>
                     </div>
-                      <div className="flex flex-col items-end gap-2">
-                        <span
-                          className={`inline-flex shrink-0 items-center rounded-full px-2 py-0.5 text-xs font-semibold ring-1 ring-inset ${statusStyles(l.status)}`}
-                        >
-                          {l.status}
-                        </span>
+                    <div className="flex flex-col items-end gap-2">
+                      <span
+                        className={`inline-flex shrink-0 items-center rounded-full px-2 py-0.5 text-xs font-semibold ring-1 ring-inset ${statusStyles(l.status)}`}
+                      >
+                        {l.status}
+                      </span>
+                      {l.status === 'pending' ? (
                         <RowActionButtons
                           onEdit={() => openEdit(l)}
                           onDelete={() => setDeleteTarget(l)}
                         />
-                      </div>
+                      ) : null}
+                    </div>
                   </div>
                 </article>
               ))}
             </div>
 
             <div className="hidden overflow-x-auto md:block">
-              <Table className="w-full min-w-[40rem] text-left text-sm">
+              <Table className="w-full min-w-[44rem] text-left text-sm">
                 <TableHeader>
                   <TableRow className="text-xs text-slate-500 uppercase">
-                    <TableHead className="px-3 py-2 font-medium">Employee</TableHead>
-                    <TableHead className="px-3 py-2 font-medium">Designation</TableHead>
-                    <TableHead className="px-3 py-2 font-medium">Leave Dates</TableHead>
                     <TableHead className="px-3 py-2 font-medium">Reason</TableHead>
+                    <TableHead className="px-3 py-2 font-medium">Leave Date Range</TableHead>
+                    <TableHead className="px-3 py-2 font-medium">Apply Date & Time</TableHead>
                     <TableHead className="px-3 py-2 font-medium">Status</TableHead>
                     <TableHead className="px-3 py-2 text-right font-medium">Actions</TableHead>
                   </TableRow>
@@ -229,17 +219,14 @@ export function StaffLeavesTab({
                 <TableBody>
                   {pageRows.map((l) => (
                     <TableRow key={l.id} className="hover:bg-slate-50/50">
-                      <TableCell className="px-3 py-3 font-semibold text-slate-900">
-                        {l.fullName || 'Employee'}
-                      </TableCell>
-                      <TableCell className="px-3 py-3 text-slate-600">
-                        {l.designation || '—'}
+                      <TableCell className="max-w-xs truncate px-3 py-3 font-semibold text-slate-900">
+                        {l.reason || 'Leave'}
                       </TableCell>
                       <TableCell className="px-3 py-3 text-slate-600">
                         {formatRange(l.startDate, l.endDate)}
                       </TableCell>
-                      <TableCell className="max-w-xs truncate px-3 py-3 italic text-slate-700">
-                        {l.reason || 'Leave'}
+                      <TableCell className="px-3 py-3 text-slate-600">
+                        {formatDateTime(l.createdAt)}
                       </TableCell>
                       <TableCell className="px-3 py-3">
                         <span
@@ -248,12 +235,16 @@ export function StaffLeavesTab({
                           {l.status}
                         </span>
                       </TableCell>
-                        <TableCell className="px-3 py-3 text-right">
+                      <TableCell className="px-3 py-3 text-right">
+                        {l.status === 'pending' ? (
                           <RowActionButtons
                             onEdit={() => openEdit(l)}
                             onDelete={() => setDeleteTarget(l)}
                           />
-                        </TableCell>
+                        ) : (
+                          <span className="text-xs text-slate-400">—</span>
+                        )}
+                      </TableCell>
                     </TableRow>
                   ))}
                 </TableBody>
@@ -272,22 +263,18 @@ export function StaffLeavesTab({
         />
       </SurfaceCard>
 
-      {/* Create — driven by page header “Add Leaves” CTA */}
-      <LeaveFormDialog
+      <MyLeaveFormDialog
         open={createOpen}
         onOpenChange={onCreateOpenChange}
-        designations={designations}
-        staff={staff}
         onSuccess={fetchLeaves}
       />
 
-      {/* Edit leave */}
       <Dialog open={!!editing} onOpenChange={(open) => !open && setEditing(null)}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Edit Leave</DialogTitle>
+            <DialogTitle>Edit Leave Request</DialogTitle>
             <DialogDescription>
-              Update leave for {editing?.fullName || 'employee'}.
+              Update your pending leave dates or reason before Admin decides.
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-3 py-2">
@@ -311,27 +298,17 @@ export function StaffLeavesTab({
                 />
               </div>
             </div>
-            {editDateError ? <p className="text-xs font-medium text-red-500">{editDateError}</p> : null}
+            {editDateError ? (
+              <p className="text-xs font-medium text-red-500">{editDateError}</p>
+            ) : null}
             <div className="space-y-1.5">
               <Label>Reason</Label>
               <Input value={editReason} onChange={(e) => setEditReason(e.target.value)} />
             </div>
-            <div className="space-y-1.5">
-              <Label>Status</Label>
-              <NativeSelect value={editStatus} onChange={(e) => setEditStatus(e.target.value)}>
-                <option value="approved">approved</option>
-                <option value="cancelled">cancelled</option>
-                <option value="rejected">rejected</option>
-              </NativeSelect>
-            </div>
           </div>
           <DialogFooter>
             <DialogCancelButton onClick={() => setEditing(null)}>Cancel</DialogCancelButton>
-            <Button
-              onClick={handleUpdateLeave}
-              disabled={mutating}
-              variant="brand"
-            >
+            <Button onClick={handleUpdateLeave} disabled={mutating} variant="brand">
               {mutating ? 'Saving…' : 'Save changes'}
             </Button>
           </DialogFooter>
@@ -341,10 +318,10 @@ export function StaffLeavesTab({
       <ConfirmDialog
         open={!!deleteTarget}
         onOpenChange={(open) => !open && setDeleteTarget(null)}
-        title="Delete leave?"
+        title="Delete leave request?"
         description={
           deleteTarget
-            ? `Remove leave for ${deleteTarget.fullName} (${formatRange(deleteTarget.startDate, deleteTarget.endDate)}) and clear related leave attendance.`
+            ? `Remove your pending request (${formatRange(deleteTarget.startDate, deleteTarget.endDate)})?`
             : ''
         }
         confirmLabel="Delete"
@@ -355,4 +332,4 @@ export function StaffLeavesTab({
   )
 }
 
-export default StaffLeavesTab
+export default MyLeavesTab

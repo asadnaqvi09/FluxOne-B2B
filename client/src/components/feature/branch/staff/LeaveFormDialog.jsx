@@ -98,8 +98,8 @@ export function LeaveFormDialog({
       open={open}
       onOpenChange={onOpenChange}
       dirty={dirty}
-      title="Apply Leave"
-      description="Register single or bulk employee leaves"
+      title="Add Staff Leave"
+      description="Register single or bulk employee leaves (approved immediately)"
       contentClassName="sm:max-w-lg"
       footer={
         step === 1 ? (

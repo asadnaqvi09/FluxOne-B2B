@@ -95,7 +95,7 @@ function StaffStatusToggle({ row, loading, onChange }) {
   )
 }
 
-// Branch staff table — Doc v4: ID | Image | Joining Date/Time | Assign Designation | Scheduling | Hardware Assign | Status | Actions
+// Branch staff table: Staff ID | Name | Joining Date/Time | Designation | Scheduling | Assigned hardware | Status | Actions
 export function StaffTable({
   items = [],
   loading = false,
@@ -216,12 +216,12 @@ export function StaffTable({
             <Table className="min-w-[56rem] text-left text-sm">
               <TableHeader>
                 <TableRow className="text-xs tracking-wide text-slate-500 uppercase">
-                  <TableHead className="px-2 py-2.5 font-medium">ID</TableHead>
-                  <TableHead className="px-2 py-2.5 font-medium">Image</TableHead>
+                  <TableHead className="px-2 py-2.5 font-medium">Staff ID</TableHead>
+                  <TableHead className="px-2 py-2.5 font-medium">Name</TableHead>
                   <TableHead className="px-2 py-2.5 font-medium">Joining Date/Time</TableHead>
-                  <TableHead className="px-2 py-2.5 font-medium">Assign Designation</TableHead>
+                  <TableHead className="px-2 py-2.5 font-medium">Designation</TableHead>
                   <TableHead className="px-2 py-2.5 font-medium">Scheduling</TableHead>
-                  <TableHead className="px-2 py-2.5 font-medium">Hardware Assign</TableHead>
+                  <TableHead className="px-2 py-2.5 font-medium">Assigned hardware</TableHead>
                   <TableHead className="px-2 py-2.5 font-medium">Status</TableHead>
                   <TableActionsHead className="px-2 py-2.5 font-medium" />
                 </TableRow>

@@ -17,6 +17,7 @@ import {
 } from '@/components/ui/table'
 import { DataCard, ResponsiveDataShell } from '@/components/shared/ResponsiveDataShell'
 import { BRAND } from '@/lib/constants'
+import { displayItemCode } from '@/lib/formatDisplayId'
 import { money } from '@/lib/mapProduct'
 
 // View all lines on a purchase order + approve / cancel
@@ -51,7 +52,7 @@ export function OrderDetailPanel({
           mobile={lines.map((line) => (
             <DataCard key={line.id || line.productId}>
               <p className="text-sm font-medium text-slate-900">{line.name}</p>
-              <p className="font-mono text-[11px] text-slate-400">{line.itemCode}</p>
+              <p className="font-mono text-[11px] text-slate-400">{displayItemCode(line)}</p>
               <div className="mt-2 grid grid-cols-2 gap-2 text-xs text-slate-600">
                 <div>
                   <span className="text-slate-400">Scale</span>
@@ -77,7 +78,7 @@ export function OrderDetailPanel({
               <Table className="min-w-[520px] text-left text-sm">
                 <TableHeader>
                   <TableRow className="bg-slate-50 text-xs uppercase text-slate-400">
-                    <TableHead className="px-3 py-2">Name / Id</TableHead>
+                    <TableHead className="px-3 py-2">Name</TableHead>
                     <TableHead className="px-3 py-2">Scale</TableHead>
                     <TableHead className="px-3 py-2">Qty</TableHead>
                     <TableHead className="px-3 py-2">Price</TableHead>
@@ -90,7 +91,7 @@ export function OrderDetailPanel({
                       <TableCell className="px-3 py-2">
                         <span className="font-medium">{line.name}</span>
                         <span className="mt-0.5 block font-mono text-[11px] text-slate-400">
-                          {line.itemCode}
+                          {displayItemCode(line)}
                         </span>
                       </TableCell>
                       <TableCell className="px-3 py-2 capitalize">{line.scale}</TableCell>

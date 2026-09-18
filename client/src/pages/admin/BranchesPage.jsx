@@ -147,8 +147,8 @@ function BranchRowActions({
 }) {
   const isOpen = b.status === 'open'
   return (
-    // Centered action icons with even spacing (TC--MANAGE BRANCH-0A1)
-    <div className="inline-flex items-center justify-center gap-1">
+    // Left-aligned action icons (table consistency)
+    <div className="inline-flex items-center justify-start gap-1">
       <Button
         type="button"
         variant="ghost"
@@ -660,8 +660,8 @@ export function BranchesPage() {
                         Manager
                       </TableHead>
                       <TableHead className="px-2 py-3 font-medium whitespace-nowrap sm:px-3">Status</TableHead>
-                      <TableHead className="sticky right-0 z-[1] bg-slate-200/80 px-2 py-3 text-center font-medium whitespace-nowrap sm:px-3">
-                        Action
+                      <TableHead className="sticky right-0 z-[1] bg-slate-200/80 px-2 py-3 font-medium whitespace-nowrap sm:px-3">
+                        Actions
                       </TableHead>
                     </TableRow>
                   </TableHeader>
@@ -750,7 +750,7 @@ export function BranchesPage() {
                               {isOpen ? 'Open' : 'Blocked'}
                             </Badge>
                           </TableCell>
-                          <TableCell className="sticky right-0 z-[1] bg-white px-1.5 py-3 text-center whitespace-nowrap sm:px-3 group-hover:bg-slate-50/80">
+                          <TableCell className="sticky right-0 z-[1] bg-white px-1.5 py-3 whitespace-nowrap sm:px-3 group-hover:bg-slate-50/80">
                             <BranchRowActions
                               branch={b}
                               mutating={mutating}

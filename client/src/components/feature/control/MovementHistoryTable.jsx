@@ -14,7 +14,7 @@ import {
 } from '@/components/ui/table'
 import { TableRowsSkeleton } from '@/components/ui/skeleton'
 import { formatMovementDateTime } from '@/lib/mapStockMovement'
-import { displayMovementRef } from '@/lib/formatDisplayId'
+import { displayItemCode, displayMovementRef } from '@/lib/formatDisplayId'
 import { cn } from '@/lib/utils'
 
 function MovementRowActions({ row, onEdit, onDelete }) {
@@ -79,7 +79,7 @@ export function MovementHistoryTable({
                   ))}
                 </div>
                 {showActions ? (
-                  <div className="mt-3 flex justify-end border-t border-border pt-2">
+                  <div className="mt-3 flex justify-start border-t border-border pt-2">
                     <MovementRowActions row={row} onEdit={onEdit} onDelete={onDelete} />
                   </div>
                 ) : null}
@@ -97,7 +97,7 @@ export function MovementHistoryTable({
                     </TableHead>
                   ))}
                   {showActions ? (
-                    <TableHead className="px-2 py-2 text-right font-semibold">Actions</TableHead>
+                    <TableHead className="px-2 py-2 font-semibold">Actions</TableHead>
                   ) : null}
                 </TableRow>
               </TableHeader>
@@ -110,7 +110,7 @@ export function MovementHistoryTable({
                       </TableCell>
                     ))}
                     {showActions ? (
-                      <TableCell className="px-2 py-3 text-right">
+                      <TableCell className="px-2 py-3">
                         <MovementRowActions row={row} onEdit={onEdit} onDelete={onDelete} />
                       </TableCell>
                     ) : null}
@@ -138,7 +138,7 @@ export function movementImageNameColumns() {
   return [
     {
       key: 'reference',
-      label: 'Reference',
+      label: 'Stock ID',
       className: 'w-28',
       render: (row) => (
         <span className="font-mono text-xs text-slate-600" title={row.id}>
@@ -158,9 +158,9 @@ export function movementImageNameColumns() {
       render: (row) => (
         <div className="min-w-0">
           <p className="font-medium text-slate-900">{row.productName || '—'}</p>
-          {row.itemCode ? (
-            <p className="text-xs text-slate-400">{row.itemCode}</p>
-          ) : null}
+          <p className="text-xs text-slate-400">
+            {displayItemCode({ itemCode: row.itemCode, productId: row.productId })}
+          </p>
         </div>
       ),
     },

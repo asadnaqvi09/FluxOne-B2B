@@ -28,6 +28,13 @@ export function displayDiscountRef(row = {}) {
   return row.id ? referenceFromUuid(row.id, 'OFF') : '—'
 }
 
+/** Prefer real order_number; fall back to PO-XXXXXXXX from UUID. */
+export function displayOrderRef(row = {}) {
+  if (row.orderNumber) return String(row.orderNumber)
+  const id = row.id || row.orderId
+  return id ? referenceFromUuid(id, 'PO') : '—'
+}
+
 /** Prefer real product item_code; fall back to ITM-XXXXXXXX from UUID. */
 export function displayItemCode(row = {}) {
   const code = row.itemCode || row.item_code

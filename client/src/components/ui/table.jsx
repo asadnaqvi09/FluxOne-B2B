@@ -57,13 +57,12 @@ function TableCaption({ className, ...props }) {
   return <caption className={cn('mt-4 text-sm text-muted-foreground', className)} {...props} />
 }
 
-// Actions column — shrink-to-fit + text-right so header & controls share the same edge
-// (avoids a stretched sticky column pushing icons to the far viewport end)
+// Actions column — shrink-to-fit + text-left (header & body align with other columns)
 function TableActionsHead({ className, sticky = false, children = 'Actions', ...props }) {
   return (
     <TableHead
       className={cn(
-        'w-[1%] whitespace-nowrap px-2 py-3 text-right',
+        'w-[1%] whitespace-nowrap px-2 py-3 text-left',
         sticky && 'sticky right-0 z-[1]',
         className,
       )}
@@ -78,13 +77,13 @@ function TableActionsCell({ className, sticky = false, children, ...props }) {
   return (
     <TableCell
       className={cn(
-        'w-[1%] whitespace-nowrap px-2 py-3 text-right',
+        'w-[1%] whitespace-nowrap px-2 py-3 text-left',
         sticky && 'sticky right-0 z-[1] bg-white group-hover:bg-slate-50/80',
         className,
       )}
       {...props}
     >
-      <div className="inline-flex items-center justify-end gap-2.5">{children}</div>
+      <div className="inline-flex items-center justify-start gap-2.5">{children}</div>
     </TableCell>
   )
 }

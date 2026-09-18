@@ -32,6 +32,7 @@ import {
 import { apiClient } from '@/api/api'
 import { endpoints } from '@/api/endpoints'
 import { BRAND } from '@/lib/constants'
+import { referenceFromUuid } from '@/lib/formatDisplayId'
 import { toastError, toastSuccess } from '@/lib/toast'
 import { ImageUploadField } from '@/components/shared/ImageUploadField'
 import { useDebouncedValue } from '@/hooks/useDebouncedValue'
@@ -311,7 +312,20 @@ export function ResourcesPage() {
     }
   }
 
-  const displayCode = (hw) => hw.code || hw.id
+  const displayCode = (hw) =>
+    hw.code || (hw.id ? referenceFromUuid(hw.id, 'HW') : '—')
+
+  const displayScaleCode = (sc) =>
+    sc.code || (sc.id ? referenceFromUuid(sc.id, 'SCL') : '—')
+
+  const formatDisplayLabel = (value) => {
+    if (value == null || String(value).trim() === '') return '—'
+    return String(value)
+      .trim()
+      .split(/\s+/)
+      .map((w) => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase())
+      .join(' ')
+  }
 
   return (
     <div className="space-y-6 pb-8">
@@ -426,23 +440,25 @@ export function ResourcesPage() {
                               <div className="flex items-start justify-between gap-2">
                                 <div className="min-w-0">
                                   <p className="truncate text-sm font-semibold text-slate-900">
-                                    {hw.name}
+                                    {formatDisplayLabel(hw.name)}
                                   </p>
                                   <p className="font-mono text-[11px] text-slate-400">
                                     {displayCode(hw)}
                                   </p>
                                 </div>
                                 <Badge variant="outline" className={getStatusBadge(hw.status)}>
-                                  {hw.status}
+                                  {formatDisplayLabel(hw.status)}
                                 </Badge>
                               </div>
                               <p className="mt-1 text-xs text-slate-500">
-                                {hw.type} · {hw.companyName}
+                                {formatDisplayLabel(hw.type)} · {formatDisplayLabel(hw.companyName)}
                               </p>
                               <p className="mt-0.5 text-xs text-slate-400">
-                                {hw.assignedToName || 'Unassigned'}
+                                {hw.assignedToName
+                                  ? formatDisplayLabel(hw.assignedToName)
+                                  : 'Unassigned'}
                               </p>
-                              <div className="mt-3 flex justify-end gap-3">
+                              <div className="mt-3 flex justify-start gap-3">
                                 <button
                                   type="button"
                                   className="cursor-pointer text-slate-500 transition-colors hover:text-slate-900"
@@ -474,8 +490,8 @@ export function ResourcesPage() {
                           <TableHead className="px-2 py-3">Hardware ID / Date</TableHead>
                           <TableHead className="px-2 py-3">Device Name / Type</TableHead>
                           <TableHead className="px-2 py-3">Brand/Company</TableHead>
-                          <TableHead className="px-2 py-3 text-center">Status</TableHead>
-                          <TableHead className="hidden px-2 py-3 text-center lg:table-cell">
+                          <TableHead className="px-2 py-3">Status</TableHead>
+                          <TableHead className="hidden px-2 py-3 lg:table-cell">
                             Assignee
                           </TableHead>
                           <TableActionsHead sticky />
@@ -508,26 +524,28 @@ export function ResourcesPage() {
                                 </div>
                               </TableCell>
                               <TableCell className="px-2 py-3">
-                                <div className="font-semibold text-slate-900">{hw.name}</div>
+                                <div className="font-semibold text-slate-900">
+                                  {formatDisplayLabel(hw.name)}
+                                </div>
                                 <div className="text-[10px] font-medium text-slate-400">
-                                  {hw.type}
+                                  {formatDisplayLabel(hw.type)}
                                 </div>
                               </TableCell>
                               <TableCell className="px-2 py-3 text-slate-600">
-                                {hw.companyName}
+                                {formatDisplayLabel(hw.companyName)}
                               </TableCell>
-                              <TableCell className="px-2 py-3 text-center">
+                              <TableCell className="px-2 py-3">
                                 <Badge variant="outline" className={getStatusBadge(hw.status)}>
-                                  {hw.status}
+                                  {formatDisplayLabel(hw.status)}
                                 </Badge>
                               </TableCell>
-                              <TableCell className="hidden px-2 py-3 text-center text-slate-600 lg:table-cell">
+                              <TableCell className="hidden px-2 py-3 text-slate-600 lg:table-cell">
                                 {hw.assignedToName ? (
                                   <Badge
                                     variant="secondary"
                                     className="rounded border-none bg-purple-50 font-semibold text-purple-700 hover:bg-purple-100"
                                   >
-                                    {hw.assignedToName}
+                                    {formatDisplayLabel(hw.assignedToName)}
                                   </Badge>
                                 ) : (
                                   <span className="text-xs italic text-slate-400">Unassigned</span>
@@ -609,9 +627,9 @@ export function ResourcesPage() {
                             className="flex items-center justify-between gap-3 rounded-xl border border-border bg-slate-50/60 px-3 py-3"
                           >
                             <div className="min-w-0">
-                              <p className="font-semibold text-slate-800">{sc.name}</p>
+                              <p className="font-semibold text-slate-800">{formatDisplayLabel(sc.name)}</p>
                               <p className="font-mono text-[11px] text-slate-400">
-                                {sc.code || String(sc.id).slice(0, 8)}
+                                {displayScaleCode(sc)}
                               </p>
                               <p className="text-[11px] text-slate-400">
                                 {sc.createdAt
@@ -655,7 +673,7 @@ export function ResourcesPage() {
                           {scalesPaging.slice.map((sc) => (
                               <TableRow key={sc.id} className="group">
                                 <TableCell className="px-2 py-3 font-mono font-bold text-slate-900">
-                                  {sc.code || String(sc.id).slice(0, 8)}
+                                  {displayScaleCode(sc)}
                                 </TableCell>
                                 <TableCell className="px-2 py-3 text-slate-500">
                                   {sc.createdAt
@@ -663,7 +681,7 @@ export function ResourcesPage() {
                                     : '—'}
                                 </TableCell>
                                 <TableCell className="px-2 py-3 font-semibold text-slate-800">
-                                  {sc.name}
+                                  {formatDisplayLabel(sc.name)}
                                 </TableCell>
                                 <TableActionsCell>
                                   <button

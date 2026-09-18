@@ -213,7 +213,7 @@ export function MyLeavesTab({ createOpen = false, onCreateOpenChange }) {
                     <TableHead className="px-3 py-2 font-medium">Leave Date Range</TableHead>
                     <TableHead className="px-3 py-2 font-medium">Apply Date & Time</TableHead>
                     <TableHead className="px-3 py-2 font-medium">Status</TableHead>
-                    <TableHead className="px-3 py-2 text-right font-medium">Actions</TableHead>
+                    <TableHead className="px-3 py-2 font-medium">Actions</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -235,7 +235,7 @@ export function MyLeavesTab({ createOpen = false, onCreateOpenChange }) {
                           {l.status}
                         </span>
                       </TableCell>
-                      <TableCell className="px-3 py-3 text-right">
+                      <TableCell className="px-3 py-3">
                         {l.status === 'pending' ? (
                           <RowActionButtons
                             onEdit={() => openEdit(l)}

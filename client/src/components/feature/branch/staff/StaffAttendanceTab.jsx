@@ -617,7 +617,7 @@ export function StaffAttendanceTab({ designations = [], staff = [] }) {
                       <TableHead className="px-3 py-2 font-medium">Designation</TableHead>
                       <TableHead className="px-3 py-2 font-medium">Mark Attendance</TableHead>
                       <TableHead className="px-3 py-2 font-medium">Shift Note</TableHead>
-                      <TableHead className="px-3 py-2 text-right font-medium">Action</TableHead>
+                      <TableHead className="px-3 py-2 font-medium">Action</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -657,7 +657,7 @@ export function StaffAttendanceTab({ designations = [], staff = [] }) {
                               className="h-8 max-w-[160px] py-0.5 text-xs"
                             />
                           </TableCell>
-                          <TableCell className="px-3 py-2.5 text-right">
+                          <TableCell className="px-3 py-2.5">
                             <Button
                               size="sm"
                               variant={local.isSaved ? 'outline' : 'default'}

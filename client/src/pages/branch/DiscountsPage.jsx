@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { Plus, Tag } from 'lucide-react'
+import { Plus } from 'lucide-react'
 import { PageHeader } from '@/components/shared/PageHeader'
 import { MotionHeader, MotionReveal } from '@/components/shared/MotionReveal'
 import { SurfaceCard } from '@/components/shared/SurfaceCard'
@@ -229,13 +229,12 @@ export function DiscountsPage() {
                         </div>
                         <Badge
                           variant="success"
-                          className="inline-flex shrink-0 items-center gap-1 rounded border-none bg-emerald-50 px-2.5 py-1 text-xs font-bold text-emerald-800 hover:bg-emerald-100"
+                          className="inline-flex shrink-0 rounded border-none bg-emerald-50 px-2.5 py-1 text-xs font-bold text-emerald-800 hover:bg-emerald-100"
                         >
-                          <Tag className="size-3" />
                           {parseFloat(disc.percent)}% OFF
                         </Badge>
                       </div>
-                      <div className="mt-3 flex justify-end">
+                      <div className="mt-3 flex justify-start">
                         <RowActionButtons
                           onEdit={() => handleOpenEdit(disc)}
                           onDelete={() => handleDeleteDiscount(disc.id)}
@@ -249,17 +248,17 @@ export function DiscountsPage() {
                 <Table className="min-w-[32rem] text-left text-sm">
                   <TableHeader>
                     <TableRow className="text-xs text-slate-500 uppercase">
-                      <TableHead className="px-2 py-3">Campaign Code</TableHead>
-                      <TableHead className="px-2 py-3">Campaign Name / Explanation</TableHead>
+                      <TableHead className="px-2 py-3">Offer ID</TableHead>
+                      <TableHead className="px-2 py-3">Offer name</TableHead>
                       <TableHead className="px-2 py-3">Category</TableHead>
-                      <TableHead className="px-2 py-3 text-center">Discount Percentage</TableHead>
+                      <TableHead className="px-2 py-3">Discount %</TableHead>
                       <TableActionsHead sticky />
                     </TableRow>
                   </TableHeader>
                   <TableBody>
                     {pagedDiscounts.map((disc) => (
                         <TableRow key={disc.id} className="group">
-                          <TableCell className="px-2 py-3 font-mono font-bold text-slate-900">
+                          <TableCell className="px-2 py-3 font-mono font-bold text-purple-800">
                             {displayDiscountRef(disc)}
                           </TableCell>
                           <TableCell className="px-2 py-3 font-semibold text-slate-800">
@@ -268,12 +267,11 @@ export function DiscountsPage() {
                           <TableCell className="px-2 py-3 text-slate-600">
                             {disc.categoryName || 'All categories'}
                           </TableCell>
-                          <TableCell className="px-2 py-3 text-center">
+                          <TableCell className="px-2 py-3">
                             <Badge
                               variant="success"
-                              className="inline-flex items-center gap-1 rounded border-none bg-emerald-50 px-2.5 py-1 text-xs font-bold text-emerald-800 hover:bg-emerald-100"
+                              className="inline-flex rounded border-none bg-emerald-50 px-2.5 py-1 text-xs font-bold text-emerald-800 hover:bg-emerald-100"
                             >
-                              <Tag className="size-3" />
                               {parseFloat(disc.percent)}% OFF
                             </Badge>
                           </TableCell>

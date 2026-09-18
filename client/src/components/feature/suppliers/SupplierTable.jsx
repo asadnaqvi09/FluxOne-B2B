@@ -129,7 +129,7 @@ export function SupplierTable({
               <TableHeader>
                 <TableRow className="text-xs uppercase tracking-wide text-slate-400">
                   <TableHead className="px-2 py-3 font-semibold">Image</TableHead>
-                  <TableHead className="px-2 py-3 font-semibold">Reference</TableHead>
+                  <TableHead className="px-2 py-3 font-semibold">Supplier ID</TableHead>
                   <TableHead className="px-2 py-3 font-semibold">Company</TableHead>
                   <TableHead className="px-2 py-3 font-semibold">Company phone</TableHead>
                   <TableHead className="px-2 py-3 font-semibold">Representative</TableHead>
@@ -138,7 +138,7 @@ export function SupplierTable({
                   <TableHead className="hidden px-2 py-3 font-semibold xl:table-cell">Reg / Bank</TableHead>
                   <TableHead className="hidden px-2 py-3 font-semibold xl:table-cell">Signature</TableHead>
                   <TableHead className="px-2 py-3 font-semibold">Status</TableHead>
-                  <TableHead className="sticky right-0 z-[1] bg-slate-200/80 px-2 py-3 text-right font-semibold">
+                  <TableHead className="sticky right-0 z-[1] bg-slate-200/80 px-2 py-3 font-semibold">
                     Actions
                   </TableHead>
                 </TableRow>
@@ -203,8 +203,8 @@ export function SupplierTable({
                         onChange={(status) => onStatusChange?.(row, status === 'active')}
                       />
                     </TableCell>
-                    <TableCell className="sticky right-0 z-[1] bg-white px-2 py-3 text-right group-hover:bg-slate-50/80">
-                      <div className="inline-flex items-center justify-end">
+                    <TableCell className="sticky right-0 z-[1] bg-white px-2 py-3 group-hover:bg-slate-50/80">
+                      <div className="inline-flex items-center justify-start">
                         <Button
                           type="button"
                           size="icon"

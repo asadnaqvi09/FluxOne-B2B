@@ -36,6 +36,7 @@ import {
   sumScalePoints,
 } from '@/lib/performanceScales'
 import { BRAND } from '@/lib/constants'
+import { displayStaffRef } from '@/lib/formatDisplayId'
 import { toastError, toastSuccess } from '@/lib/toast'
 
 export function StaffPerformanceTab({
@@ -94,7 +95,9 @@ export function StaffPerformanceTab({
     if (searchQuery) {
       const q = searchQuery.toLowerCase()
       const matchesName = String(emp.fullName || '').toLowerCase().includes(q)
-      const matchesId = String(emp.staffId || '').toLowerCase().includes(q)
+      const staffRef = displayStaffRef(emp).toLowerCase()
+      const matchesId =
+        staffRef.includes(q) || String(emp.staffId || '').toLowerCase().includes(q)
       if (!matchesName && !matchesId) return false
     }
     return true
@@ -241,6 +244,12 @@ export function StaffPerformanceTab({
                   <div className="flex items-start justify-between gap-2">
                     <div className="min-w-0">
                       <p className="truncate text-sm font-semibold text-slate-900">{emp.fullName}</p>
+                      <p
+                        title={emp.staffId || undefined}
+                        className="mt-0.5 font-mono text-[11px] font-bold text-purple-800"
+                      >
+                        {displayStaffRef(emp)}
+                      </p>
                       <p className="mt-0.5 text-xs text-slate-500">{emp.designation || '—'}</p>
                     </div>
                     <Badge variant="outline" className={getRatingBadgeStyle(emp.rating)}>
@@ -263,23 +272,32 @@ export function StaffPerformanceTab({
                   <TableHeader>
                     <TableRow className="text-xs text-slate-500 uppercase">
                       <TableHead>Employee</TableHead>
+                      <TableHead>Staff ID</TableHead>
                       <TableHead>Designation</TableHead>
-                      <TableHead className="text-center">Score rating</TableHead>
-                      <TableHead className="text-right">Actions</TableHead>
+                      <TableHead>Score rating</TableHead>
+                      <TableHead>Actions</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
                     {rosterPaging.slice.map((emp) => (
                       <TableRow key={emp.staffId}>
                         <TableCell className="font-semibold text-slate-900">{emp.fullName}</TableCell>
+                        <TableCell>
+                          <span
+                            title={emp.staffId || undefined}
+                            className="font-mono text-xs font-bold text-purple-800 select-all"
+                          >
+                            {displayStaffRef(emp)}
+                          </span>
+                        </TableCell>
                         <TableCell className="text-slate-600">{emp.designation || '—'}</TableCell>
-                        <TableCell className="text-center">
+                        <TableCell>
                           <Badge variant="outline" className={getRatingBadgeStyle(emp.rating)}>
                             <Star className="mr-1 size-3.5 fill-current" />
                             {emp.rating}%
                           </Badge>
                         </TableCell>
-                        <TableCell className="text-right">
+                        <TableCell>
                           <Button
                             size="sm"
                             variant="brand"
@@ -337,7 +355,7 @@ export function StaffPerformanceTab({
                     <TableRow className="text-xs text-slate-500 uppercase">
                       <TableHead>Scale Name</TableHead>
                       <TableHead>Max Weights/Points</TableHead>
-                      <TableHead className="text-right">Actions</TableHead>
+                      <TableHead>Actions</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -345,7 +363,7 @@ export function StaffPerformanceTab({
                       <TableRow key={s.id}>
                         <TableCell className="font-semibold text-slate-900">{s.name}</TableCell>
                         <TableCell className="font-mono text-slate-700">{s.maxPoints} pts</TableCell>
-                            <TableCell className="text-right">
+                            <TableCell>
                               <RowActionButtons
                                 onEdit={() => openEditScale(s)}
                                 onDelete={() => setDeleteTargetScale(s)}

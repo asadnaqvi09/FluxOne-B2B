@@ -53,7 +53,7 @@ export function RowActionButtons({
   iconClassName,
 }) {
   return (
-    <div className={cn('flex items-center justify-end gap-1', className)}>
+    <div className={cn('flex items-center justify-start gap-1', className)}>
       {onEdit ? (
         <ActionIconButton
           action="edit"

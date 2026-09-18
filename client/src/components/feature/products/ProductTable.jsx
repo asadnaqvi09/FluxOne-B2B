@@ -17,6 +17,7 @@ import {
 } from '@/components/ui/table'
 import { TableRowsSkeleton } from '@/components/ui/skeleton'
 import { money } from '@/lib/mapProduct'
+import { displayItemCode } from '@/lib/formatDisplayId'
 
 export function ProductTable({
   items = [],
@@ -67,7 +68,7 @@ export function ProductTable({
                     <div className="flex items-start justify-between gap-2">
                       <div className="min-w-0">
                         <p className="truncate text-sm font-semibold text-slate-900">{row.name}</p>
-                        <p className="font-mono text-[11px] text-slate-400">{row.itemCode}</p>
+                        <p className="font-mono text-[11px] text-slate-400">{displayItemCode(row)}</p>
                       </div>
                       <ProductStatusToggle
                         status={row.status}
@@ -145,7 +146,7 @@ export function ProductTable({
             <Table className="min-w-[1100px] text-left text-sm">
               <TableHeader>
                 <TableRow className="text-[11px] tracking-wide text-slate-500 uppercase">
-                  <TableHead className="px-2 py-3 font-semibold">Image</TableHead>
+                  <TableHead className="px-2 py-3 font-semibold">Name</TableHead>
                   <TableHead className="px-2 py-3 font-semibold">Scale</TableHead>
                   <TableHead className="px-2 py-3 font-semibold">Item code</TableHead>
                   <TableHead className="px-2 py-3 font-semibold">Barcode</TableHead>
@@ -179,8 +180,10 @@ export function ProductTable({
                       </div>
                     </TableCell>
                     <TableCell className="px-2 py-3 text-slate-700">{row.scale}</TableCell>
-                    <TableCell className="px-2 py-3 font-mono text-xs text-slate-600">{row.itemCode}</TableCell>
-                    <TableCell className="max-w-[120px] px-2 py-3">
+                    <TableCell className="px-2 py-3 font-mono text-xs text-slate-600 whitespace-nowrap">
+                      {displayItemCode(row)}
+                    </TableCell>
+                    <TableCell className="max-w-[140px] px-2 py-3 whitespace-nowrap">
                       <BarcodeCell value={row.barcode} />
                     </TableCell>
                     <TableCell className="px-2 py-3">

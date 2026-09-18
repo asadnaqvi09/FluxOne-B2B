@@ -176,7 +176,7 @@ export function StaffHolidaysTab({
                   <TableRow className="text-xs text-slate-500 uppercase">
                     <TableHead className="px-3 py-2 font-medium">Holiday Date</TableHead>
                     <TableHead className="px-3 py-2 font-medium">Holiday Name</TableHead>
-                    <TableHead className="px-3 py-2 text-right font-medium">Actions</TableHead>
+                    <TableHead className="px-3 py-2 font-medium">Actions</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -186,7 +186,7 @@ export function StaffHolidaysTab({
                         {formatDate(h.holidayDate)}
                       </TableCell>
                       <TableCell className="px-3 py-3 text-slate-700">{h.name}</TableCell>
-                        <TableCell className="px-3 py-3 text-right">
+                        <TableCell className="px-3 py-3">
                           <RowActionButtons
                             onEdit={() => openEdit(h)}
                             onDelete={() => setDeleteTarget(h)}

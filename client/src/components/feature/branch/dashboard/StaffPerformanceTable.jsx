@@ -50,7 +50,7 @@ export function StaffPerformanceTable({ staff = [], className }) {
       className={cn('flex h-full flex-col justify-between', className)}
       bodyClassName="flex flex-1 flex-col justify-between"
       title="Staff List"
-      description="Name, code, status & score rating"
+      description="Name, staff ID, status & score rating"
     >
       {isEmpty ? (
         <EmptyState
@@ -82,7 +82,10 @@ export function StaffPerformanceTable({ staff = [], className }) {
                       </span>
                     </div>
                     <div className="mt-2 flex items-center justify-between gap-2">
-                      <span className="inline-block rounded border border-purple-100 bg-purple-50 px-2 py-0.5 font-mono text-[11px] font-semibold whitespace-nowrap text-purple-800">
+                      <span
+                        title={person.id || undefined}
+                        className="font-mono text-[11px] font-bold whitespace-nowrap text-purple-800 select-all"
+                      >
                         {displayStaffRef(person)}
                       </span>
                       <p className="text-sm font-semibold text-slate-900">{formatScore(person)}</p>
@@ -96,9 +99,9 @@ export function StaffPerformanceTable({ staff = [], className }) {
                 <TableHeader>
                   <TableRow className="text-xs tracking-wide text-slate-500 uppercase">
                     <TableHead className="px-2 py-2.5 font-medium">Employee</TableHead>
-                    <TableHead className="px-2 py-2.5 font-medium">Code</TableHead>
+                    <TableHead className="px-2 py-2.5 font-medium">Staff ID</TableHead>
                     <TableHead className="px-2 py-2.5 font-medium">Status</TableHead>
-                    <TableHead className="px-2 py-2.5 text-right font-medium">Score</TableHead>
+                    <TableHead className="px-2 py-2.5 font-medium">Score</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -118,7 +121,10 @@ export function StaffPerformanceTable({ staff = [], className }) {
                         </div>
                       </TableCell>
                       <TableCell className="px-2 py-3">
-                        <span className="inline-block rounded border border-purple-100 bg-purple-50 px-2 py-0.5 font-mono text-[11px] font-semibold whitespace-nowrap text-purple-800">
+                        <span
+                          title={person.id || undefined}
+                          className="font-mono text-xs font-bold text-purple-800 select-all"
+                        >
                           {displayStaffRef(person)}
                         </span>
                       </TableCell>
@@ -132,7 +138,7 @@ export function StaffPerformanceTable({ staff = [], className }) {
                           {statusLabel(person.status)}
                         </span>
                       </TableCell>
-                      <TableCell className="px-2 py-3 text-right font-semibold text-slate-900">
+                      <TableCell className="px-2 py-3 font-semibold text-slate-900">
                         {formatScore(person)}
                       </TableCell>
                     </TableRow>

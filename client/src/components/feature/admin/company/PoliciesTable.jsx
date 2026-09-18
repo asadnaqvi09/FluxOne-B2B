@@ -82,7 +82,7 @@ function CategoryBadge({ category, config }) {
 
 function PolicyActionsMenu({ policy, onView, onEdit, onDelete }) {
   return (
-    <div className="relative inline-flex justify-end">
+    <div className="relative inline-flex justify-start">
       <DropdownMenu>
         <DropdownMenuTrigger
           className="inline-flex size-8 cursor-pointer items-center justify-center rounded-lg text-slate-500 hover:bg-slate-100 hover:text-slate-800"
@@ -90,7 +90,7 @@ function PolicyActionsMenu({ policy, onView, onEdit, onDelete }) {
         >
           <MoreVertical className="size-4" />
         </DropdownMenuTrigger>
-        <DropdownMenuContent className="min-w-[9rem]" align="end">
+        <DropdownMenuContent className="min-w-[9rem]" align="start">
           <DropdownMenuItem
             className="cursor-pointer gap-2 text-slate-700"
             onClick={() => onView?.(policy)}
@@ -128,7 +128,7 @@ function SortableHead({ label, active, direction, onClick, className }) {
       >
         {label}
         <ArrowDownUp
-          className={cn('size-3 opacity-40', active && 'opacity-100 text-purple-700')}
+          className={cn('size-3 text-slate-400 opacity-40', active && 'opacity-100 text-slate-600')}
           data-dir={direction}
         />
       </button>
@@ -265,7 +265,7 @@ export function PoliciesTable({
                       direction={sortDir}
                       onClick={() => toggleSort('updatedAt')}
                     />
-                    <TableHead className="px-3 py-3 text-right font-semibold">Actions</TableHead>
+                    <TableHead className="px-3 py-3 font-semibold">Actions</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -290,7 +290,7 @@ export function PoliciesTable({
                         <TableCell className="px-3 py-3 whitespace-nowrap text-slate-600">
                           {formatPolicyUpdatedAt(p.updatedAt || p.createdAt)}
                         </TableCell>
-                        <TableCell className="px-3 py-3 text-right">
+                        <TableCell className="px-3 py-3">
                           <PolicyActionsMenu
                             policy={p}
                             onView={onView}

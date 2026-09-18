@@ -270,12 +270,9 @@ export function SalesPage() {
                     >
                       <div className="flex items-start justify-between gap-2">
                         <div className="min-w-0">
-                          <Badge
-                            variant="secondary"
-                            className="rounded border-none bg-purple-50 font-semibold text-purple-700 hover:bg-purple-100"
-                          >
+                          <span className="font-mono text-xs font-bold text-purple-800 select-all">
                             {salId}
-                          </Badge>
+                          </span>
                           <p className="mt-0.5 font-mono text-[10px] text-slate-400">{trkId}</p>
                           <p className="mt-1 text-xs text-slate-500">{soldAtLabel}</p>
                         </div>
@@ -348,15 +345,15 @@ export function SalesPage() {
                 <Table className="min-w-[56rem]">
                   <TableHeader>
                     <TableRow className="text-xs text-slate-500">
-                      <TableHead>ID</TableHead>
+                      <TableHead>Sale ID</TableHead>
                       <TableHead>Date / Time</TableHead>
                       <TableHead>Sale items</TableHead>
                       <TableHead className="hidden lg:table-cell">Exchange item</TableHead>
-                      <TableHead className="hidden text-right xl:table-cell">Tax</TableHead>
-                      <TableHead className="hidden text-right xl:table-cell">Discount</TableHead>
-                      <TableHead className="text-right">Final</TableHead>
-                      <TableHead className="text-right">Paid</TableHead>
-                      <TableHead className="hidden text-right lg:table-cell">Return</TableHead>
+                      <TableHead className="hidden xl:table-cell">Tax</TableHead>
+                      <TableHead className="hidden xl:table-cell">Discount</TableHead>
+                      <TableHead>Final</TableHead>
+                      <TableHead>Paid</TableHead>
+                      <TableHead className="hidden lg:table-cell">Return</TableHead>
                       <TableActionsHead sticky />
                     </TableRow>
                   </TableHeader>
@@ -371,12 +368,9 @@ export function SalesPage() {
                       return (
                         <TableRow key={sale.id} className="group">
                           <TableCell className="py-4">
-                            <Badge
-                              variant="secondary"
-                              className="rounded border-none bg-purple-50 font-semibold text-purple-700 hover:bg-purple-100"
-                            >
+                            <span className="font-mono text-xs font-bold text-purple-800 select-all">
                               {salId}
-                            </Badge>
+                            </span>
                             <div className="mt-0.5 font-mono text-[10px] text-slate-400">{trkId}</div>
                           </TableCell>
                           <TableCell className="text-slate-600">
@@ -400,19 +394,19 @@ export function SalesPage() {
                           <TableCell className="hidden text-slate-500 lg:table-cell">
                             {exchangeItems.map((i) => i.name).join(', ') || '—'}
                           </TableCell>
-                          <TableCell className="hidden text-right text-slate-600 xl:table-cell">
+                          <TableCell className="hidden text-slate-600 xl:table-cell">
                             Rs. {formatPrice(sale.tax_amount || sale.taxAmount)}
                           </TableCell>
-                          <TableCell className="hidden text-right text-slate-600 xl:table-cell">
+                          <TableCell className="hidden text-slate-600 xl:table-cell">
                             Rs. {formatPrice(sale.discount_amount || sale.discountAmount)}
                           </TableCell>
-                          <TableCell className="text-right font-bold text-slate-900">
+                          <TableCell className="font-bold text-slate-900">
                             Rs. {formatPrice(sale.finalAmount)}
                           </TableCell>
-                          <TableCell className="text-right text-slate-600">
+                          <TableCell className="text-slate-600">
                             Rs. {formatPrice(sale.paidAmount)}
                           </TableCell>
-                          <TableCell className="hidden text-right text-slate-600 lg:table-cell">
+                          <TableCell className="hidden text-slate-600 lg:table-cell">
                             {parseFloat(sale.returnAmount) > 0
                               ? `Rs. ${formatPrice(sale.returnAmount)}`
                               : '—'}

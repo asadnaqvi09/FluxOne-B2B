@@ -98,7 +98,7 @@ function StockAlertsTableComponent({
             <Table className="w-full table-fixed text-left text-sm">
               <TableHeader>
                 <TableRow className="text-xs tracking-wide text-slate-500 uppercase">
-                  <TableHead className="w-[18%] px-2 py-3 font-semibold">Code</TableHead>
+                  <TableHead className="w-[18%] px-2 py-3 font-semibold">Item code</TableHead>
                   <TableHead className="w-[28%] px-2 py-3 font-semibold">Name</TableHead>
                   <TableHead className="w-[14%] px-2 py-3 font-semibold">Remaining</TableHead>
                   <TableHead className="w-[18%] px-2 py-3 font-semibold">Status</TableHead>

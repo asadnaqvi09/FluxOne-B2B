@@ -35,6 +35,7 @@ import { useDebouncedValue } from '@/hooks/useDebouncedValue'
 import { useFormBaseline } from '@/hooks/useFormBaseline'
 import { BRAND } from '@/lib/constants'
 import { toastSuccess, toastError } from '@/lib/toast'
+import { displayItemCode } from '@/lib/formatDisplayId'
 import { validatePercentage } from '@/lib/validation/formValidators'
 import {
   Percent,
@@ -284,7 +285,7 @@ export function TaxProfitPage() {
               <Search className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-slate-400" />
               <input
                 type="text"
-                placeholder="Search by SKU, name, or barcode..."
+                placeholder="Search by item code, name, or barcode..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 className="h-10 w-full rounded-xl border border-border bg-slate-50/70 py-2 pl-9 pr-4 text-xs sm:text-sm text-slate-900 outline-none focus:border-purple-300 focus:bg-white focus:ring-1 focus:ring-purple-300"
@@ -374,6 +375,7 @@ export function TaxProfitPage() {
                       />
                       {colKey
                         .replace('Pct', ' %')
+                        .replace('id', 'Item code')
                         .replace('baseCost', 'Base Cost')
                         .replace('finalPrice', 'Final Price')}
                     </label>
@@ -481,7 +483,7 @@ export function TaxProfitPage() {
                         <div className="min-w-0 flex-1">
                           <p className="truncate text-sm font-bold text-slate-900">{p.name}</p>
                           <p className="font-mono text-[11px] text-slate-400">
-                            {p.itemCode || p.id}
+                            {displayItemCode(p)}
                           </p>
                           <p className="mt-1 text-xs text-slate-500">
                             {p.category || 'Uncategorized'}
@@ -529,7 +531,7 @@ export function TaxProfitPage() {
                         />
                       </TableHead>
                       {visibleColumns.id && (
-                        <TableHead className="px-3 py-3 font-medium">SKU ID</TableHead>
+                        <TableHead className="px-3 py-3 font-medium">Item code</TableHead>
                       )}
                       {visibleColumns.image && (
                         <TableHead className="px-3 py-3 font-medium">Image</TableHead>
@@ -555,7 +557,7 @@ export function TaxProfitPage() {
                         <TableHead className="px-3 py-3 font-medium">Tax %</TableHead>
                       )}
                       {visibleColumns.finalPrice && (
-                        <TableHead className="sticky right-0 z-[1] bg-slate-200/80 px-3 py-3 text-right font-bold text-slate-900">
+                        <TableHead className="sticky right-0 z-[1] bg-slate-200/80 px-3 py-3 font-bold text-slate-900">
                           Final Price
                         </TableHead>
                       )}
@@ -585,8 +587,8 @@ export function TaxProfitPage() {
                           </TableCell>
 
                           {visibleColumns.id && (
-                            <TableCell className="px-3 py-3 font-mono text-xs font-bold text-slate-700">
-                              {p.itemCode || p.id}
+                            <TableCell className="px-3 py-3 font-mono text-xs font-bold text-slate-700 whitespace-nowrap">
+                              {displayItemCode(p)}
                             </TableCell>
                           )}
 
@@ -651,7 +653,7 @@ export function TaxProfitPage() {
                           )}
 
                           {visibleColumns.finalPrice && (
-                            <TableCell className="sticky right-0 z-[1] bg-white px-3 py-3 text-right group-hover:bg-slate-50/70">
+                            <TableCell className="sticky right-0 z-[1] bg-white px-3 py-3 group-hover:bg-slate-50/70">
                               <span className="font-extrabold text-sm text-purple-950 block">
                                 Rs. {Number(finalPrice).toLocaleString()}
                               </span>

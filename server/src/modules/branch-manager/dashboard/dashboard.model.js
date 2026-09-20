@@ -1,6 +1,6 @@
 import { pool, requireTenantId, tenantQuery } from '../../../config/db.js'
 
-// Final % = (Σ actual / Σ max) × 100 — missing actual treated as 0
+// Final % = (Σ actual / Σ max) × 100 — enabled (is_active) factors only
 const WEIGHTED_RATING_SQL = `
   COALESCE(
     ROUND(
@@ -11,7 +11,9 @@ const WEIGHTED_RATING_SQL = `
             SELECT DISTINCT ON (ps.scale_id) ps.points
             FROM performance_scores ps
             INNER JOIN scoring_scales ss_live
-              ON ss_live.id = ps.scale_id AND ss_live.tenant_id = ps.tenant_id
+              ON ss_live.id = ps.scale_id
+              AND ss_live.tenant_id = ps.tenant_id
+              AND ss_live.is_active = true
             WHERE ps.staff_id = s.id AND ps.tenant_id = s.tenant_id
             ORDER BY ps.scale_id, ps.scored_on DESC, ps.id DESC
           ) lp
@@ -21,6 +23,7 @@ const WEIGHTED_RATING_SQL = `
           SELECT SUM(ss_all.max_points)::numeric
           FROM scoring_scales ss_all
           WHERE ss_all.tenant_id = s.tenant_id
+            AND ss_all.is_active = true
         ), 0)
       ) * 100
     , 2)

@@ -16,8 +16,20 @@ import {
   TablePagination,
 } from '@/components/ui/table'
 import { TableRowsSkeleton } from '@/components/ui/skeleton'
-import { money } from '@/lib/mapProduct'
+import { formatInventoryStock, money } from '@/lib/mapProduct'
 import { displayItemCode } from '@/lib/formatDisplayId'
+
+function InventoryStockCell({ row, className = '' }) {
+  const stock = formatInventoryStock(row.quantity, row.reorderPoint, row.scale)
+  return (
+    <span
+      className={`text-xs font-medium whitespace-nowrap ${stock.className} ${className}`.trim()}
+      title={stock.display}
+    >
+      {stock.display}
+    </span>
+  )
+}
 
 export function ProductTable({
   items = [],
@@ -55,6 +67,7 @@ export function ProductTable({
         />
       ) : (
         <>
+          {/* Make Sure All tables are responsive */}
           {/* Mobile cards */}
           <div className="space-y-3 md:hidden">
             {list.map((row) => (
@@ -103,6 +116,10 @@ export function ProductTable({
                         <span className="text-slate-400">Current selling</span>{' '}
                         {money(row.sellingPrice)}
                       </p>
+                      <p>
+                        <span className="text-slate-400">Inventory stock</span>{' '}
+                        <InventoryStockCell row={row} />
+                      </p>
                     </div>
                     <div className="mt-3 flex flex-wrap gap-1.5">
                       <Button
@@ -141,9 +158,10 @@ export function ProductTable({
               </article>
             ))}
           </div>
+          {/* Make Sure All tables are responsive */}
           {/* Desktop table */}
           <div className="hidden overflow-x-auto md:block">
-            <Table className="min-w-[1100px] text-left text-sm">
+            <Table className="min-w-[1240px] text-left text-sm">
               <TableHeader>
                 <TableRow className="text-[11px] tracking-wide text-slate-500 uppercase">
                   <TableHead className="px-2 py-3 font-semibold">Name</TableHead>
@@ -157,6 +175,9 @@ export function ProductTable({
                   </TableHead>
                   <TableHead className="px-2 py-3 font-semibold">
                     Last / Current selling
+                  </TableHead>
+                  <TableHead className="px-2 py-3 font-semibold whitespace-nowrap">
+                    Inventory Stock
                   </TableHead>
                   <TableHead className="px-2 py-3 font-semibold">Status</TableHead>
                   <TableHead className="px-2 py-3 font-semibold">Action</TableHead>
@@ -227,6 +248,9 @@ export function ProductTable({
                           {money(row.sellingPrice)}
                         </span>
                       </p>
+                    </TableCell>
+                    <TableCell className="px-2 py-3">
+                      <InventoryStockCell row={row} />
                     </TableCell>
                     <TableCell className="px-2 py-3">
                       <ProductStatusToggle

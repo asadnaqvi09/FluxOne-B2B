@@ -94,7 +94,7 @@ export function useAdminPolicies({ q = '', category = 'all', page = 1, limit = D
     [load],
   )
 
-  // Quick patch for Print on Slip toggle without rewriting name/detail
+  // Quick patch for Enable / Disable (invoice slip visibility)
   const setPrintOnSlip = useCallback(
     async (id, printOnSlip) => {
       setMutating(true)

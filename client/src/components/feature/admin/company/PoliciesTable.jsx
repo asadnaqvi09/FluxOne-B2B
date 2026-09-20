@@ -209,7 +209,7 @@ export function PoliciesTable({
   return (
     <SurfaceCard
       title="Policies & Governance"
-      description="Corporate protocols enforced across branch portals. Toggle Print on Slip to show a policy on POS invoices."
+      description="Corporate protocols enforced across branch portals. Enable a policy to show it on POS invoice slips."
     >
       {loading ? (
         <p className="py-10 text-center text-sm text-slate-400">Loading policies…</p>
@@ -247,10 +247,10 @@ export function PoliciesTable({
                       active={Boolean(p.printOnSlip)}
                       loading={mutating && togglingId === p.id}
                       onChange={(next) => handleTogglePrint(p, next)}
-                      activeLabel="Print on slip"
-                      inactiveLabel="Slip off"
-                      activeTitle="Click to hide this policy on POS invoices"
-                      inactiveTitle="Click to print this policy on POS invoices"
+                      activeLabel="Enabled"
+                      inactiveLabel="Disabled"
+                      activeTitle="Click to disable — hide this policy on POS invoices"
+                      inactiveTitle="Click to enable — show this policy on POS invoices"
                     />
                     <span>{formatPolicyUpdatedAt(p.updatedAt || p.createdAt)}</span>
                   </div>
@@ -286,7 +286,7 @@ export function PoliciesTable({
                       onClick={() => toggleSort('status')}
                     />
                     <SortableHead
-                      label="Print on Slip"
+                      label="Enable / Disable"
                       active={sortKey === 'printOnSlip'}
                       direction={sortDir}
                       onClick={() => toggleSort('printOnSlip')}
@@ -331,10 +331,10 @@ export function PoliciesTable({
                               active={Boolean(p.printOnSlip)}
                               loading={mutating && togglingId === p.id}
                               onChange={(next) => handleTogglePrint(p, next)}
-                              activeLabel="On"
-                              inactiveLabel="Off"
-                              activeTitle="Click to hide this policy on POS invoices"
-                              inactiveTitle="Click to print this policy on POS invoices"
+                              activeLabel="Enabled"
+                              inactiveLabel="Disabled"
+                              activeTitle="Click to disable — hide this policy on POS invoices"
+                              inactiveTitle="Click to enable — show this policy on POS invoices"
                             />
                           </div>
                         </TableCell>

@@ -12,7 +12,15 @@ function slugify(text) {
 
 const SCALE_MAX_POINTS_MSG = 'Maximum points must be a whole number greater than 0.'
 
-// Final % = (Σ actual / Σ max) × 100 — missing actual treated as 0 via numerator.
+const SCALE_RETURNING = `
+  id,
+  code,
+  name,
+  max_points AS "maxPoints",
+  is_active AS "isActive"
+`
+
+// Final % = (Σ actual / Σ max) × 100 — only Enabled (is_active) factors
 const WEIGHTED_RATING_SQL = `
   COALESCE(
     ROUND(
@@ -23,7 +31,9 @@ const WEIGHTED_RATING_SQL = `
             SELECT DISTINCT ON (ps.scale_id) ps.points
             FROM performance_scores ps
             INNER JOIN scoring_scales ss_live
-              ON ss_live.id = ps.scale_id AND ss_live.tenant_id = ps.tenant_id
+              ON ss_live.id = ps.scale_id
+              AND ss_live.tenant_id = ps.tenant_id
+              AND ss_live.is_active = true
             WHERE ps.staff_id = s.id AND ps.tenant_id = s.tenant_id
             ORDER BY ps.scale_id, ps.scored_on DESC, ps.id DESC
           ) lp
@@ -33,6 +43,7 @@ const WEIGHTED_RATING_SQL = `
           SELECT SUM(ss_all.max_points)::numeric
           FROM scoring_scales ss_all
           WHERE ss_all.tenant_id = s.tenant_id
+            AND ss_all.is_active = true
         ), 0)
       ) * 100
     , 2)
@@ -47,16 +58,28 @@ function parseMaxPoints(raw) {
   return { ok: true, value: points }
 }
 
+function parseIsActive(raw) {
+  if (raw === undefined || raw === null || raw === '') return undefined
+  if (raw === true || raw === 'true') return true
+  if (raw === false || raw === 'false') return false
+  return undefined
+}
+
 export async function listScales(req, res) {
   const { rows } = await tenantQuery(
     req.tenantId,
-    `SELECT id, code, name, max_points AS "maxPoints" FROM scoring_scales WHERE tenant_id = $1 ORDER BY name ASC`,
+    `
+      SELECT ${SCALE_RETURNING}
+      FROM scoring_scales
+      WHERE tenant_id = $1
+      ORDER BY name ASC
+    `,
   )
   return success(res, rows)
 }
 
 export async function createScale(req, res) {
-  const { name, maxPoints } = req.body
+  const { name, maxPoints, isActive } = req.body
   if (!name || maxPoints === undefined || maxPoints === null || maxPoints === '') {
     return fail(res, 'Scale name and max points are required', 400)
   }
@@ -65,17 +88,22 @@ export async function createScale(req, res) {
   if (!parsed.ok) return fail(res, parsed.error, 400)
   const points = parsed.value
   const code = slugify(name)
+  const active = parseIsActive(isActive)
+  const activeValue = active === undefined ? true : active
 
   try {
     const { rows } = await tenantQuery(
       req.tenantId,
       `
-        INSERT INTO scoring_scales (tenant_id, code, name, max_points)
-        VALUES ($1, $2, $3, $4)
-        ON CONFLICT (tenant_id, code) DO UPDATE SET name = EXCLUDED.name, max_points = EXCLUDED.max_points
-        RETURNING id, code, name, max_points AS "maxPoints"
+        INSERT INTO scoring_scales (tenant_id, code, name, max_points, is_active)
+        VALUES ($1, $2, $3, $4, $5)
+        ON CONFLICT (tenant_id, code) DO UPDATE SET
+          name = EXCLUDED.name,
+          max_points = EXCLUDED.max_points,
+          is_active = EXCLUDED.is_active
+        RETURNING ${SCALE_RETURNING}
       `,
-      [code, name.trim(), points],
+      [code, name.trim(), points, activeValue],
     )
     return success(res, rows[0], 201)
   } catch (err) {
@@ -85,28 +113,53 @@ export async function createScale(req, res) {
 
 export async function updateScale(req, res) {
   const { id } = req.params
-  const { name, maxPoints } = req.body
-
-  if (!name || maxPoints === undefined || maxPoints === null || maxPoints === '') {
-    return fail(res, 'Scale name and max points are required', 400)
-  }
-
-  const parsed = parseMaxPoints(maxPoints)
-  if (!parsed.ok) return fail(res, parsed.error, 400)
-  const points = parsed.value
-  const code = slugify(name)
+  const { name, maxPoints, isActive } = req.body
+  const activeOnly =
+    parseIsActive(isActive) !== undefined &&
+    (name === undefined || name === null || name === '') &&
+    (maxPoints === undefined || maxPoints === null || maxPoints === '')
 
   try {
+    // Quick Enable / Disable toggle without renaming the factor
+    if (activeOnly) {
+      const { rows } = await tenantQuery(
+        req.tenantId,
+        `
+          UPDATE scoring_scales
+          SET is_active = $2
+          WHERE tenant_id = $1 AND id = $3
+          RETURNING ${SCALE_RETURNING}
+        `,
+        [parseIsActive(isActive), id],
+      )
+      if (rows.length === 0) return fail(res, 'Scale not found', 404)
+      return success(res, rows[0])
+    }
+
+    if (!name || maxPoints === undefined || maxPoints === null || maxPoints === '') {
+      return fail(res, 'Scale name and max points are required', 400)
+    }
+
+    const parsed = parseMaxPoints(maxPoints)
+    if (!parsed.ok) return fail(res, parsed.error, 400)
+    const points = parsed.value
+    const code = slugify(name)
+    const active = parseIsActive(isActive)
+
     // tenantQuery prepends tenantId as $1 — do not pass it again in params
     const { rows } = await tenantQuery(
       req.tenantId,
       `
         UPDATE scoring_scales
-        SET name = $2, max_points = $3, code = $4
-        WHERE tenant_id = $1 AND id = $5
-        RETURNING id, code, name, max_points AS "maxPoints"
+        SET
+          name = $2,
+          max_points = $3,
+          code = $4,
+          is_active = CASE WHEN $5::boolean IS NOT NULL THEN $5 ELSE is_active END
+        WHERE tenant_id = $1 AND id = $6
+        RETURNING ${SCALE_RETURNING}
       `,
-      [name.trim(), points, code, id],
+      [name.trim(), points, code, active === undefined ? null : active, id],
     )
     if (rows.length === 0) {
       return fail(res, 'Scale not found', 404)
@@ -154,11 +207,19 @@ export async function scoreStaff(req, res) {
   try {
     const { rows: scaleRows } = await tenantQuery(
       req.tenantId,
-      `SELECT max_points AS "maxPoints" FROM scoring_scales WHERE tenant_id = $1 AND id = $2 LIMIT 1`,
+      `
+        SELECT max_points AS "maxPoints", is_active AS "isActive"
+        FROM scoring_scales
+        WHERE tenant_id = $1 AND id = $2
+        LIMIT 1
+      `,
       [scaleId],
     )
     if (scaleRows.length === 0) {
       return fail(res, 'Scoring scale not found', 404)
+    }
+    if (scaleRows[0].isActive === false) {
+      return fail(res, 'Cannot score against a disabled scoring factor', 400)
     }
 
     const maxPoints = Number(scaleRows[0].maxPoints)
@@ -188,7 +249,7 @@ export async function scoreStaff(req, res) {
   }
 }
 
-// Aggregated scores for all staff — weighted % out of 100
+// Aggregated scores for all staff — weighted % out of 100 (enabled factors only)
 export async function getStaffScores(req, res) {
   try {
     const { rows } = await tenantQuery(

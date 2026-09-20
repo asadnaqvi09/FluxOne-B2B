@@ -11,11 +11,16 @@ export async function notifyAdminsOfLeaveRequest(tenantId, leave, { managerName,
 
   const name = managerName || 'Branch Manager'
   const branch = branchName || 'their branch'
+  const dates = formatRange(leave.startDate, leave.endDate)
+
+  // TL exact: New leave request submitted by [Employee Name] of branch (branch name)
+  // for (dates) and awaiting your approval.
+  const message = `New leave request submitted by ${name} of branch (${branch}) for (${dates}) and awaiting your approval.`
 
   return createNotificationsForUsers(tenantId, adminIds, {
     type: 'leave_request',
-    title: `New leave request submitted by ${name}.`,
-    body: `${name} requested leave at ${branch} (${formatRange(leave.startDate, leave.endDate)}).`,
+    title: message,
+    body: message,
     linkPath: `/admin/leaves?highlight=${leave.id}`,
     entityType: 'leave',
     entityId: leave.id,

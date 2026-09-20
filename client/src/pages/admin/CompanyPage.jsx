@@ -275,8 +275,8 @@ export function CompanyPage() {
     }
     toastSuccess(
       next
-        ? `"${policy.name}" will print on POS slips`
-        : `"${policy.name}" removed from POS slips`,
+        ? `"${policy.name}" enabled on POS invoice slips`
+        : `"${policy.name}" disabled on POS invoice slips`,
     )
   }
 
@@ -669,9 +669,9 @@ export function CompanyPage() {
           </div>
           {viewPolicy ? (
             <p className="text-xs text-slate-500">
-              Print on slip:{' '}
+              Invoice slip:{' '}
               <strong className={viewPolicy.printOnSlip ? 'text-emerald-700' : 'text-slate-600'}>
-                {viewPolicy.printOnSlip ? 'On' : 'Off'}
+                {viewPolicy.printOnSlip ? 'Enabled' : 'Disabled'}
               </strong>
             </p>
           ) : null}
@@ -767,10 +767,11 @@ export function CompanyPage() {
               />
               <span className="min-w-0">
                 <span className="block text-sm font-semibold text-slate-900">
-                  Print on slip / invoice
+                  Enable on invoice slip
                 </span>
                 <span className="mt-0.5 block text-xs text-slate-500">
-                  When enabled, this policy syncs to POS and prints on the customer receipt after a sale.
+                  When enabled, this policy syncs to POS and appears on the customer receipt after a
+                  sale. Disabled policies are hidden from the slip.
                 </span>
               </span>
             </label>

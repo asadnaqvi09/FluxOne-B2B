@@ -1,12 +1,23 @@
 // Dynamic scoring factors — final score is always normalized to 100%.
 // Final % = (Σ actual points / Σ maximum points) × 100
+// Disabled (isActive=false) factors are excluded from totals and evaluation.
 
 export const SCALE_MAX_POINTS_MSG =
   'Maximum points must be a whole number greater than 0.'
 
-export function sumScalePoints(scales = [], excludeId = null) {
+export function isScaleActive(scale) {
+  return scale?.isActive !== false
+}
+
+// Only enabled factors count toward totals / evaluation
+export function activeScales(scales = []) {
+  return (scales || []).filter(isScaleActive)
+}
+
+export function sumScalePoints(scales = [], excludeId = null, { activeOnly = false } = {}) {
   return scales.reduce((sum, scale) => {
     if (excludeId && scale?.id === excludeId) return sum
+    if (activeOnly && !isScaleActive(scale)) return sum
     return sum + (Number(scale?.maxPoints) || 0)
   }, 0)
 }
@@ -33,11 +44,12 @@ export function sumActualPoints(scoresByScaleId = {}, scales = []) {
   }, 0)
 }
 
-// Weighted aggregate out of 100 — defaults to 0 when no factors exist.
+// Weighted aggregate out of 100 — uses enabled factors only; defaults to 0.
 export function calcWeightedScorePercent(scoresByScaleId = {}, scales = []) {
-  const maxTotal = sumScalePoints(scales)
+  const enabled = activeScales(scales)
+  const maxTotal = sumScalePoints(enabled)
   if (maxTotal <= 0) return 0
-  const actualTotal = sumActualPoints(scoresByScaleId, scales)
+  const actualTotal = sumActualPoints(scoresByScaleId, enabled)
   return Math.round((actualTotal / maxTotal) * 10000) / 100
 }
 

@@ -1242,7 +1242,13 @@ async function fetchTenantBranchMeta(tenantId, branchId) {
   return rows[0] || null
 }
 
-// Active policies with Print on Slip enabled — shown on POS invoices
+// ---------------------------------------------------------------------------
+// Admin policies → POS invoice slip (FluxOne-POS consume contract)
+// Enabled policies only (print_on_slip = true). Helpers:
+//   posSlipPolicies.contract.js → resolveSlipPoliciesForPrint / formatSlipPolicyPrintLines
+// POS must print company.slipPolicies on each sale receipt; see that file when
+// implementing FluxOne-POS printer UI.
+// ---------------------------------------------------------------------------
 async function fetchSlipPolicies(tenantId) {
   const { rows } = await tenantQuery(
     tenantId,
@@ -1266,11 +1272,13 @@ async function fetchSlipPolicies(tenantId) {
     detail: row.detail || '',
     category: row.category || null,
     printOnSlip: true,
+    // Alias for TL "Enabled" wording on POS if needed
+    enabled: true,
   }))
 }
 
 function buildCompanyPayload(meta, slipPolicies = []) {
-  // Flatten for POS clients that only read warning / return text fields
+  // Flat text for simple / legacy thermal printers
   const returnInstructions =
     slipPolicies.length > 0
       ? slipPolicies.map((p) => `${p.name}: ${p.detail}`).join('\n\n')
@@ -1285,7 +1293,7 @@ function buildCompanyPayload(meta, slipPolicies = []) {
     address: meta.businessAddress || null,
     warningMessage,
     returnInstructions,
-    // Structured list for POS slip / invoice footer
+    // Structured list — preferred source for FluxOne-POS receipt footer
     slipPolicies,
   }
 }
@@ -1313,7 +1321,7 @@ async function buildSnapshotSections(tenantId, branchId, since = null) {
     offers,
     branchInventory,
     counters,
-    // Only policies toggled ON for print-on-slip
+    // Only Admin-Enabled policies (print_on_slip) — POS prints these on sale slips
     policies: slipPolicies,
   }
 }

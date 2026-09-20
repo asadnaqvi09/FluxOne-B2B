@@ -6,8 +6,9 @@ import { Label } from '@/components/ui/label'
 import { parseScaleMaxPoints, sumScalePoints } from '@/lib/performanceScales'
 import { toastError, toastSuccess } from '@/lib/toast'
 import { apiClient } from '@/api/api'
+import { Checkbox } from '@/components/ui/checkbox'
 
-const EMPTY = { name: '', maxPoints: '' }
+const EMPTY = { name: '', maxPoints: '', isActive: true }
 
 // Add / Edit scoring factor — dynamic max points, no fixed 100 budget.
 export function ScaleFormDialog({
@@ -39,9 +40,10 @@ export function ScaleFormDialog({
       setForm({
         name: initialScale.name || '',
         maxPoints: String(initialScale.maxPoints ?? ''),
+        isActive: initialScale.isActive !== false,
       })
     } else {
-      setForm({ name: '', maxPoints: '' })
+      setForm({ name: '', maxPoints: '', isActive: true })
     }
   }, [open, isEdit, initialScale])
 
@@ -61,7 +63,8 @@ export function ScaleFormDialog({
   const dirty =
     isEdit && initialScale
       ? form.name !== (initialScale.name || '') ||
-        String(form.maxPoints) !== String(initialScale.maxPoints ?? '')
+        String(form.maxPoints) !== String(initialScale.maxPoints ?? '') ||
+        Boolean(form.isActive) !== (initialScale.isActive !== false)
       : Boolean(form.name || form.maxPoints)
 
   const handleSubmit = async (e) => {
@@ -75,7 +78,11 @@ export function ScaleFormDialog({
     if (!check.ok) return toastError(check.error)
 
     setMutating(true)
-    const payload = { name, maxPoints: check.value }
+    const payload = {
+      name,
+      maxPoints: check.value,
+      isActive: Boolean(form.isActive),
+    }
     const res = isEdit
       ? await apiClient.put(`/branch/performance/scales/${initialScale.id}`, payload)
       : await apiClient.post('/branch/performance/scales', payload)
@@ -145,6 +152,24 @@ export function ScaleFormDialog({
           />
           {rangeError ? <p className="text-xs font-medium text-rose-600">{rangeError}</p> : null}
         </div>
+
+        <label
+          htmlFor="scale-active"
+          className="flex cursor-pointer items-start gap-3 rounded-xl border border-slate-200 bg-slate-50/80 px-3 py-3"
+        >
+          <Checkbox
+            id="scale-active"
+            checked={Boolean(form.isActive)}
+            onChange={(e) => setForm((prev) => ({ ...prev, isActive: e.target.checked }))}
+            className="mt-0.5"
+          />
+          <span className="min-w-0">
+            <span className="block text-sm font-semibold text-slate-900">Enable factor</span>
+            <span className="mt-0.5 block text-xs text-slate-500">
+              Disabled factors are excluded from employee evaluation and final % calculation.
+            </span>
+          </span>
+        </label>
       </form>
     </FormDialog>
   )

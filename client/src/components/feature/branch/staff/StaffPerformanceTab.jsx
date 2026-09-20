@@ -3,6 +3,7 @@ import { Settings, Star } from 'lucide-react'
 import { SurfaceCard } from '@/components/shared/SurfaceCard'
 import { ConfirmDialog } from '@/components/shared/ConfirmDialog'
 import { DataCard, ResponsiveDataShell } from '@/components/shared/ResponsiveDataShell'
+import { EntityStatusToggle } from '@/components/shared/EntityStatusToggle'
 import { RowActionButtons } from '@/components/shared/ActionIconButton'
 import { ScaleFormDialog } from '@/components/feature/branch/staff/ScaleFormDialog'
 import { Button } from '@/components/ui/button'
@@ -31,6 +32,7 @@ import {
 import { apiClient } from '@/api/api'
 import { useClientPagination } from '@/hooks/useClientPagination'
 import {
+  activeScales,
   calcWeightedScorePercent,
   formatScorePercent,
   sumActualPoints,
@@ -107,22 +109,25 @@ export function StaffPerformanceTab({
   const rosterPaging = useClientPagination(filteredRoster)
   const scalesPaging = useClientPagination(scales)
 
-  // Running total of all factor max points (reference for BM)
-  const pointsUsed = sumScalePoints(scales)
+  // Enabled factors only — disabled are excluded from totals / evaluation
+  const enabledScales = useMemo(() => activeScales(scales), [scales])
+
+  // Running total of enabled factor max points (reference for BM)
+  const pointsUsed = sumScalePoints(enabledScales)
 
   // Live evaluation summary while scoring
   const evaluationSummary = useMemo(() => {
-    const actualTotal = sumActualPoints(scores, scales)
-    const maxTotal = sumScalePoints(scales)
+    const actualTotal = sumActualPoints(scores, enabledScales)
+    const maxTotal = sumScalePoints(enabledScales)
     const percent = calcWeightedScorePercent(scores, scales)
     return { actualTotal, maxTotal, percent }
-  }, [scores, scales])
+  }, [scores, enabledScales, scales])
 
   const openScoringModal = (employee) => {
     setScoringEmployee(employee)
-    // Default each factor mid-range; missing values still count as 0 on submit
+    // Default each enabled factor mid-range; missing values still count as 0 on submit
     const initialScores = {}
-    scales.forEach((s) => {
+    enabledScales.forEach((s) => {
       initialScores[s.id] = Math.round(s.maxPoints / 2)
     })
     setScores(initialScores)
@@ -136,13 +141,13 @@ export function StaffPerformanceTab({
   }
 
   const submitScores = async () => {
-    if (scales.length === 0) {
-      return toastError('At least one scoring factor must be configured before evaluating')
+    if (enabledScales.length === 0) {
+      return toastError('At least one scoring factor must be enabled before evaluating')
     }
 
     setMutatingScore(true)
     let successCount = 0
-    for (const scale of scales) {
+    for (const scale of enabledScales) {
       // Treat unset factors as 0
       const pts = Number(scores[scale.id])
       const safePts = Number.isFinite(pts) && pts >= 0 ? pts : 0
@@ -168,6 +173,19 @@ export function StaffPerformanceTab({
   const openEditScale = (scale) => {
     setEditingScale(scale)
     setEditOpen(true)
+  }
+
+  const handleToggleScaleActive = async (scale, next) => {
+    const res = await apiClient.put(`/branch/performance/scales/${scale.id}`, {
+      isActive: next,
+    })
+    if (!res.success) {
+      toastError(res.error || 'Failed to update factor status')
+      return
+    }
+    toastSuccess(next ? `"${scale.name}" enabled` : `"${scale.name}" disabled`)
+    void fetchScales()
+    void fetchRoster()
   }
 
   const confirmDeleteScale = async () => {
@@ -340,7 +358,7 @@ export function StaffPerformanceTab({
       ) : (
         <SurfaceCard
           title="Configured Scoring Criteria"
-          description={`Total maximum points: ${pointsUsed}`}
+          description={`Enabled max points total: ${pointsUsed} · ${enabledScales.length} enabled / ${scales.length} total`}
         >
           {loadingScales ? (
             <p className="py-8 text-center text-sm text-slate-400">Loading...</p>
@@ -360,6 +378,16 @@ export function StaffPerformanceTab({
                       onDelete={() => setDeleteTargetScale(s)}
                     />
                   </div>
+                  <div className="mt-3">
+                    <EntityStatusToggle
+                      active={s.isActive !== false}
+                      onChange={(next) => handleToggleScaleActive(s, next)}
+                      activeLabel="Enabled"
+                      inactiveLabel="Disabled"
+                      activeTitle="Click to disable this scoring factor"
+                      inactiveTitle="Click to enable this scoring factor"
+                    />
+                  </div>
                 </DataCard>
               ))}
               desktop={
@@ -368,6 +396,7 @@ export function StaffPerformanceTab({
                     <TableRow className="text-xs text-slate-500 uppercase">
                       <TableHead>Scale Name</TableHead>
                       <TableHead>Max Weights/Points</TableHead>
+                      <TableHead>Enable / Disable</TableHead>
                       <TableHead>Actions</TableHead>
                     </TableRow>
                   </TableHeader>
@@ -376,6 +405,16 @@ export function StaffPerformanceTab({
                       <TableRow key={s.id}>
                         <TableCell className="font-semibold text-slate-900">{s.name}</TableCell>
                         <TableCell className="font-mono text-slate-700">{s.maxPoints} pts</TableCell>
+                        <TableCell>
+                          <EntityStatusToggle
+                            active={s.isActive !== false}
+                            onChange={(next) => handleToggleScaleActive(s, next)}
+                            activeLabel="Enabled"
+                            inactiveLabel="Disabled"
+                            activeTitle="Click to disable this scoring factor"
+                            inactiveTitle="Click to enable this scoring factor"
+                          />
+                        </TableCell>
                         <TableCell>
                           <RowActionButtons
                             onEdit={() => openEditScale(s)}
@@ -435,11 +474,13 @@ export function StaffPerformanceTab({
             </DialogDescription>
           </DialogHeader>
 
-          {scales.length === 0 ? (
-            <p className="py-4 text-center text-slate-400">Please configure scoring scales first.</p>
+          {enabledScales.length === 0 ? (
+            <p className="py-4 text-center text-slate-400">
+              Please enable at least one scoring scale first.
+            </p>
           ) : (
             <div className="space-y-4 py-2">
-              {scales.map((s) => {
+              {enabledScales.map((s) => {
                 const currentVal = scores[s.id] ?? 0
                 return (
                   <div
@@ -481,7 +522,7 @@ export function StaffPerformanceTab({
             <DialogCancelButton disabled={mutatingScore} className="w-full sm:w-auto" />
             <Button
               onClick={submitScores}
-              disabled={mutatingScore || scales.length === 0}
+              disabled={mutatingScore || enabledScales.length === 0}
               variant="brand"
               className="w-full sm:w-auto"
             >

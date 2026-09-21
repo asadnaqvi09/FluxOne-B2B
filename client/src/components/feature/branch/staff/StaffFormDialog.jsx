@@ -13,14 +13,29 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { NativeSelect } from '@/components/ui/select'
 import { ImageUploadField } from '@/components/shared/ImageUploadField'
+import { FieldError } from '@/components/shared/FieldError'
 import { TimePicker } from '@/components/shared/TimePicker'
 import {
   getBranchHoursSoftWarning,
-  validateStaffForm,
+  STAFF_FIELD_ORDER,
+  validateStaffFormFields,
 } from '@/lib/validation/staffSchedule'
+import { fieldErrorClass } from '@/lib/validation/fieldErrors'
+import { useFieldErrors } from '@/hooks/useFieldErrors'
 import { apiClient } from '@/api/api'
 import { endpoints } from '@/api/endpoints'
 import { useFormBaseline } from '@/hooks/useFormBaseline'
+
+const FIELD_IDS = {
+  email: 'staff-email',
+  password: 'staff-password',
+  fullName: 'staff-name',
+  role: 'staff-role',
+  scheduleStart: 'staff-start',
+  scheduleEnd: 'staff-end',
+  scheduleBreakStart: 'staff-break-start',
+  scheduleBreakEnd: 'staff-break-end',
+}
 
 const EMPTY_FORM = {
   email: '',
@@ -75,13 +90,14 @@ export function StaffFormDialog({
   const [branchHours, setBranchHours] = useState({ openingTime: '', closingTime: '' })
   const hoursWarning = getBranchHoursSoftWarning(branchHours)
   const [form, setForm] = useState(EMPTY_FORM)
-  const [error, setError] = useState(null)
   const [hardwareOptions, setHardwareOptions] = useState([])
+  const { fieldErrors, formError, setFormError, resetErrors, clearField, applyErrors } =
+    useFieldErrors()
   const { captureBaseline, isDirty } = useFormBaseline(open)
 
   useEffect(() => {
     if (!open) return
-    setError(null)
+    resetErrors()
 
     async function loadBranchHours() {
       const res = await apiClient.get(endpoints.auth.me)
@@ -126,15 +142,15 @@ export function StaffFormDialog({
       setForm(EMPTY_FORM)
       captureBaseline(EMPTY_FORM)
     }
-  }, [open, isEdit, initialStaff])
+  }, [open, isEdit, initialStaff, captureBaseline, resetErrors])
 
   function patch(field, value) {
     setForm((prev) => ({ ...prev, [field]: value }))
+    clearField(field)
   }
 
   async function handleSubmit(event) {
     event.preventDefault()
-    setError(null)
 
     let hours = branchHours
     const meRes = await apiClient.get(endpoints.auth.me)
@@ -146,15 +162,16 @@ export function StaffFormDialog({
       setBranchHours(hours)
     }
 
-    const validationError = validateStaffForm(form, { isEdit, branchHours: hours })
-    if (validationError) {
-      setError(validationError)
+    const errors = validateStaffFormFields(form, { isEdit, branchHours: hours })
+    if (Object.keys(errors).length) {
+      applyErrors(errors, FIELD_IDS, STAFF_FIELD_ORDER)
       return
     }
 
+    resetErrors()
     const result = await onSubmit?.(form)
     if (result && result.success === false) {
-      setError(result.error || 'Save failed')
+      setFormError(result.error || 'Save failed')
       return
     }
     onOpenChange?.(false)
@@ -172,7 +189,13 @@ export function StaffFormDialog({
           </DialogDescription>
         </DialogHeader>
 
-        <form className="space-y-4" onSubmit={handleSubmit}>
+        {formError ? (
+          <p className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700 ring-1 ring-red-100">
+            {formError}
+          </p>
+        ) : null}
+
+        <form className="space-y-4" onSubmit={handleSubmit} noValidate>
           <div className="grid gap-4 sm:grid-cols-2">
             <div className="space-y-1.5 sm:col-span-2">
               <Label htmlFor="staff-email">ID (login)</Label>
@@ -182,7 +205,10 @@ export function StaffFormDialog({
                 placeholder="e.g. im.wah01"
                 value={form.email}
                 onChange={(e) => patch('email', e.target.value)}
+                aria-invalid={Boolean(fieldErrors.email)}
+                className={fieldErrorClass(fieldErrors.email)}
               />
+              <FieldError message={fieldErrors.email} />
               <p className="text-xs text-slate-500">Used with password at login (maps to API email).</p>
             </div>
 
@@ -197,7 +223,10 @@ export function StaffFormDialog({
                 placeholder={isEdit ? 'Leave blank to keep current' : 'Min. 8 characters'}
                 value={form.password}
                 onChange={(e) => patch('password', e.target.value)}
+                aria-invalid={Boolean(fieldErrors.password)}
+                className={fieldErrorClass(fieldErrors.password)}
               />
+              <FieldError message={fieldErrors.password} />
             </div>
 
             <div className="space-y-1.5 sm:col-span-2">
@@ -207,7 +236,10 @@ export function StaffFormDialog({
                 value={form.fullName}
                 placeholder="Full name"
                 onChange={(e) => patch('fullName', e.target.value)}
+                aria-invalid={Boolean(fieldErrors.fullName)}
+                className={fieldErrorClass(fieldErrors.fullName)}
               />
+              <FieldError message={fieldErrors.fullName} />
             </div>
 
             <div className="space-y-1.5">
@@ -216,6 +248,8 @@ export function StaffFormDialog({
                 id="staff-role"
                 value={form.role}
                 onChange={(e) => patch('role', e.target.value)}
+                aria-invalid={Boolean(fieldErrors.role)}
+                className={fieldErrorClass(fieldErrors.role)}
               >
                 {STAFF_ROLES.map((role) => (
                   <option key={role.value} value={role.value}>
@@ -223,6 +257,7 @@ export function StaffFormDialog({
                   </option>
                 ))}
               </NativeSelect>
+              <FieldError message={fieldErrors.role} />
             </div>
 
             <div className="space-y-1.5">
@@ -272,7 +307,9 @@ export function StaffFormDialog({
                 id="staff-start"
                 value={form.scheduleStart}
                 onChange={(e) => patch('scheduleStart', e.target.value)}
+                className={fieldErrorClass(fieldErrors.scheduleStart)}
               />
+              <FieldError message={fieldErrors.scheduleStart} />
             </div>
 
             <div className="space-y-1.5">
@@ -281,7 +318,9 @@ export function StaffFormDialog({
                 id="staff-break-start"
                 value={form.scheduleBreakStart}
                 onChange={(e) => patch('scheduleBreakStart', e.target.value)}
+                className={fieldErrorClass(fieldErrors.scheduleBreakStart)}
               />
+              <FieldError message={fieldErrors.scheduleBreakStart} />
             </div>
 
             <div className="space-y-1.5">
@@ -290,7 +329,9 @@ export function StaffFormDialog({
                 id="staff-break-end"
                 value={form.scheduleBreakEnd}
                 onChange={(e) => patch('scheduleBreakEnd', e.target.value)}
+                className={fieldErrorClass(fieldErrors.scheduleBreakEnd)}
               />
+              <FieldError message={fieldErrors.scheduleBreakEnd} />
             </div>
 
             <div className="space-y-1.5">
@@ -299,7 +340,9 @@ export function StaffFormDialog({
                 id="staff-end"
                 value={form.scheduleEnd}
                 onChange={(e) => patch('scheduleEnd', e.target.value)}
+                className={fieldErrorClass(fieldErrors.scheduleEnd)}
               />
+              <FieldError message={fieldErrors.scheduleEnd} />
             </div>
 
             <ImageUploadField
@@ -311,12 +354,6 @@ export function StaffFormDialog({
               onChange={(file) => patch('image', file)}
             />
           </div>
-
-          {error ? (
-            <p className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700 ring-1 ring-red-100">
-              {error}
-            </p>
-          ) : null}
 
           <DialogFooter>
             <DialogCancelButton

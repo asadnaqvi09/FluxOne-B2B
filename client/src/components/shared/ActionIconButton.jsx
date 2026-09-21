@@ -1,24 +1,30 @@
-import { Eye, Pencil, Trash2 } from 'lucide-react'
+import { Check, Eye, Pencil, Trash2, X } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
 
 // Reusable row action CTAs with hover scale / color feedback.
 const ACTION_STYLES = {
-  view: 'text-slate-500 hover:bg-slate-100 hover:text-slate-900 hover:scale-110 active:scale-95',
+  view: 'text-purple-700 hover:bg-purple-50 hover:text-purple-900 hover:scale-110 active:scale-95',
   edit: 'text-slate-500 hover:bg-slate-100 hover:text-slate-900 hover:scale-110 active:scale-95',
   delete: 'text-slate-500 hover:bg-rose-50 hover:text-rose-700 hover:scale-110 active:scale-95',
+  approve: 'text-emerald-600 hover:bg-emerald-50 hover:text-emerald-700 hover:scale-110 active:scale-95',
+  reject: 'text-red-600 hover:bg-rose-50 hover:text-rose-700 hover:scale-110 active:scale-95',
 }
 
 const ACTION_ICONS = {
   view: Eye,
   edit: Pencil,
   delete: Trash2,
+  approve: Check,
+  reject: X,
 }
 
 const ACTION_LABELS = {
   view: 'View',
   edit: 'Edit',
   delete: 'Delete',
+  approve: 'Approve',
+  reject: 'Reject',
 }
 
 export function ActionIconButton({

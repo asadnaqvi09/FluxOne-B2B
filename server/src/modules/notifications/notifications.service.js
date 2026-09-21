@@ -13,14 +13,14 @@ export async function notifyAdminsOfLeaveRequest(tenantId, leave, { managerName,
   const branch = branchName || 'their branch'
   const dates = formatRange(leave.startDate, leave.endDate)
 
-  // TL exact: New leave request submitted by [Employee Name] of branch (branch name)
-  // for (dates) and awaiting your approval.
-  const message = `New leave request submitted by ${name} of branch (${branch}) for (${dates}) and awaiting your approval.`
+  // Short header + full detail body (bell / inbox)
+  const title = 'New Leave Request From Employee'
+  const body = `New leave request submitted by ${name} of branch (${branch}) for (${dates}) and awaiting your approval.`
 
   return createNotificationsForUsers(tenantId, adminIds, {
     type: 'leave_request',
-    title: message,
-    body: message,
+    title,
+    body,
     linkPath: `/admin/leaves?highlight=${leave.id}`,
     entityType: 'leave',
     entityId: leave.id,
@@ -65,8 +65,11 @@ export async function notifyBmOfLeaveDecision(tenantId, leave, { status, decisio
 }
 
 function formatRange(start, end) {
-  const a = String(start || '').slice(0, 10)
-  const b = String(end || '').slice(0, 10)
-  if (!a || !b) return '—'
-  return a === b ? a : `${a} – ${b}`
+  const opts = { weekday: 'short', month: 'short', day: 'numeric' }
+  const a = start ? new Date(start) : null
+  const b = end ? new Date(end) : null
+  if (!a || Number.isNaN(a.getTime()) || !b || Number.isNaN(b.getTime())) return '—'
+  const left = a.toLocaleDateString('en-US', opts)
+  const right = b.toLocaleDateString('en-US', opts)
+  return left === right ? left : `${left} – ${right}`
 }

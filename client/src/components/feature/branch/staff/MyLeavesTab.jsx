@@ -3,6 +3,7 @@ import { SurfaceCard } from '@/components/shared/SurfaceCard'
 import { ConfirmDialog } from '@/components/shared/ConfirmDialog'
 import { ActionIconButton, RowActionButtons } from '@/components/shared/ActionIconButton'
 import { MyLeaveFormDialog } from '@/components/feature/branch/staff/MyLeaveFormDialog'
+import { LeaveDetailDialog } from '@/components/feature/admin/leaves/LeaveDetailDialog'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -60,7 +61,7 @@ function toInputDate(value) {
 
 function statusStyles(status) {
   if (status === 'cancelled' || status === 'rejected') {
-    return 'bg-slate-100 text-slate-600 ring-slate-200'
+    return 'bg-rose-50 text-rose-700 ring-rose-200'
   }
   if (status === 'pending') {
     return 'bg-amber-50 text-amber-700 ring-amber-200'
@@ -175,6 +176,7 @@ export function MyLeavesTab({ createOpen = false, onCreateOpenChange }) {
           <p className="py-8 text-center text-sm text-slate-400">No leave requests yet</p>
         ) : (
           <>
+            {/* Make Sure All tables are responsive */}
             <div className="space-y-3 md:hidden">
               {pageRows.map((l) => (
                 <article
@@ -183,19 +185,19 @@ export function MyLeavesTab({ createOpen = false, onCreateOpenChange }) {
                 >
                   <div className="flex items-start justify-between gap-2">
                     <div className="min-w-0">
-                      <p className="text-sm font-semibold text-slate-900">
-                        {l.reason || 'Leave'}
-                      </p>
-                      <p className="mt-1 text-xs text-slate-600">
+                      <p className="text-xs text-slate-600">
                         {formatRange(l.startDate, l.endDate)}
                       </p>
                       <p className="mt-1 text-[11px] text-slate-500">
                         Applied {formatDateTime(l.createdAt)}
                       </p>
+                      <p className="mt-1.5 text-sm font-semibold text-slate-900">
+                        {l.reason || 'Leave'}
+                      </p>
                     </div>
                     <div className="flex flex-col items-end gap-2">
                       <span
-                        className={`inline-flex shrink-0 items-center rounded-full px-2 py-0.5 text-xs font-semibold ring-1 ring-inset ${statusStyles(l.status)}`}
+                        className={`inline-flex shrink-0 items-center rounded-full px-2 py-0.5 text-xs font-semibold capitalize ring-1 ring-inset ${statusStyles(l.status)}`}
                       >
                         {l.status}
                       </span>
@@ -213,13 +215,14 @@ export function MyLeavesTab({ createOpen = false, onCreateOpenChange }) {
               ))}
             </div>
 
+            {/* Make Sure All tables are responsive */}
             <div className="hidden overflow-x-auto md:block">
               <Table className="w-full min-w-[44rem] text-left text-sm">
                 <TableHeader>
                   <TableRow className="text-xs text-slate-500 uppercase">
-                    <TableHead className="px-3 py-2 font-medium">Reason</TableHead>
                     <TableHead className="px-3 py-2 font-medium">Leave Date Range</TableHead>
                     <TableHead className="px-3 py-2 font-medium">Apply Date & Time</TableHead>
+                    <TableHead className="px-3 py-2 font-medium">Reason</TableHead>
                     <TableHead className="px-3 py-2 font-medium">Status</TableHead>
                     <TableHead className="px-3 py-2 font-medium">Actions</TableHead>
                   </TableRow>
@@ -227,18 +230,20 @@ export function MyLeavesTab({ createOpen = false, onCreateOpenChange }) {
                 <TableBody>
                   {pageRows.map((l) => (
                     <TableRow key={l.id} className="hover:bg-slate-50/50">
-                      <TableCell className="max-w-xs truncate px-3 py-3 font-semibold text-slate-900">
-                        {l.reason || 'Leave'}
-                      </TableCell>
-                      <TableCell className="px-3 py-3 text-slate-600">
+                      <TableCell className="px-3 py-3 whitespace-nowrap text-slate-700">
                         {formatRange(l.startDate, l.endDate)}
                       </TableCell>
-                      <TableCell className="px-3 py-3 text-slate-600">
+                      <TableCell className="px-3 py-3 whitespace-nowrap text-slate-600">
                         {formatDateTime(l.createdAt)}
+                      </TableCell>
+                      <TableCell className="max-w-xs px-3 py-3">
+                        <p className="truncate font-medium text-slate-900" title={l.reason || 'Leave'}>
+                          {l.reason || 'Leave'}
+                        </p>
                       </TableCell>
                       <TableCell className="px-3 py-3">
                         <span
-                          className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-semibold ring-1 ring-inset ${statusStyles(l.status)}`}
+                          className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-semibold capitalize ring-1 ring-inset ${statusStyles(l.status)}`}
                         >
                           {l.status}
                         </span>
@@ -279,54 +284,13 @@ export function MyLeavesTab({ createOpen = false, onCreateOpenChange }) {
         onSuccess={fetchLeaves}
       />
 
-      // View Admin decision + note for decided leaves
-      <Dialog open={!!viewing} onOpenChange={(open) => !open && setViewing(null)}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Leave Details</DialogTitle>
-            <DialogDescription>
-              Review your leave request and Admin decision comments.
-            </DialogDescription>
-          </DialogHeader>
-          {viewing ? (
-            <div className="space-y-2 py-2 text-sm">
-              <p>
-                <span className="text-slate-500">Reason:</span>{' '}
-                <strong>{viewing.reason || 'Leave'}</strong>
-              </p>
-              <p>
-                <span className="text-slate-500">Leave dates:</span>{' '}
-                {formatRange(viewing.startDate, viewing.endDate)}
-              </p>
-              <p>
-                <span className="text-slate-500">Applied:</span>{' '}
-                {formatDateTime(viewing.createdAt)}
-              </p>
-              <p>
-                <span className="text-slate-500">Status:</span>{' '}
-                <span
-                  className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-semibold ring-1 ring-inset ${statusStyles(viewing.status)}`}
-                >
-                  {viewing.status}
-                </span>
-              </p>
-              {viewing.decidedAt ? (
-                <p>
-                  <span className="text-slate-500">Decided:</span>{' '}
-                  {formatDateTime(viewing.decidedAt)}
-                </p>
-              ) : null}
-              <p>
-                <span className="text-slate-500">Admin note:</span>{' '}
-                {viewing.decisionReason || '—'}
-              </p>
-            </div>
-          ) : null}
-          <DialogFooter>
-            <DialogCancelButton onClick={() => setViewing(null)}>Close</DialogCancelButton>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      {/* use reusable LeaveDetailDialog — same card pattern as Admin leave details */}
+      <LeaveDetailDialog
+        open={!!viewing}
+        onOpenChange={(open) => !open && setViewing(null)}
+        row={viewing}
+        mode="self"
+      />
 
       <Dialog open={!!editing} onOpenChange={(open) => !open && setEditing(null)}>
         <DialogContent>

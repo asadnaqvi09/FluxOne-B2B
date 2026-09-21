@@ -2,12 +2,23 @@ import { useEffect, useState } from 'react'
 import { ArrowLeft, ArrowRight } from 'lucide-react'
 import { FormDialog, DialogCancelButton } from '@/components/shared/FormDialog'
 import { StaffEmployeeChecklist } from '@/components/feature/branch/staff/StaffEmployeeChecklist'
+import { FieldError } from '@/components/shared/FieldError'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { toastError, toastSuccess } from '@/lib/toast'
-import { validateLeaveForm } from '@/lib/validation/branchForms'
+import { validateLeaveFormFields } from '@/lib/validation/branchForms'
+import { fieldErrorClass } from '@/lib/validation/fieldErrors'
+import { useFieldErrors } from '@/hooks/useFieldErrors'
 import { apiClient } from '@/api/api'
+
+const FIELD_IDS = {
+  startDate: 'leave-start',
+  endDate: 'leave-end',
+  employees: 'leave-employees',
+}
+
+const LEAVE_FIELD_ORDER = ['startDate', 'endDate', 'employees']
 
 // Create Leave wizard (2 steps) — opened from Staff Management header CTA.
 export function LeaveFormDialog({
@@ -24,6 +35,7 @@ export function LeaveFormDialog({
   const [selectedEmployees, setSelectedEmployees] = useState([])
   const [filterDesignation, setFilterDesignation] = useState('')
   const [mutating, setMutating] = useState(false)
+  const { fieldErrors, formError, resetErrors, clearField, applyErrors } = useFieldErrors()
 
   const resetForm = () => {
     setStep(1)
@@ -35,20 +47,22 @@ export function LeaveFormDialog({
   }
 
   useEffect(() => {
-    if (!open) resetForm()
-  }, [open])
-
-  const dateError =
-    startDate && endDate && new Date(startDate) > new Date(endDate)
-      ? 'Start date cannot be after end date'
-      : ''
+    if (!open) {
+      resetForm()
+      return
+    }
+    resetErrors()
+  }, [open, resetErrors])
 
   const dirty = Boolean(startDate || endDate || reason || selectedEmployees.length)
 
   const handleNextStep = () => {
-    const validationError = validateLeaveForm({ reason, startDate, endDate })
-    if (validationError) return toastError(validationError)
-    if (dateError) return
+    const errors = validateLeaveFormFields({ reason, startDate, endDate })
+    if (Object.keys(errors).length) {
+      applyErrors(errors, FIELD_IDS, LEAVE_FIELD_ORDER)
+      return
+    }
+    resetErrors()
     setStep(2)
   }
 
@@ -56,6 +70,7 @@ export function LeaveFormDialog({
     setSelectedEmployees((prev) =>
       prev.includes(employeeId) ? prev.filter((id) => id !== employeeId) : [...prev, employeeId],
     )
+    clearField('employees')
   }
 
   const handleSelectAllFiltered = (filteredStaff) => {
@@ -72,10 +87,19 @@ export function LeaveFormDialog({
         return next
       })
     }
+    clearField('employees')
   }
 
   const handleSave = async () => {
-    if (selectedEmployees.length === 0) return toastError('Please select at least one employee')
+    if (selectedEmployees.length === 0) {
+      applyErrors(
+        { employees: 'Please select at least one employee' },
+        FIELD_IDS,
+        LEAVE_FIELD_ORDER,
+      )
+      return
+    }
+    resetErrors()
     setMutating(true)
     const res = await apiClient.post('/branch/leaves', {
       employeeIds: selectedEmployees,
@@ -123,6 +147,10 @@ export function LeaveFormDialog({
         )
       }
     >
+      {formError ? (
+        <p className="mb-3 rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">{formError}</p>
+      ) : null}
+
       {step === 1 ? (
         <div className="space-y-4 py-1">
           <div className="rounded-lg border border-slate-200 bg-slate-50 p-2.5 text-xs text-slate-600">
@@ -136,9 +164,14 @@ export function LeaveFormDialog({
                   id="leave-start"
                   type="date"
                   value={startDate}
-                  onChange={(e) => setStartDate(e.target.value)}
-                  className={dateError ? 'border-red-500 focus-visible:ring-red-500' : ''}
+                  onChange={(e) => {
+                    setStartDate(e.target.value)
+                    clearField('startDate')
+                  }}
+                  aria-invalid={Boolean(fieldErrors.startDate)}
+                  className={fieldErrorClass(fieldErrors.startDate)}
                 />
+                <FieldError message={fieldErrors.startDate} />
               </div>
               <div className="space-y-1.5">
                 <Label htmlFor="leave-end">End Date</Label>
@@ -146,12 +179,16 @@ export function LeaveFormDialog({
                   id="leave-end"
                   type="date"
                   value={endDate}
-                  onChange={(e) => setEndDate(e.target.value)}
-                  className={dateError ? 'border-red-500 focus-visible:ring-red-500' : ''}
+                  onChange={(e) => {
+                    setEndDate(e.target.value)
+                    clearField('endDate')
+                  }}
+                  aria-invalid={Boolean(fieldErrors.endDate)}
+                  className={fieldErrorClass(fieldErrors.endDate)}
                 />
+                <FieldError message={fieldErrors.endDate} />
               </div>
             </div>
-            {dateError ? <p className="mt-1.5 text-xs font-medium text-red-500">{dateError}</p> : null}
           </div>
           <div className="space-y-1.5">
             <Label htmlFor="leave-reason">Reason / Note</Label>
@@ -168,15 +205,18 @@ export function LeaveFormDialog({
           <div className="rounded-lg border border-emerald-100 bg-emerald-50 p-2 text-xs text-emerald-800">
             <strong>Step 2:</strong> Select single or multiple employees.
           </div>
-          <StaffEmployeeChecklist
-            designations={designations}
-            staff={staff}
-            selectedIds={selectedEmployees}
-            filterDesignation={filterDesignation}
-            onFilterChange={setFilterDesignation}
-            onToggle={handleCheckboxToggle}
-            onSelectAllFiltered={handleSelectAllFiltered}
-          />
+          <div id="leave-employees" tabIndex={-1}>
+            <StaffEmployeeChecklist
+              designations={designations}
+              staff={staff}
+              selectedIds={selectedEmployees}
+              filterDesignation={filterDesignation}
+              onFilterChange={setFilterDesignation}
+              onToggle={handleCheckboxToggle}
+              onSelectAllFiltered={handleSelectAllFiltered}
+            />
+          </div>
+          <FieldError message={fieldErrors.employees} />
         </div>
       )}
     </FormDialog>

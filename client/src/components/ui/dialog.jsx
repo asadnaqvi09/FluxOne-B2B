@@ -104,9 +104,13 @@ function DialogTrigger({ asChild, children, className, ...props }) {
   )
 }
 
+// Viewport-fixed so long/scrollable forms never hide Stay / Discard off-screen
 function DiscardChangesPrompt({ onStay, onDiscard }) {
   return (
-    <div className="absolute inset-0 z-20 flex items-end justify-center rounded-t-2xl bg-black/40 p-3 sm:items-center sm:rounded-xl sm:p-4">
+    <div
+      className="fixed inset-0 z-[60] flex items-end justify-center bg-black/40 p-3 sm:items-center sm:p-4"
+      role="presentation"
+    >
       <div
         className="w-full max-w-sm rounded-xl border bg-card p-3 shadow-lg sm:p-4"
         role="alertdialog"
@@ -194,14 +198,15 @@ function DialogContent({ className, children, showCloseButton = true }) {
         ) : null}
 
         {children}
-
-        {discardOpen ? (
-          <DiscardChangesPrompt
-            onStay={() => setDiscardOpen(false)}
-            onDiscard={() => forceClose()}
-          />
-        ) : null}
       </div>
+
+      {/* Outside scroll container — always visible in the viewport */}
+      {discardOpen ? (
+        <DiscardChangesPrompt
+          onStay={() => setDiscardOpen(false)}
+          onDiscard={() => forceClose()}
+        />
+      ) : null}
     </div>
   )
 }

@@ -1,17 +1,12 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
-import {
-  Check,
-  Download,
-  Eye,
-  Filter,
-  Search,
-  X,
-} from 'lucide-react'
+import { Download, Filter, Search } from 'lucide-react'
 import { PageHeader } from '@/components/shared/PageHeader'
 import { MotionHeader, MotionReveal } from '@/components/shared/MotionReveal'
 import { SurfaceCard } from '@/components/shared/SurfaceCard'
 import { DataCard, ResponsiveDataShell } from '@/components/shared/ResponsiveDataShell'
+import { ActionIconButton } from '@/components/shared/ActionIconButton'
+import { LeaveDetailDialog } from '@/components/feature/admin/leaves/LeaveDetailDialog'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -26,15 +21,6 @@ import {
   TableCell,
   TablePagination,
 } from '@/components/ui/table'
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-  DialogCancelButton,
-} from '@/components/ui/dialog'
 import { apiClient } from '@/api/api'
 import { endpoints } from '@/api/endpoints'
 import { BRAND } from '@/lib/constants'
@@ -127,6 +113,30 @@ function exportCsv(rows) {
   URL.revokeObjectURL(url)
 }
 
+// use reusable components if possible — ActionIconButton for icon-only row actions
+function LeaveRowActions({ row, mutating, onView, onApprove, onReject }) {
+  const pending = row.status === 'pending'
+  return (
+    <div className="inline-flex items-center gap-0.5">
+      <ActionIconButton action="view" onClick={() => onView(row)} />
+      {pending ? (
+        <>
+          <ActionIconButton
+            action="approve"
+            disabled={mutating}
+            onClick={() => onApprove(row)}
+          />
+          <ActionIconButton
+            action="reject"
+            disabled={mutating}
+            onClick={() => onReject(row)}
+          />
+        </>
+      ) : null}
+    </div>
+  )
+}
+
 export function LeavesPage() {
   const [searchParams, setSearchParams] = useSearchParams()
   const highlightId = searchParams.get('highlight') || ''
@@ -137,14 +147,24 @@ export function LeavesPage() {
   const [mutatingId, setMutatingId] = useState(null)
   const [statusFilter, setStatusFilter] = useState('all')
   const [branchFilter, setBranchFilter] = useState('')
-  const [showBranchFilter, setShowBranchFilter] = useState(false)
+  const [branchMenuOpen, setBranchMenuOpen] = useState(false)
   const [searchQuery, setSearchQuery] = useState('')
   const debouncedQ = useDebouncedValue(searchQuery.trim(), 300)
 
-  const [viewRow, setViewRow] = useState(null)
-  const [decideRow, setDecideRow] = useState(null)
-  const [decideStatus, setDecideStatus] = useState('approved')
-  const [decisionReason, setDecisionReason] = useState('')
+  const [detailRow, setDetailRow] = useState(null)
+  const [presetDecision, setPresetDecision] = useState(null)
+  const branchMenuRef = useRef(null)
+
+  useEffect(() => {
+    if (!branchMenuOpen) return undefined
+    const onDoc = (e) => {
+      if (branchMenuRef.current && !branchMenuRef.current.contains(e.target)) {
+        setBranchMenuOpen(false)
+      }
+    }
+    document.addEventListener('mousedown', onDoc)
+    return () => document.removeEventListener('mousedown', onDoc)
+  }, [branchMenuOpen])
 
   const fetchLeaves = useCallback(async () => {
     setLoading(true)
@@ -203,32 +223,38 @@ export function LeavesPage() {
     if (!highlightId || !items.length) return
     const match = items.find((r) => r.id === highlightId)
     if (match) {
-      setViewRow(match)
+      setDetailRow(match)
+      setPresetDecision(null)
       setStatusFilter(match.status === 'pending' ? 'pending' : 'all')
     }
   }, [highlightId, items])
 
-  const openDecide = (row, status) => {
-    setDecideRow(row)
-    setDecideStatus(status)
-    setDecisionReason('')
+  const openDetail = (row, decision = null) => {
+    setDetailRow(row)
+    setPresetDecision(decision)
   }
 
-  const submitDecide = async () => {
-    if (!decideRow) return
-    if (decideStatus === 'rejected' && !decisionReason.trim()) {
+  const closeDetail = (open) => {
+    if (open) return
+    setDetailRow(null)
+    setPresetDecision(null)
+  }
+
+  const submitDecision = async ({ status, decisionReason }) => {
+    if (!detailRow) return
+    if (status === 'rejected' && !String(decisionReason || '').trim()) {
       return toastError('Please provide a rejection reason')
     }
-    setMutatingId(decideRow.id)
-    const res = await apiClient.patch(endpoints.admin.leaves.decide(decideRow.id), {
-      status: decideStatus,
-      decisionReason: decisionReason.trim() || null,
+    setMutatingId(detailRow.id)
+    const res = await apiClient.patch(endpoints.admin.leaves.decide(detailRow.id), {
+      status,
+      decisionReason: decisionReason?.trim() || null,
     })
     setMutatingId(null)
     if (res.success) {
-      toastSuccess(decideStatus === 'approved' ? 'Leave approved' : 'Leave rejected')
-      setDecideRow(null)
-      setViewRow(null)
+      toastSuccess(status === 'approved' ? 'Leave approved' : 'Leave rejected')
+      setDetailRow(null)
+      setPresetDecision(null)
       if (highlightId) {
         searchParams.delete('highlight')
         setSearchParams(searchParams, { replace: true })
@@ -302,34 +328,56 @@ export function LeavesPage() {
                   {chip.label}
                 </button>
               ))}
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                onClick={() => setShowBranchFilter((v) => !v)}
-              >
-                <Filter className="mr-1 size-3.5" />
-                Filter
-              </Button>
+              {/* Filter icon opens branch dropdown (not a separate tab below) */}
+              <div ref={branchMenuRef} className="relative">
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  aria-expanded={branchMenuOpen}
+                  aria-haspopup="listbox"
+                  onClick={() => setBranchMenuOpen((v) => !v)}
+                >
+                  <Filter className="mr-1 size-3.5" />
+                  {branchFilter
+                    ? branches.find((b) => b.id === branchFilter)?.name || 'Branch'
+                    : 'Filter'}
+                </Button>
+                {branchMenuOpen ? (
+                  <div className="absolute top-full right-0 z-30 mt-1.5 w-64 rounded-xl border border-border bg-white p-3 shadow-lg">
+                    <Label className="mb-1.5 block text-xs text-slate-500">Branch</Label>
+                    <NativeSelect
+                      value={branchFilter}
+                      onChange={(e) => {
+                        setBranchFilter(e.target.value)
+                        setBranchMenuOpen(false)
+                      }}
+                      aria-label="Filter by branch"
+                    >
+                      <option value="">All Branches</option>
+                      {branches.map((b) => (
+                        <option key={b.id} value={b.id}>
+                          {b.name}
+                        </option>
+                      ))}
+                    </NativeSelect>
+                    {branchFilter ? (
+                      <button
+                        type="button"
+                        className="mt-2 cursor-pointer text-xs font-medium text-[#8E238F] hover:underline"
+                        onClick={() => {
+                          setBranchFilter('')
+                          setBranchMenuOpen(false)
+                        }}
+                      >
+                        Clear branch filter
+                      </button>
+                    ) : null}
+                  </div>
+                ) : null}
+              </div>
             </div>
           </div>
-
-          {showBranchFilter ? (
-            <div className="mb-4 max-w-xs">
-              <Label className="mb-1.5 block text-xs text-slate-500">Branch</Label>
-              <NativeSelect
-                value={branchFilter}
-                onChange={(e) => setBranchFilter(e.target.value)}
-              >
-                <option value="">All Branches</option>
-                {branches.map((b) => (
-                  <option key={b.id} value={b.id}>
-                    {b.name}
-                  </option>
-                ))}
-              </NativeSelect>
-            </div>
-          ) : null}
 
           {loading ? (
             <p className="py-10 text-center text-sm text-slate-400">Loading leave requests…</p>
@@ -363,38 +411,19 @@ export function LeavesPage() {
                       {row.status}
                     </Badge>
                   </div>
-                  <div className="mt-3 flex flex-wrap gap-2">
-                    <Button size="sm" variant="outline" className="h-8 text-xs" onClick={() => setViewRow(row)}>
-                      <Eye className="mr-1 size-3.5" />
-                      View
-                    </Button>
-                    {row.status === 'pending' ? (
-                      <>
-                        <Button
-                          size="sm"
-                          className="h-8 bg-emerald-600 text-xs text-white hover:bg-emerald-700"
-                          disabled={mutatingId === row.id}
-                          onClick={() => openDecide(row, 'approved')}
-                        >
-                          <Check className="mr-1 size-3.5" />
-                          Approve
-                        </Button>
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          className="h-8 text-xs text-red-600"
-                          disabled={mutatingId === row.id}
-                          onClick={() => openDecide(row, 'rejected')}
-                        >
-                          <X className="mr-1 size-3.5" />
-                          Reject
-                        </Button>
-                      </>
-                    ) : null}
+                  <div className="mt-3">
+                    <LeaveRowActions
+                      row={row}
+                      mutating={mutatingId === row.id}
+                      onView={(r) => openDetail(r)}
+                      onApprove={(r) => openDetail(r, 'approved')}
+                      onReject={(r) => openDetail(r, 'rejected')}
+                    />
                   </div>
                 </DataCard>
               ))}
               desktop={
+                // Make Sure All tables are responsive
                 <Table className="w-full min-w-[64rem] text-left text-sm">
                   <TableHeader>
                     <TableRow className="text-xs text-slate-500 uppercase">
@@ -457,43 +486,13 @@ export function LeavesPage() {
                           </Badge>
                         </TableCell>
                         <TableCell className="px-3 py-3">
-                          <div className="inline-flex items-center gap-1">
-                            <Button
-                              size="sm"
-                              variant="ghost"
-                              className="h-8 text-xs text-purple-800"
-                              onClick={() => setViewRow(row)}
-                            >
-                              <Eye className="mr-1 size-3.5" />
-                              View
-                            </Button>
-                            {row.status === 'pending' ? (
-                              <>
-                                <Button
-                                  size="sm"
-                                  variant="ghost"
-                                  className="h-8 text-xs text-emerald-700"
-                                  disabled={mutatingId === row.id}
-                                  onClick={() => openDecide(row, 'approved')}
-                                >
-                                  <Check className="mr-1 size-3.5" />
-                                  Approve
-                                </Button>
-                                <Button
-                                  size="sm"
-                                  variant="ghost"
-                                  className="h-8 text-xs text-red-600"
-                                  disabled={mutatingId === row.id}
-                                  onClick={() => openDecide(row, 'rejected')}
-                                >
-                                  <X className="mr-1 size-3.5" />
-                                  Reject
-                                </Button>
-                              </>
-                            ) : (
-                              <span className="px-2 text-xs text-slate-400">--</span>
-                            )}
-                          </div>
+                          <LeaveRowActions
+                            row={row}
+                            mutating={mutatingId === row.id}
+                            onView={(r) => openDetail(r)}
+                            onApprove={(r) => openDetail(r, 'approved')}
+                            onReject={(r) => openDetail(r, 'rejected')}
+                          />
                         </TableCell>
                       </TableRow>
                     ))}
@@ -514,114 +513,15 @@ export function LeavesPage() {
         </SurfaceCard>
       </MotionReveal>
 
-      {/* View details */}
-      <Dialog open={!!viewRow} onOpenChange={(open) => !open && setViewRow(null)}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Leave Details — {displayLeaveRef(viewRow || {})}</DialogTitle>
-            <DialogDescription>Branch manager personal leave request</DialogDescription>
-          </DialogHeader>
-          {viewRow ? (
-            <div className="space-y-2 py-2 text-sm">
-              <p>
-                <span className="text-slate-500">Employee:</span>{' '}
-                <strong>{viewRow.managerName}</strong> ({displayLeaveStaffRef(viewRow)})
-              </p>
-              <p>
-                <span className="text-slate-500">Branch:</span>{' '}
-                {viewRow.branchName || '—'}
-                {viewRow.branchLocation ? ` / ${viewRow.branchLocation}` : ''}
-              </p>
-              <p>
-                <span className="text-slate-500">Dates:</span>{' '}
-                {formatRange(viewRow.startDate, viewRow.endDate)} ({dayLabel(viewRow.dayCount)})
-              </p>
-              <p>
-                <span className="text-slate-500">Applied:</span> {formatDateTime(viewRow.createdAt)}
-              </p>
-              <p>
-                <span className="text-slate-500">Reason:</span> {viewRow.reason || '—'}
-              </p>
-              <p>
-                <span className="text-slate-500">Status:</span>{' '}
-                <Badge className={cn('border capitalize', statusBadgeClass(viewRow.status))}>
-                  {viewRow.status}
-                </Badge>
-              </p>
-              {viewRow.decisionReason ? (
-                <p>
-                  <span className="text-slate-500">Admin note:</span> {viewRow.decisionReason}
-                </p>
-              ) : null}
-            </div>
-          ) : null}
-          <DialogFooter>
-            <DialogCancelButton onClick={() => setViewRow(null)}>Close</DialogCancelButton>
-            {viewRow?.status === 'pending' ? (
-              <>
-                <Button
-                  className="bg-emerald-600 text-white hover:bg-emerald-700"
-                  onClick={() => openDecide(viewRow, 'approved')}
-                >
-                  Approve
-                </Button>
-                <Button variant="outline" className="text-red-600" onClick={() => openDecide(viewRow, 'rejected')}>
-                  Reject
-                </Button>
-              </>
-            ) : null}
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      {/* Approve / Reject */}
-      <Dialog open={!!decideRow} onOpenChange={(open) => !open && setDecideRow(null)}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>
-              {decideStatus === 'approved' ? 'Approve leave request' : 'Reject leave request'}
-            </DialogTitle>
-            <DialogDescription>
-              {decideRow
-                ? `${decideRow.managerName} · ${formatRange(decideRow.startDate, decideRow.endDate)}`
-                : ''}
-            </DialogDescription>
-          </DialogHeader>
-          <div className="space-y-2 py-2">
-            <Label>
-              {decideStatus === 'rejected' ? 'Rejection reason *' : 'Note (optional)'}
-            </Label>
-            <Input
-              placeholder={
-                decideStatus === 'rejected'
-                  ? 'Explain why this leave is rejected'
-                  : 'Optional note for the branch manager'
-              }
-              value={decisionReason}
-              onChange={(e) => setDecisionReason(e.target.value)}
-            />
-          </div>
-          <DialogFooter>
-            <DialogCancelButton onClick={() => setDecideRow(null)}>Cancel</DialogCancelButton>
-            <Button
-              variant="brand"
-              disabled={mutatingId === decideRow?.id}
-              onClick={submitDecide}
-              className={
-                decideStatus === 'rejected'
-                  ? 'bg-red-600 text-white hover:bg-red-700'
-                  : undefined
-              }
-            >
-              {mutatingId === decideRow?.id
-                ? 'Saving…'
-                : decideStatus === 'approved'
-                  ? 'Confirm Approve'
-                  : 'Confirm Reject'}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      {/* Leave details + decision (Cancel / Confirm, discard when dirty) */}
+      <LeaveDetailDialog
+        open={!!detailRow}
+        onOpenChange={closeDetail}
+        row={detailRow}
+        presetDecision={presetDecision}
+        submitting={mutatingId === detailRow?.id}
+        onConfirm={submitDecision}
+      />
     </div>
   )
 }

@@ -30,6 +30,7 @@ import {
 import { ConfirmDialog } from '@/components/shared/ConfirmDialog'
 import { DeleteEntityDialog } from '@/components/shared/DeleteEntityDialog'
 import { ImageUploadField } from '@/components/shared/ImageUploadField'
+import { FieldError } from '@/components/shared/FieldError'
 import { PhoneInput } from '@/components/shared/PhoneInput'
 import { TimePicker } from '@/components/shared/TimePicker'
 import { DataCard, ResponsiveDataShell } from '@/components/shared/ResponsiveDataShell'
@@ -39,6 +40,8 @@ import {
   validatePhone,
   validateEmail,
 } from '@/lib/validation/formValidators'
+import { fieldErrorClass } from '@/lib/validation/fieldErrors'
+import { useFieldErrors } from '@/hooks/useFieldErrors'
 import { useAdminBranches } from '@/hooks/useAdminBranches'
 import { useAuthSession } from '@/hooks/useAuthSession'
 import { useDebouncedValue } from '@/hooks/useDebouncedValue'
@@ -207,6 +210,28 @@ function BranchRowActions({
   )
 }
 
+const BRANCH_FIELD_IDS = {
+  name: 'branchName',
+  location: 'branchLocation',
+  managerName: 'mgrName',
+  managerEmail: 'mgrEmail',
+  managerContact: 'mgrContact',
+  managerOtherContact: 'mgrOtherContact',
+  openingTime: 'branchOpeningTime',
+  closingTime: 'branchClosingTime',
+}
+
+const BRANCH_FIELD_ORDER = [
+  'name',
+  'location',
+  'openingTime',
+  'closingTime',
+  'managerName',
+  'managerEmail',
+  'managerContact',
+  'managerOtherContact',
+]
+
 export function BranchesPage() {
   const { user } = useAuthSession()
   const [searchQuery, setSearchQuery] = useState('')
@@ -220,6 +245,7 @@ export function BranchesPage() {
   const [resetTarget, setResetTarget] = useState(null)
   const [deleteTarget, setDeleteTarget] = useState(null)
   const [formData, setFormData] = useState(emptyForm)
+  const { fieldErrors, formError, resetErrors, clearField, applyErrors } = useFieldErrors()
 
   const {
     items,
@@ -239,9 +265,10 @@ export function BranchesPage() {
   // Snapshot form when Add/Edit opens so Esc/X only prompt when fields changed
   useEffect(() => {
     if (!addDialogOpen) return
+    resetErrors()
     captureBaseline(formData)
     // eslint-disable-next-line react-hooks/exhaustive-deps -- capture once per open
-  }, [addDialogOpen, captureBaseline])
+  }, [addDialogOpen, captureBaseline, resetErrors])
 
   const stats = useMemo(() => {
     const total = items.length
@@ -366,48 +393,47 @@ export function BranchesPage() {
 
   async function handleSubmitBranch(e) {
     e.preventDefault()
+    const errors = {}
     if (!formData.name.trim() || !formData.location.trim()) {
-      toastError('Please fill in Branch Name and Location')
-      return
+      if (!formData.name.trim()) {
+        errors.name = 'Please fill in Branch Name and Location'
+      }
+      if (!formData.location.trim()) {
+        errors.location = 'Please fill in Branch Name and Location'
+      }
     }
     if (!formData.managerName.trim()) {
-      toastError('Please fill in Branch Manager Name')
-      return
+      errors.managerName = 'Please fill in Branch Manager Name'
     }
 
     const emailErr = validateEmail(formData.managerEmail, { fieldName: 'Manager Email' })
-    if (emailErr) {
-      toastError(emailErr)
-      return
-    }
+    if (emailErr) errors.managerEmail = emailErr
 
     const phoneErr = validatePhone(formData.managerContact, { fieldName: 'Manager Contact Phone' })
-    if (phoneErr) {
-      toastError(phoneErr)
-      return
-    }
+    if (phoneErr) errors.managerContact = phoneErr
 
     if (formData.managerOtherContact.trim()) {
       const otherErr = validatePhone(formData.managerOtherContact, {
         fieldName: 'Other contact number',
         required: false,
       })
-      if (otherErr) {
-        toastError(otherErr)
-        return
-      }
+      if (otherErr) errors.managerOtherContact = otherErr
     }
 
     const hasOpen = Boolean(formData.openingTime?.trim())
     const hasClose = Boolean(formData.closingTime?.trim())
     if (hasOpen !== hasClose) {
-      toastError('Set both opening and closing time, or leave both empty')
+      errors.openingTime = 'Set both opening and closing time, or leave both empty'
+      errors.closingTime = 'Set both opening and closing time, or leave both empty'
+    } else if (hasOpen && hasClose && formData.openingTime >= formData.closingTime) {
+      errors.closingTime = 'Closing time must be after opening time'
+    }
+
+    if (Object.keys(errors).length) {
+      applyErrors(errors, BRANCH_FIELD_IDS, BRANCH_FIELD_ORDER)
       return
     }
-    if (hasOpen && hasClose && formData.openingTime >= formData.closingTime) {
-      toastError('Closing time must be after opening time')
-      return
-    }
+    resetErrors()
 
     const payload = {
       name: formData.name.trim(),
@@ -791,7 +817,11 @@ export function BranchesPage() {
             </DialogDescription>
           </DialogHeader>
 
-          <form onSubmit={handleSubmitBranch} className="space-y-4 pt-2">
+          {formError ? (
+            <p className="mb-3 rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">{formError}</p>
+          ) : null}
+
+          <form onSubmit={handleSubmitBranch} className="space-y-4 pt-2" noValidate>
             <div className="space-y-3">
               <h5 className="text-xs font-bold uppercase tracking-wider text-purple-900 border-b border-slate-100 pb-1">
                 Branch Details
@@ -831,9 +861,14 @@ export function BranchesPage() {
                     id="branchName"
                     placeholder="e.g. Wah Cantt SoftFlux"
                     value={formData.name}
-                    onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                    required
+                    onChange={(e) => {
+                      setFormData({ ...formData, name: e.target.value })
+                      clearField('name')
+                    }}
+                    aria-invalid={Boolean(fieldErrors.name)}
+                    className={fieldErrorClass(fieldErrors.name)}
                   />
+                  <FieldError message={fieldErrors.name} />
                 </div>
 
                 <div className="space-y-1">
@@ -844,9 +879,14 @@ export function BranchesPage() {
                     id="branchLocation"
                     placeholder="e.g. Main GT Road, Wah Cantt"
                     value={formData.location}
-                    onChange={(e) => setFormData({ ...formData, location: e.target.value })}
-                    required
+                    onChange={(e) => {
+                      setFormData({ ...formData, location: e.target.value })
+                      clearField('location')
+                    }}
+                    aria-invalid={Boolean(fieldErrors.location)}
+                    className={fieldErrorClass(fieldErrors.location)}
                   />
+                  <FieldError message={fieldErrors.location} />
                 </div>
 
                 <div className="space-y-1">
@@ -856,8 +896,15 @@ export function BranchesPage() {
                   <TimePicker
                     id="branchOpeningTime"
                     value={formData.openingTime}
-                    onChange={(e) => setFormData({ ...formData, openingTime: e.target.value })}
+                    onChange={(e) => {
+                      setFormData({ ...formData, openingTime: e.target.value })
+                      clearField('openingTime')
+                      clearField('closingTime')
+                    }}
+                    aria-invalid={Boolean(fieldErrors.openingTime)}
+                    className={fieldErrorClass(fieldErrors.openingTime)}
                   />
+                  <FieldError message={fieldErrors.openingTime} />
                 </div>
 
                 <div className="space-y-1">
@@ -867,8 +914,15 @@ export function BranchesPage() {
                   <TimePicker
                     id="branchClosingTime"
                     value={formData.closingTime}
-                    onChange={(e) => setFormData({ ...formData, closingTime: e.target.value })}
+                    onChange={(e) => {
+                      setFormData({ ...formData, closingTime: e.target.value })
+                      clearField('openingTime')
+                      clearField('closingTime')
+                    }}
+                    aria-invalid={Boolean(fieldErrors.closingTime)}
+                    className={fieldErrorClass(fieldErrors.closingTime)}
                   />
+                  <FieldError message={fieldErrors.closingTime} />
                 </div>
 
                 <p className="text-[11px] text-slate-500 sm:col-span-2">
@@ -914,9 +968,14 @@ export function BranchesPage() {
                     id="mgrName"
                     placeholder="e.g. Farhan Ali"
                     value={formData.managerName}
-                    onChange={(e) => setFormData({ ...formData, managerName: e.target.value })}
-                    required
+                    onChange={(e) => {
+                      setFormData({ ...formData, managerName: e.target.value })
+                      clearField('managerName')
+                    }}
+                    aria-invalid={Boolean(fieldErrors.managerName)}
+                    className={fieldErrorClass(fieldErrors.managerName)}
                   />
+                  <FieldError message={fieldErrors.managerName} />
                 </div>
 
                 <div className="space-y-1">
@@ -928,9 +987,14 @@ export function BranchesPage() {
                     type="email"
                     placeholder="e.g. bm.wah@softwareflux.com"
                     value={formData.managerEmail}
-                    onChange={(e) => setFormData({ ...formData, managerEmail: e.target.value })}
-                    required
+                    onChange={(e) => {
+                      setFormData({ ...formData, managerEmail: e.target.value })
+                      clearField('managerEmail')
+                    }}
+                    aria-invalid={Boolean(fieldErrors.managerEmail)}
+                    className={fieldErrorClass(fieldErrors.managerEmail)}
                   />
+                  <FieldError message={fieldErrors.managerEmail} />
                 </div>
 
                 <div className="space-y-1">
@@ -940,9 +1004,14 @@ export function BranchesPage() {
                   <PhoneInput
                     id="mgrContact"
                     value={formData.managerContact}
-                    onChange={(val) => setFormData({ ...formData, managerContact: val })}
-                    required
+                    onChange={(val) => {
+                      setFormData({ ...formData, managerContact: val })
+                      clearField('managerContact')
+                    }}
+                    aria-invalid={Boolean(fieldErrors.managerContact)}
+                    className={fieldErrorClass(fieldErrors.managerContact)}
                   />
+                  <FieldError message={fieldErrors.managerContact} />
                 </div>
 
                 <div className="space-y-1">
@@ -952,8 +1021,14 @@ export function BranchesPage() {
                   <PhoneInput
                     id="mgrOtherContact"
                     value={formData.managerOtherContact}
-                    onChange={(val) => setFormData({ ...formData, managerOtherContact: val })}
+                    onChange={(val) => {
+                      setFormData({ ...formData, managerOtherContact: val })
+                      clearField('managerOtherContact')
+                    }}
+                    aria-invalid={Boolean(fieldErrors.managerOtherContact)}
+                    className={fieldErrorClass(fieldErrors.managerOtherContact)}
                   />
+                  <FieldError message={fieldErrors.managerOtherContact} />
                 </div>
 
                 <div className="space-y-1">

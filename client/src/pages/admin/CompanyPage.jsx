@@ -3,6 +3,7 @@ import { SurfaceCard } from '@/components/shared/SurfaceCard'
 import { PageHeader } from '@/components/shared/PageHeader'
 import { MotionHeader, MotionReveal } from '@/components/shared/MotionReveal'
 import { ImageUploadField } from '@/components/shared/ImageUploadField'
+import { FieldError } from '@/components/shared/FieldError'
 import { SlowLoadingBanner, useSlowLoadingHint } from '@/components/shared/SlowLoadingBanner'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -31,7 +32,22 @@ import {
   validatePhone,
   validateUrl,
 } from '@/lib/validation/formValidators'
+import { fieldErrorClass } from '@/lib/validation/fieldErrors'
+import { useFieldErrors } from '@/hooks/useFieldErrors'
 import { useFormBaseline } from '@/hooks/useFormBaseline'
+
+const COMPANY_FIELD_IDS = {
+  name: 'companyName',
+  contactNumbers: 'contacts',
+  whatsappNumber: 'whatsapp',
+  facebookUrl: 'facebook',
+  instagramUrl: 'instagram',
+}
+
+const COMPANY_FIELD_ORDER = ['name', 'contactNumbers', 'whatsappNumber', 'facebookUrl', 'instagramUrl']
+
+const POLICY_FIELD_IDS = { name: 'polName', detail: 'polDetail' }
+const POLICY_FIELD_ORDER = ['name', 'detail']
 import {
   Building2,
   Phone,
@@ -125,6 +141,22 @@ export function CompanyPage() {
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false)
   const [deleteTargetPolicy, setDeleteTargetPolicy] = useState(null)
   const [viewPolicy, setViewPolicy] = useState(null)
+  const {
+    fieldErrors: companyFieldErrors,
+    formError: companyFormError,
+    setFormError: setCompanyFormError,
+    resetErrors: resetCompanyErrors,
+    clearField: clearCompanyField,
+    applyErrors: applyCompanyErrors,
+  } = useFieldErrors()
+  const {
+    fieldErrors: policyFieldErrors,
+    formError: policyFormError,
+    setFormError: setPolicyFormError,
+    resetErrors: resetPolicyErrors,
+    clearField: clearPolicyField,
+    applyErrors: applyPolicyErrors,
+  } = useFieldErrors()
 
   const {
     items: policies,
@@ -165,13 +197,12 @@ export function CompanyPage() {
 
   async function handleSaveCompanyDetails(e) {
     e.preventDefault()
+    const errors = {}
     if (!form.name.trim()) {
-      toastError('Please enter the registered company name')
-      return
+      errors.name = 'Please enter the registered company name'
     }
     if (!form.contactNumbers.trim()) {
-      toastError('Please provide company contact numbers')
-      return
+      errors.contactNumbers = 'Please provide company contact numbers'
     }
 
     if (form.whatsappNumber?.trim()) {
@@ -179,10 +210,7 @@ export function CompanyPage() {
         required: false,
         fieldName: 'WhatsApp number',
       })
-      if (waErr) {
-        toastError(waErr)
-        return
-      }
+      if (waErr) errors.whatsappNumber = waErr
     }
 
     if (form.facebookUrl?.trim()) {
@@ -190,10 +218,7 @@ export function CompanyPage() {
         required: false,
         fieldName: 'Facebook URL',
       })
-      if (fbErr) {
-        toastError(fbErr)
-        return
-      }
+      if (fbErr) errors.facebookUrl = fbErr
     }
 
     if (form.instagramUrl?.trim()) {
@@ -201,11 +226,14 @@ export function CompanyPage() {
         required: false,
         fieldName: 'Instagram URL',
       })
-      if (igErr) {
-        toastError(igErr)
-        return
-      }
+      if (igErr) errors.instagramUrl = igErr
     }
+
+    if (Object.keys(errors).length) {
+      applyCompanyErrors(errors, COMPANY_FIELD_IDS, COMPANY_FIELD_ORDER)
+      return
+    }
+    resetCompanyErrors()
 
     const result = await updateCompany({
       name: form.name,
@@ -220,7 +248,7 @@ export function CompanyPage() {
     })
 
     if (!result.success) {
-      toastError(result.error || 'Failed to save company details')
+      setCompanyFormError(result.error || 'Failed to save company details')
       return
     }
 
@@ -230,6 +258,7 @@ export function CompanyPage() {
 
   function handleOpenAddPolicy() {
     setEditingPolicy(null)
+    resetPolicyErrors()
     setPolicyForm({
       name: '',
       detail: '',
@@ -241,6 +270,7 @@ export function CompanyPage() {
 
   function handleOpenEditPolicy(policy) {
     setEditingPolicy(policy)
+    resetPolicyErrors()
     setPolicyForm({
       name: policy.name,
       detail: policy.detail,
@@ -282,22 +312,30 @@ export function CompanyPage() {
 
   async function handleSubmitPolicy(e) {
     e.preventDefault()
-    if (!policyForm.name.trim() || !policyForm.detail.trim()) {
-      toastError('Please provide a policy name and description')
+    const errors = {}
+    if (!policyForm.name.trim()) {
+      errors.name = 'Please provide a policy name and description'
+    }
+    if (!policyForm.detail.trim()) {
+      errors.detail = 'Please provide a policy name and description'
+    }
+    if (Object.keys(errors).length) {
+      applyPolicyErrors(errors, POLICY_FIELD_IDS, POLICY_FIELD_ORDER)
       return
     }
+    resetPolicyErrors()
 
     if (editingPolicy) {
       const result = await updatePolicy(editingPolicy.id, policyForm)
       if (!result.success) {
-        toastError(result.error || 'Failed to update policy')
+        setPolicyFormError(result.error || 'Failed to update policy')
         return
       }
       toastSuccess('Policy updated successfully')
     } else {
       const result = await createPolicy(policyForm)
       if (!result.success) {
-        toastError(result.error || 'Failed to create policy')
+        setPolicyFormError(result.error || 'Failed to create policy')
         return
       }
       toastSuccess('New policy created and published')
@@ -399,7 +437,12 @@ export function CompanyPage() {
                 Loading company details…
               </div>
             ) : (
-              <form onSubmit={handleSaveCompanyDetails} className="space-y-5">
+              <form onSubmit={handleSaveCompanyDetails} className="space-y-5" noValidate>
+                {companyFormError ? (
+                  <p className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">
+                    {companyFormError}
+                  </p>
+                ) : null}
                 <div className="flex flex-col sm:flex-row items-start gap-4 pb-4 border-b border-slate-100">
                   <div className="w-full sm:flex-1">
                     <ImageUploadField
@@ -418,10 +461,15 @@ export function CompanyPage() {
                     <Input
                       id="companyName"
                       value={form.name}
-                      onChange={(e) => setForm({ ...form, name: e.target.value })}
+                      onChange={(e) => {
+                        setForm({ ...form, name: e.target.value })
+                        clearCompanyField('name')
+                      }}
                       placeholder="e.g. FluxOne Enterprise Solutions Ltd."
-                      required
+                      aria-invalid={Boolean(companyFieldErrors.name)}
+                      className={fieldErrorClass(companyFieldErrors.name)}
                     />
+                    <FieldError message={companyFieldErrors.name} />
                     <p className="text-[11px] text-slate-400">
                       This name appears on wholesale supplier bills, tax invoices, and branch headers.
                     </p>
@@ -437,12 +485,15 @@ export function CompanyPage() {
                     <Input
                       id="contacts"
                       value={form.contactNumbers}
-                      onChange={(e) =>
+                      onChange={(e) => {
                         setForm({ ...form, contactNumbers: e.target.value })
-                      }
+                        clearCompanyField('contactNumbers')
+                      }}
                       placeholder="+92 51 2223344, +92 300 1234567"
-                      required
+                      aria-invalid={Boolean(companyFieldErrors.contactNumbers)}
+                      className={fieldErrorClass(companyFieldErrors.contactNumbers)}
                     />
+                    <FieldError message={companyFieldErrors.contactNumbers} />
                   </div>
 
                   <div className="space-y-1.5">
@@ -453,8 +504,14 @@ export function CompanyPage() {
                     <PhoneInput
                       id="whatsapp"
                       value={form.whatsappNumber}
-                      onChange={(val) => setForm({ ...form, whatsappNumber: val })}
+                      onChange={(val) => {
+                        setForm({ ...form, whatsappNumber: val })
+                        clearCompanyField('whatsappNumber')
+                      }}
+                      aria-invalid={Boolean(companyFieldErrors.whatsappNumber)}
+                      className={fieldErrorClass(companyFieldErrors.whatsappNumber)}
                     />
+                    <FieldError message={companyFieldErrors.whatsappNumber} />
                   </div>
 
                   <div className="space-y-1.5">
@@ -466,9 +523,15 @@ export function CompanyPage() {
                       id="facebook"
                       type="url"
                       value={form.facebookUrl}
-                      onChange={(e) => setForm({ ...form, facebookUrl: e.target.value })}
+                      onChange={(e) => {
+                        setForm({ ...form, facebookUrl: e.target.value })
+                        clearCompanyField('facebookUrl')
+                      }}
                       placeholder="https://facebook.com/your-business"
+                      aria-invalid={Boolean(companyFieldErrors.facebookUrl)}
+                      className={fieldErrorClass(companyFieldErrors.facebookUrl)}
                     />
+                    <FieldError message={companyFieldErrors.facebookUrl} />
                   </div>
 
                   <div className="space-y-1.5">
@@ -480,9 +543,15 @@ export function CompanyPage() {
                       id="instagram"
                       type="url"
                       value={form.instagramUrl}
-                      onChange={(e) => setForm({ ...form, instagramUrl: e.target.value })}
+                      onChange={(e) => {
+                        setForm({ ...form, instagramUrl: e.target.value })
+                        clearCompanyField('instagramUrl')
+                      }}
                       placeholder="https://instagram.com/your-business"
+                      aria-invalid={Boolean(companyFieldErrors.instagramUrl)}
+                      className={fieldErrorClass(companyFieldErrors.instagramUrl)}
                     />
+                    <FieldError message={companyFieldErrors.instagramUrl} />
                   </div>
 
                   <div className="space-y-1.5">
@@ -708,7 +777,13 @@ export function CompanyPage() {
             </DialogDescription>
           </DialogHeader>
 
-          <form onSubmit={handleSubmitPolicy} className="space-y-4 pt-2">
+          {policyFormError ? (
+            <p className="mb-3 rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">
+              {policyFormError}
+            </p>
+          ) : null}
+
+          <form onSubmit={handleSubmitPolicy} className="space-y-4 pt-2" noValidate>
             <div className="space-y-1.5">
               <Label htmlFor="polName" className="text-xs font-semibold">
                 Policy Name *
@@ -717,9 +792,14 @@ export function CompanyPage() {
                 id="polName"
                 placeholder="e.g. 7-Day Return & Replacement Policy"
                 value={policyForm.name}
-                onChange={(e) => setPolicyForm({ ...policyForm, name: e.target.value })}
-                required
+                onChange={(e) => {
+                  setPolicyForm({ ...policyForm, name: e.target.value })
+                  clearPolicyField('name')
+                }}
+                aria-invalid={Boolean(policyFieldErrors.name)}
+                className={fieldErrorClass(policyFieldErrors.name)}
               />
+              <FieldError message={policyFieldErrors.name} />
             </div>
 
             <div className="space-y-1.5">
@@ -748,9 +828,14 @@ export function CompanyPage() {
                 rows={4}
                 placeholder="Describe the conditions, timeframe, receipts required, and branch handling procedures..."
                 value={policyForm.detail}
-                onChange={(e) => setPolicyForm({ ...policyForm, detail: e.target.value })}
-                required
+                onChange={(e) => {
+                  setPolicyForm({ ...policyForm, detail: e.target.value })
+                  clearPolicyField('detail')
+                }}
+                aria-invalid={Boolean(policyFieldErrors.detail)}
+                className={fieldErrorClass(policyFieldErrors.detail)}
               />
+              <FieldError message={policyFieldErrors.detail} />
             </div>
 
             <label

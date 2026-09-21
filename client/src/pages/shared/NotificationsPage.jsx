@@ -9,6 +9,7 @@ import { ConfirmDialog } from '@/components/shared/ConfirmDialog'
 import { apiClient } from '@/api/api'
 import { endpoints } from '@/api/endpoints'
 import { toastError, toastSuccess } from '@/lib/toast'
+import { displayNotification } from '@/lib/notificationDisplay'
 import { cn } from '@/lib/utils'
 
 function formatDateTime(value) {
@@ -125,7 +126,9 @@ export function NotificationsPage() {
             <p className="py-10 text-center text-sm text-slate-400">No notifications</p>
           ) : (
             <ul className="divide-y divide-border">
-              {items.map((n) => (
+              {items.map((n) => {
+                const { title, body } = displayNotification(n)
+                return (
                 <li
                   key={n.id}
                   className={cn(
@@ -144,10 +147,12 @@ export function NotificationsPage() {
                       ) : (
                         <span className="size-2 shrink-0" />
                       )}
-                      <p className="text-sm font-semibold text-slate-900">{n.title}</p>
+                      <p className="text-sm font-semibold text-slate-900">{title}</p>
                     </div>
-                    {n.body ? (
-                      <p className="mt-0.5 pl-4 text-xs text-slate-600">{n.body}</p>
+                    {body ? (
+                      <p className="mt-0.5 pl-4 whitespace-normal break-words text-xs leading-relaxed text-slate-600">
+                        {body}
+                      </p>
                     ) : null}
                     <p className="mt-1 pl-4 text-[11px] text-slate-400">
                       {formatDateTime(n.createdAt)}
@@ -176,7 +181,8 @@ export function NotificationsPage() {
                     </Button>
                   </div>
                 </li>
-              ))}
+                )
+              })}
             </ul>
           )}
         </SurfaceCard>

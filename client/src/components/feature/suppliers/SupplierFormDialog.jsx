@@ -13,9 +13,15 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { NativeSelect } from '@/components/ui/select'
 import { ImageUploadField } from '@/components/shared/ImageUploadField'
+import { FieldError } from '@/components/shared/FieldError'
 import { PhoneInput } from '@/components/shared/PhoneInput'
 import { BRAND } from '@/lib/constants'
-import { validateSupplierForm } from '@/lib/validation/supplierForm'
+import {
+  SUPPLIER_FIELD_ORDER,
+  validateSupplierFormFields,
+} from '@/lib/validation/supplierForm'
+import { fieldErrorClass } from '@/lib/validation/fieldErrors'
+import { useFieldErrors } from '@/hooks/useFieldErrors'
 import { useFormBaseline } from '@/hooks/useFormBaseline'
 
 const EMPTY = {
@@ -32,17 +38,25 @@ const EMPTY = {
   signature: null,
 }
 
-// Add / Edit supplier — fields align with tech lead + createSupplierSchema.
+const FIELD_IDS = {
+  companyName: 'sup-company',
+  companyPhone: 'sup-phone',
+  representativeName: 'sup-rep-name',
+  representativePhone: 'sup-rep-phone',
+  representativeEmail: 'sup-rep-email',
+}
 
+// Add / Edit supplier — fields align with tech lead + createSupplierSchema.
 export function SupplierFormDialog({ open, onOpenChange, mode = 'create', initialSupplier = null, loading = false, onSubmit }) {
   const isEdit = mode === 'edit'
   const [form, setForm] = useState(EMPTY)
-  const [error, setError] = useState(null)
+  const { fieldErrors, formError, setFormError, resetErrors, clearField, applyErrors } =
+    useFieldErrors()
   const { captureBaseline, isDirty } = useFormBaseline(open)
 
   useEffect(() => {
     if (!open) return
-    setError(null)
+    resetErrors()
     if (isEdit && initialSupplier) {
       const nextForm = {
         companyName: initialSupplier.companyName || '',
@@ -63,24 +77,25 @@ export function SupplierFormDialog({ open, onOpenChange, mode = 'create', initia
       setForm(EMPTY)
       captureBaseline(EMPTY)
     }
-  }, [open, isEdit, initialSupplier])
+  }, [open, isEdit, initialSupplier, captureBaseline, resetErrors])
 
   function patch(field, value) {
     setForm((prev) => ({ ...prev, [field]: value }))
+    clearField(field)
   }
 
   async function handleSubmit(event) {
     event.preventDefault()
-    setError(null)
-    const validationError = validateSupplierForm(form)
-    if (validationError) {
-      setError(validationError)
+    const errors = validateSupplierFormFields(form)
+    if (Object.keys(errors).length) {
+      applyErrors(errors, FIELD_IDS, SUPPLIER_FIELD_ORDER)
       return
     }
 
+    resetErrors()
     const result = await onSubmit?.(form)
     if (result?.success) onOpenChange?.(false)
-    else if (result?.error) setError(result.error)
+    else if (result?.error) setFormError(result.error)
   }
 
   return (
@@ -93,11 +108,11 @@ export function SupplierFormDialog({ open, onOpenChange, mode = 'create', initia
           </DialogDescription>
         </DialogHeader>
 
-        {error ? (
-          <p className="mb-3 rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">{error}</p>
+        {formError ? (
+          <p className="mb-3 rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">{formError}</p>
         ) : null}
 
-        <form className="space-y-4" onSubmit={handleSubmit}>
+        <form className="space-y-4" onSubmit={handleSubmit} noValidate>
           <div className="grid gap-4 sm:grid-cols-2">
             <div className="space-y-1.5 sm:col-span-2">
               <Label htmlFor="sup-company">Company name</Label>
@@ -106,7 +121,10 @@ export function SupplierFormDialog({ open, onOpenChange, mode = 'create', initia
                 value={form.companyName}
                 onChange={(e) => patch('companyName', e.target.value)}
                 placeholder="Company name"
+                aria-invalid={Boolean(fieldErrors.companyName)}
+                className={fieldErrorClass(fieldErrors.companyName)}
               />
+              <FieldError message={fieldErrors.companyName} />
             </div>
 
             <ImageUploadField
@@ -124,7 +142,9 @@ export function SupplierFormDialog({ open, onOpenChange, mode = 'create', initia
                 id="sup-phone"
                 value={form.companyPhone}
                 onChange={(val) => patch('companyPhone', val)}
+                className={fieldErrorClass(fieldErrors.companyPhone)}
               />
+              <FieldError message={fieldErrors.companyPhone} />
             </div>
 
             <div className="space-y-1.5">
@@ -133,7 +153,10 @@ export function SupplierFormDialog({ open, onOpenChange, mode = 'create', initia
                 id="sup-rep-name"
                 value={form.representativeName}
                 onChange={(e) => patch('representativeName', e.target.value)}
+                aria-invalid={Boolean(fieldErrors.representativeName)}
+                className={fieldErrorClass(fieldErrors.representativeName)}
               />
+              <FieldError message={fieldErrors.representativeName} />
             </div>
 
             <div className="space-y-1.5">
@@ -142,7 +165,9 @@ export function SupplierFormDialog({ open, onOpenChange, mode = 'create', initia
                 id="sup-rep-phone"
                 value={form.representativePhone}
                 onChange={(val) => patch('representativePhone', val)}
+                className={fieldErrorClass(fieldErrors.representativePhone)}
               />
+              <FieldError message={fieldErrors.representativePhone} />
             </div>
 
             <div className="space-y-1.5">
@@ -152,7 +177,10 @@ export function SupplierFormDialog({ open, onOpenChange, mode = 'create', initia
                 type="email"
                 value={form.representativeEmail}
                 onChange={(e) => patch('representativeEmail', e.target.value)}
+                aria-invalid={Boolean(fieldErrors.representativeEmail)}
+                className={fieldErrorClass(fieldErrors.representativeEmail)}
               />
+              <FieldError message={fieldErrors.representativeEmail} />
             </div>
 
             <div className="space-y-1.5">

@@ -13,10 +13,16 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
 import { NativeSelect } from '@/components/ui/select'
+import { FieldError } from '@/components/shared/FieldError'
 import { BRAND } from '@/lib/constants'
 import { SCALE_OPTIONS } from '@/lib/mapProduct'
+import { fieldErrorClass } from '@/lib/validation/fieldErrors'
+import { useFieldErrors } from '@/hooks/useFieldErrors'
 import { fetchControlProductOptions } from '@/hooks/useInventoryControl'
 import { useFormBaseline } from '@/hooks/useFormBaseline'
+
+const OUT_FIELD_IDS = { productId: 'stockout-product', quantity: 'stockout-quantity' }
+const OUT_FIELD_ORDER = ['productId', 'quantity']
 
 // Stock-out create dialog.
 
@@ -37,7 +43,8 @@ export function StockOutDialog({
   const [scale, setScale] = useState('unit')
   const [quantity, setQuantity] = useState('1')
   const [reason, setReason] = useState('')
-  const [error, setError] = useState(null)
+  const { fieldErrors, formError, setFormError, resetErrors, clearField, applyErrors } =
+    useFieldErrors()
   const { captureBaseline, isDirty } = useFormBaseline(open)
 
   const formSnapshot = useMemo(
@@ -52,7 +59,7 @@ export function StockOutDialog({
 
   useEffect(() => {
     if (!open) return
-    setError(null)
+    resetErrors()
     const snapshot = {
       categoryId: '',
       subcategoryId: '',
@@ -88,15 +95,14 @@ export function StockOutDialog({
   }, [open, categoryId, subcategoryId])
 
   async function handleSave() {
-    setError(null)
-    if (!productId) {
-      setError('Select a product')
+    const errors = {}
+    if (!productId) errors.productId = 'Select a product'
+    if (!(Number(quantity) > 0)) errors.quantity = 'Quantity must be positive'
+    if (Object.keys(errors).length) {
+      applyErrors(errors, OUT_FIELD_IDS, OUT_FIELD_ORDER)
       return
     }
-    if (!(Number(quantity) > 0)) {
-      setError('Quantity must be positive')
-      return
-    }
+    resetErrors()
     const payload = {
       productId,
       scale,
@@ -105,7 +111,7 @@ export function StockOutDialog({
     }
     const result = await onSubmit?.(payload)
     if (result?.success) onOpenChange?.(false)
-    else if (result?.error) setError(result.error)
+    else if (result?.error) setFormError(result.error)
   }
 
   return (
@@ -115,6 +121,10 @@ export function StockOutDialog({
           <DialogTitle>Add stock out</DialogTitle>
           <DialogDescription>Remove stock from on-hand inventory.</DialogDescription>
         </DialogHeader>
+
+        {formError ? (
+          <p className="mb-3 rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">{formError}</p>
+        ) : null}
 
         <div className="grid gap-3 sm:grid-cols-2">
           <div className="space-y-1.5">
@@ -150,15 +160,19 @@ export function StockOutDialog({
             </NativeSelect>
           </div>
           <div className="space-y-1.5 sm:col-span-2">
-            <Label>Product</Label>
+            <Label htmlFor="stockout-product">Product</Label>
             <NativeSelect
+              id="stockout-product"
               value={productId}
               onChange={(e) => {
                 const id = e.target.value
                 setProductId(id)
+                clearField('productId')
                 const p = products.find((x) => x.id === id)
                 if (p) setScale(p.scale || 'unit')
               }}
+              aria-invalid={Boolean(fieldErrors.productId)}
+              className={fieldErrorClass(fieldErrors.productId)}
             >
               {!products.length ? <option value="">No products</option> : null}
               {products.map((p) => (
@@ -167,6 +181,7 @@ export function StockOutDialog({
                 </option>
               ))}
             </NativeSelect>
+            <FieldError message={fieldErrors.productId} />
           </div>
           <div className="space-y-1.5">
             <Label>Scale</Label>
@@ -179,14 +194,21 @@ export function StockOutDialog({
             </NativeSelect>
           </div>
           <div className="space-y-1.5">
-            <Label>Quantity</Label>
+            <Label htmlFor="stockout-quantity">Quantity</Label>
             <Input
+              id="stockout-quantity"
               type="number"
               min="0.001"
               step="any"
               value={quantity}
-              onChange={(e) => setQuantity(e.target.value)}
+              onChange={(e) => {
+                setQuantity(e.target.value)
+                clearField('quantity')
+              }}
+              aria-invalid={Boolean(fieldErrors.quantity)}
+              className={fieldErrorClass(fieldErrors.quantity)}
             />
+            <FieldError message={fieldErrors.quantity} />
           </div>
         </div>
 
@@ -194,10 +216,6 @@ export function StockOutDialog({
           <Label>Reason (optional)</Label>
           <Textarea rows={2} value={reason} onChange={(e) => setReason(e.target.value)} />
         </div>
-
-        {error ? (
-          <p className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">{error}</p>
-        ) : null}
 
         <DialogFooter>
           <DialogCancelButton disabled={loading} />

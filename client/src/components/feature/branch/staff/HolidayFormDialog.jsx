@@ -2,12 +2,24 @@ import { useEffect, useState } from 'react'
 import { ArrowLeft, ArrowRight } from 'lucide-react'
 import { FormDialog, DialogCancelButton } from '@/components/shared/FormDialog'
 import { StaffEmployeeChecklist } from '@/components/feature/branch/staff/StaffEmployeeChecklist'
+import { FieldError } from '@/components/shared/FieldError'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { toastError, toastSuccess } from '@/lib/toast'
-import { validateHolidayForm } from '@/lib/validation/branchForms'
+import { validateHolidayFormFields } from '@/lib/validation/branchForms'
+import { fieldErrorClass } from '@/lib/validation/fieldErrors'
+import { useFieldErrors } from '@/hooks/useFieldErrors'
 import { apiClient } from '@/api/api'
+
+const FIELD_IDS = {
+  name: 'holiday-name',
+  startDate: 'holiday-start',
+  endDate: 'holiday-end',
+  employees: 'holiday-employees',
+}
+
+const HOLIDAY_FIELD_ORDER = ['name', 'startDate', 'endDate', 'employees']
 
 // Create Holiday wizard (2 steps) — opened from Staff Management header CTA.
 export function HolidayFormDialog({
@@ -24,6 +36,7 @@ export function HolidayFormDialog({
   const [selectedEmployees, setSelectedEmployees] = useState([])
   const [filterDesignation, setFilterDesignation] = useState('')
   const [mutating, setMutating] = useState(false)
+  const { fieldErrors, formError, resetErrors, clearField, applyErrors } = useFieldErrors()
 
   const resetForm = () => {
     setStep(1)
@@ -35,20 +48,22 @@ export function HolidayFormDialog({
   }
 
   useEffect(() => {
-    if (!open) resetForm()
-  }, [open])
-
-  const dateError =
-    startDate && endDate && new Date(startDate) > new Date(endDate)
-      ? 'Start date cannot be after end date'
-      : ''
+    if (!open) {
+      resetForm()
+      return
+    }
+    resetErrors()
+  }, [open, resetErrors])
 
   const dirty = Boolean(name || startDate || endDate || selectedEmployees.length)
 
   const handleNextStep = () => {
-    const validationError = validateHolidayForm({ name, startDate, endDate })
-    if (validationError) return toastError(validationError)
-    if (dateError) return
+    const errors = validateHolidayFormFields({ name, startDate, endDate })
+    if (Object.keys(errors).length) {
+      applyErrors(errors, FIELD_IDS, HOLIDAY_FIELD_ORDER)
+      return
+    }
+    resetErrors()
     setStep(2)
   }
 
@@ -56,6 +71,7 @@ export function HolidayFormDialog({
     setSelectedEmployees((prev) =>
       prev.includes(employeeId) ? prev.filter((id) => id !== employeeId) : [...prev, employeeId],
     )
+    clearField('employees')
   }
 
   const handleSelectAllFiltered = (filteredStaff) => {
@@ -72,10 +88,19 @@ export function HolidayFormDialog({
         return next
       })
     }
+    clearField('employees')
   }
 
   const handleSave = async () => {
-    if (selectedEmployees.length === 0) return toastError('Please select at least one employee')
+    if (selectedEmployees.length === 0) {
+      applyErrors(
+        { employees: 'Please select at least one employee' },
+        FIELD_IDS,
+        HOLIDAY_FIELD_ORDER,
+      )
+      return
+    }
+    resetErrors()
     setMutating(true)
     const res = await apiClient.post('/branch/holidays', {
       name,
@@ -132,6 +157,10 @@ export function HolidayFormDialog({
         )
       }
     >
+      {formError ? (
+        <p className="mb-3 rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">{formError}</p>
+      ) : null}
+
       {step === 1 ? (
         <div className="space-y-4 py-1">
           <div className="rounded-lg border border-slate-200 bg-slate-50 p-2 text-xs text-slate-500">
@@ -143,8 +172,14 @@ export function HolidayFormDialog({
               id="holiday-name"
               placeholder="e.g. Independence Day"
               value={name}
-              onChange={(e) => setName(e.target.value)}
+              onChange={(e) => {
+                setName(e.target.value)
+                clearField('name')
+              }}
+              aria-invalid={Boolean(fieldErrors.name)}
+              className={fieldErrorClass(fieldErrors.name)}
             />
+            <FieldError message={fieldErrors.name} />
           </div>
           <div>
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
@@ -154,9 +189,14 @@ export function HolidayFormDialog({
                   id="holiday-start"
                   type="date"
                   value={startDate}
-                  onChange={(e) => setStartDate(e.target.value)}
-                  className={dateError ? 'border-red-500 focus-visible:ring-red-500' : ''}
+                  onChange={(e) => {
+                    setStartDate(e.target.value)
+                    clearField('startDate')
+                  }}
+                  aria-invalid={Boolean(fieldErrors.startDate)}
+                  className={fieldErrorClass(fieldErrors.startDate)}
                 />
+                <FieldError message={fieldErrors.startDate} />
               </div>
               <div className="space-y-1.5">
                 <Label htmlFor="holiday-end">End Date</Label>
@@ -164,12 +204,16 @@ export function HolidayFormDialog({
                   id="holiday-end"
                   type="date"
                   value={endDate}
-                  onChange={(e) => setEndDate(e.target.value)}
-                  className={dateError ? 'border-red-500 focus-visible:ring-red-500' : ''}
+                  onChange={(e) => {
+                    setEndDate(e.target.value)
+                    clearField('endDate')
+                  }}
+                  aria-invalid={Boolean(fieldErrors.endDate)}
+                  className={fieldErrorClass(fieldErrors.endDate)}
                 />
+                <FieldError message={fieldErrors.endDate} />
               </div>
             </div>
-            {dateError ? <p className="mt-1.5 text-xs font-medium text-red-500">{dateError}</p> : null}
           </div>
         </div>
       ) : (
@@ -177,16 +221,19 @@ export function HolidayFormDialog({
           <div className="rounded-lg border border-emerald-100 bg-emerald-50 p-2 text-xs text-emerald-800">
             <strong>Step 2:</strong> Checklist selected employees.
           </div>
-          <StaffEmployeeChecklist
-            designations={designations}
-            staff={staff}
-            selectedIds={selectedEmployees}
-            filterDesignation={filterDesignation}
-            onFilterChange={setFilterDesignation}
-            onToggle={handleCheckboxToggle}
-            onSelectAllFiltered={handleSelectAllFiltered}
-            selectedLabel="Apply to Filtered"
-          />
+          <div id="holiday-employees" tabIndex={-1}>
+            <StaffEmployeeChecklist
+              designations={designations}
+              staff={staff}
+              selectedIds={selectedEmployees}
+              filterDesignation={filterDesignation}
+              onFilterChange={setFilterDesignation}
+              onToggle={handleCheckboxToggle}
+              onSelectAllFiltered={handleSelectAllFiltered}
+              selectedLabel="Apply to Filtered"
+            />
+          </div>
+          <FieldError message={fieldErrors.employees} />
         </div>
       )}
     </FormDialog>

@@ -13,14 +13,33 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
 import { NativeSelect } from '@/components/ui/select'
+import { FieldError } from '@/components/shared/FieldError'
 import { BRAND } from '@/lib/constants'
 import { SCALE_OPTIONS } from '@/lib/mapProduct'
 import { DAMAGED_LOCATIONS } from '@/lib/mapStockMovement'
+import { fieldErrorClass } from '@/lib/validation/fieldErrors'
+import { useFieldErrors } from '@/hooks/useFieldErrors'
 import {
   fetchControlProductOptions,
   fetchEmployeeLookups,
 } from '@/hooks/useInventoryControl'
 import { useFormBaseline } from '@/hooks/useFormBaseline'
+
+const DMG_FIELD_IDS = {
+  productId: 'damaged-product',
+  quantity: 'damaged-quantity',
+  damagedByUserId: 'damaged-by',
+  damagedLocation: 'damaged-location',
+  reason: 'damaged-reason',
+}
+
+const DMG_FIELD_ORDER = [
+  'productId',
+  'quantity',
+  'damagedByUserId',
+  'damagedLocation',
+  'reason',
+]
 
 // Create / edit damaged item (employee + location + reason required).
 export function DamagedDialog({
@@ -46,7 +65,8 @@ export function DamagedDialog({
   const [damagedByUserId, setDamagedByUserId] = useState('')
   const [damagedLocation, setDamagedLocation] = useState('warehouse')
   const [reason, setReason] = useState('')
-  const [error, setError] = useState(null)
+  const { fieldErrors, formError, setFormError, resetErrors, clearField, applyErrors } =
+    useFieldErrors()
   const { captureBaseline, isDirty } = useFormBaseline(open)
 
   const formSnapshot = useMemo(
@@ -79,7 +99,7 @@ export function DamagedDialog({
 
   useEffect(() => {
     if (!open) return
-    setError(null)
+    resetErrors()
     void fetchEmployeeLookups().then((res) => {
       if (res.success) setEmployees(res.items)
       else setEmployees([])
@@ -143,27 +163,19 @@ export function DamagedDialog({
   }, [open, isEdit, categoryId, subcategoryId])
 
   async function handleSave() {
-    setError(null)
-    if (!isEdit && !productId) {
-      setError('Select a product')
-      return
-    }
-    if (!(Number(quantity) > 0)) {
-      setError('Quantity must be positive')
-      return
-    }
-    if (!damagedByUserId) {
-      setError('Select who damaged the item')
-      return
-    }
-    if (!damagedLocation) {
-      setError('Select where it was damaged')
-      return
-    }
+    const errors = {}
+    if (!isEdit && !productId) errors.productId = 'Select a product'
+    if (!(Number(quantity) > 0)) errors.quantity = 'Quantity must be positive'
+    if (!damagedByUserId) errors.damagedByUserId = 'Select who damaged the item'
+    if (!damagedLocation) errors.damagedLocation = 'Select where it was damaged'
     if (!reason || reason.trim().length < 3) {
-      setError('Reason is required (min 3 characters)')
+      errors.reason = 'Reason is required (min 3 characters)'
+    }
+    if (Object.keys(errors).length) {
+      applyErrors(errors, DMG_FIELD_IDS, DMG_FIELD_ORDER)
       return
     }
+    resetErrors()
     const payload = isEdit
       ? {
           quantity: Number(quantity),
@@ -181,7 +193,7 @@ export function DamagedDialog({
         }
     const result = await onSubmit?.(payload)
     if (result?.success) onOpenChange?.(false)
-    else if (result?.error) setError(result.error)
+    else if (result?.error) setFormError(result.error)
   }
 
   return (
@@ -193,6 +205,10 @@ export function DamagedDialog({
             Record damage with employee, location, and reason. Stock decreases.
           </DialogDescription>
         </DialogHeader>
+
+        {formError ? (
+          <p className="mb-3 rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">{formError}</p>
+        ) : null}
 
         {!isEdit ? (
           <div className="grid gap-3 sm:grid-cols-2">
@@ -229,15 +245,19 @@ export function DamagedDialog({
               </NativeSelect>
             </div>
             <div className="space-y-1.5 sm:col-span-2">
-              <Label>Product</Label>
+              <Label htmlFor="damaged-product">Product</Label>
               <NativeSelect
+                id="damaged-product"
                 value={productId}
                 onChange={(e) => {
                   const id = e.target.value
                   setProductId(id)
+                  clearField('productId')
                   const p = products.find((x) => x.id === id)
                   if (p) setScale(p.scale || 'unit')
                 }}
+                aria-invalid={Boolean(fieldErrors.productId)}
+                className={fieldErrorClass(fieldErrors.productId)}
               >
                 <option value="">Select product</option>
                 {products.map((p) => (
@@ -249,6 +269,7 @@ export function DamagedDialog({
               {!products.length ? (
                 <p className="text-xs text-amber-700">No products match these filters.</p>
               ) : null}
+              <FieldError message={fieldErrors.productId} />
             </div>
             <div className="space-y-1.5">
               <Label>Scale</Label>
@@ -267,20 +288,33 @@ export function DamagedDialog({
 
         <div className="grid grid-cols-2 gap-3">
           <div className="space-y-1.5">
-            <Label>Quantity</Label>
+            <Label htmlFor="damaged-quantity">Quantity</Label>
             <Input
+              id="damaged-quantity"
               type="number"
               min="0.001"
               step="any"
               value={quantity}
-              onChange={(e) => setQuantity(e.target.value)}
+              onChange={(e) => {
+                setQuantity(e.target.value)
+                clearField('quantity')
+              }}
+              aria-invalid={Boolean(fieldErrors.quantity)}
+              className={fieldErrorClass(fieldErrors.quantity)}
             />
+            <FieldError message={fieldErrors.quantity} />
           </div>
           <div className="space-y-1.5">
-            <Label>Where damaged</Label>
+            <Label htmlFor="damaged-location">Where damaged</Label>
             <NativeSelect
+              id="damaged-location"
               value={damagedLocation}
-              onChange={(e) => setDamagedLocation(e.target.value)}
+              onChange={(e) => {
+                setDamagedLocation(e.target.value)
+                clearField('damagedLocation')
+              }}
+              aria-invalid={Boolean(fieldErrors.damagedLocation)}
+              className={fieldErrorClass(fieldErrors.damagedLocation)}
             >
               {DAMAGED_LOCATIONS.map((o) => (
                 <option key={o.value} value={o.value}>
@@ -288,14 +322,21 @@ export function DamagedDialog({
                 </option>
               ))}
             </NativeSelect>
+            <FieldError message={fieldErrors.damagedLocation} />
           </div>
         </div>
 
         <div className="space-y-1.5">
-          <Label>Damaged by</Label>
+          <Label htmlFor="damaged-by">Damaged by</Label>
           <NativeSelect
+            id="damaged-by"
             value={damagedByUserId}
-            onChange={(e) => setDamagedByUserId(e.target.value)}
+            onChange={(e) => {
+              setDamagedByUserId(e.target.value)
+              clearField('damagedByUserId')
+            }}
+            aria-invalid={Boolean(fieldErrors.damagedByUserId)}
+            className={fieldErrorClass(fieldErrors.damagedByUserId)}
           >
             <option value="">Select employee</option>
             {employees.map((e) => (
@@ -310,21 +351,25 @@ export function DamagedDialog({
               No employees in lookup. Add staff first, or check staff:lookup permission.
             </p>
           ) : null}
+          <FieldError message={fieldErrors.damagedByUserId} />
         </div>
 
         <div className="space-y-1.5">
-          <Label>Reason</Label>
+          <Label htmlFor="damaged-reason">Reason</Label>
           <Textarea
+            id="damaged-reason"
             rows={3}
             value={reason}
-            onChange={(e) => setReason(e.target.value)}
+            onChange={(e) => {
+              setReason(e.target.value)
+              clearField('reason')
+            }}
             placeholder="Describe the damage…"
+            aria-invalid={Boolean(fieldErrors.reason)}
+            className={fieldErrorClass(fieldErrors.reason)}
           />
+          <FieldError message={fieldErrors.reason} />
         </div>
-
-        {error ? (
-          <p className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">{error}</p>
-        ) : null}
 
         <DialogFooter>
           <DialogCancelButton disabled={loading} />

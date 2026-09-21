@@ -7,6 +7,7 @@ import { endpoints } from '@/api/endpoints'
 import { PATHS } from '@/router/paths'
 import { useAuthSession } from '@/hooks/useAuthSession'
 import { ROLES } from '@/lib/constants'
+import { displayNotification } from '@/lib/notificationDisplay'
 import { cn } from '@/lib/utils'
 
 function formatRelative(value) {
@@ -95,7 +96,7 @@ export function NotificationBell({ className }) {
       </Button>
 
       {open ? (
-        <div className="absolute top-full right-0 z-50 mt-2 w-[min(22rem,calc(100vw-1.5rem))] overflow-hidden rounded-xl border border-border bg-white shadow-lg">
+        <div className="absolute top-full right-0 z-50 mt-2 w-[min(26rem,calc(100vw-1.5rem))] overflow-hidden rounded-xl border border-border bg-white shadow-lg">
           <div className="flex items-center justify-between border-b border-border px-3 py-2.5">
             <p className="text-sm font-semibold text-slate-900">Notifications</p>
             {unreadCount > 0 ? (
@@ -112,34 +113,39 @@ export function NotificationBell({ className }) {
             ) : null}
           </div>
 
-          <div className="max-h-80 overflow-y-auto">
+          <div className="max-h-96 overflow-y-auto">
             {loading && !items.length ? (
               <p className="px-3 py-6 text-center text-xs text-slate-400">Loading…</p>
             ) : items.length === 0 ? (
               <p className="px-3 py-6 text-center text-xs text-slate-400">No notifications yet</p>
             ) : (
-              items.map((n) => (
-                <button
-                  key={n.id}
-                  type="button"
-                  onClick={() => handleClickItem(n)}
-                  className={cn(
-                    'flex w-full cursor-pointer flex-col gap-0.5 border-b border-slate-100 px-3 py-2.5 text-left transition-colors hover:bg-slate-50',
-                    !n.isRead && 'bg-purple-50/40',
-                  )}
-                >
-                  <div className="flex items-start justify-between gap-2">
-                    <p className="text-sm font-semibold text-slate-900">{n.title}</p>
-                    {!n.isRead ? (
-                      <span className="mt-1 size-2 shrink-0 rounded-full bg-[#8E238F]" />
+              items.map((n) => {
+                const { title, body } = displayNotification(n)
+                return (
+                  <button
+                    key={n.id}
+                    type="button"
+                    onClick={() => handleClickItem(n)}
+                    className={cn(
+                      'flex w-full cursor-pointer flex-col gap-1 border-b border-slate-100 px-3 py-2.5 text-left transition-colors hover:bg-slate-50',
+                      !n.isRead && 'bg-purple-50/40',
+                    )}
+                  >
+                    <div className="flex items-start justify-between gap-2">
+                      <p className="text-sm font-semibold leading-snug text-slate-900">{title}</p>
+                      {!n.isRead ? (
+                        <span className="mt-1 size-2 shrink-0 rounded-full bg-[#8E238F]" />
+                      ) : null}
+                    </div>
+                    {body ? (
+                      <p className="whitespace-normal break-words text-xs leading-relaxed text-slate-600">
+                        {body}
+                      </p>
                     ) : null}
-                  </div>
-                  {n.body ? (
-                    <p className="line-clamp-2 text-xs text-slate-600">{n.body}</p>
-                  ) : null}
-                  <p className="text-[11px] text-slate-400">{formatRelative(n.createdAt)}</p>
-                </button>
-              ))
+                    <p className="text-[11px] text-slate-400">{formatRelative(n.createdAt)}</p>
+                  </button>
+                )
+              })
             )}
           </div>
 

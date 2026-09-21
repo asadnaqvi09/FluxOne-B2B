@@ -12,7 +12,10 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { ImageUploadField } from '@/components/shared/ImageUploadField'
+import { FieldError } from '@/components/shared/FieldError'
 import { BRAND } from '@/lib/constants'
+import { fieldErrorClass } from '@/lib/validation/fieldErrors'
+import { useFieldErrors } from '@/hooks/useFieldErrors'
 import { useFormBaseline } from '@/hooks/useFormBaseline'
 
 export function CategoryDialog({
@@ -27,27 +30,29 @@ export function CategoryDialog({
   const isEdit = mode === 'edit'
   const [name, setName] = useState('')
   const [image, setImage] = useState(null)
-  const [error, setError] = useState(null)
+  const { fieldErrors, formError, setFormError, resetErrors, clearField, applyErrors } =
+    useFieldErrors()
   const { captureBaseline, isDirty } = useFormBaseline(open)
 
   useEffect(() => {
     if (!open) return
-    setError(null)
+    resetErrors()
     const snapshot = { name: initial?.name || '', image: null }
     setImage(null)
     setName(snapshot.name)
     captureBaseline(snapshot)
-  }, [open, initial, captureBaseline])
+  }, [open, initial, captureBaseline, resetErrors])
 
   async function handleSubmit(event) {
     event.preventDefault()
     if (!name.trim()) {
-      setError('Name is required')
+      applyErrors({ name: 'Name is required' }, { name: 'category-name' }, ['name'])
       return
     }
+    resetErrors()
     const result = await onSubmit?.({ name: name.trim(), image })
     if (result?.success) onOpenChange?.(false)
-    else if (result?.error) setError(result.error)
+    else if (result?.error) setFormError(result.error)
   }
 
   return (
@@ -60,19 +65,25 @@ export function CategoryDialog({
           <DialogDescription>Set a name and optional image.</DialogDescription>
         </DialogHeader>
 
-        {error ? (
-          <p className="mb-3 rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">{error}</p>
+        {formError ? (
+          <p className="mb-3 rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">{formError}</p>
         ) : null}
 
-        <form className="space-y-4" onSubmit={handleSubmit}>
+        <form className="space-y-4" onSubmit={handleSubmit} noValidate>
           <div className="space-y-1.5">
             <Label htmlFor="category-name">Name</Label>
             <Input
               id="category-name"
               value={name}
-              onChange={(event) => setName(event.target.value)}
+              onChange={(event) => {
+                setName(event.target.value)
+                clearField('name')
+              }}
               placeholder={`${title} name`}
+              aria-invalid={Boolean(fieldErrors.name)}
+              className={fieldErrorClass(fieldErrors.name)}
             />
+            <FieldError message={fieldErrors.name} />
           </div>
           <ImageUploadField
             id="category-image"

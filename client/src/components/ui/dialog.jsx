@@ -1,13 +1,14 @@
 import { createContext, useCallback, useContext, useEffect, useState } from 'react'
-import { X } from 'lucide-react'
+import { AlertTriangle, X } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
 
 const DialogContext = createContext(null)
 
 // Modal close policy:
-// - Backdrop / outside click never closes (no message)
+// - Backdrop / outside click never closes
 // - Esc / X / DialogCancelButton → Discard prompt only when dirty
+// - Successful submit must call forceClose() so Discard never blocks
 function Dialog({ open, onOpenChange, dirty = false, children }) {
   const [discardOpen, setDiscardOpen] = useState(false)
 
@@ -62,10 +63,16 @@ function useDialogContext() {
   return ctx
 }
 
-// Guarded close for Cancel buttons — must be rendered inside Dialog.
+// Guarded close for Cancel buttons — must be rendered inside Dialog
 function useRequestDialogClose() {
   const { requestClose } = useDialogContext()
   return requestClose
+}
+
+// Close after successful save — skips Discard prompt even when form is dirty
+function useForceDialogClose() {
+  const { forceClose } = useDialogContext()
+  return forceClose
 }
 
 function DialogCancelButton({ children = 'Cancel', className, ...props }) {
@@ -104,26 +111,44 @@ function DialogTrigger({ asChild, children, className, ...props }) {
   )
 }
 
-// Viewport-fixed so long/scrollable forms never hide Stay / Discard off-screen
+// Viewport-fixed overlay so Stay / Discard stay visible above long forms
+// Dim + blur everything behind so this is the clear active layer
 function DiscardChangesPrompt({ onStay, onDiscard }) {
   return (
     <div
-      className="fixed inset-0 z-[60] flex items-end justify-center bg-black/40 p-3 sm:items-center sm:p-4"
+      className="fixed inset-0 z-[60] flex items-end justify-center bg-black/55 p-3 backdrop-blur-sm sm:items-center sm:p-4"
       role="presentation"
+      // Block all interaction with the form modal underneath
+      onClick={(event) => event.stopPropagation()}
     >
       <div
-        className="w-full max-w-sm rounded-xl border bg-card p-3 shadow-lg sm:p-4"
+        className="w-full max-w-sm rounded-xl border bg-card p-4 shadow-lg sm:p-5"
         role="alertdialog"
         aria-labelledby="discard-dialog-title"
         aria-describedby="discard-dialog-description"
+        // Keep clicks inside the card from bubbling to the overlay
+        onClick={(event) => event.stopPropagation()}
       >
-        <h3 id="discard-dialog-title" className="text-sm font-semibold sm:text-base">
+        <div className="mb-3 flex justify-center">
+          <div className="flex size-10 items-center justify-center rounded-full bg-amber-500 text-white shadow-xs">
+            <AlertTriangle className="size-5" aria-hidden="true" />
+          </div>
+        </div>
+
+        <h3
+          id="discard-dialog-title"
+          className="text-center text-sm font-semibold sm:text-base"
+        >
           Discard changes?
         </h3>
-        <p id="discard-dialog-description" className="mt-1 text-xs text-muted-foreground sm:text-sm">
+        <p
+          id="discard-dialog-description"
+          className="mt-1 text-center text-xs text-muted-foreground sm:text-sm"
+        >
           Are you sure you want to close? Unsaved changes will be lost.
         </p>
-        <div className="mt-3 flex flex-col-reverse gap-2 sm:mt-4 sm:flex-row sm:justify-end">
+
+        <div className="mt-4 flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
           <Button
             type="button"
             variant="outline"
@@ -155,6 +180,7 @@ function DialogContent({ className, children, showCloseButton = true }) {
     function onKeyDown(event) {
       if (event.key !== 'Escape') return
       event.preventDefault()
+      // Esc while discard is open → Stay (cancel discard)
       if (discardOpen) {
         setDiscardOpen(false)
         return
@@ -171,14 +197,18 @@ function DialogContent({ className, children, showCloseButton = true }) {
   return (
     <div className="fixed inset-0 z-50 flex items-end justify-center p-0 sm:items-center sm:p-4 lg:p-6">
       <div aria-hidden="true" className="absolute inset-0 bg-black/50" />
+
       <div
         className={cn(
-          // Phone: bottom sheet · sm+: centered card · xl: capped width (not full 32" stretch)
+          // Phone: bottom sheet · sm+: centered card · xl: capped width
           'relative z-10 w-full max-h-[92dvh] overflow-y-auto overscroll-contain rounded-t-2xl border bg-card p-4 pb-[max(1rem,env(safe-area-inset-bottom))] shadow-lg',
           'sm:max-h-[90dvh] sm:max-w-lg sm:rounded-xl sm:p-6 sm:pb-6',
           'md:max-w-xl',
+          // Soften inactive form while Discard prompt is open
+          discardOpen && 'pointer-events-none select-none',
           className,
         )}
+        aria-hidden={discardOpen || undefined}
       >
         {showCloseButton ? (
           <button
@@ -244,4 +274,6 @@ export {
   DialogDescription,
   DialogFooter,
   DialogCancelButton,
+  useRequestDialogClose,
+  useForceDialogClose,
 }

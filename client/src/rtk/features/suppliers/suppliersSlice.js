@@ -66,7 +66,8 @@ export const createSupplier = createAsyncThunk(
     if (!result.success) return rejectWithValue(result.error || 'Create failed')
     const filters = { ...getState().suppliers.filters, page: 1 }
     dispatch(setSupplierFilters(filters))
-    await dispatch(fetchSuppliers(filters))
+    // Refresh list in background — do not block form close / toast (QA tc-IM-suppliers091)
+    void dispatch(fetchSuppliers(filters))
     return { success: true, data: mapSupplier(result.data) }
   },
 )
@@ -77,7 +78,7 @@ export const updateSupplier = createAsyncThunk(
     const body = buildSupplierPayload(fields)
     const result = await apiClient.patch(endpoints.suppliers.update(id), body)
     if (!result.success) return rejectWithValue(result.error || 'Update failed')
-    await dispatch(fetchSuppliers(getState().suppliers.filters))
+    void dispatch(fetchSuppliers(getState().suppliers.filters))
     return { success: true, data: mapSupplier(result.data) }
   },
 )
@@ -87,7 +88,7 @@ export const deleteSupplier = createAsyncThunk(
   async (id, { getState, dispatch, rejectWithValue }) => {
     const result = await apiClient.delete(endpoints.suppliers.remove(id))
     if (!result.success) return rejectWithValue(result.error || 'Delete failed')
-    await dispatch(fetchSuppliers(getState().suppliers.filters))
+    void dispatch(fetchSuppliers(getState().suppliers.filters))
     return result
   },
 )

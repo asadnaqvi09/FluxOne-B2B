@@ -279,14 +279,14 @@ export function PoliciesTable({
                       direction={sortDir}
                       onClick={() => toggleSort('category')}
                     />
-                    <SortableHead
+                    {/* <SortableHead
                       label="Status"
                       active={sortKey === 'status'}
                       direction={sortDir}
                       onClick={() => toggleSort('status')}
-                    />
+                    /> */}
                     <SortableHead
-                      label="Enable / Disable"
+                      label="Printability status"
                       active={sortKey === 'printOnSlip'}
                       direction={sortDir}
                       onClick={() => toggleSort('printOnSlip')}
@@ -316,9 +316,9 @@ export function PoliciesTable({
                         <TableCell className="px-3 py-3">
                           <CategoryBadge category={p.category} config={cfg} />
                         </TableCell>
-                        <TableCell className="px-3 py-3">
+                        {/* <TableCell className="px-3 py-3">
                           <StatusBadge active={p.isActive} />
-                        </TableCell>
+                        </TableCell> */}
                         <TableCell className="px-3 py-3">
                           <div className="inline-flex items-center gap-1.5">
                             <Printer

@@ -169,12 +169,16 @@ export function StaffFormDialog({
     }
 
     resetErrors()
-    const result = await onSubmit?.(form)
-    if (result && result.success === false) {
-      setFormError(result.error || 'Save failed')
-      return
+    try {
+      const result = await onSubmit?.(form)
+      if (result && result.success === false) {
+        setFormError(result.error || 'Save failed. Please try again.')
+        return
+      }
+      onOpenChange?.(false)
+    } catch (err) {
+      setFormError(err?.message || 'Save failed. Please try again.')
     }
-    onOpenChange?.(false)
   }
 
   return (

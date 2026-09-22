@@ -47,16 +47,26 @@ const FIELD_IDS = {
 }
 
 // Add / Edit supplier — fields align with tech lead + createSupplierSchema.
-export function SupplierFormDialog({ open, onOpenChange, mode = 'create', initialSupplier = null, loading = false, onSubmit }) {
+export function SupplierFormDialog({
+  open,
+  onOpenChange,
+  mode = 'create',
+  initialSupplier = null,
+  loading = false,
+  onSubmit,
+}) {
   const isEdit = mode === 'edit'
   const [form, setForm] = useState(EMPTY)
+  const [submitting, setSubmitting] = useState(false)
   const { fieldErrors, formError, setFormError, resetErrors, clearField, applyErrors } =
     useFieldErrors()
   const { captureBaseline, isDirty } = useFormBaseline(open)
+  const busy = loading || submitting
 
   useEffect(() => {
     if (!open) return
     resetErrors()
+    setSubmitting(false)
     if (isEdit && initialSupplier) {
       const nextForm = {
         companyName: initialSupplier.companyName || '',
@@ -86,6 +96,8 @@ export function SupplierFormDialog({ open, onOpenChange, mode = 'create', initia
 
   async function handleSubmit(event) {
     event.preventDefault()
+    if (busy) return
+
     const errors = validateSupplierFormFields(form)
     if (Object.keys(errors).length) {
       applyErrors(errors, FIELD_IDS, SUPPLIER_FIELD_ORDER)
@@ -93,9 +105,20 @@ export function SupplierFormDialog({ open, onOpenChange, mode = 'create', initia
     }
 
     resetErrors()
-    const result = await onSubmit?.(form)
-    if (result?.success) onOpenChange?.(false)
-    else if (result?.error) setFormError(result.error)
+    setSubmitting(true)
+    try {
+      const result = await onSubmit?.(form)
+      if (result?.success) {
+        // Parent setter closes immediately (bypasses Discard) + toast from page
+        onOpenChange?.(false)
+        return
+      }
+      setFormError(result?.error || 'Save failed. Please try again.')
+    } catch (err) {
+      setFormError(err?.message || 'Save failed. Please try again.')
+    } finally {
+      setSubmitting(false)
+    }
   }
 
   return (
@@ -123,6 +146,7 @@ export function SupplierFormDialog({ open, onOpenChange, mode = 'create', initia
                 placeholder="Company name"
                 aria-invalid={Boolean(fieldErrors.companyName)}
                 className={fieldErrorClass(fieldErrors.companyName)}
+                disabled={busy}
               />
               <FieldError message={fieldErrors.companyName} />
             </div>
@@ -155,6 +179,7 @@ export function SupplierFormDialog({ open, onOpenChange, mode = 'create', initia
                 onChange={(e) => patch('representativeName', e.target.value)}
                 aria-invalid={Boolean(fieldErrors.representativeName)}
                 className={fieldErrorClass(fieldErrors.representativeName)}
+                disabled={busy}
               />
               <FieldError message={fieldErrors.representativeName} />
             </div>
@@ -179,6 +204,7 @@ export function SupplierFormDialog({ open, onOpenChange, mode = 'create', initia
                 onChange={(e) => patch('representativeEmail', e.target.value)}
                 aria-invalid={Boolean(fieldErrors.representativeEmail)}
                 className={fieldErrorClass(fieldErrors.representativeEmail)}
+                disabled={busy}
               />
               <FieldError message={fieldErrors.representativeEmail} />
             </div>
@@ -189,6 +215,7 @@ export function SupplierFormDialog({ open, onOpenChange, mode = 'create', initia
                 id="sup-location"
                 value={form.location}
                 onChange={(e) => patch('location', e.target.value)}
+                disabled={busy}
               />
             </div>
 
@@ -198,6 +225,7 @@ export function SupplierFormDialog({ open, onOpenChange, mode = 'create', initia
                 id="sup-tax"
                 value={form.taxPaid ? 'yes' : 'no'}
                 onChange={(e) => patch('taxPaid', e.target.value === 'yes')}
+                disabled={busy}
               >
                 <option value="no">No</option>
                 <option value="yes">Yes</option>
@@ -210,6 +238,7 @@ export function SupplierFormDialog({ open, onOpenChange, mode = 'create', initia
                 id="sup-reg"
                 value={form.registrationNumber}
                 onChange={(e) => patch('registrationNumber', e.target.value)}
+                disabled={busy}
               />
             </div>
 
@@ -219,6 +248,7 @@ export function SupplierFormDialog({ open, onOpenChange, mode = 'create', initia
                 id="sup-bank"
                 value={form.bankAccountNumber}
                 onChange={(e) => patch('bankAccountNumber', e.target.value)}
+                disabled={busy}
               />
             </div>
 
@@ -234,14 +264,14 @@ export function SupplierFormDialog({ open, onOpenChange, mode = 'create', initia
           </div>
 
           <DialogFooter>
-            <DialogCancelButton className="cursor-pointer" />
+            <DialogCancelButton className="cursor-pointer" disabled={busy} />
             <Button
               type="submit"
               className="cursor-pointer text-white"
               style={{ background: BRAND.purple }}
-              disabled={loading}
+              disabled={busy}
             >
-              {loading ? 'Saving…' : isEdit ? 'Save changes' : 'Add supplier'}
+              {busy ? 'Saving…' : isEdit ? 'Save changes' : 'Add supplier'}
             </Button>
           </DialogFooter>
         </form>
@@ -249,3 +279,5 @@ export function SupplierFormDialog({ open, onOpenChange, mode = 'create', initia
     </Dialog>
   )
 }
+
+export default SupplierFormDialog

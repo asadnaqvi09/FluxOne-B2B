@@ -6,11 +6,13 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
+  useForceDialogClose,
 } from '@/components/ui/dialog'
 
 // Form modal shell.
 // - Outside / backdrop click: ignored (no close, no message)
 // - Esc / X / Cancel: Discard only when dirty; otherwise quiet close
+// - After successful submit: call useForceDialogClose() so Discard never blocks
 export function FormDialog({
   open,
   onOpenChange,
@@ -43,6 +45,6 @@ export function FormDialog({
   )
 }
 
-export { DialogCancelButton }
+export { DialogCancelButton, useForceDialogClose }
 
 export default FormDialog

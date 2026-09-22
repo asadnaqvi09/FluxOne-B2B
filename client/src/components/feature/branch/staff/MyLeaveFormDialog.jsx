@@ -51,19 +51,24 @@ export function MyLeaveFormDialog({ open, onOpenChange, onSuccess }) {
 
     resetErrors()
     setMutating(true)
-    const res = await apiClient.post('/branch/leaves/me', {
-      startDate,
-      endDate,
-      reason,
-    })
-    setMutating(false)
+    try {
+      const res = await apiClient.post('/branch/leaves/me', {
+        startDate,
+        endDate,
+        reason,
+      })
 
-    if (res.success) {
-      toastSuccess('Leave request submitted for Admin approval')
-      onOpenChange?.(false)
-      onSuccess?.()
-    } else {
-      toastError(res.error || 'Failed to submit leave request')
+      if (res.success) {
+        toastSuccess('Leave request submitted for Admin approval')
+        onOpenChange?.(false)
+        onSuccess?.()
+      } else {
+        toastError(res.error || 'Failed to submit leave request')
+      }
+    } catch (err) {
+      toastError(err?.message || 'Failed to submit leave request')
+    } finally {
+      setMutating(false)
     }
   }
 

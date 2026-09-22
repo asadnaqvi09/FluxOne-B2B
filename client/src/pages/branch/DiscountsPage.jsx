@@ -129,20 +129,25 @@ export function DiscountsPage() {
     }
 
     setSaving(true)
-    let res
-    if (mode === 'create') {
-      res = await apiClient.post(endpoints.branch.discounts.create, payload)
-    } else {
-      res = await apiClient.put(endpoints.branch.discounts.update(editing.id), payload)
-    }
-    setSaving(false)
+    try {
+      let res
+      if (mode === 'create') {
+        res = await apiClient.post(endpoints.branch.discounts.create, payload)
+      } else {
+        res = await apiClient.put(endpoints.branch.discounts.update(editing.id), payload)
+      }
 
-    if (res.success) {
-      toastSuccess(mode === 'create' ? 'Discount offer created' : 'Discount offer updated')
-      setOpen(false)
-      void fetchDiscounts()
-    } else {
-      toastError(res.error || 'Failed to save discount')
+      if (res.success) {
+        toastSuccess(mode === 'create' ? 'Discount offer created' : 'Discount offer updated')
+        setOpen(false)
+        void fetchDiscounts()
+      } else {
+        toastError(res.error || 'Failed to save discount')
+      }
+    } catch (err) {
+      toastError(err?.message || 'Failed to save discount')
+    } finally {
+      setSaving(false)
     }
   }
 

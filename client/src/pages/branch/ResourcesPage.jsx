@@ -188,29 +188,36 @@ export function ResourcesPage() {
     }
 
     setSaving(true)
-    const res = isCreate
-      ? await apiClient.post(endpoints.branch.resources.hardware.create, formData)
-      : await apiClient.put(
-          endpoints.branch.resources.hardware.update(editingHardware.id),
-          formData,
-        )
-    setSaving(false)
+    try {
+      const res = isCreate
+        ? await apiClient.post(endpoints.branch.resources.hardware.create, formData)
+        : await apiClient.put(
+            endpoints.branch.resources.hardware.update(editingHardware.id),
+            formData,
+          )
 
-    if (!res.success) {
-      setFormError(res.error || 'Failed to save hardware')
-      return toastError(res.error || 'Failed to save hardware')
+      if (!res.success) {
+        setFormError(res.error || 'Failed to save hardware')
+        return toastError(res.error || 'Failed to save hardware')
+      }
+
+      const createdCode = res.data?.code
+      toastSuccess(
+        isCreate
+          ? createdCode
+            ? `Hardware added (${createdCode})`
+            : 'Hardware added successfully'
+          : 'Hardware updated successfully',
+      )
+      setHardwareOpen(false)
+      void loadHardware(filterHardware, debouncedHwSearch)
+    } catch (err) {
+      const msg = err?.message || 'Failed to save hardware'
+      setFormError(msg)
+      toastError(msg)
+    } finally {
+      setSaving(false)
     }
-
-    const createdCode = res.data?.code
-    toastSuccess(
-      isCreate
-        ? createdCode
-          ? `Hardware added (${createdCode})`
-          : 'Hardware added successfully'
-        : 'Hardware updated successfully',
-    )
-    setHardwareOpen(false)
-    void loadHardware(filterHardware, debouncedHwSearch)
   }
 
   function handleDeleteHardware(hw) {

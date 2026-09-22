@@ -270,9 +270,13 @@ export function AddStockInDialog({
       })),
     }
 
-    const result = await onSubmit?.(payload)
-    if (result?.success) onOpenChange?.(false)
-    else if (result?.error) setFormError(result.error)
+    try {
+      const result = await onSubmit?.(payload)
+      if (result?.success) onOpenChange?.(false)
+      else setFormError(result?.error || 'Failed to save stock-in. Please try again.')
+    } catch (err) {
+      setFormError(err?.message || 'Failed to save stock-in. Please try again.')
+    }
   }
 
   return (

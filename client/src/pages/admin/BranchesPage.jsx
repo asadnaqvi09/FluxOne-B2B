@@ -451,23 +451,32 @@ export function BranchesPage() {
     }
 
     if (editingBranch) {
-      const result = await updateBranch(editingBranch.id, payload)
-      if (!result.success) {
-        toastError(result.error || 'Failed to update branch')
-        return
+      try {
+        const result = await updateBranch(editingBranch.id, payload)
+        if (!result.success) {
+          toastError(result.error || 'Failed to update branch')
+          return
+        }
+        toastSuccess(`Branch details updated for "${formData.name}"`)
+        setAddDialogOpen(false)
+        setEditingBranch(null)
+      } catch (err) {
+        toastError(err?.message || 'Failed to update branch')
       }
-      toastSuccess(`Branch details updated for "${formData.name}"`)
     } else {
-      const result = await createBranch(payload)
-      if (!result.success) {
-        toastError(result.error || 'Failed to create branch')
-        return
+      try {
+        const result = await createBranch(payload)
+        if (!result.success) {
+          toastError(result.error || 'Failed to create branch')
+          return
+        }
+        credentialsToast(`Branch "${formData.name}" created.`, result.data?.credentials)
+        setAddDialogOpen(false)
+        setEditingBranch(null)
+      } catch (err) {
+        toastError(err?.message || 'Failed to create branch')
       }
-      credentialsToast(`Branch "${formData.name}" created.`, result.data?.credentials)
     }
-
-    setAddDialogOpen(false)
-    setEditingBranch(null)
   }
 
   return (

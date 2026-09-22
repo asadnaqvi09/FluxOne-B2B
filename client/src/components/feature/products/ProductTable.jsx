@@ -1,8 +1,9 @@
-import { Package, Pencil, Printer, Trash2 } from 'lucide-react'
+import { Package, Printer } from 'lucide-react'
 import { BarcodeCell } from '@/components/feature/products/BarcodeCell'
 import { PricingColumns } from '@/components/feature/products/PricingColumns'
 import { ProductImageCell, ProductStatusToggle } from '@/components/feature/products/ProductStatusToggle'
 import { PromotionColumns } from '@/components/feature/products/PromotionColumns'
+import { ActionIconButton } from '@/components/shared/ActionIconButton'
 import { EmptyState } from '@/components/shared/EmptyState'
 import { SurfaceCard } from '@/components/shared/SurfaceCard'
 import { Button } from '@/components/ui/button'
@@ -13,11 +14,44 @@ import {
   TableHead,
   TableRow,
   TableCell,
+  TableActionsHead,
+  TableActionsCell,
   TablePagination,
 } from '@/components/ui/table'
 import { TableRowsSkeleton } from '@/components/ui/skeleton'
 import { formatInventoryStock, money } from '@/lib/mapProduct'
 import { displayItemCode } from '@/lib/formatDisplayId'
+
+// Print / Edit / Delete for one catalog row
+function ProductRowActions({ row, onPrintBarcode, onEdit, onDelete }) {
+  return (
+    <>
+      <Button
+        type="button"
+        size="icon"
+        variant="ghost"
+        className="size-8 cursor-pointer text-slate-500 hover:bg-slate-100 hover:text-slate-900"
+        title="Download barcode PDF"
+        aria-label="Download barcode PDF"
+        onClick={() => onPrintBarcode?.(row)}
+      >
+        <Printer className="size-4" />
+      </Button>
+      <ActionIconButton
+        action="edit"
+        label="Edit product"
+        className="size-8"
+        onClick={() => onEdit?.(row)}
+      />
+      <ActionIconButton
+        action="delete"
+        label="Delete product"
+        className="size-8"
+        onClick={() => onDelete?.(row)}
+      />
+    </>
+  )
+}
 
 function InventoryStockCell({ row, className = '' }) {
   const stock = formatInventoryStock(row.quantity, row.reorderPoint, row.scale)
@@ -67,7 +101,6 @@ export function ProductTable({
         />
       ) : (
         <>
-          {/* Make Sure All tables are responsive */}
           {/* Mobile cards */}
           <div className="space-y-3 md:hidden">
             {list.map((row) => (
@@ -121,47 +154,22 @@ export function ProductTable({
                         <InventoryStockCell row={row} />
                       </p>
                     </div>
-                    <div className="mt-3 flex flex-wrap gap-1.5">
-                      <Button
-                        type="button"
-                        size="sm"
-                        variant="outline"
-                        className="cursor-pointer"
-                        onClick={() => onPrintBarcode?.(row)}
-                      >
-                        <Printer className="size-3.5" />
-                        PDF
-                      </Button>
-                      <Button
-                        type="button"
-                        size="sm"
-                        variant="outline"
-                        className="cursor-pointer"
-                        onClick={() => onEdit?.(row)}
-                      >
-                        <Pencil className="size-3.5" />
-                        Edit
-                      </Button>
-                      <Button
-                        type="button"
-                        size="sm"
-                        variant="outline"
-                        className="cursor-pointer text-red-600 hover:text-red-700"
-                        onClick={() => onDelete?.(row)}
-                      >
-                        <Trash2 className="size-3.5" />
-                        Delete
-                      </Button>
+                    <div className="mt-3 flex flex-wrap items-center gap-1">
+                      <ProductRowActions
+                        row={row}
+                        onPrintBarcode={onPrintBarcode}
+                        onEdit={onEdit}
+                        onDelete={onDelete}
+                      />
                     </div>
                   </div>
                 </div>
               </article>
             ))}
           </div>
-          {/* Make Sure All tables are responsive */}
-          {/* Desktop table */}
+          {/* Desktop table — Action uses nowrap cell so Delete is not clipped */}
           <div className="hidden overflow-x-auto md:block">
-            <Table className="min-w-[1240px] text-left text-sm">
+            <Table className="min-w-[1280px] text-left text-sm">
               <TableHeader>
                 <TableRow className="text-[11px] tracking-wide text-slate-500 uppercase">
                   <TableHead className="px-2 py-3 font-semibold">Name</TableHead>
@@ -180,7 +188,7 @@ export function ProductTable({
                     Inventory Stock
                   </TableHead>
                   <TableHead className="px-2 py-3 font-semibold">Status</TableHead>
-                  <TableHead className="px-2 py-3 font-semibold">Action</TableHead>
+                  <TableActionsHead className="px-2 py-3 font-semibold">Action</TableActionsHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -259,40 +267,14 @@ export function ProductTable({
                         onChange={(status) => onStatusChange?.(row, status)}
                       />
                     </TableCell>
-                    <TableCell className="px-2 py-3">
-                      <div className="flex items-center gap-1">
-                        <Button
-                          type="button"
-                          size="icon"
-                          variant="ghost"
-                          className="cursor-pointer"
-                          title="Download barcode PDF"
-                          onClick={() => onPrintBarcode?.(row)}
-                        >
-                          <Printer className="size-4" />
-                        </Button>
-                        <Button
-                          type="button"
-                          size="icon"
-                          variant="ghost"
-                          className="cursor-pointer text-slate-500 hover:bg-slate-100 hover:text-slate-900 hover:scale-110"
-                          title="Edit"
-                          onClick={() => onEdit?.(row)}
-                        >
-                          <Pencil className="size-4" />
-                        </Button>
-                        <Button
-                          type="button"
-                          size="icon"
-                          variant="ghost"
-                          className="cursor-pointer text-slate-500 hover:bg-rose-50 hover:text-rose-700 hover:scale-110"
-                          title="Delete"
-                          onClick={() => onDelete?.(row)}
-                        >
-                          <Trash2 className="size-4" />
-                        </Button>
-                      </div>
-                    </TableCell>
+                    <TableActionsCell>
+                      <ProductRowActions
+                        row={row}
+                        onPrintBarcode={onPrintBarcode}
+                        onEdit={onEdit}
+                        onDelete={onDelete}
+                      />
+                    </TableActionsCell>
                   </TableRow>
                 ))}
               </TableBody>

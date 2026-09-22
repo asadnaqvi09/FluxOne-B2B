@@ -20,6 +20,10 @@ function getTransporter() {
       user: process.env.SMTP_USER,
       pass: process.env.SMTP_PASS,
     },
+    // Fail fast — never hang create/submit HTTP on SMTP (QA form unresponsive)
+    connectionTimeout: 10_000,
+    greetingTimeout: 10_000,
+    socketTimeout: 15_000,
   })
   return transporter
 }

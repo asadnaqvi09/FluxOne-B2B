@@ -101,19 +101,24 @@ export function LeaveFormDialog({
     }
     resetErrors()
     setMutating(true)
-    const res = await apiClient.post('/branch/leaves', {
-      employeeIds: selectedEmployees,
-      startDate,
-      endDate,
-      reason,
-    })
-    setMutating(false)
-    if (res.success) {
-      toastSuccess('Leave recorded and scheduled successfully')
-      onOpenChange?.(false)
-      onSuccess?.()
-    } else {
-      toastError(res.error || 'Failed to submit leave request')
+    try {
+      const res = await apiClient.post('/branch/leaves', {
+        employeeIds: selectedEmployees,
+        startDate,
+        endDate,
+        reason,
+      })
+      if (res.success) {
+        toastSuccess('Leave recorded and scheduled successfully')
+        onOpenChange?.(false)
+        onSuccess?.()
+      } else {
+        toastError(res.error || 'Failed to submit leave request')
+      }
+    } catch (err) {
+      toastError(err?.message || 'Failed to submit leave request')
+    } finally {
+      setMutating(false)
     }
   }
 

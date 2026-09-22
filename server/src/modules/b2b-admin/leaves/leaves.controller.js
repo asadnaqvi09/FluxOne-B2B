@@ -4,7 +4,7 @@ import {
   decideLeave,
 } from '../../branch-manager/leaves/leaves.model.js'
 import { notifyBmOfLeaveDecision } from '../../notifications/notifications.service.js'
-import { sendLeaveDecisionEmail } from '../../../mail/mail.service.js'
+// import { sendLeaveDecisionEmail } from '../../../mail/mail.service.js'
 import { normalizeImageUrl } from '../../../utils/uploadUrl.util.js'
 import { tenantQuery } from '../../../config/db.js'
 import { success, fail } from '../../../utils/response.util.js'
@@ -77,26 +77,26 @@ export async function decideManagerLeave(req, res) {
       )
       const bm = bmRows[0] || {}
 
-      await notifyBmOfLeaveDecision(req.tenantId, updated, {
-        status,
-        decisionReason: updated.decisionReason,
-        decidedByName: req.user.name || 'Admin',
-      })
+      // await notifyBmOfLeaveDecision(req.tenantId, updated, {
+      //   status,
+      //   decisionReason: updated.decisionReason,
+      //   decidedByName: req.user.name || 'Admin',
+      // })
 
-      if (bm.managerEmail) {
-        await sendLeaveDecisionEmail({
-          toEmail: bm.managerEmail,
-          recipientName: bm.managerName,
-          status,
-          startDate: updated.startDate,
-          endDate: updated.endDate,
-          reason: updated.reason,
-          decisionReason: updated.decisionReason,
-          branchName: bm.branchName || existing.branchName,
-          companyName: null,
-          decidedByName: req.user.name || 'Admin',
-        })
-      }
+      // if (bm.managerEmail) {
+      //   await sendLeaveDecisionEmail({
+      //     toEmail: bm.managerEmail,
+      //     recipientName: bm.managerName,
+      //     status,
+      //     startDate: updated.startDate,
+      //     endDate: updated.endDate,
+      //     reason: updated.reason,
+      //     decisionReason: updated.decisionReason,
+      //     branchName: bm.branchName || existing.branchName,
+      //     companyName: null,
+      //     decidedByName: req.user.name || 'Admin',
+      //   })
+      // }
     } catch (notifyErr) {
       console.error('[admin/leaves] Failed to notify BM:', notifyErr?.message || notifyErr)
     }

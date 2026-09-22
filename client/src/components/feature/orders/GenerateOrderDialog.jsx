@@ -139,9 +139,13 @@ export function GenerateOrderDialog({
       printAfter: andPrint,
     }
     console.debug('[GenerateOrderDialog] submit', payload)
-    const result = await onSubmit?.(payload)
-    if (result?.success) onOpenChange?.(false)
-    else if (result?.error) setFormError(result.error)
+    try {
+      const result = await onSubmit?.(payload)
+      if (result?.success) onOpenChange?.(false)
+      else setFormError(result?.error || 'Failed to create order. Please try again.')
+    } catch (err) {
+      setFormError(err?.message || 'Failed to create order. Please try again.')
+    }
   }
 
   return (

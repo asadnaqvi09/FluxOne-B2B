@@ -267,18 +267,23 @@ export function ItemFormDialog({
       taxIds: payload.taxIds,
       type: payload.type,
     })
-    const result = await onSubmit?.(payload)
-    if (result?.success) {
-      const product = result.data || null
-      if (!isEdit && product?.id) {
-        setCreated(product)
-        setImageWarning(result.imageWarning || null)
-        setStep('success')
-        return
+    try {
+      const result = await onSubmit?.(payload)
+      if (result?.success) {
+        const product = result.data || null
+        if (!isEdit && product?.id) {
+          setCreated(product)
+          setImageWarning(result.imageWarning || null)
+          setStep('success')
+          return
+        }
+        onOpenChange?.(false)
+      } else {
+        setFormError(result?.error || 'Save failed. Please try again.')
+        setStep('form')
       }
-      onOpenChange?.(false)
-    } else if (result?.error) {
-      setFormError(result.error)
+    } catch (err) {
+      setFormError(err?.message || 'Save failed. Please try again.')
       setStep('form')
     }
   }

@@ -50,9 +50,13 @@ export function CategoryDialog({
       return
     }
     resetErrors()
-    const result = await onSubmit?.({ name: name.trim(), image })
-    if (result?.success) onOpenChange?.(false)
-    else if (result?.error) setFormError(result.error)
+    try {
+      const result = await onSubmit?.({ name: name.trim(), image })
+      if (result?.success) onOpenChange?.(false)
+      else setFormError(result?.error || 'Save failed. Please try again.')
+    } catch (err) {
+      setFormError(err?.message || 'Save failed. Please try again.')
+    }
   }
 
   return (

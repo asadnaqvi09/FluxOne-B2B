@@ -102,19 +102,24 @@ export function HolidayFormDialog({
     }
     resetErrors()
     setMutating(true)
-    const res = await apiClient.post('/branch/holidays', {
-      name,
-      startDate,
-      endDate,
-      employeeIds: selectedEmployees,
-    })
-    setMutating(false)
-    if (res.success) {
-      toastSuccess('Holiday added and marked on employee attendance sheets')
-      onOpenChange?.(false)
-      onSuccess?.()
-    } else {
-      toastError(res.error || 'Failed to save holiday')
+    try {
+      const res = await apiClient.post('/branch/holidays', {
+        name,
+        startDate,
+        endDate,
+        employeeIds: selectedEmployees,
+      })
+      if (res.success) {
+        toastSuccess('Holiday added and marked on employee attendance sheets')
+        onOpenChange?.(false)
+        onSuccess?.()
+      } else {
+        toastError(res.error || 'Failed to save holiday')
+      }
+    } catch (err) {
+      toastError(err?.message || 'Failed to save holiday')
+    } finally {
+      setMutating(false)
     }
   }
 

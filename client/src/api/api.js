@@ -237,6 +237,9 @@ function shouldAttemptRefresh(path, options, status) {
   return Boolean(tokenStorage.getRefreshToken())
 }
 
+// Prevent form submit from hanging forever (QA tc-IM-suppliers091)
+const DEFAULT_FETCH_TIMEOUT_MS = 45_000
+
 export async function api(path, options = {}) {
   const method = (options.method || 'GET').toUpperCase()
   const body = options.body
@@ -247,6 +250,13 @@ export async function api(path, options = {}) {
 
   const url = `${API_BASE_URL}${path}`
   const asForm = isFormDataBody(body)
+  const timeoutMs =
+    typeof options.timeoutMs === 'number' ? options.timeoutMs : DEFAULT_FETCH_TIMEOUT_MS
+  const controller = new AbortController()
+  const timeoutId =
+    timeoutMs > 0
+      ? setTimeout(() => controller.abort(), timeoutMs)
+      : null
 
   try {
     const token = tokenStorage.getToken()
@@ -254,6 +264,7 @@ export async function api(path, options = {}) {
       method,
       // Avoid stale 304/ETag responses after mutations (categories delete looked “stuck”)
       cache: 'no-store',
+      signal: options.signal || controller.signal,
       headers: {
         ...(asForm ? {} : { 'Content-Type': 'application/json' }),
         ...(token ? { Authorization: `Bearer ${token}` } : {}),
@@ -288,7 +299,12 @@ export async function api(path, options = {}) {
     }
     return ok(payload?.data ?? payload)
   } catch (error) {
+    if (error?.name === 'AbortError') {
+      return fail('Request timed out. Please try again.')
+    }
     return fail(error.message || `Network error calling ${url}`)
+  } finally {
+    if (timeoutId) clearTimeout(timeoutId)
   }
 }
 

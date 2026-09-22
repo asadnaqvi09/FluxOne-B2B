@@ -99,22 +99,27 @@ export function ScaleFormDialog({
 
     resetErrors()
     setMutating(true)
-    const payload = {
-      name,
-      maxPoints: check.value,
-      isActive: Boolean(form.isActive),
-    }
-    const res = isEdit
-      ? await apiClient.put(`/branch/performance/scales/${initialScale.id}`, payload)
-      : await apiClient.post('/branch/performance/scales', payload)
-    setMutating(false)
+    try {
+      const payload = {
+        name,
+        maxPoints: check.value,
+        isActive: Boolean(form.isActive),
+      }
+      const res = isEdit
+        ? await apiClient.put(`/branch/performance/scales/${initialScale.id}`, payload)
+        : await apiClient.post('/branch/performance/scales', payload)
 
-    if (res.success) {
-      toastSuccess(isEdit ? 'Scoring scale updated' : 'Scoring scale added')
-      onOpenChange?.(false)
-      onSuccess?.()
-    } else {
-      toastError(res.error || (isEdit ? 'Failed to update scale' : 'Failed to add scale'))
+      if (res.success) {
+        toastSuccess(isEdit ? 'Scoring scale updated' : 'Scoring scale added')
+        onOpenChange?.(false)
+        onSuccess?.()
+      } else {
+        toastError(res.error || (isEdit ? 'Failed to update scale' : 'Failed to add scale'))
+      }
+    } catch (err) {
+      toastError(err?.message || (isEdit ? 'Failed to update scale' : 'Failed to add scale'))
+    } finally {
+      setMutating(false)
     }
   }
 

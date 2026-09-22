@@ -160,7 +160,8 @@ export const createProduct = createAsyncThunk(
 
     const filters = { ...getState().products.filters, page: 1 }
     dispatch(setProductFilters(filters))
-    await dispatch(fetchProducts(filters))
+    // Refresh in background so Add modal can close immediately after create
+    void dispatch(fetchProducts(filters))
     return { success: true, data: product, imageWarning }
   },
 )
@@ -184,7 +185,7 @@ export const updateProduct = createAsyncThunk(
         )
       }
     }
-    await dispatch(fetchProducts(getState().products.filters))
+    void dispatch(fetchProducts(getState().products.filters))
     return { success: true, data: mapProduct(result.data || { id, ...fields }) }
   },
 )
@@ -215,7 +216,7 @@ export const deleteProduct = createAsyncThunk(
       : endpoints.products.remove(id)
     const result = await apiClient.delete(path)
     if (!result.success) return rejectWithValue(result.error || 'Delete failed')
-    await dispatch(fetchProducts(getState().products.filters))
+    void dispatch(fetchProducts(getState().products.filters))
     return { success: true, permanent }
   },
 )
@@ -256,8 +257,8 @@ export const importProducts = createAsyncThunk(
     if (!result.success) return rejectWithValue(result.error || 'Import failed')
     const filters = { ...getState().products.filters, page: 1, status: 'all' }
     dispatch(setProductFilters(filters))
-    await dispatch(fetchProducts(filters))
-    await dispatch(reloadProductCategories())
+    void dispatch(fetchProducts(filters))
+    void dispatch(reloadProductCategories())
     return result
   },
 )

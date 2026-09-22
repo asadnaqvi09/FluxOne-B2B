@@ -359,7 +359,7 @@ export function ResourcesPage() {
                 className={`cursor-pointer flex-1 sm:flex-none ${activeTab === 'scales' ? 'text-white' : 'hover:border-slate-300'}`}
               >
                 <Scale className="mr-1.5 size-4" />
-                Items Scales
+                Variat Management
               </Button>
             </div>
           }

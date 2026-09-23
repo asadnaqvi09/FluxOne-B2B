@@ -1,9 +1,17 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
-import { Download, Filter, Search } from 'lucide-react'
+import {
+  CalendarDays,
+  CheckCircle2,
+  ChevronDown,
+  Clock3,
+  Search,
+  XCircle,
+} from 'lucide-react'
 import { PageHeader } from '@/components/shared/PageHeader'
 import { MotionHeader, MotionReveal } from '@/components/shared/MotionReveal'
 import { SurfaceCard } from '@/components/shared/SurfaceCard'
+import { StatCard } from '@/components/shared/StatsCards'
 import { DataCard, ResponsiveDataShell } from '@/components/shared/ResponsiveDataShell'
 import { ActionIconButton } from '@/components/shared/ActionIconButton'
 import { LeaveDetailDialog } from '@/components/feature/admin/leaves/LeaveDetailDialog'
@@ -75,44 +83,6 @@ function statusBadgeClass(status) {
   return 'bg-slate-50 text-slate-600 border-slate-200'
 }
 
-function exportCsv(rows) {
-  const header = [
-    'Leave ID',
-    'Employee',
-    'Branch',
-    'Start',
-    'End',
-    'Days',
-    'Applied On',
-    'Status',
-    'Reason',
-  ]
-  const lines = rows.map((r) =>
-    [
-      displayLeaveRef(r),
-      r.managerName || '',
-      r.branchName || '',
-      String(r.startDate || '').slice(0, 10),
-      String(r.endDate || '').slice(0, 10),
-      r.dayCount ?? '',
-      r.createdAt || '',
-      r.status || '',
-      (r.reason || '').replace(/"/g, '""'),
-    ]
-      .map((cell) => `"${cell}"`)
-      .join(','),
-  )
-  const blob = new Blob([[header.join(','), ...lines].join('\n')], {
-    type: 'text/csv;charset=utf-8;',
-  })
-  const url = URL.createObjectURL(blob)
-  const a = document.createElement('a')
-  a.href = url
-  a.download = `leave-management-${new Date().toISOString().slice(0, 10)}.csv`
-  a.click()
-  URL.revokeObjectURL(url)
-}
-
 // use reusable components if possible — ActionIconButton for icon-only row actions
 function LeaveRowActions({ row, mutating, onView, onApprove, onReject }) {
   const pending = row.status === 'pending'
@@ -168,14 +138,14 @@ export function LeavesPage() {
 
   const fetchLeaves = useCallback(async () => {
     setLoading(true)
+    // Branch-scoped list only — search/status applied client-side so KPIs stay accurate
     const res = await apiClient.get(endpoints.admin.leaves.list, {
       branchId: branchFilter || undefined,
-      q: debouncedQ || undefined,
     })
     setLoading(false)
     if (res.success) setItems(res.data || [])
     else toastError(res.error || 'Failed to load leave requests')
-  }, [branchFilter, debouncedQ])
+  }, [branchFilter])
 
   useEffect(() => {
     void fetchLeaves()
@@ -191,6 +161,7 @@ export function LeavesPage() {
     })()
   }, [])
 
+  // Dynamic KPIs from full branch-scoped set (not search/status filtered)
   const counts = useMemo(() => {
     const all = items.length
     const pending = items.filter((r) => r.status === 'pending').length
@@ -199,10 +170,25 @@ export function LeavesPage() {
     return { all, pending, approved, rejected }
   }, [items])
 
+  const searched = useMemo(() => {
+    if (!debouncedQ) return items
+    const q = debouncedQ.toLowerCase()
+    return items.filter((r) => {
+      const id = String(r.id || '').toLowerCase()
+      const leaveRef = displayLeaveRef(r).toLowerCase()
+      const name = String(r.managerName || '').toLowerCase()
+      return id.includes(q) || leaveRef.includes(q) || name.includes(q)
+    })
+  }, [items, debouncedQ])
+
   const filtered = useMemo(() => {
-    if (statusFilter === 'all') return items
-    return items.filter((r) => r.status === statusFilter)
-  }, [items, statusFilter])
+    if (statusFilter === 'all') return searched
+    return searched.filter((r) => r.status === statusFilter)
+  }, [searched, statusFilter])
+
+  const selectedBranchLabel = branchFilter
+    ? branches.find((b) => b.id === branchFilter)?.name || 'Branch'
+    : 'All Branches'
 
   const {
     page,
@@ -272,6 +258,37 @@ export function LeavesPage() {
     { id: 'rejected', label: `Rejected (${counts.rejected})` },
   ]
 
+  const kpiCards = [
+    {
+      id: 'all',
+      label: 'Total Leaves',
+      value: counts.all,
+      icon: CalendarDays,
+      iconGradient: 'from-[#8E238F] to-[#412283]',
+    },
+    {
+      id: 'approved',
+      label: 'Total Approved',
+      value: counts.approved,
+      icon: CheckCircle2,
+      iconGradient: 'from-emerald-500 to-teal-600',
+    },
+    {
+      id: 'rejected',
+      label: 'Total Rejected',
+      value: counts.rejected,
+      icon: XCircle,
+      iconGradient: 'from-rose-500 to-red-600',
+    },
+    {
+      id: 'pending',
+      label: 'Approval Required',
+      value: counts.pending,
+      icon: Clock3,
+      iconGradient: 'from-amber-500 to-orange-600',
+    },
+  ]
+
   return (
     <div className="space-y-6 pb-8">
       <MotionHeader>
@@ -279,21 +296,27 @@ export function LeavesPage() {
           eyebrow="Workforce"
           title="Leave Management"
           description="View and manage leave requests submitted by branch managers"
-          actions={
-            <Button
-              type="button"
-              variant="brand"
-              onClick={() => exportCsv(filtered)}
-              disabled={!filtered.length}
-            >
-              <Download className="mr-1.5 size-4" />
-              Export
-            </Button>
-          }
         />
       </MotionHeader>
 
-      <MotionReveal delay={0.04}>
+      <MotionReveal delay={0.03}>
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+          {kpiCards.map((kpi, index) => (
+            <StatCard
+              key={kpi.id}
+              index={index}
+              label={kpi.label}
+              value={loading ? '—' : kpi.value}
+              icon={kpi.icon}
+              iconGradient={kpi.iconGradient}
+              onClick={() => setStatusFilter(kpi.id)}
+              className={cn(statusFilter === kpi.id && 'border-purple-300 ring-1 ring-purple-200')}
+            />
+          ))}
+        </div>
+      </MotionReveal>
+
+      <MotionReveal delay={0.06}>
         <SurfaceCard
           title="Leave Management"
           description="Branch manager personal leave requests awaiting or past Admin decision"
@@ -328,7 +351,7 @@ export function LeavesPage() {
                   {chip.label}
                 </button>
               ))}
-              {/* Filter icon opens branch dropdown (not a separate tab below) */}
+              {/* Branch filter — button opens All Branches dropdown */}
               <div ref={branchMenuRef} className="relative">
                 <Button
                   type="button"
@@ -337,11 +360,15 @@ export function LeavesPage() {
                   aria-expanded={branchMenuOpen}
                   aria-haspopup="listbox"
                   onClick={() => setBranchMenuOpen((v) => !v)}
+                  className="min-w-[8.5rem] justify-between gap-2"
                 >
-                  <Filter className="mr-1 size-3.5" />
-                  {branchFilter
-                    ? branches.find((b) => b.id === branchFilter)?.name || 'Branch'
-                    : 'Filter'}
+                  <span className="truncate">{selectedBranchLabel}</span>
+                  <ChevronDown
+                    className={cn(
+                      'size-3.5 shrink-0 text-slate-500 transition-transform',
+                      branchMenuOpen && 'rotate-180',
+                    )}
+                  />
                 </Button>
                 {branchMenuOpen ? (
                   <div className="absolute top-full right-0 z-30 mt-1.5 w-64 rounded-xl border border-border bg-white p-3 shadow-lg">

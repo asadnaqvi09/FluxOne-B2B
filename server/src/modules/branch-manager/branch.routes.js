@@ -44,6 +44,28 @@ import {
   scalesUpdate,
   scalesRemove,
 } from './resources/resources.controller.js'
+import {
+  variantTypesList,
+  variantTypesGet,
+  variantTypesCreate,
+  variantTypesUpdate,
+  variantTypesRemove,
+  variantValuesList,
+  variantValuesGet,
+  variantValuesCreate,
+  variantValuesUpdate,
+  variantValuesRemove,
+} from './resources/variants.controller.js'
+import {
+  listVariantTypesSchema,
+  createVariantTypeSchema,
+  updateVariantTypeSchema,
+  variantTypeIdParamsSchema,
+  listVariantValuesSchema,
+  createVariantValueSchema,
+  updateVariantValueSchema,
+  variantValueIdParamsSchema,
+} from './resources/variants.validator.js'
 import { asyncHandler } from '../../middlewares/error.middleware.js'
 import { requirePermission } from '../../middlewares/role.middleware.js'
 import { validate } from '../../middlewares/validate.middleware.js'
@@ -158,6 +180,68 @@ router.get('/resources/scales', requirePermission('resources:read'), asyncHandle
 router.post('/resources/scales', requirePermission('resources:write'), asyncHandler(scalesCreate))
 router.put('/resources/scales/:id', requirePermission('resources:write'), asyncHandler(scalesUpdate))
 router.delete('/resources/scales/:id', requirePermission('resources:write'), asyncHandler(scalesRemove))
+
+// Resources — Variant Types & Values (parallel to item_scales)
+router.get(
+  '/resources/variant-types',
+  requirePermission('resources:read'),
+  validate(listVariantTypesSchema),
+  asyncHandler(variantTypesList),
+)
+router.get(
+  '/resources/variant-types/:id',
+  requirePermission('resources:read'),
+  validate(variantTypeIdParamsSchema),
+  asyncHandler(variantTypesGet),
+)
+router.post(
+  '/resources/variant-types',
+  requirePermission('resources:write'),
+  validate(createVariantTypeSchema),
+  asyncHandler(variantTypesCreate),
+)
+router.put(
+  '/resources/variant-types/:id',
+  requirePermission('resources:write'),
+  validate(updateVariantTypeSchema),
+  asyncHandler(variantTypesUpdate),
+)
+router.delete(
+  '/resources/variant-types/:id',
+  requirePermission('resources:write'),
+  validate(variantTypeIdParamsSchema),
+  asyncHandler(variantTypesRemove),
+)
+router.get(
+  '/resources/variant-values',
+  requirePermission('resources:read'),
+  validate(listVariantValuesSchema),
+  asyncHandler(variantValuesList),
+)
+router.get(
+  '/resources/variant-values/:id',
+  requirePermission('resources:read'),
+  validate(variantValueIdParamsSchema),
+  asyncHandler(variantValuesGet),
+)
+router.post(
+  '/resources/variant-values',
+  requirePermission('resources:write'),
+  validate(createVariantValueSchema),
+  asyncHandler(variantValuesCreate),
+)
+router.put(
+  '/resources/variant-values/:id',
+  requirePermission('resources:write'),
+  validate(updateVariantValueSchema),
+  asyncHandler(variantValuesUpdate),
+)
+router.delete(
+  '/resources/variant-values/:id',
+  requirePermission('resources:write'),
+  validate(variantValueIdParamsSchema),
+  asyncHandler(variantValuesRemove),
+)
 
 // Stock Requests
 router.get(

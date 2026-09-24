@@ -55,6 +55,44 @@ export function validateItemScaleForm(fields = {}) {
   return firstValidationMessage(validateItemScaleFormFields(fields), ['name'])
 }
 
+const VARIANT_NAME_RE = /^[A-Za-z0-9][A-Za-z0-9 ._\-/%]*$/
+
+export function validateVariantTypeFormFields(fields = {}) {
+  const errors = {}
+  const name = String(fields.name || '').trim()
+  if (!name) errors.name = 'Variant type name is required'
+  else if (name.length > 80) errors.name = 'Name must be 80 characters or less'
+  else if (!VARIANT_NAME_RE.test(name)) {
+    errors.name = 'Name may only contain letters, numbers, spaces, and . _ - / %'
+  }
+  return errors
+}
+
+export function validateVariantTypeForm(fields = {}) {
+  return firstValidationMessage(validateVariantTypeFormFields(fields), ['name'])
+}
+
+export function validateVariantValueFormFields(fields = {}, { requireType = true } = {}) {
+  const errors = {}
+  const name = String(fields.name || '').trim()
+  if (!name) errors.name = 'Variant value name is required'
+  else if (name.length > 80) errors.name = 'Name must be 80 characters or less'
+  else if (!VARIANT_NAME_RE.test(name)) {
+    errors.name = 'Name may only contain letters, numbers, spaces, and . _ - / %'
+  }
+  if (requireType && !fields.variantTypeId) {
+    errors.variantTypeId = 'Select a variant type'
+  }
+  return errors
+}
+
+export function validateVariantValueForm(fields = {}, opts = {}) {
+  return firstValidationMessage(validateVariantValueFormFields(fields, opts), [
+    'variantTypeId',
+    'name',
+  ])
+}
+
 export function validateDiscountFormFields(fields = {}) {
   const errors = {}
   const name = String(fields.name || '').trim()

@@ -1,9 +1,10 @@
 import { useEffect, useState } from 'react'
-import { Scale, Plus, Trash2, Edit3, Monitor, Search } from 'lucide-react'
+import { Layers, Plus, Trash2, Edit3, Monitor, Search } from 'lucide-react'
 import { PageHeader } from '@/components/shared/PageHeader'
 import { MotionHeader, MotionReveal } from '@/components/shared/MotionReveal'
 import { SurfaceCard } from '@/components/shared/SurfaceCard'
 import { DeleteEntityDialog } from '@/components/shared/DeleteEntityDialog'
+import { VariantManagementPanel } from '@/components/feature/branch/resources/VariantManagementPanel'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -37,10 +38,7 @@ import { toastError, toastSuccess } from '@/lib/toast'
 import { ImageUploadField } from '@/components/shared/ImageUploadField'
 import { useDebouncedValue } from '@/hooks/useDebouncedValue'
 import { useFormBaseline } from '@/hooks/useFormBaseline'
-import {
-  validateHardwareForm,
-  validateItemScaleForm,
-} from '@/lib/validation/branchForms'
+import { validateHardwareForm } from '@/lib/validation/branchForms'
 import { useClientPagination } from '@/hooks/useClientPagination'
 
 const actionBtnClass =
@@ -52,14 +50,10 @@ export function ResourcesPage() {
   const [saving, setSaving] = useState(false)
 
   const [hardwareList, setHardwareList] = useState([])
-  const [scalesList, setScalesList] = useState([])
   const hwPaging = useClientPagination(hardwareList)
-  const scalesPaging = useClientPagination(scalesList)
   const [filterHardware, setFilterHardware] = useState('')
   const [hwSearch, setHwSearch] = useState('')
-  const [scaleSearch, setScaleSearch] = useState('')
   const debouncedHwSearch = useDebouncedValue(hwSearch, 300)
-  const debouncedScaleSearch = useDebouncedValue(scaleSearch, 300)
 
   const [hardwareOpen, setHardwareOpen] = useState(false)
   const [hardwareMode, setHardwareMode] = useState('create')
@@ -72,13 +66,7 @@ export function ResourcesPage() {
   const [hImageFile, setHImageFile] = useState(null)
   const [hExistingImageUrl, setHExistingImageUrl] = useState(null)
   const [formError, setFormError] = useState(null)
-
-  const [scalesMode, setScalesMode] = useState('create')
-  const [editingScale, setEditingScale] = useState(null)
-  const [scaleName, setScaleName] = useState('')
-  const [scaleError, setScaleError] = useState(null)
   const [deleteTargetHardware, setDeleteTargetHardware] = useState(null)
-  const [deleteTargetScale, setDeleteTargetScale] = useState(null)
 
   const hardwareSnapshot = {
     hName,
@@ -107,29 +95,13 @@ export function ResourcesPage() {
     }
   }
 
-  async function loadScales(q = debouncedScaleSearch) {
-    const params = {}
-    if (q?.trim()) params.q = q.trim()
-    const res = await apiClient.get(endpoints.branch.resources.scales.list, params)
-    if (res.success) {
-      setScalesList(res.data || [])
-    } else {
-      toastError(res.error || 'Failed to load scales')
-    }
-  }
-
   useEffect(() => {
+    if (activeTab !== 'hardware') return
     hwPaging.setPage(1)
     setLoading(true)
     void loadHardware(filterHardware, debouncedHwSearch).finally(() => setLoading(false))
-  }, [filterHardware, debouncedHwSearch])
-
-  useEffect(() => {
-    if (activeTab !== 'scales') return
-    scalesPaging.setPage(1)
-    setLoading(true)
-    void loadScales(debouncedScaleSearch).finally(() => setLoading(false))
-  }, [activeTab, debouncedScaleSearch])
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- reload on filter/search/tab
+  }, [activeTab, filterHardware, debouncedHwSearch])
 
   function handleOpenHardwareCreate() {
     setHardwareMode('create')
@@ -242,70 +214,6 @@ export function ResourcesPage() {
     void loadHardware(filterHardware, debouncedHwSearch)
   }
 
-  function handleOpenScaleCreate() {
-    setScalesMode('create')
-    setEditingScale(null)
-    setScaleName('')
-    setScaleError(null)
-  }
-
-  function handleOpenScaleEdit(sc) {
-    setScalesMode('edit')
-    setEditingScale(sc)
-    setScaleName(sc.name)
-    setScaleError(null)
-  }
-
-  async function handleSaveScale(e) {
-    e.preventDefault()
-    const validationError = validateItemScaleForm({ name: scaleName })
-    if (validationError) {
-      setScaleError(validationError)
-      return toastError(validationError)
-    }
-    setScaleError(null)
-
-    setSaving(true)
-    const res =
-      scalesMode === 'create'
-        ? await apiClient.post(endpoints.branch.resources.scales.create, {
-            name: scaleName.trim(),
-          })
-        : await apiClient.put(endpoints.branch.resources.scales.update(editingScale.id), {
-            name: scaleName.trim(),
-          })
-    setSaving(false)
-
-    if (!res.success) {
-      setScaleError(res.error || 'Failed to save scale')
-      return toastError(res.error || 'Failed to save scale')
-    }
-
-    toastSuccess(scalesMode === 'create' ? 'Scale added successfully' : 'Scale updated successfully')
-    handleOpenScaleCreate()
-    void loadScales(debouncedScaleSearch)
-  }
-
-  function handleDeleteScale(sc) {
-    setDeleteTargetScale(sc)
-  }
-
-  async function confirmDeleteScale() {
-    if (!deleteTargetScale) return
-    setSaving(true)
-    const res = await apiClient.delete(
-      endpoints.branch.resources.scales.delete(deleteTargetScale.id),
-    )
-    setSaving(false)
-    if (!res.success) {
-      return toastError(res.error || 'Failed to delete scale')
-    }
-    toastSuccess('Scale deleted successfully')
-    setDeleteTargetScale(null)
-    if (editingScale?.id === deleteTargetScale.id) handleOpenScaleCreate()
-    void loadScales(debouncedScaleSearch)
-  }
-
   const getStatusBadge = (status) => {
     switch (status) {
       case 'New':
@@ -322,25 +230,13 @@ export function ResourcesPage() {
   const displayCode = (hw) =>
     hw.code || (hw.id ? referenceFromUuid(hw.id, 'HW') : '—')
 
-  const displayScaleCode = (sc) =>
-    sc.code || (sc.id ? referenceFromUuid(sc.id, 'SCL') : '—')
-
-  const formatDisplayLabel = (value) => {
-    if (value == null || String(value).trim() === '') return '—'
-    return String(value)
-      .trim()
-      .split(/\s+/)
-      .map((w) => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase())
-      .join(' ')
-  }
-
   return (
     <div className="space-y-6 pb-8">
       <MotionHeader>
         <PageHeader
           eyebrow="Roster Assets"
           title="Resources Management"
-          description="Register and track POS hardware assets and configure product weighing scales."
+          description="Register POS hardware and manage variant types and values for inventory products."
           actions={
             <div className="flex w-full flex-wrap gap-2 sm:w-auto">
               <Button
@@ -353,13 +249,13 @@ export function ResourcesPage() {
                 Hardware
               </Button>
               <Button
-                variant={activeTab === 'scales' ? 'default' : 'outline'}
-                onClick={() => setActiveTab('scales')}
-                style={activeTab === 'scales' ? { backgroundColor: BRAND.purple } : {}}
-                className={`cursor-pointer flex-1 sm:flex-none ${activeTab === 'scales' ? 'text-white' : 'hover:border-slate-300'}`}
+                variant={activeTab === 'variants' ? 'default' : 'outline'}
+                onClick={() => setActiveTab('variants')}
+                style={activeTab === 'variants' ? { backgroundColor: BRAND.purple } : {}}
+                className={`cursor-pointer flex-1 sm:flex-none ${activeTab === 'variants' ? 'text-white' : 'hover:border-slate-300'}`}
               >
-                <Scale className="mr-1.5 size-4" />
-                Variat Management
+                <Layers className="mr-1.5 size-4" />
+                Variant Management
               </Button>
             </div>
           }
@@ -370,7 +266,6 @@ export function ResourcesPage() {
         <>
           <MotionReveal delay={0.02}>
             <SurfaceCard padding="compact">
-              {/* Flex must live inside body — SurfaceCard wraps children in its own div */}
               <div className="flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
                 <div className="grid w-full min-w-0 flex-1 gap-3 sm:grid-cols-2">
                   <div className="space-y-1.5">
@@ -416,9 +311,7 @@ export function ResourcesPage() {
           </MotionReveal>
 
           <MotionReveal delay={0.04}>
-            <SurfaceCard
-              title="Hardware Assets Registry"
-            >
+            <SurfaceCard title="Hardware Assets Registry">
               {loading ? (
                 <p className="py-8 text-center text-sm text-slate-400">Loading hardware…</p>
               ) : hardwareList.length === 0 ? (
@@ -427,164 +320,124 @@ export function ResourcesPage() {
                 <>
                   <div className="space-y-3 md:hidden">
                     {hwPaging.slice.map((hw) => (
-                        <article
-                          key={hw.id}
-                          className="rounded-xl border border-border bg-slate-50/60 px-3 py-3"
-                        >
-                          <div className="flex items-start gap-3">
-                            {hw.image ? (
-                              <img
-                                src={hw.image}
-                                alt={hw.name}
-                                className="size-12 shrink-0 rounded-lg object-cover"
-                              />
-                            ) : (
-                              <div className="flex size-12 shrink-0 items-center justify-center rounded-lg border border-slate-200 bg-slate-100 text-[10px] font-bold text-slate-400 uppercase">
-                                HW
+                      <article
+                        key={hw.id}
+                        className="rounded-xl border border-border bg-slate-50/60 px-3 py-3"
+                      >
+                        <div className="flex items-start gap-3">
+                          {hw.image ? (
+                            <img
+                              src={hw.image}
+                              alt={hw.name}
+                              className="size-12 shrink-0 rounded-lg object-cover"
+                            />
+                          ) : (
+                            <div className="flex size-12 shrink-0 items-center justify-center rounded-lg border border-slate-200 bg-slate-100 text-[10px] font-bold text-slate-400 uppercase">
+                              HW
+                            </div>
+                          )}
+                          <div className="min-w-0 flex-1">
+                            <div className="flex items-start justify-between gap-2">
+                              <div className="min-w-0">
+                                <p className="truncate text-sm font-semibold text-slate-900">
+                                  {hw.name}
+                                </p>
+                                <p className="font-mono text-[11px] text-slate-400">
+                                  {displayCode(hw)}
+                                </p>
                               </div>
-                            )}
-                            <div className="min-w-0 flex-1">
-                              <div className="flex items-start justify-between gap-2">
-                                <div className="min-w-0">
-                                  <p className="truncate text-sm font-semibold text-slate-900">
-                                    {formatDisplayLabel(hw.name)}
-                                  </p>
-                                  <p className="font-mono text-[11px] text-slate-400">
-                                    {displayCode(hw)}
-                                  </p>
-                                </div>
-                                <Badge variant="outline" className={getStatusBadge(hw.status)}>
-                                  {formatDisplayLabel(hw.status)}
-                                </Badge>
-                              </div>
-                              <p className="mt-1 text-xs text-slate-500">
-                                {formatDisplayLabel(hw.type)} · {formatDisplayLabel(hw.companyName)}
-                              </p>
-                              <p className="mt-0.5 text-xs text-slate-400">
-                                {hw.assignedToName
-                                  ? formatDisplayLabel(hw.assignedToName)
-                                  : 'Unassigned'}
-                              </p>
-                              <div className="mt-3 flex justify-start gap-3">
-                                <button
-                                  type="button"
-                                  className="cursor-pointer text-slate-500 transition-colors hover:text-slate-900"
-                                  onClick={() => handleOpenHardwareEdit(hw)}
-                                  aria-label="Edit hardware"
-                                >
-                                  <Edit3 className="size-4" />
-                                </button>
-                                <button
-                                  type="button"
-                                  className="cursor-pointer text-slate-500 transition-colors hover:text-slate-900"
-                                  onClick={() => handleDeleteHardware(hw)}
-                                  aria-label="Delete hardware"
-                                >
-                                  <Trash2 className="size-4" />
-                                </button>
-                              </div>
+                              <Badge className={getStatusBadge(hw.status)}>{hw.status}</Badge>
+                            </div>
+                            <p className="mt-1 text-xs text-slate-500">
+                              {hw.companyName} · {hw.type}
+                            </p>
+                            <div className="mt-2 flex gap-3">
+                              <button
+                                type="button"
+                                className={actionBtnClass}
+                                onClick={() => handleOpenHardwareEdit(hw)}
+                                aria-label="Edit hardware"
+                              >
+                                <Edit3 className="size-4" />
+                              </button>
+                              <button
+                                type="button"
+                                className={actionBtnClass}
+                                onClick={() => handleDeleteHardware(hw)}
+                                aria-label="Delete hardware"
+                              >
+                                <Trash2 className="size-4" />
+                              </button>
                             </div>
                           </div>
-                        </article>
-                      ))}
+                        </div>
+                      </article>
+                    ))}
                   </div>
 
                   <div className="hidden overflow-x-auto md:block">
-                    <Table className="min-w-[44rem] text-left text-sm">
+                    <Table className="w-full text-left text-sm">
                       <TableHeader>
                         <TableRow className="text-xs text-slate-500 uppercase">
-                          <TableHead className="px-2 py-3">Device Image</TableHead>
-                          <TableHead className="px-2 py-3">Hardware ID / Date</TableHead>
-                          <TableHead className="px-2 py-3">Device Name / Type</TableHead>
-                          <TableHead className="px-2 py-3">Brand/Company</TableHead>
+                          <TableHead className="px-2 py-3">ID</TableHead>
+                          <TableHead className="px-2 py-3">Name</TableHead>
+                          <TableHead className="px-2 py-3">Company</TableHead>
+                          <TableHead className="px-2 py-3">Type</TableHead>
                           <TableHead className="px-2 py-3">Status</TableHead>
-                          <TableHead className="hidden px-2 py-3 lg:table-cell">
-                            Assignee
-                          </TableHead>
-                          <TableActionsHead sticky />
+                          <TableActionsHead />
                         </TableRow>
                       </TableHeader>
                       <TableBody>
                         {hwPaging.slice.map((hw) => (
-                            <TableRow key={hw.id} className="group">
-                              <TableCell className="px-2 py-3">
+                          <TableRow key={hw.id} className="group">
+                            <TableCell className="px-2 py-3 font-mono font-bold text-slate-900">
+                              {displayCode(hw)}
+                            </TableCell>
+                            <TableCell className="px-2 py-3">
+                              <div className="flex items-center gap-2">
                                 {hw.image ? (
                                   <img
                                     src={hw.image}
-                                    alt={hw.name}
-                                    className="size-10 rounded-lg object-cover"
+                                    alt=""
+                                    className="size-8 rounded object-cover"
                                   />
-                                ) : (
-                                  <div className="flex size-10 items-center justify-center rounded-lg border border-slate-200 bg-slate-100 text-[10px] font-bold text-slate-400 uppercase">
-                                    HW
-                                  </div>
-                                )}
-                              </TableCell>
-                              <TableCell className="px-2 py-3">
-                                <div className="font-mono font-bold text-slate-900">
-                                  {displayCode(hw)}
-                                </div>
-                                <div className="text-[10px] text-slate-400">
-                                  {hw.createdAt
-                                    ? new Date(hw.createdAt).toLocaleDateString()
-                                    : '—'}
-                                </div>
-                              </TableCell>
-                              <TableCell className="px-2 py-3">
-                                <div className="font-semibold text-slate-900">
-                                  {formatDisplayLabel(hw.name)}
-                                </div>
-                                <div className="text-[10px] font-medium text-slate-400">
-                                  {formatDisplayLabel(hw.type)}
-                                </div>
-                              </TableCell>
-                              <TableCell className="px-2 py-3 text-slate-600">
-                                {formatDisplayLabel(hw.companyName)}
-                              </TableCell>
-                              <TableCell className="px-2 py-3">
-                                <Badge variant="outline" className={getStatusBadge(hw.status)}>
-                                  {formatDisplayLabel(hw.status)}
-                                </Badge>
-                              </TableCell>
-                              <TableCell className="hidden px-2 py-3 text-slate-600 lg:table-cell">
-                                {hw.assignedToName ? (
-                                  <Badge
-                                    variant="secondary"
-                                    className="rounded border-none bg-purple-50 font-semibold text-purple-700 hover:bg-purple-100"
-                                  >
-                                    {formatDisplayLabel(hw.assignedToName)}
-                                  </Badge>
-                                ) : (
-                                  <span className="text-xs italic text-slate-400">Unassigned</span>
-                                )}
-                              </TableCell>
-                              <TableActionsCell sticky>
-                                <button
-                                  type="button"
-                                  className="cursor-pointer text-slate-500 transition-colors hover:text-slate-900"
-                                  onClick={() => handleOpenHardwareEdit(hw)}
-                                  aria-label="Edit hardware"
-                                >
-                                  <Edit3 className="size-4" />
-                                </button>
-                                <button
-                                  type="button"
-                                  className="cursor-pointer text-slate-500 transition-colors hover:text-slate-900"
-                                  onClick={() => handleDeleteHardware(hw)}
-                                  aria-label="Delete hardware"
-                                >
-                                  <Trash2 className="size-4" />
-                                </button>
-                              </TableActionsCell>
-                            </TableRow>
-                          ))}
+                                ) : null}
+                                <span className="font-semibold text-slate-800">{hw.name}</span>
+                              </div>
+                            </TableCell>
+                            <TableCell className="px-2 py-3 text-slate-600">
+                              {hw.companyName}
+                            </TableCell>
+                            <TableCell className="px-2 py-3 text-slate-600">{hw.type}</TableCell>
+                            <TableCell className="px-2 py-3">
+                              <Badge className={getStatusBadge(hw.status)}>{hw.status}</Badge>
+                            </TableCell>
+                            <TableActionsCell>
+                              <button
+                                type="button"
+                                className={actionBtnClass}
+                                onClick={() => handleOpenHardwareEdit(hw)}
+                                aria-label="Edit hardware"
+                              >
+                                <Edit3 className="size-4" />
+                              </button>
+                              <button
+                                type="button"
+                                className={actionBtnClass}
+                                onClick={() => handleDeleteHardware(hw)}
+                                aria-label="Delete hardware"
+                              >
+                                <Trash2 className="size-4" />
+                              </button>
+                            </TableActionsCell>
+                          </TableRow>
+                        ))}
                       </TableBody>
                     </Table>
                   </div>
                 </>
               )}
 
-              {/* Standard pagination below table (tc-Resources-02q) */}
               <TablePagination
                 page={hwPaging.page}
                 pageCount={hwPaging.pageCount}
@@ -598,181 +451,8 @@ export function ResourcesPage() {
           </MotionReveal>
         </>
       ) : (
-        <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
-          <div className="lg:col-span-2 space-y-4">
-            <MotionReveal delay={0.02}>
-              <SurfaceCard padding="compact">
-                <div className="space-y-1.5">
-                  <Label htmlFor="scale-search">Search by Name / ID</Label>
-                  <div className="relative">
-                    <Search className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-slate-400" />
-                    <Input
-                      id="scale-search"
-                      value={scaleSearch}
-                      placeholder="Search scale name or ITM-001…"
-                      className="pl-9"
-                      onChange={(e) => setScaleSearch(e.target.value)}
-                    />
-                  </div>
-                </div>
-              </SurfaceCard>
-            </MotionReveal>
-            <MotionReveal delay={0.03}>
-              <SurfaceCard
-                title="Packaging Weighing Scales"
-              >
-                {loading ? (
-                  <p className="py-8 text-center text-sm text-slate-400">Loading scales…</p>
-                ) : scalesList.length === 0 ? (
-                  <p className="py-8 text-center text-sm text-slate-400">No scales found</p>
-                ) : (
-                  <>
-                    <div className="space-y-3 md:hidden">
-                      {scalesPaging.slice.map((sc) => (
-                          <article
-                            key={sc.id}
-                            className="flex items-center justify-between gap-3 rounded-xl border border-border bg-slate-50/60 px-3 py-3"
-                          >
-                            <div className="min-w-0">
-                              <p className="font-semibold text-slate-800">{formatDisplayLabel(sc.name)}</p>
-                              <p className="font-mono text-[11px] text-slate-400">
-                                {displayScaleCode(sc)}
-                              </p>
-                              <p className="text-[11px] text-slate-400">
-                                {sc.createdAt
-                                  ? new Date(sc.createdAt).toLocaleDateString()
-                                  : '—'}
-                              </p>
-                            </div>
-                            <div className="flex shrink-0 gap-3">
-                              <button
-                                type="button"
-                                className="cursor-pointer text-slate-500 transition-colors hover:text-slate-900"
-                                onClick={() => handleOpenScaleEdit(sc)}
-                                aria-label="Edit scale"
-                              >
-                                <Edit3 className="size-4" />
-                              </button>
-                              <button
-                                type="button"
-                                className="cursor-pointer text-slate-500 transition-colors hover:text-slate-900"
-                                onClick={() => handleDeleteScale(sc)}
-                                aria-label="Delete scale"
-                              >
-                                <Trash2 className="size-4" />
-                              </button>
-                            </div>
-                          </article>
-                        ))}
-                    </div>
-
-                    <div className="hidden overflow-x-auto md:block">
-                      <Table className="w-full text-left text-sm">
-                        <TableHeader>
-                          <TableRow className="text-xs text-slate-500 uppercase">
-                            <TableHead className="px-2 py-3">Scale ID</TableHead>
-                            <TableHead className="px-2 py-3">Created Date</TableHead>
-                            <TableHead className="px-2 py-3">Scale unit</TableHead>
-                            <TableActionsHead />
-                          </TableRow>
-                        </TableHeader>
-                        <TableBody>
-                          {scalesPaging.slice.map((sc) => (
-                              <TableRow key={sc.id} className="group">
-                                <TableCell className="px-2 py-3 font-mono font-bold text-slate-900">
-                                  {displayScaleCode(sc)}
-                                </TableCell>
-                                <TableCell className="px-2 py-3 text-slate-500">
-                                  {sc.createdAt
-                                    ? new Date(sc.createdAt).toLocaleDateString()
-                                    : '—'}
-                                </TableCell>
-                                <TableCell className="px-2 py-3 font-semibold text-slate-800">
-                                  {formatDisplayLabel(sc.name)}
-                                </TableCell>
-                                <TableActionsCell>
-                                  <button
-                                    type="button"
-                                    className="cursor-pointer text-slate-500 transition-colors hover:text-slate-900"
-                                    onClick={() => handleOpenScaleEdit(sc)}
-                                    aria-label="Edit scale"
-                                  >
-                                    <Edit3 className="size-4" />
-                                  </button>
-                                  <button
-                                    type="button"
-                                    className="cursor-pointer text-slate-500 transition-colors hover:text-slate-900"
-                                    onClick={() => handleDeleteScale(sc)}
-                                    aria-label="Delete scale"
-                                  >
-                                    <Trash2 className="size-4" />
-                                  </button>
-                                </TableActionsCell>
-                              </TableRow>
-                            ))}
-                        </TableBody>
-                      </Table>
-                    </div>
-                  </>
-                )}
-
-                {/* Standard pagination below table (tc-Resources-02q) */}
-                <TablePagination
-                  page={scalesPaging.page}
-                  pageCount={scalesPaging.pageCount}
-                  totalItems={scalesPaging.total}
-                  pageSize={scalesPaging.pageSize}
-                  onPageChange={scalesPaging.setPage}
-                  onPageSizeChange={scalesPaging.setPageSize}
-                  alwaysShow={scalesPaging.total > 0}
-                />
-              </SurfaceCard>
-            </MotionReveal>
-          </div>
-
-          <div>
-            <MotionReveal delay={0.04}>
-              <SurfaceCard title={scalesMode === 'create' ? 'Add New Scale' : 'Edit Scale'}>
-                <form className="space-y-4" onSubmit={handleSaveScale}>
-                  <div className="space-y-1.5">
-                    <Label htmlFor="scale-name">Scale Name</Label>
-                    <Input
-                      id="scale-name"
-                      placeholder="e.g. kg, pound, Box, Litre"
-                      value={scaleName}
-                      onChange={(e) => setScaleName(e.target.value)}
-                      required
-                    />
-                  </div>
-                  {scaleError ? (
-                    <p className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700 ring-1 ring-red-100">
-                      {scaleError}
-                    </p>
-                  ) : null}
-                  <div className="flex gap-2">
-                    {scalesMode === 'edit' ? (
-                      <Button
-                        type="button"
-                        variant="outline"
-                        className="w-1/2"
-                        onClick={handleOpenScaleCreate}
-                      >
-                        Cancel
-                      </Button>
-                    ) : null}
-                    <Button
-                      type="submit"
-                      disabled={saving}
-                      variant="brand"
-                      className="w-full"
-                    >
-                      {saving ? 'Saving…' : 'Save Scale'}
-                    </Button>
-                  </div>
-                </form>
-              </SurfaceCard>
-            </MotionReveal>
-          </div>
+        <div className="space-y-4">
+          <VariantManagementPanel />
         </div>
       )}
 
@@ -797,9 +477,7 @@ export function ResourcesPage() {
               <Input
                 id="hw-form-id"
                 value={
-                  hardwareMode === 'edit'
-                    ? hId
-                    : 'Auto-generated after save'
+                  hardwareMode === 'edit' ? hId : 'Auto-generated after save'
                 }
                 disabled
                 readOnly
@@ -912,24 +590,6 @@ export function ResourcesPage() {
         hardLabel="Permanently delete"
         loading={saving}
         onHardDelete={confirmDeleteHardware}
-      />
-
-      <DeleteEntityDialog
-        open={Boolean(deleteTargetScale)}
-        onOpenChange={(open) => {
-          if (!open) setDeleteTargetScale(null)
-        }}
-        entityName={deleteTargetScale?.name}
-        description={
-          deleteTargetScale
-            ? `Permanently remove scale “${deleteTargetScale.name}”? This cannot be undone.`
-            : null
-        }
-        showSoftAction={false}
-        canHardDelete
-        hardLabel="Permanently delete"
-        loading={saving}
-        onHardDelete={confirmDeleteScale}
       />
     </div>
   )

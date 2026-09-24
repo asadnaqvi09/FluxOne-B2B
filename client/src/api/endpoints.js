@@ -101,6 +101,20 @@ export const endpoints = {
         update: (id) => `/branch/resources/scales/${id}`,
         delete: (id) => `/branch/resources/scales/${id}`,
       },
+      variantTypes: {
+        list: '/branch/resources/variant-types',
+        create: '/branch/resources/variant-types',
+        detail: (id) => `/branch/resources/variant-types/${id}`,
+        update: (id) => `/branch/resources/variant-types/${id}`,
+        delete: (id) => `/branch/resources/variant-types/${id}`,
+      },
+      variantValues: {
+        list: '/branch/resources/variant-values',
+        create: '/branch/resources/variant-values',
+        detail: (id) => `/branch/resources/variant-values/${id}`,
+        update: (id) => `/branch/resources/variant-values/${id}`,
+        delete: (id) => `/branch/resources/variant-values/${id}`,
+      },
     },
     activityLogs: {
       list: '/branch/activity-logs',

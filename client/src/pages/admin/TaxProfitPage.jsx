@@ -850,15 +850,8 @@ export function TaxProfitPage() {
               </Label>
               <WholeNumberInput
                 id="defaultTaxInput"
-<<<<<<< HEAD
                 min={0}
                 max={100}
-=======
-                type="number"
-                min="0"
-                max="100"
-                step="0.01"
->>>>>>> 1f0570efb3bcad612e68ad31f5e65837d72f876f
                 value={defaultTaxValue}
                 onChange={(e) => setDefaultTaxValue(e.target.value)}
                 placeholder="Enter tax percentage"
@@ -872,15 +865,8 @@ export function TaxProfitPage() {
               </Label>
               <WholeNumberInput
                 id="defaultProfitInput"
-<<<<<<< HEAD
                 min={0}
                 max={100}
-=======
-                type="number"
-                min="0"
-                max="100"
-                step="0.01"
->>>>>>> 1f0570efb3bcad612e68ad31f5e65837d72f876f
                 value={defaultProfitValue}
                 onChange={(e) => setDefaultProfitValue(e.target.value)}
                 placeholder="Enter profit percentage"

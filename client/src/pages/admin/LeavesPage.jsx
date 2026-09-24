@@ -1,9 +1,8 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import {
   CalendarDays,
   CheckCircle2,
-  ChevronDown,
   Clock3,
   Search,
   XCircle,
@@ -15,9 +14,7 @@ import { StatCard } from '@/components/shared/StatsCards'
 import { DataCard, ResponsiveDataShell } from '@/components/shared/ResponsiveDataShell'
 import { ActionIconButton } from '@/components/shared/ActionIconButton'
 import { LeaveDetailDialog } from '@/components/feature/admin/leaves/LeaveDetailDialog'
-import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
-import { Label } from '@/components/ui/label'
 import { NativeSelect } from '@/components/ui/select'
 import { Badge } from '@/components/ui/badge'
 import {
@@ -117,24 +114,11 @@ export function LeavesPage() {
   const [mutatingId, setMutatingId] = useState(null)
   const [statusFilter, setStatusFilter] = useState('all')
   const [branchFilter, setBranchFilter] = useState('')
-  const [branchMenuOpen, setBranchMenuOpen] = useState(false)
   const [searchQuery, setSearchQuery] = useState('')
   const debouncedQ = useDebouncedValue(normalizeSearchQuery(searchQuery), 300)
 
   const [detailRow, setDetailRow] = useState(null)
   const [presetDecision, setPresetDecision] = useState(null)
-  const branchMenuRef = useRef(null)
-
-  useEffect(() => {
-    if (!branchMenuOpen) return undefined
-    const onDoc = (e) => {
-      if (branchMenuRef.current && !branchMenuRef.current.contains(e.target)) {
-        setBranchMenuOpen(false)
-      }
-    }
-    document.addEventListener('mousedown', onDoc)
-    return () => document.removeEventListener('mousedown', onDoc)
-  }, [branchMenuOpen])
 
   const fetchLeaves = useCallback(async () => {
     setLoading(true)
@@ -184,10 +168,6 @@ export function LeavesPage() {
     if (statusFilter === 'all') return searched
     return searched.filter((r) => r.status === statusFilter)
   }, [searched, statusFilter])
-
-  const selectedBranchLabel = branchFilter
-    ? branches.find((b) => b.id === branchFilter)?.name || 'Branch'
-    : 'All Branches'
 
   const {
     page,
@@ -356,58 +336,19 @@ export function LeavesPage() {
                   {chip.label}
                 </button>
               ))}
-              {/* Branch filter — button opens All Branches dropdown */}
-              <div ref={branchMenuRef} className="relative">
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  aria-expanded={branchMenuOpen}
-                  aria-haspopup="listbox"
-                  onClick={() => setBranchMenuOpen((v) => !v)}
-                  className="min-w-[8.5rem] justify-between gap-2"
-                >
-                  <span className="truncate">{selectedBranchLabel}</span>
-                  <ChevronDown
-                    className={cn(
-                      'size-3.5 shrink-0 text-slate-500 transition-transform',
-                      branchMenuOpen && 'rotate-180',
-                    )}
-                  />
-                </Button>
-                {branchMenuOpen ? (
-                  <div className="absolute top-full right-0 z-30 mt-1.5 w-64 rounded-xl border border-border bg-white p-3 shadow-lg">
-                    <Label className="mb-1.5 block text-xs text-slate-500">Branch</Label>
-                    <NativeSelect
-                      value={branchFilter}
-                      onChange={(e) => {
-                        setBranchFilter(e.target.value)
-                        setBranchMenuOpen(false)
-                      }}
-                      aria-label="Filter by branch"
-                    >
-                      <option value="">All Branches</option>
-                      {branches.map((b) => (
-                        <option key={b.id} value={b.id}>
-                          {b.name}
-                        </option>
-                      ))}
-                    </NativeSelect>
-                    {branchFilter ? (
-                      <button
-                        type="button"
-                        className="mt-2 cursor-pointer text-xs font-medium text-[#8E238F] hover:underline"
-                        onClick={() => {
-                          setBranchFilter('')
-                          setBranchMenuOpen(false)
-                        }}
-                      >
-                        Clear branch filter
-                      </button>
-                    ) : null}
-                  </div>
-                ) : null}
-              </div>
+              <NativeSelect
+                value={branchFilter}
+                onChange={(e) => setBranchFilter(e.target.value)}
+                aria-label="Filter by branch"
+                className="h-8 w-auto min-w-[8.5rem] max-w-[14rem] cursor-pointer rounded-full border-border px-3 py-1.5 text-xs font-semibold"
+              >
+                <option value="">All Branches</option>
+                {branches.map((b) => (
+                  <option key={b.id} value={b.id}>
+                    {b.name}
+                  </option>
+                ))}
+              </NativeSelect>
             </div>
           </div>
 

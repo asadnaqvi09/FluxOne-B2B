@@ -852,19 +852,18 @@ export function TaxProfitPage() {
                 </Table>
               </div>
 
-              <div className="pt-4 border-t border-slate-100">
-                <TablePagination
-                  page={pagination.page || page}
-                  pageCount={pagination.pageCount || 1}
-                  totalItems={pagination.total || 0}
-                  pageSize={limit}
-                  onPageChange={setPage}
-                  onPageSizeChange={(next) => {
-                    setLimit(next)
-                    setPage(1)
-                  }}
-                />
-              </div>
+          <TablePagination
+            page={pagination.page || page}
+            pageCount={pagination.pageCount || 1}
+            totalItems={pagination.total || 0}
+            pageSize={limit}
+            loading={loading}
+            onPageChange={setPage}
+            onPageSizeChange={(next) => {
+              setLimit(next)
+              setPage(1)
+            }}
+          />
             </>
           )}
         </SurfaceCard>

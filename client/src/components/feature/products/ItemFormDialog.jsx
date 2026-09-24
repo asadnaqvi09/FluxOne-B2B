@@ -169,6 +169,7 @@ export function ItemFormDialog({
       if (field === 'categoryId') next.subcategoryId = ''
       return next
     })
+    clearField(field)
   }
 
   function handleDiscountOfferChange(selectedId) {
@@ -181,55 +182,75 @@ export function ItemFormDialog({
     }))
   }
 
-  function validate() {
-    if (!form.name.trim()) return 'Name is required'
-    if (!form.scale) return 'Scale is required'
+  // Field-level validation for Review & Confirm (stay on form until resolved)
+  function validateFields() {
+    const errors = {}
+
+    if (!form.name.trim()) errors.name = 'Name is required'
+    if (!form.scale) errors.scale = 'Scale is required'
 
     if (isBundle) {
       if (!form.bundleItems || form.bundleItems.length === 0) {
-        return 'Select at least one item for this bundle'
-      }
-      for (const row of form.bundleItems) {
-        if (!row.itemId) return 'Select an item for each bundle line'
-        if (!row.quantity || Number(row.quantity) <= 0) {
-          return 'Quantity must be greater than 0 for each selected item'
+        errors.bundleItems = 'Select at least one item for this bundle'
+      } else {
+        for (const row of form.bundleItems) {
+          if (!row.itemId) {
+            errors.bundleItems = 'Select an item for each bundle line'
+            break
+          }
+          if (!row.quantity || Number(row.quantity) <= 0) {
+            errors.bundleItems = 'Quantity must be greater than 0 for each selected item'
+            break
+          }
         }
       }
-      return null
+    } else {
+      if (!form.categoryId) {
+        errors.categoryId = categories.length
+          ? 'Category is required'
+          : 'Create a category first (Categories page), then add products'
+      }
+      if (form.purchasePrice === '' || Number.isNaN(Number(form.purchasePrice)) || Number(form.purchasePrice) < 0) {
+        errors.purchasePrice = 'Purchase price is required'
+      }
+      if (form.sellingPrice === '' || Number.isNaN(Number(form.sellingPrice)) || Number(form.sellingPrice) < 0) {
+        errors.sellingPrice = 'Selling price is required'
+      }
     }
 
-    if (!form.categoryId) {
-      return categories.length
-        ? 'Category is required'
-        : 'Create a category first (Categories page), then add products'
-    }
-    if (form.purchasePrice === '' || Number(form.purchasePrice) < 0) {
-      return 'Purchase price is required'
-    }
-    if (form.sellingPrice === '' || Number(form.sellingPrice) < 0) {
-      return 'Selling price is required'
-    }
-    return null
+    const order = isBundle
+      ? ['bundleItems', 'name', 'scale']
+      : ['name', 'scale', 'categoryId', 'purchasePrice', 'sellingPrice']
+    return { errors, order }
+  }
+
+  const FIELD_FOCUS_IDS = {
+    name: 'product-name',
+    scale: 'product-scale',
+    categoryId: 'product-category',
+    purchasePrice: 'product-purchase',
+    sellingPrice: 'product-selling',
+    bundleItems: 'product-bundle-items',
   }
 
   function goReview(event) {
     event.preventDefault()
-    const message = validate()
-    if (message) {
-      setError(message)
+    const { errors, order } = validateFields()
+    if (Object.keys(errors).length) {
+      applyErrors(errors, FIELD_FOCUS_IDS, order)
       return
     }
-    setError(null)
+    resetErrors()
     setConfirmed(false)
     setStep('confirm')
   }
 
   async function handleConfirm() {
     if (!confirmed) {
-      setError('Please confirm before saving')
+      setFormError('Please confirm before saving')
       return
     }
-    setError(null)
+    resetErrors()
     const selectedOffer = offers.find((o) => o.id === form.offerId)
     const payload = {
       name: form.name,

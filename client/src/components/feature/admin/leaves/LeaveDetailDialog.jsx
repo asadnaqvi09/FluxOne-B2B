@@ -142,10 +142,10 @@ export function LeaveDetailDialog({
           : 'Branch manager personal leave request'
       }
       footer={
-        <>
-          {/* Cancel / X use Dialog discard flow when dirty */}
-          <DialogCancelButton>Cancel</DialogCancelButton>
-          {isPending ? (
+        isPending ? (
+          <>
+            {/* Cancel / X use Dialog discard flow when dirty */}
+            <DialogCancelButton>Cancel</DialogCancelButton>
             <Button
               type="button"
               variant="brand"
@@ -159,12 +159,12 @@ export function LeaveDetailDialog({
             >
               {submitting ? 'Saving…' : 'Confirm'}
             </Button>
-          ) : (
-            <Button type="button" variant="brand" onClick={() => onOpenChange?.(false)}>
-              Close
-            </Button>
-          )}
-        </>
+          </>
+        ) : (
+          <Button type="button" variant="brand" onClick={() => onOpenChange?.(false)}>
+            Close
+          </Button>
+        )
       }
     >
       {row ? (

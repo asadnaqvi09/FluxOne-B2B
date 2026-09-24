@@ -1,5 +1,294 @@
-import { tenantQuery } from '../../../config/db.js'
+import { tenantClientQuery, tenantQuery, withTransaction } from '../../../config/db.js'
 
+function httpError(status, message) {
+  const error = new Error(message)
+  error.status = status
+  return error
+}
+
+function calculateDays(startDate, endDate) {
+  if (!startDate || !endDate) return 1
+  const s = new Date(startDate)
+  const e = new Date(endDate)
+  const diffTime = Math.abs(e.getTime() - s.getTime())
+  const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24)) + 1
+  return Math.max(1, diffDays)
+}
+
+function formatDate(val) {
+  if (!val) return null
+  if (typeof val === 'string') return val.slice(0, 10)
+  return new Date(val).toISOString().slice(0, 10)
+}
+
+export async function listHolidaySchedules(tenantId, { branchId = null } = {}) {
+  // 1. Get total active staff count in this branch/tenant
+  const { rows: staffCountRows } = await tenantQuery(
+    tenantId,
+    `
+      SELECT count(*)::int AS "totalStaff"
+      FROM staff s
+      JOIN users u ON u.id = s.user_id AND u.tenant_id = s.tenant_id
+      WHERE s.tenant_id = $1
+        AND s.status = 'active'
+        AND u.is_active = true
+        AND ($2::uuid IS NULL OR s.branch_id = $2)
+    `,
+    [branchId],
+  )
+  const totalActiveStaff = staffCountRows[0]?.totalStaff || 0
+
+  // 2. Fetch all holiday schedules with assigned employees
+  const { rows } = await tenantQuery(
+    tenantId,
+    `
+      SELECT
+        hs.id,
+        hs.name,
+        hs.start_date AS "startDate",
+        hs.end_date AS "endDate",
+        hs.is_all_employees AS "isAllEmployees",
+        hs.status,
+        hs.branch_id AS "branchId",
+        hs.created_at AS "createdAt",
+        COALESCE(
+          json_agg(
+            json_build_object(
+              'id', s.id,
+              'fullName', u.full_name,
+              'designation', COALESCE(d.name, s.designation, 'Staff')
+            )
+          ) FILTER (WHERE s.id IS NOT NULL),
+          '[]'::json
+        ) AS "assignedEmployees",
+        COALESCE(
+          array_agg(hss.staff_id) FILTER (WHERE hss.staff_id IS NOT NULL),
+          ARRAY[]::uuid[]
+        ) AS "employeeIds"
+      FROM holiday_schedules hs
+      LEFT JOIN holiday_schedule_staff hss
+        ON hss.holiday_schedule_id = hs.id AND hss.tenant_id = hs.tenant_id
+      LEFT JOIN staff s
+        ON s.id = hss.staff_id AND s.tenant_id = hs.tenant_id
+      LEFT JOIN users u
+        ON u.id = s.user_id AND u.tenant_id = s.tenant_id
+      LEFT JOIN designations d
+        ON d.id = s.designation_id AND d.tenant_id = s.tenant_id
+      WHERE hs.tenant_id = $1
+        AND ($2::uuid IS NULL OR hs.branch_id IS NULL OR hs.branch_id = $2)
+      GROUP BY hs.id
+      ORDER BY hs.start_date DESC, hs.created_at DESC
+    `,
+    [branchId],
+  )
+
+  return rows.map((row) => {
+    const sDate = formatDate(row.startDate)
+    const eDate = formatDate(row.endDate)
+    const noOfDays = calculateDays(sDate, eDate)
+    const noOfEmployees = row.isAllEmployees
+      ? totalActiveStaff
+      : (row.employeeIds?.length || 0)
+
+    return {
+      id: row.id,
+      name: row.name,
+      startDate: sDate,
+      endDate: eDate,
+      holidayDate: sDate, // Backward compat
+      noOfDays,
+      isAllEmployees: row.isAllEmployees,
+      noOfEmployees,
+      totalActiveStaff,
+      status: row.status || 'active',
+      branchId: row.branchId,
+      assignedEmployees: row.assignedEmployees || [],
+      employeeIds: row.employeeIds || [],
+      createdAt: row.createdAt,
+    }
+  })
+}
+
+export async function getHolidayScheduleById(tenantId, id) {
+  const { rows } = await tenantQuery(
+    tenantId,
+    `
+      SELECT
+        hs.id,
+        hs.name,
+        hs.start_date AS "startDate",
+        hs.end_date AS "endDate",
+        hs.is_all_employees AS "isAllEmployees",
+        hs.status,
+        hs.branch_id AS "branchId",
+        hs.created_at AS "createdAt",
+        COALESCE(
+          json_agg(
+            json_build_object(
+              'id', s.id,
+              'fullName', u.full_name,
+              'designation', COALESCE(d.name, s.designation, 'Staff')
+            )
+          ) FILTER (WHERE s.id IS NOT NULL),
+          '[]'::json
+        ) AS "assignedEmployees",
+        COALESCE(
+          array_agg(hss.staff_id) FILTER (WHERE hss.staff_id IS NOT NULL),
+          ARRAY[]::uuid[]
+        ) AS "employeeIds"
+      FROM holiday_schedules hs
+      LEFT JOIN holiday_schedule_staff hss
+        ON hss.holiday_schedule_id = hs.id AND hss.tenant_id = hs.tenant_id
+      LEFT JOIN staff s
+        ON s.id = hss.staff_id AND s.tenant_id = hs.tenant_id
+      LEFT JOIN users u
+        ON u.id = s.user_id AND u.tenant_id = s.tenant_id
+      LEFT JOIN designations d
+        ON d.id = s.designation_id AND d.tenant_id = s.tenant_id
+      WHERE hs.tenant_id = $1 AND hs.id = $2
+      GROUP BY hs.id
+      LIMIT 1
+    `,
+    [id],
+  )
+  if (!rows[0]) return null
+  const row = rows[0]
+  const sDate = formatDate(row.startDate)
+  const eDate = formatDate(row.endDate)
+
+  return {
+    id: row.id,
+    name: row.name,
+    startDate: sDate,
+    endDate: eDate,
+    holidayDate: sDate,
+    noOfDays: calculateDays(sDate, eDate),
+    isAllEmployees: row.isAllEmployees,
+    status: row.status || 'active',
+    branchId: row.branchId,
+    assignedEmployees: row.assignedEmployees || [],
+    employeeIds: row.employeeIds || [],
+    createdAt: row.createdAt,
+  }
+}
+
+export async function createHolidaySchedule(
+  tenantId,
+  { name, startDate, endDate, isAllEmployees = true, employeeIds = [], status = 'active', branchId = null },
+) {
+  return withTransaction(async (client) => {
+    const sDate = formatDate(startDate)
+    const eDate = formatDate(endDate || startDate)
+
+    const { rows } = await tenantClientQuery(
+      client,
+      tenantId,
+      `
+        INSERT INTO holiday_schedules (tenant_id, branch_id, name, start_date, end_date, is_all_employees, status)
+        VALUES ($1, $2, $3, $4::date, $5::date, $6, $7)
+        RETURNING id, name, start_date AS "startDate", end_date AS "endDate",
+                  is_all_employees AS "isAllEmployees", status, branch_id AS "branchId"
+      `,
+      [branchId, name.trim(), sDate, eDate, Boolean(isAllEmployees), status || 'active'],
+    )
+    const schedule = rows[0]
+
+    if (!isAllEmployees && Array.isArray(employeeIds) && employeeIds.length > 0) {
+      const uniqueIds = [...new Set(employeeIds)]
+      await tenantClientQuery(
+        client,
+        tenantId,
+        `
+          INSERT INTO holiday_schedule_staff (tenant_id, holiday_schedule_id, staff_id)
+          SELECT $1, $2, x.staff_id
+          FROM unnest($3::uuid[]) AS x(staff_id)
+          ON CONFLICT (tenant_id, holiday_schedule_id, staff_id) DO NOTHING
+        `,
+        [schedule.id, uniqueIds],
+      )
+    }
+
+    return schedule
+  })
+}
+
+export async function updateHolidaySchedule(
+  tenantId,
+  id,
+  { name, startDate, endDate, isAllEmployees, employeeIds, status, branchId = null },
+) {
+  return withTransaction(async (client) => {
+    const existing = await getHolidayScheduleById(tenantId, id)
+    if (!existing) throw httpError(404, 'Holiday schedule not found')
+
+    const nextName = name !== undefined ? name.trim() : existing.name
+    const nextStart = startDate !== undefined ? formatDate(startDate) : existing.startDate
+    const nextEnd = endDate !== undefined ? formatDate(endDate) : existing.endDate
+    const nextAll = isAllEmployees !== undefined ? Boolean(isAllEmployees) : existing.isAllEmployees
+    const nextStatus = status !== undefined ? status : existing.status
+
+    await tenantClientQuery(
+      client,
+      tenantId,
+      `
+        UPDATE holiday_schedules
+        SET
+          name = $2,
+          start_date = $3::date,
+          end_date = $4::date,
+          is_all_employees = $5,
+          status = $6,
+          updated_at = now()
+        WHERE tenant_id = $1 AND id = $7
+      `,
+      [nextName, nextStart, nextEnd, nextAll, nextStatus, id],
+    )
+
+    if (employeeIds !== undefined || isAllEmployees !== undefined) {
+      await tenantClientQuery(
+        client,
+        tenantId,
+        `DELETE FROM holiday_schedule_staff WHERE tenant_id = $1 AND holiday_schedule_id = $2`,
+        [id],
+      )
+
+      if (!nextAll && Array.isArray(employeeIds) && employeeIds.length > 0) {
+        const uniqueIds = [...new Set(employeeIds)]
+        await tenantClientQuery(
+          client,
+          tenantId,
+          `
+            INSERT INTO holiday_schedule_staff (tenant_id, holiday_schedule_id, staff_id)
+            SELECT $1, $2, x.staff_id
+            FROM unnest($3::uuid[]) AS x(staff_id)
+            ON CONFLICT (tenant_id, holiday_schedule_id, staff_id) DO NOTHING
+          `,
+          [id, uniqueIds],
+        )
+      }
+    }
+
+    return getHolidayScheduleById(tenantId, id)
+  })
+}
+
+export async function deleteHolidaySchedule(tenantId, id) {
+  const existing = await getHolidayScheduleById(tenantId, id)
+  if (!existing) return null
+
+  const { rows } = await tenantQuery(
+    tenantId,
+    `
+      DELETE FROM holiday_schedules
+      WHERE tenant_id = $1 AND id = $2
+      RETURNING id, name, start_date AS "startDate", end_date AS "endDate"
+    `,
+    [id],
+  )
+  return rows[0] || null
+}
+
+// Fallback legacy functions
 export async function createHoliday(tenantId, { name, date }) {
   const { rows } = await tenantQuery(
     tenantId,
@@ -15,57 +304,17 @@ export async function createHoliday(tenantId, { name, date }) {
 }
 
 export async function listHolidays(tenantId) {
-  const { rows } = await tenantQuery(
-    tenantId,
-    `
-      SELECT id, holiday_date AS "holidayDate", name
-      FROM holidays
-      WHERE tenant_id = $1
-      ORDER BY holiday_date DESC
-    `,
-  )
-  return rows
+  return listHolidaySchedules(tenantId)
 }
 
 export async function getHolidayById(tenantId, id) {
-  const { rows } = await tenantQuery(
-    tenantId,
-    `
-      SELECT id, holiday_date AS "holidayDate", name
-      FROM holidays
-      WHERE tenant_id = $1 AND id = $2
-      LIMIT 1
-    `,
-    [id],
-  )
-  return rows[0] || null
+  return getHolidayScheduleById(tenantId, id)
 }
 
-export async function updateHoliday(tenantId, id, { name, holidayDate }) {
-  const { rows } = await tenantQuery(
-    tenantId,
-    `
-      UPDATE holidays
-      SET
-        name = COALESCE($2, name),
-        holiday_date = COALESCE($3::date, holiday_date)
-      WHERE tenant_id = $1 AND id = $4
-      RETURNING id, holiday_date AS "holidayDate", name
-    `,
-    [name?.trim() || null, holidayDate || null, id],
-  )
-  return rows[0] || null
+export async function updateHoliday(tenantId, id, payload) {
+  return updateHolidaySchedule(tenantId, id, payload)
 }
 
 export async function deleteHoliday(tenantId, id) {
-  const { rows } = await tenantQuery(
-    tenantId,
-    `
-      DELETE FROM holidays
-      WHERE tenant_id = $1 AND id = $2
-      RETURNING id, holiday_date AS "holidayDate", name
-    `,
-    [id],
-  )
-  return rows[0] || null
+  return deleteHolidaySchedule(tenantId, id)
 }

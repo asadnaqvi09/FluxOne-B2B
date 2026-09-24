@@ -152,8 +152,11 @@ export const updateProductSchema = z
         }),
       sellingPrice: z.coerce.number().nonnegative().optional(),
       purchasePrice: z.coerce.number().nonnegative().optional(),
-      discountPercent: z.coerce.number().min(0).max(100).optional(),
-      offerId: optionalLooseUuid,
+      discountPercent: z.preprocess(
+        (v) => (v === '' || v === undefined ? undefined : v === null ? null : v),
+        z.coerce.number().min(0).max(100).nullable().optional(),
+      ),
+      offerId: nullableLooseUuid,
       description: z.string().optional(),
       scale: z.string().min(1).optional(),
       taxIds: z.array(looseUuid).optional(),

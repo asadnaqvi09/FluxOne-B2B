@@ -473,6 +473,36 @@ export async function getProductDetail(tenantId, id, { branchId = null } = {}) {
   }
 }
 
+async function findOrCreateTaxByRate(client, tenantId, taxPercent) {
+  const rate = Number(taxPercent)
+  const { rows: existing } = await tenantClientQuery(
+    client,
+    tenantId,
+    `
+      SELECT id
+      FROM taxes
+      WHERE tenant_id = $1
+        AND rate_percent = $2::numeric
+      ORDER BY name ASC, id ASC
+      LIMIT 1
+    `,
+    [rate],
+  )
+  if (existing[0]?.id) return existing[0].id
+
+  const { rows: created } = await tenantClientQuery(
+    client,
+    tenantId,
+    `
+      INSERT INTO taxes (tenant_id, name, rate_percent)
+      VALUES ($1, $2, $3::numeric)
+      RETURNING id
+    `,
+    [`Sales Tax ${rate}%`, rate],
+  )
+  return created[0].id
+}
+
 async function attachTaxes(client, tenantId, productId, taxIds = []) {
   await tenantClientQuery(
     client,
@@ -628,6 +658,25 @@ export async function createProduct(tenantId, payload) {
       }
     }
 
+    // Fetch tenant defaults for profit % and tax %
+    const { rows: tenantRows } = await tenantClientQuery(
+      client,
+      tenantId,
+      `
+        SELECT
+          COALESCE(default_profit_percent, 0) AS "defaultProfitPercent",
+          COALESCE(default_tax_percent, 0) AS "defaultTaxPercent"
+        FROM tenants
+        WHERE id = $1
+        LIMIT 1
+      `,
+    )
+    const defaultProfit = Number(tenantRows[0]?.defaultProfitPercent) || 0
+    const defaultTax = Number(tenantRows[0]?.defaultTaxPercent) || 0
+
+    const profitPercent =
+      payload.profitPercent !== undefined ? Number(payload.profitPercent) : defaultProfit
+
     let purchasePrice = payload.purchasePrice ?? 0
     let sellingPrice = payload.sellingPrice ?? 0
     if (payload.type === PRODUCT_TYPES.BUNDLE && payload.bundleItems?.length) {
@@ -639,6 +688,8 @@ export async function createProduct(tenantId, payload) {
       )
       purchasePrice = derived.purchasePrice
       sellingPrice = derived.sellingPrice
+    } else if ((!sellingPrice || sellingPrice === 0) && purchasePrice > 0 && profitPercent > 0) {
+      sellingPrice = Math.round(purchasePrice * (1 + profitPercent / 100) * 100) / 100
     }
 
     const { rows } = await tenantClientQuery(
@@ -647,9 +698,9 @@ export async function createProduct(tenantId, payload) {
       `
         INSERT INTO products (
           tenant_id, branch_id, category_id, subcategory_id, type, item_code, name, image_url,
-          scale, barcode, description, purchase_price, selling_price, offer_id, discount_percent, quantity, status
+          scale, barcode, description, purchase_price, selling_price, profit_percent, offer_id, discount_percent, quantity, status
         )
-        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, 'active')
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, 'active')
         RETURNING id, name, item_code AS "itemCode", barcode, type, status, branch_id AS "branchId"
       `,
       [
@@ -665,13 +716,26 @@ export async function createProduct(tenantId, payload) {
         payload.description || null,
         purchasePrice,
         sellingPrice,
+        profitPercent,
         payload.offerId || null,
         payload.discountPercent || null,
         payload.quantity ?? 0,
       ],
     )
     const product = rows[0]
-    await attachTaxes(client, tenantId, product.id, payload.taxIds || [])
+
+    // Tax assignment: Use explicit taxIds if provided; otherwise fallback to tenant defaultTaxPercent
+    let resolvedTaxIds = payload.taxIds
+    if (resolvedTaxIds === undefined || resolvedTaxIds === null) {
+      if (defaultTax > 0) {
+        const defaultTaxId = await findOrCreateTaxByRate(client, tenantId, defaultTax)
+        resolvedTaxIds = [defaultTaxId]
+      } else {
+        resolvedTaxIds = []
+      }
+    }
+
+    await attachTaxes(client, tenantId, product.id, resolvedTaxIds)
     if (payload.type === PRODUCT_TYPES.BUNDLE) {
       await attachBundleItems(client, tenantId, product.id, payload.bundleItems || [], payload.branchId)
     }

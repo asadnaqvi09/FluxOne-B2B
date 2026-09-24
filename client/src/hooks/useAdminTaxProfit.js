@@ -8,6 +8,10 @@ const EMPTY_META = {
   categories: [],
   scales: [],
   taxes: [],
+  defaults: {
+    defaultProfitPercent: 0,
+    defaultTaxPercent: 0,
+  },
 }
 
 // Live B2B Admin Tax & Profit (/api/admin/tax-profit).
@@ -45,6 +49,10 @@ export function useAdminTaxProfit({
       categories: result.data?.categories || [],
       scales: result.data?.scales || [],
       taxes: result.data?.taxes || [],
+      defaults: {
+        defaultProfitPercent: Number(result.data?.defaults?.defaultProfitPercent) || 0,
+        defaultTaxPercent: Number(result.data?.defaults?.defaultTaxPercent) || 0,
+      },
     })
     setMetaLoading(false)
     return result
@@ -90,6 +98,26 @@ export function useAdminTaxProfit({
     void load()
   }, [load])
 
+  const updateDefaults = useCallback(
+    async ({ defaultProfitPercent, defaultTaxPercent, applyToAllProducts = false }) => {
+      setMutating(true)
+      const payload = { applyToAllProducts }
+      if (defaultProfitPercent !== undefined) {
+        payload.defaultProfitPercent = Number(defaultProfitPercent)
+      }
+      if (defaultTaxPercent !== undefined) {
+        payload.defaultTaxPercent = Number(defaultTaxPercent)
+      }
+      const result = await apiClient.patch(endpoints.admin.taxProfit.defaults, payload)
+      setMutating(false)
+      if (result.success) {
+        await Promise.all([load(), loadMeta()])
+      }
+      return result
+    },
+    [load, loadMeta],
+  )
+
   const bulkSetProfit = useCallback(
     async (productIds, profitPercent) => {
       setMutating(true)
@@ -130,6 +158,7 @@ export function useAdminTaxProfit({
     error,
     reload: load,
     reloadMeta: loadMeta,
+    updateDefaults,
     bulkSetProfit,
     bulkSetTax,
   }

@@ -543,11 +543,10 @@ export function StaffLeavesTab({ designations = [], staff = [] }) {
             </div>
           </div>
           <DialogFooter>
-            <DialogCancelButton onClick={() => setEditing(null)}>Cancel</DialogCancelButton>
             <Button
               onClick={handleUpdateLeave}
               disabled={mutating}
-              className="text-white"
+              className="text-white cursor-pointer"
               style={{ backgroundColor: BRAND.purple }}
             >
               {mutating ? 'Saving…' : 'Save changes'}

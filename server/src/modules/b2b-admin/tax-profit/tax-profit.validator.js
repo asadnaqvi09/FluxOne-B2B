@@ -50,3 +50,22 @@ export const bulkTaxSchema = z.object({
   query: empty,
   params: empty,
 })
+
+export const updateDefaultsSchema = z.object({
+  body: z
+    .object({
+      defaultProfitPercent: percentField.optional(),
+      defaultTaxPercent: percentField.optional(),
+      applyToAllProducts: z.coerce.boolean().optional(),
+    })
+    .refine(
+      (data) =>
+        data.defaultProfitPercent !== undefined || data.defaultTaxPercent !== undefined,
+      {
+        message: 'Must provide either defaultProfitPercent or defaultTaxPercent',
+      },
+    ),
+  query: empty,
+  params: empty,
+})
+

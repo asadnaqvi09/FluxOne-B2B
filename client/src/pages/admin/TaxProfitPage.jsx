@@ -46,6 +46,13 @@ import {
   Columns,
   Loader2,
   PackageOpen,
+  Settings,
+  Edit2,
+  AlertTriangle,
+  CheckCircle2,
+  Layers,
+  ShieldAlert,
+  Info,
 } from 'lucide-react'
 
 const PAGE_SIZE = ADMIN_TAX_PROFIT_PAGE_SIZE
@@ -64,6 +71,20 @@ export function TaxProfitPage() {
   const [taxDialogOpen, setTaxDialogOpen] = useState(false)
   const [bulkProfitValue, setBulkProfitValue] = useState('20')
   const [bulkTaxValue, setBulkTaxValue] = useState('5')
+
+  // Default Tax & Profit configuration states
+  const [defaultTaxDialogOpen, setDefaultTaxDialogOpen] = useState(false)
+  const [defaultProfitDialogOpen, setDefaultProfitDialogOpen] = useState(false)
+  const [defaultTaxValue, setDefaultTaxValue] = useState('0')
+  const [defaultProfitValue, setDefaultProfitValue] = useState('0')
+  const [confirmApplyModalOpen, setConfirmApplyModalOpen] = useState(false)
+  const [pendingApplyAction, setPendingApplyAction] = useState(null) // { type: 'tax' | 'profit', value: number }
+
+  // Individual product override dialog state
+  const [singleItemModalOpen, setSingleItemModalOpen] = useState(false)
+  const [singleItemTarget, setSingleItemTarget] = useState(null)
+  const [singleProfitValue, setSingleProfitValue] = useState('0')
+  const [singleTaxValue, setSingleTaxValue] = useState('0')
 
   const [visibleColumns, setVisibleColumns] = useState({
     id: true,
@@ -90,6 +111,7 @@ export function TaxProfitPage() {
     loading,
     mutating,
     error,
+    updateDefaults,
     bulkSetProfit,
     bulkSetTax,
   } = useAdminTaxProfit({
@@ -101,6 +123,14 @@ export function TaxProfitPage() {
     page,
     limit: PAGE_SIZE,
   })
+
+  // Sync current defaults from meta
+  useEffect(() => {
+    if (meta?.defaults) {
+      setDefaultProfitValue(String(meta.defaults.defaultProfitPercent ?? 0))
+      setDefaultTaxValue(String(meta.defaults.defaultTaxPercent ?? 0))
+    }
+  }, [meta?.defaults])
 
   const slowHint = useSlowLoadingHint(loading)
   const totalCatalog = pagination.total || 0
@@ -132,6 +162,127 @@ export function TaxProfitPage() {
     setSelectedIds((prev) =>
       prev.includes(id) ? prev.filter((item) => item !== id) : [...prev, id],
     )
+  }
+
+  function handleOpenSingleItemEdit(product) {
+    setSingleItemTarget(product)
+    setSingleProfitValue(String(product.profitPct ?? 0))
+    setSingleTaxValue(String(product.taxPct ?? 0))
+    setSingleItemModalOpen(true)
+  }
+
+  async function handleSaveSingleItemOverrides(e) {
+    e.preventDefault()
+    if (!singleItemTarget) return
+
+    const profitErr = validatePercentage(singleProfitValue, {
+      min: 0,
+      max: 100,
+      fieldName: 'Profit percentage',
+    })
+    if (profitErr) {
+      toastError(profitErr)
+      return
+    }
+
+    const taxErr = validatePercentage(singleTaxValue, {
+      min: 0,
+      max: 100,
+      fieldName: 'Tax percentage',
+    })
+    if (taxErr) {
+      toastError(taxErr)
+      return
+    }
+
+    const profitNum = Number(singleProfitValue)
+    const taxNum = Number(singleTaxValue)
+
+    const profitRes = await bulkSetProfit([singleItemTarget.id], profitNum)
+    if (!profitRes.success) {
+      toastError(profitRes.error || 'Failed to update profit %')
+      return
+    }
+
+    const taxRes = await bulkSetTax([singleItemTarget.id], taxNum)
+    if (!taxRes.success) {
+      toastError(taxRes.error || 'Failed to update tax %')
+      return
+    }
+
+    toastSuccess(`Updated "${singleItemTarget.name}" margin & tax settings`)
+    setSingleItemModalOpen(false)
+    setSingleItemTarget(null)
+  }
+
+  // --- Default Profit & Tax Handlers ---
+  async function handleSaveDefaultOnly(type, value) {
+    const err = validatePercentage(value, {
+      min: 0,
+      max: 100,
+      fieldName: type === 'profit' ? 'Default profit percentage' : 'Default tax percentage',
+    })
+    if (err) {
+      toastError(err)
+      return
+    }
+
+    const numVal = Number(value)
+    const payload =
+      type === 'profit'
+        ? { defaultProfitPercent: numVal, applyToAllProducts: false }
+        : { defaultTaxPercent: numVal, applyToAllProducts: false }
+
+    const result = await updateDefaults(payload)
+    if (!result.success) {
+      toastError(result.error || 'Failed to update default setting')
+      return
+    }
+
+    toastSuccess(
+      `Default ${type === 'profit' ? 'Profit' : 'Tax'} set to ${numVal}%. This will automatically apply to newly added products.`,
+    )
+    if (type === 'profit') setDefaultProfitDialogOpen(false)
+    if (type === 'tax') setDefaultTaxDialogOpen(false)
+  }
+
+  function handlePromptApplyToAll(type, value) {
+    const err = validatePercentage(value, {
+      min: 0,
+      max: 100,
+      fieldName: type === 'profit' ? 'Default profit percentage' : 'Default tax percentage',
+    })
+    if (err) {
+      toastError(err)
+      return
+    }
+
+    setPendingApplyAction({ type, value: Number(value) })
+    setConfirmApplyModalOpen(true)
+  }
+
+  async function handleConfirmApplyToAll() {
+    if (!pendingApplyAction) return
+
+    const { type, value } = pendingApplyAction
+    const payload =
+      type === 'profit'
+        ? { defaultProfitPercent: value, applyToAllProducts: true }
+        : { defaultTaxPercent: value, applyToAllProducts: true }
+
+    const result = await updateDefaults(payload)
+    if (!result.success) {
+      toastError(result.error || 'Failed to apply defaults to all products')
+      return
+    }
+
+    toastSuccess(
+      `Applied default ${type === 'profit' ? 'Profit' : 'Tax'} of ${value}% to all existing products and configured for newly added products.`,
+    )
+    setConfirmApplyModalOpen(false)
+    setPendingApplyAction(null)
+    if (type === 'profit') setDefaultProfitDialogOpen(false)
+    if (type === 'tax') setDefaultTaxDialogOpen(false)
   }
 
   async function handleApplyBulkProfit(e) {
@@ -214,6 +365,35 @@ export function TaxProfitPage() {
           eyebrow="Pricing & Margin Control"
           title="Tax & Profit Management"
           description="Global wholesale margin rules, sales tax compliance, and automated multi-branch price calculations"
+          className="sm:items-center"
+          actions={
+            <div className="flex flex-wrap items-center gap-2">
+              <Button
+                type="button"
+                onClick={() => {
+                  setDefaultTaxValue(String(meta?.defaults?.defaultTaxPercent ?? 0))
+                  setDefaultTaxDialogOpen(true)
+                }}
+                className="h-9 px-3.5 text-xs font-bold cursor-pointer text-white rounded-xl shadow-xs transition-opacity hover:opacity-90 flex items-center gap-1.5"
+                style={{ background: BRAND.deep }}
+              >
+                <Settings className="size-3.5" />
+                Set Default Tax %
+              </Button>
+              <Button
+                type="button"
+                onClick={() => {
+                  setDefaultProfitValue(String(meta?.defaults?.defaultProfitPercent ?? 0))
+                  setDefaultProfitDialogOpen(true)
+                }}
+                className="h-9 px-3.5 text-xs font-bold cursor-pointer text-white rounded-xl shadow-xs transition-opacity hover:opacity-90 flex items-center gap-1.5"
+                style={{ background: BRAND.purple }}
+              >
+                <Settings className="size-3.5" />
+                Set Default Profit %
+              </Button>
+            </div>
+          }
         />
       </MotionHeader>
 
@@ -477,12 +657,20 @@ export function TaxProfitPage() {
                             {p.scaleLabel || p.scale || '—'}
                           </p>
                           <div className="mt-2 flex flex-wrap gap-1.5">
-                            <span className="inline-flex items-center rounded border border-emerald-200 bg-emerald-50 px-2 py-0.5 text-xs font-bold text-emerald-700">
+                            <button
+                              type="button"
+                              onClick={() => handleOpenSingleItemEdit(p)}
+                              className="inline-flex items-center rounded border border-emerald-200 bg-emerald-50 px-2 py-0.5 text-xs font-bold text-emerald-700 hover:bg-emerald-100 cursor-pointer"
+                            >
                               +{p.profitPct}%
-                            </span>
-                            <span className="inline-flex items-center rounded border border-blue-200 bg-blue-50 px-2 py-0.5 text-xs font-bold text-blue-700">
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => handleOpenSingleItemEdit(p)}
+                              className="inline-flex items-center rounded border border-blue-200 bg-blue-50 px-2 py-0.5 text-xs font-bold text-blue-700 hover:bg-blue-100 cursor-pointer"
+                            >
                               {p.taxPct > 0 ? `${p.taxPct}%` : '0% (Exempt)'}
-                            </span>
+                            </button>
                           </div>
                           <div className="mt-2 flex items-end justify-between gap-2">
                             <div>
@@ -623,17 +811,27 @@ export function TaxProfitPage() {
 
                           {visibleColumns.profitPct && (
                             <TableCell className="px-3 py-3">
-                              <span className="inline-flex items-center font-bold text-xs text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200">
+                              <button
+                                type="button"
+                                onClick={() => handleOpenSingleItemEdit(p)}
+                                title="Click to override Profit % for this product"
+                                className="inline-flex items-center font-bold text-xs text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200 hover:bg-emerald-100 hover:border-emerald-300 transition-colors cursor-pointer"
+                              >
                                 +{p.profitPct}%
-                              </span>
+                              </button>
                             </TableCell>
                           )}
 
                           {visibleColumns.taxPct && (
                             <TableCell className="px-3 py-3">
-                              <span className="inline-flex items-center font-bold text-xs text-blue-700 bg-blue-50 px-2 py-0.5 rounded border border-blue-200">
+                              <button
+                                type="button"
+                                onClick={() => handleOpenSingleItemEdit(p)}
+                                title="Click to override Tax % for this product"
+                                className="inline-flex items-center font-bold text-xs text-blue-700 bg-blue-50 px-2 py-0.5 rounded border border-blue-200 hover:bg-blue-100 hover:border-blue-300 transition-colors cursor-pointer"
+                              >
                                 {p.taxPct > 0 ? `${p.taxPct}%` : '0% (Exempt)'}
-                              </span>
+                              </button>
                             </TableCell>
                           )}
 
@@ -668,6 +866,300 @@ export function TaxProfitPage() {
         </SurfaceCard>
       </MotionReveal>
 
+      {/* Set Default Tax % Dialog */}
+      <Dialog open={defaultTaxDialogOpen} onOpenChange={setDefaultTaxDialogOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Settings className="size-4 text-purple-600" />
+              Set Default Sales Tax %
+            </DialogTitle>
+            <DialogDescription>
+              Configure the company-wide default tax rate.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4 pt-1">
+            <div className="space-y-1.5">
+              <Label htmlFor="defaultTaxInput" className="text-xs font-semibold">
+                Default Tax Percentage (%)
+              </Label>
+              <Input
+                id="defaultTaxInput"
+                type="number"
+                min="0"
+                max="100"
+                step="1"
+                value={defaultTaxValue}
+                onChange={(e) => setDefaultTaxValue(e.target.value)}
+                placeholder="e.g. 5"
+                required
+              />
+              <p className="text-[11px] text-slate-500">
+                This rate will automatically apply to newly created catalog products.
+              </p>
+            </div>
+
+            <DialogFooter className="pt-2 flex flex-col sm:flex-row gap-2 sm:justify-between">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => setDefaultTaxDialogOpen(false)}
+                disabled={mutating}
+              >
+                Cancel
+              </Button>
+              <div className="flex items-center gap-2">
+                <Button
+                  type="button"
+                  variant="secondary"
+                  onClick={() => handleSaveDefaultOnly('tax', defaultTaxValue)}
+                  disabled={mutating}
+                  className="font-semibold text-xs cursor-pointer"
+                >
+                  Save as Default
+                </Button>
+                <Button
+                  type="button"
+                  onClick={() => handlePromptApplyToAll('tax', defaultTaxValue)}
+                  disabled={mutating}
+                  className="text-white font-semibold text-xs cursor-pointer shadow-xs"
+                  style={{ background: BRAND.deep }}
+                >
+                  Apply to All Products
+                </Button>
+              </div>
+            </DialogFooter>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Set Default Profit % Dialog */}
+      <Dialog open={defaultProfitDialogOpen} onOpenChange={setDefaultProfitDialogOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Settings className="size-4 text-purple-600" />
+              Set Default Profit %
+            </DialogTitle>
+            <DialogDescription>
+              Configure the company-wide default profit margin percentage.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4 pt-1">
+            <div className="space-y-1.5">
+              <Label htmlFor="defaultProfitInput" className="text-xs font-semibold">
+                Default Profit Percentage (%)
+              </Label>
+              <Input
+                id="defaultProfitInput"
+                type="number"
+                min="0"
+                max="100"
+                step="1"
+                value={defaultProfitValue}
+                onChange={(e) => setDefaultProfitValue(e.target.value)}
+                placeholder="e.g. 20"
+                required
+              />
+              <p className="text-[11px] text-slate-500">
+                Selling prices for newly created products will calculate automatically from cost.
+              </p>
+            </div>
+
+            <DialogFooter className="pt-2 flex flex-col sm:flex-row gap-2 sm:justify-between">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => setDefaultProfitDialogOpen(false)}
+                disabled={mutating}
+              >
+                Cancel
+              </Button>
+              <div className="flex items-center gap-2">
+                <Button
+                  type="button"
+                  variant="secondary"
+                  onClick={() => handleSaveDefaultOnly('profit', defaultProfitValue)}
+                  disabled={mutating}
+                  className="font-semibold text-xs cursor-pointer"
+                >
+                  Save as Default
+                </Button>
+                <Button
+                  type="button"
+                  onClick={() => handlePromptApplyToAll('profit', defaultProfitValue)}
+                  disabled={mutating}
+                  className="text-white font-semibold text-xs cursor-pointer shadow-xs"
+                  style={{ background: BRAND.purple }}
+                >
+                  Apply to All Products
+                </Button>
+              </div>
+            </DialogFooter>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Confirmation Popup Before Applying Defaults to All Products */}
+      <Dialog open={confirmApplyModalOpen} onOpenChange={setConfirmApplyModalOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="text-base font-bold text-slate-900 flex items-center gap-2">
+              <div className="flex size-7 items-center justify-center rounded-full bg-purple-50 text-purple-700">
+                <Percent className="size-4" />
+              </div>
+              Apply Defaults to All Products?
+            </DialogTitle>
+            <DialogDescription className="text-sm font-medium text-slate-700 pt-1 leading-relaxed">
+              Apply these default Tax and Profit values to all products? Existing product-specific values will be replaced.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="rounded-xl border border-amber-200/80 bg-amber-50/70 p-3.5 text-xs text-amber-900 space-y-1.5">
+            <div className="flex items-start gap-2">
+              <Info className="size-4 text-amber-600 shrink-0 mt-0.5" />
+              <div className="space-y-1">
+                <p className="font-medium">
+                  This will update all existing products in your catalog to{' '}
+                  <strong className="font-bold text-amber-950">{pendingApplyAction?.value}%</strong>{' '}
+                  {pendingApplyAction?.type === 'profit' ? 'profit margin' : 'tax rate'}.
+                </p>
+                <p className="text-[11px] text-amber-800">
+                  Newly added products will also automatically use this configured default.
+                </p>
+              </div>
+            </div>
+          </div>
+
+          <DialogFooter className="pt-2 flex gap-2 sm:justify-end">
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => {
+                setConfirmApplyModalOpen(false)
+                setPendingApplyAction(null)
+              }}
+              disabled={mutating}
+              className="cursor-pointer"
+            >
+              Cancel
+            </Button>
+            <Button
+              type="button"
+              onClick={handleConfirmApplyToAll}
+              disabled={mutating}
+              className="text-white font-semibold cursor-pointer shadow-xs"
+              style={{
+                background: pendingApplyAction?.type === 'tax' ? BRAND.deep : BRAND.purple,
+              }}
+            >
+              {mutating ? 'Applying…' : 'Confirm & Apply'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Individual Product Override Dialog */}
+      <Dialog open={singleItemModalOpen} onOpenChange={setSingleItemModalOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Edit2 className="size-4 text-purple-600" />
+              Edit Product Margin & Tax
+            </DialogTitle>
+            <DialogDescription>
+              Override profit % and tax % for &quot;{singleItemTarget?.name}&quot;
+            </DialogDescription>
+          </DialogHeader>
+
+          <form onSubmit={handleSaveSingleItemOverrides} className="space-y-4 pt-2">
+            <div className="rounded-xl border border-slate-200 bg-slate-50/70 p-3 text-xs space-y-1">
+              <div className="flex justify-between">
+                <span className="text-slate-500">Product SKU:</span>
+                <span className="font-mono font-bold text-slate-800">{singleItemTarget?.itemCode || '—'}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-slate-500">Base Cost:</span>
+                <span className="font-bold text-slate-800">Rs. {Number(singleItemTarget?.baseCost || 0).toLocaleString()}</span>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1.5">
+                <Label htmlFor="singleProfitInput" className="text-xs font-semibold">
+                  Profit Margin (%)
+                </Label>
+                <Input
+                  id="singleProfitInput"
+                  type="number"
+                  min="0"
+                  max="100"
+                  step="1"
+                  value={singleProfitValue}
+                  onChange={(e) => setSingleProfitValue(e.target.value)}
+                  placeholder="e.g. 20"
+                  required
+                />
+              </div>
+
+              <div className="space-y-1.5">
+                <Label htmlFor="singleTaxInput" className="text-xs font-semibold">
+                  Sales Tax (%)
+                </Label>
+                <Input
+                  id="singleTaxInput"
+                  type="number"
+                  min="0"
+                  max="100"
+                  step="1"
+                  value={singleTaxValue}
+                  onChange={(e) => setSingleTaxValue(e.target.value)}
+                  placeholder="e.g. 5"
+                  required
+                />
+              </div>
+            </div>
+
+            <div className="rounded-xl border border-purple-100 bg-purple-50/60 p-3 text-xs text-purple-950 flex items-center justify-between">
+              <span>Calculated Final Price:</span>
+              <span className="font-extrabold text-sm text-purple-950">
+                Rs.{' '}
+                {calculateFinalPrice(
+                  singleItemTarget?.baseCost || 0,
+                  Number(singleProfitValue) || 0,
+                  Number(singleTaxValue) || 0,
+                ).toLocaleString()}
+              </span>
+            </div>
+
+            <DialogFooter className="pt-2">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => {
+                  setSingleItemModalOpen(false)
+                  setSingleItemTarget(null)
+                }}
+                disabled={mutating}
+              >
+                Cancel
+              </Button>
+              <Button
+                type="submit"
+                disabled={mutating}
+                className="text-white font-semibold"
+                style={{ background: BRAND.purple }}
+              >
+                {mutating ? 'Saving…' : 'Save Changes'}
+              </Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
+
+      {/* Bulk Profit Dialog */}
       <Dialog open={profitDialogOpen} onOpenChange={setProfitDialogOpen}>
         <DialogContent className="max-w-md">
           <DialogHeader>
@@ -720,6 +1212,7 @@ export function TaxProfitPage() {
         </DialogContent>
       </Dialog>
 
+      {/* Bulk Tax Dialog */}
       <Dialog open={taxDialogOpen} onOpenChange={setTaxDialogOpen}>
         <DialogContent className="max-w-md">
           <DialogHeader>
@@ -776,3 +1269,4 @@ export function TaxProfitPage() {
 }
 
 export default TaxProfitPage
+

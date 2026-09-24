@@ -3,6 +3,7 @@ import {
   bulkSetTaxPercent,
   getTaxProfitMeta,
   listTaxProfitProducts,
+  updateTaxProfitDefaults,
 } from './tax-profit.model.js'
 import { fail, success } from '../../../utils/response.util.js'
 import { paginatedResult } from '../../../utils/pagination.util.js'
@@ -15,6 +16,16 @@ export async function taxProfitProductsList(req, res) {
 export async function taxProfitMeta(req, res) {
   const meta = await getTaxProfitMeta(req.tenantId)
   return success(res, meta)
+}
+
+export async function updateDefaultsHandler(req, res) {
+  try {
+    const result = await updateTaxProfitDefaults(req.tenantId, req.validated.body)
+    return success(res, result)
+  } catch (err) {
+    if (err.status) return fail(res, err.message, err.status)
+    throw err
+  }
 }
 
 export async function bulkProfitHandler(req, res) {
@@ -38,3 +49,4 @@ export async function bulkTaxHandler(req, res) {
     throw err
   }
 }
+

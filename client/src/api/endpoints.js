@@ -32,6 +32,7 @@ export const endpoints = {
     taxProfit: {
       meta: '/admin/tax-profit/meta',
       products: '/admin/tax-profit/products',
+      defaults: '/admin/tax-profit/defaults',
       bulkProfit: '/admin/tax-profit/bulk-profit',
       bulkTax: '/admin/tax-profit/bulk-tax',
     },

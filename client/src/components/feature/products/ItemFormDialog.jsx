@@ -37,6 +37,16 @@ const EMPTY = {
   image: null,
 }
 
+function formatOfferOptionLabel(offer) {
+  if (!offer) return ''
+  const name = offer.name || 'Offer'
+  const percent = Number(offer.percent)
+  if (percent && percent > 0 && !name.includes('%')) {
+    return `${name} – ${percent}%`
+  }
+  return name
+}
+
 //
 // Create / edit single or bundle product.
 // Steps: form → confirm → success (create only: itemCode + barcode + print).
@@ -160,6 +170,16 @@ export function ItemFormDialog({
     })
   }
 
+  function handleDiscountOfferChange(selectedId) {
+    const selectedOffer = offers.find((o) => o.id === selectedId)
+    setForm((prev) => ({
+      ...prev,
+      offerId: selectedId,
+      discountPercent:
+        selectedOffer?.percent != null ? String(selectedOffer.percent) : '',
+    }))
+  }
+
   function validate() {
     if (!form.name.trim()) return 'Name is required'
     if (!form.scale) return 'Scale is required'
@@ -209,15 +229,18 @@ export function ItemFormDialog({
       return
     }
     setError(null)
+    const selectedOffer = offers.find((o) => o.id === form.offerId)
     const payload = {
       name: form.name,
       type,
       scale: form.scale,
       description: form.description,
       taxIds: form.taxIds,
-      offerId: form.offerId || undefined,
+      offerId: form.offerId ? form.offerId : null,
       discountPercent:
-        form.discountPercent === '' ? undefined : Number(form.discountPercent),
+        form.offerId && selectedOffer?.percent != null
+          ? Number(selectedOffer.percent)
+          : null,
       image: form.image,
       purchasePrice: Number(form.purchasePrice) || 0,
       sellingPrice: Number(form.sellingPrice) || 0,
@@ -393,39 +416,34 @@ export function ItemFormDialog({
                     />
                   </div>
 
-                  <div className="grid gap-4 sm:grid-cols-2">
-                    <div className="space-y-1.5">
-                      <Label htmlFor="product-offer">Offer</Label>
-                      <NativeSelect
-                        id="product-offer"
-                        value={form.offerId}
-                        onChange={(event) => patch('offerId', event.target.value)}
-                      >
-                        <option value="">Select Offer</option>
-                        {offers.map((offer) => (
-                          <option key={offer.id} value={offer.id}>
-                            {offer.name}
-                            {offer.percent != null ? ` (${offer.percent}%)` : ''}
-                          </option>
-                        ))}
-                      </NativeSelect>
+                  <div className="space-y-1.5">
+                    <Label htmlFor="bundle-discount-offer">Discount / Offer</Label>
+                    <NativeSelect
+                      id="bundle-discount-offer"
+                      value={form.offerId}
+                      onChange={(event) => handleDiscountOfferChange(event.target.value)}
+                    >
                       {!offers.length ? (
-                        <p className="text-[11px] text-slate-400">No offers configured yet.</p>
+                        <option value="">No Discount/Offer Available</option>
+                      ) : (
+                        <>
+                          <option value="">No Discount</option>
+                          {offers.map((offer) => (
+                            <option key={offer.id} value={offer.id}>
+                              {formatOfferOptionLabel(offer)}
+                            </option>
+                          ))}
+                        </>
+                      )}
+                      {form.offerId && !offers.some((o) => o.id === form.offerId) ? (
+                        <option value={form.offerId}>
+                          {initialProduct?.offerName || 'Current Offer'}
+                        </option>
                       ) : null}
-                    </div>
-
-                    <div className="space-y-1.5">
-                      <Label htmlFor="product-discount">Discount %</Label>
-                      <Input
-                        id="product-discount"
-                        type="number"
-                        min="0"
-                        max="100"
-                        step="0.01"
-                        value={form.discountPercent}
-                        onChange={(event) => patch('discountPercent', event.target.value)}
-                      />
-                    </div>
+                    </NativeSelect>
+                    {!offers.length ? (
+                      <p className="text-[11px] text-slate-400">No discount or offer configured yet.</p>
+                    ) : null}
                   </div>
 
                   <div className="space-y-1.5">
@@ -575,36 +593,33 @@ export function ItemFormDialog({
                   />
                 </div>
 
-                <div className="space-y-1.5">
-                  <Label htmlFor="product-discount">Discount %</Label>
-                  <Input
-                    id="product-discount"
-                    type="number"
-                    min="0"
-                    max="100"
-                    step="0.01"
-                    value={form.discountPercent}
-                    onChange={(event) => patch('discountPercent', event.target.value)}
-                  />
-                </div>
-
-                <div className="space-y-1.5">
-                  <Label htmlFor="product-offer">Offer</Label>
+                <div className="space-y-1.5 sm:col-span-2">
+                  <Label htmlFor="product-discount-offer">Discount / Offer</Label>
                   <NativeSelect
-                    id="product-offer"
+                    id="product-discount-offer"
                     value={form.offerId}
-                    onChange={(event) => patch('offerId', event.target.value)}
+                    onChange={(event) => handleDiscountOfferChange(event.target.value)}
                   >
-                    <option value="">Select Offer</option>
-                    {offers.map((offer) => (
-                      <option key={offer.id} value={offer.id}>
-                        {offer.name}
-                        {offer.percent != null ? ` (${offer.percent}%)` : ''}
+                    {!offers.length ? (
+                      <option value="">No Discount/Offer Available</option>
+                    ) : (
+                      <>
+                        <option value="">No Discount</option>
+                        {offers.map((offer) => (
+                          <option key={offer.id} value={offer.id}>
+                            {formatOfferOptionLabel(offer)}
+                          </option>
+                        ))}
+                      </>
+                    )}
+                    {form.offerId && !offers.some((o) => o.id === form.offerId) ? (
+                      <option value={form.offerId}>
+                        {initialProduct?.offerName || 'Current Offer'}
                       </option>
-                    ))}
+                    ) : null}
                   </NativeSelect>
                   {!offers.length ? (
-                    <p className="text-[11px] text-slate-400">No offers configured yet.</p>
+                    <p className="text-[11px] text-slate-400">No discount or offer configured yet.</p>
                   ) : null}
                 </div>
               </div>
@@ -698,17 +713,17 @@ export function ItemFormDialog({
                     .join(', ')}
                 </p>
               ) : null}
-              {form.offerId ? (
-                <p className="mt-1">
-                  <span className="text-slate-500">Offer:</span>{' '}
-                  {offers.find((offer) => offer.id === form.offerId)?.name || '—'}
-                </p>
-              ) : null}
-              {form.discountPercent !== '' && form.discountPercent != null ? (
-                <p className="mt-1">
-                  <span className="text-slate-500">Discount:</span> {form.discountPercent}%
-                </p>
-              ) : null}
+              <p className="mt-1">
+                <span className="text-slate-500">Discount / Offer:</span>{' '}
+                {form.offerId
+                  ? formatOfferOptionLabel(
+                      offers.find((offer) => offer.id === form.offerId) || {
+                        name: initialProduct?.offerName || 'Offer',
+                        percent: form.discountPercent,
+                      },
+                    )
+                  : 'No Discount'}
+              </p>
               {form.description ? (
                 <p className="mt-1">
                   <span className="text-slate-500">Description:</span> {form.description}

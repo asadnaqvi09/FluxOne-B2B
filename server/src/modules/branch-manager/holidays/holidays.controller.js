@@ -1,9 +1,9 @@
 import {
-  createHoliday,
-  listHolidays,
-  getHolidayById,
-  updateHoliday,
-  deleteHoliday,
+  createHolidaySchedule,
+  listHolidaySchedules,
+  getHolidayScheduleById,
+  updateHolidaySchedule,
+  deleteHolidaySchedule,
 } from './holidays.model.js'
 import {
   upsertAttendance,
@@ -14,8 +14,9 @@ import { success, fail } from '../../../utils/response.util.js'
 
 function getDatesInRange(startDate, endDate) {
   const dates = []
-  let current = new Date(startDate)
-  const last = new Date(endDate)
+  if (!startDate) return dates
+  const current = new Date(startDate)
+  const last = new Date(endDate || startDate)
   while (current <= last) {
     dates.push(current.toISOString().split('T')[0])
     current.setDate(current.getDate() + 1)
@@ -23,83 +24,142 @@ function getDatesInRange(startDate, endDate) {
   return dates
 }
 
+async function syncScheduleAttendance(tenantId, userId, schedule, employeeIds) {
+  const dates = getDatesInRange(schedule.startDate, schedule.endDate)
+
+  if (schedule.status === 'inactive') {
+    // Clear attendance marks if inactive
+    for (const date of dates) {
+      await clearHolidayAttendanceByDate(tenantId, {
+        workDate: date,
+        note: schedule.name,
+      })
+    }
+    return
+  }
+
+  let targetStaffIds = employeeIds || []
+  if (schedule.isAllEmployees) {
+    const { rows: allStaff } = await tenantQuery(
+      tenantId,
+      `
+        SELECT s.id
+        FROM staff s
+        JOIN users u ON u.id = s.user_id AND u.tenant_id = s.tenant_id
+        WHERE s.tenant_id = $1
+          AND s.status = 'active'
+          AND u.is_active = true
+          AND ($2::uuid IS NULL OR s.branch_id = $2)
+      `,
+      [schedule.branchId || null],
+    )
+    targetStaffIds = allStaff.map((s) => s.id)
+  }
+
+  for (const staffId of targetStaffIds) {
+    for (const date of dates) {
+      await upsertAttendance(tenantId, {
+        staffId,
+        workDate: date,
+        status: 'holiday',
+        note: schedule.name,
+        createdBy: userId,
+      })
+    }
+  }
+}
+
 export async function holidaysList(req, res) {
-  const rows = await listHolidays(req.tenantId)
+  const rows = await listHolidaySchedules(req.tenantId, { branchId: req.user?.branchId || null })
   return success(res, rows)
 }
 
 export async function addHoliday(req, res) {
-  const { name, startDate, endDate, employeeIds } = req.body
+  const {
+    name,
+    startDate,
+    endDate,
+    isAllEmployees = true,
+    employeeIds = [],
+    status = 'active',
+  } = req.body
 
-  if (!name || !startDate || !endDate) {
-    return fail(res, 'Holiday name, start date, and end date are required', 400)
+  if (!name || !startDate) {
+    return fail(res, 'Holiday name and start date are required', 400)
   }
 
   try {
-    const dates = getDatesInRange(startDate, endDate)
+    const schedule = await createHolidaySchedule(req.tenantId, {
+      name: name.trim(),
+      startDate,
+      endDate: endDate || startDate,
+      isAllEmployees: Boolean(isAllEmployees),
+      employeeIds: Array.isArray(employeeIds) ? employeeIds : [],
+      status: status || 'active',
+      branchId: req.user?.branchId || null,
+    })
 
-    for (const date of dates) {
-      await createHoliday(req.tenantId, { name, date })
-    }
+    await syncScheduleAttendance(
+      req.tenantId,
+      req.user.id,
+      schedule,
+      employeeIds,
+    )
 
-    if (Array.isArray(employeeIds) && employeeIds.length > 0) {
-      for (const employeeId of employeeIds) {
-        for (const date of dates) {
-          await upsertAttendance(req.tenantId, {
-            staffId: employeeId,
-            workDate: date,
-            status: 'holiday',
-            note: name,
-            createdBy: req.user.id,
-          })
-        }
-      }
-    }
-
-    return success(res, { message: 'Holiday created and applied to selected employees successfully' }, 201)
+    return success(res, schedule, 201)
   } catch (err) {
-    return fail(res, err.message || 'Failed to create holiday', 500)
+    return fail(res, err.message || 'Failed to create holiday schedule', 500)
   }
 }
 
 export async function editHoliday(req, res) {
   const { id } = req.params
-  const { name, holidayDate } = req.body
-
-  if (!name && !holidayDate) {
-    return fail(res, 'Provide a name and/or holiday date to update', 400)
-  }
+  const {
+    name,
+    startDate,
+    endDate,
+    holidayDate,
+    isAllEmployees,
+    employeeIds,
+    status,
+  } = req.body
 
   try {
-    const existing = await getHolidayById(req.tenantId, id)
-    if (!existing) return fail(res, 'Holiday not found', 404)
+    const existing = await getHolidayScheduleById(req.tenantId, id)
+    if (!existing) return fail(res, 'Holiday schedule not found', 404)
 
-    const updated = await updateHoliday(req.tenantId, id, { name, holidayDate })
-    if (!updated) return fail(res, 'Failed to update holiday', 500)
-
-    // Keep attendance notes in sync when renaming same-date holiday marks
-    if (name && name.trim() !== existing.name) {
-      const dateStr =
-        typeof existing.holidayDate === 'string'
-          ? existing.holidayDate.slice(0, 10)
-          : new Date(existing.holidayDate).toISOString().slice(0, 10)
-      await tenantQuery(
-        req.tenantId,
-        `
-          UPDATE attendance
-          SET note = $2
-          WHERE tenant_id = $1
-            AND work_date = $3::date
-            AND status = 'holiday'
-            AND note = $4
-        `,
-        [name.trim(), dateStr, existing.name],
-      )
+    // Clear previous dates attendance if dates or name changed
+    const oldDates = getDatesInRange(existing.startDate, existing.endDate)
+    for (const date of oldDates) {
+      await clearHolidayAttendanceByDate(req.tenantId, {
+        workDate: date,
+        note: existing.name,
+      })
     }
+
+    const updated = await updateHolidaySchedule(req.tenantId, id, {
+      name: name?.trim(),
+      startDate: startDate || holidayDate || existing.startDate,
+      endDate: endDate || startDate || holidayDate || existing.endDate,
+      isAllEmployees,
+      employeeIds,
+      status,
+      branchId: req.user?.branchId || null,
+    })
+
+    if (!updated) return fail(res, 'Failed to update holiday schedule', 500)
+
+    // Re-apply attendance for new configuration
+    await syncScheduleAttendance(
+      req.tenantId,
+      req.user.id,
+      updated,
+      updated.employeeIds,
+    )
 
     return success(res, updated)
   } catch (err) {
-    return fail(res, err.message || 'Failed to update holiday', 500)
+    return fail(res, err.message || 'Failed to update holiday schedule', 500)
   }
 }
 
@@ -107,22 +167,20 @@ export async function removeHoliday(req, res) {
   const { id } = req.params
 
   try {
-    const existing = await getHolidayById(req.tenantId, id)
-    if (!existing) return fail(res, 'Holiday not found', 404)
+    const existing = await getHolidayScheduleById(req.tenantId, id)
+    if (!existing) return fail(res, 'Holiday schedule not found', 404)
 
-    const dateStr =
-      typeof existing.holidayDate === 'string'
-        ? existing.holidayDate.slice(0, 10)
-        : new Date(existing.holidayDate).toISOString().slice(0, 10)
+    const dates = getDatesInRange(existing.startDate, existing.endDate)
+    for (const date of dates) {
+      await clearHolidayAttendanceByDate(req.tenantId, {
+        workDate: date,
+        note: existing.name,
+      })
+    }
 
-    await clearHolidayAttendanceByDate(req.tenantId, {
-      workDate: dateStr,
-      note: existing.name,
-    })
-
-    const deleted = await deleteHoliday(req.tenantId, id)
+    const deleted = await deleteHolidaySchedule(req.tenantId, id)
     return success(res, deleted)
   } catch (err) {
-    return fail(res, err.message || 'Failed to delete holiday', 500)
+    return fail(res, err.message || 'Failed to delete holiday schedule', 500)
   }
 }

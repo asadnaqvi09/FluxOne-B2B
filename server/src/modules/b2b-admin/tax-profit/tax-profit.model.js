@@ -121,44 +121,56 @@ export async function listTaxProfitProducts(tenantId, filters = {}) {
 }
 
 export async function getTaxProfitMeta(tenantId) {
-  const [{ rows: categoryRows }, { rows: scaleRows }, { rows: taxRows }] = await Promise.all([
-    tenantQuery(
-      tenantId,
-      `
-        SELECT
-          id,
-          name,
-          parent_id AS "parentId"
-        FROM categories
-        WHERE tenant_id = $1
-          AND COALESCE(is_active, true) = true
-        ORDER BY name ASC
-      `,
-    ),
-    tenantQuery(
-      tenantId,
-      `
-        SELECT DISTINCT scale
-        FROM products
-        WHERE tenant_id = $1
-          AND scale IS NOT NULL
-          AND trim(scale) <> ''
-        ORDER BY scale ASC
-      `,
-    ),
-    tenantQuery(
-      tenantId,
-      `
-        SELECT
-          id,
-          name,
-          rate_percent AS "ratePercent"
-        FROM taxes
-        WHERE tenant_id = $1
-        ORDER BY rate_percent ASC, name ASC
-      `,
-    ),
-  ])
+  const [{ rows: categoryRows }, { rows: scaleRows }, { rows: taxRows }, { rows: tenantRows }] =
+    await Promise.all([
+      tenantQuery(
+        tenantId,
+        `
+          SELECT
+            id,
+            name,
+            parent_id AS "parentId"
+          FROM categories
+          WHERE tenant_id = $1
+            AND COALESCE(is_active, true) = true
+          ORDER BY name ASC
+        `,
+      ),
+      tenantQuery(
+        tenantId,
+        `
+          SELECT DISTINCT scale
+          FROM products
+          WHERE tenant_id = $1
+            AND scale IS NOT NULL
+            AND trim(scale) <> ''
+          ORDER BY scale ASC
+        `,
+      ),
+      tenantQuery(
+        tenantId,
+        `
+          SELECT
+            id,
+            name,
+            rate_percent AS "ratePercent"
+          FROM taxes
+          WHERE tenant_id = $1
+          ORDER BY rate_percent ASC, name ASC
+        `,
+      ),
+      tenantQuery(
+        tenantId,
+        `
+          SELECT
+            COALESCE(default_profit_percent, 0) AS "defaultProfitPercent",
+            COALESCE(default_tax_percent, 0) AS "defaultTaxPercent"
+          FROM tenants
+          WHERE id = $1
+          LIMIT 1
+        `,
+      ),
+    ])
 
   const parents = categoryRows.filter((c) => !c.parentId)
   const childrenByParent = new Map()
@@ -168,6 +180,8 @@ export async function getTaxProfitMeta(tenantId) {
     list.push({ id: row.id, name: row.name })
     childrenByParent.set(row.parentId, list)
   }
+
+  const tenantDef = tenantRows[0] || {}
 
   return {
     categories: parents.map((p) => ({
@@ -181,7 +195,112 @@ export async function getTaxProfitMeta(tenantId) {
       name: t.name,
       ratePercent: Number(t.ratePercent) || 0,
     })),
+    defaults: {
+      defaultProfitPercent: Number(tenantDef.defaultProfitPercent) || 0,
+      defaultTaxPercent: Number(tenantDef.defaultTaxPercent) || 0,
+    },
   }
+}
+
+export async function updateTaxProfitDefaults(tenantId, { defaultProfitPercent, defaultTaxPercent, applyToAllProducts = false }) {
+  return withTransaction(async (client) => {
+    const setClauses = []
+    const params = []
+
+    if (defaultProfitPercent !== undefined) {
+      params.push(Number(defaultProfitPercent))
+      setClauses.push(`default_profit_percent = $${params.length + 1}::numeric`)
+    }
+    if (defaultTaxPercent !== undefined) {
+      params.push(Number(defaultTaxPercent))
+      setClauses.push(`default_tax_percent = $${params.length + 1}::numeric`)
+    }
+
+    if (setClauses.length > 0) {
+      await tenantClientQuery(
+        client,
+        tenantId,
+        `
+          UPDATE tenants
+          SET ${setClauses.join(', ')}
+          WHERE id = $1
+        `,
+        params,
+      )
+    }
+
+    let updatedProductsCount = 0
+
+    if (applyToAllProducts) {
+      // 1. Apply default profit percentage to all products if specified
+      if (defaultProfitPercent !== undefined) {
+        const profitRate = Number(defaultProfitPercent)
+        const { rowCount } = await tenantClientQuery(
+          client,
+          tenantId,
+          `
+            UPDATE products
+            SET
+              profit_percent = $2::numeric,
+              selling_price = ROUND(purchase_price * (1 + ($2::numeric / 100)), 2),
+              updated_at = now()
+            WHERE tenant_id = $1
+          `,
+          [profitRate],
+        )
+        updatedProductsCount = rowCount || 0
+      }
+
+      // 2. Apply default tax percentage to all products if specified
+      if (defaultTaxPercent !== undefined) {
+        const taxRate = Number(defaultTaxPercent)
+
+        // Clear all existing product tax links
+        await tenantClientQuery(
+          client,
+          tenantId,
+          `DELETE FROM product_taxes WHERE tenant_id = $1`,
+        )
+
+        // If taxRate > 0, find or create tax and assign to all products of tenant
+        if (taxRate > 0) {
+          const taxId = await findOrCreateTaxByRate(client, tenantId, taxRate)
+          await tenantClientQuery(
+            client,
+            tenantId,
+            `
+              INSERT INTO product_taxes (tenant_id, product_id, tax_id)
+              SELECT $1, p.id, $2::uuid
+              FROM products p
+              WHERE p.tenant_id = $1
+              ON CONFLICT DO NOTHING
+            `,
+            [taxId],
+          )
+        }
+      }
+    }
+
+    const { rows: updatedTenant } = await tenantClientQuery(
+      client,
+      tenantId,
+      `
+        SELECT
+          COALESCE(default_profit_percent, 0) AS "defaultProfitPercent",
+          COALESCE(default_tax_percent, 0) AS "defaultTaxPercent"
+        FROM tenants
+        WHERE id = $1
+      `,
+    )
+
+    const row = updatedTenant[0] || {}
+    return {
+      defaultProfitPercent: Number(row.defaultProfitPercent) || 0,
+      defaultTaxPercent: Number(row.defaultTaxPercent) || 0,
+      appliedToAll: Boolean(applyToAllProducts),
+      updatedCount: updatedProductsCount,
+    }
+  })
 }
 
 async function assertProductsBelongToTenant(client, tenantId, productIds) {

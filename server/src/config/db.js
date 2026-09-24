@@ -10,15 +10,18 @@ if (!databaseUrl) {
   throw new Error('Missing required environment variable: DATABASE_URL')
 }
 
+const isSupabase =
+  databaseUrl.includes('supabase.co') || databaseUrl.includes('supabase.com')
+
 export const pool = new Pool({
   connectionString: databaseUrl,
-  max: 10,
-  idleTimeoutMillis: 120_000,
+  max: 5,
+  idleTimeoutMillis: 10_000,
   connectionTimeoutMillis: 10_000,
   allowExitOnIdle: false,
   keepAlive: true,
   keepAliveInitialDelayMillis: 10_000,
-  ssl: databaseUrl.includes('supabase.co') ? { rejectUnauthorized: false } : undefined,
+  ssl: isSupabase ? { rejectUnauthorized: false } : undefined,
 })
 
 let keepAliveTimer = null
@@ -29,7 +32,7 @@ function startPoolKeepAlive() {
     pool.query('SELECT 1').catch(() => {
       // ignore — next real query will reconnect
     })
-  }, 25_000)
+  }, 30_000)
   keepAliveTimer.unref?.()
 }
 
@@ -43,14 +46,23 @@ export async function query(text, params = []) {
   }
 }
 
-export async function testConnection() {
-  try {
-    await pool.query('SELECT 1')
-    console.log('Database connection established successfully.')
-    startPoolKeepAlive()
-  } catch (error) {
-    console.error('Database connection failed:', error.message)
-    throw error
+export async function testConnection(retries = 3, delayMs = 1500) {
+  for (let attempt = 1; attempt <= retries; attempt++) {
+    try {
+      await pool.query('SELECT 1')
+      console.log('Database connection established successfully.')
+      startPoolKeepAlive()
+      return
+    } catch (error) {
+      console.error(
+        `Database connection attempt ${attempt}/${retries} failed:`,
+        error.message,
+      )
+      if (attempt === retries) {
+        throw error
+      }
+      await new Promise((resolve) => setTimeout(resolve, delayMs))
+    }
   }
 }
 

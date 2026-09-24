@@ -66,6 +66,7 @@ export function TaxProfitPage() {
   const [selectedScale, setSelectedScale] = useState('')
   const [presetFilter, setPresetFilter] = useState('all')
   const [page, setPage] = useState(1)
+  const [limit, setLimit] = useState(ADMIN_TAX_PROFIT_PAGE_SIZE)
 
   const [profitDialogOpen, setProfitDialogOpen] = useState(false)
   const [taxDialogOpen, setTaxDialogOpen] = useState(false)
@@ -73,12 +74,9 @@ export function TaxProfitPage() {
   const [bulkTaxValue, setBulkTaxValue] = useState('5')
 
   // Default Tax & Profit configuration states
-  const [defaultTaxDialogOpen, setDefaultTaxDialogOpen] = useState(false)
-  const [defaultProfitDialogOpen, setDefaultProfitDialogOpen] = useState(false)
+  const [defaultTaxProfitDialogOpen, setDefaultTaxProfitDialogOpen] = useState(false)
   const [defaultTaxValue, setDefaultTaxValue] = useState('0')
   const [defaultProfitValue, setDefaultProfitValue] = useState('0')
-  const [confirmApplyModalOpen, setConfirmApplyModalOpen] = useState(false)
-  const [pendingApplyAction, setPendingApplyAction] = useState(null) // { type: 'tax' | 'profit', value: number }
 
   // Individual product override dialog state
   const [singleItemModalOpen, setSingleItemModalOpen] = useState(false)
@@ -121,7 +119,7 @@ export function TaxProfitPage() {
     scale: selectedScale,
     sort: presetFilter,
     page,
-    limit: PAGE_SIZE,
+    limit,
   })
 
   // Sync current defaults from meta
@@ -216,73 +214,53 @@ export function TaxProfitPage() {
   }
 
   // --- Default Profit & Tax Handlers ---
-  async function handleSaveDefaultOnly(type, value) {
-    const err = validatePercentage(value, {
+  function handleOpenDefaultTaxProfit() {
+    setDefaultTaxValue(String(meta?.defaults?.defaultTaxPercent ?? 0))
+    setDefaultProfitValue(String(meta?.defaults?.defaultProfitPercent ?? 0))
+    setDefaultTaxProfitDialogOpen(true)
+  }
+
+  async function handleSaveDefaults(e) {
+    e?.preventDefault()
+
+    const taxErr = validatePercentage(defaultTaxValue, {
       min: 0,
       max: 100,
-      fieldName: type === 'profit' ? 'Default profit percentage' : 'Default tax percentage',
+      fieldName: 'Default tax percentage',
     })
-    if (err) {
-      toastError(err)
+    if (taxErr) {
+      toastError(taxErr)
       return
     }
 
-    const numVal = Number(value)
-    const payload =
-      type === 'profit'
-        ? { defaultProfitPercent: numVal, applyToAllProducts: false }
-        : { defaultTaxPercent: numVal, applyToAllProducts: false }
+    const profitErr = validatePercentage(defaultProfitValue, {
+      min: 0,
+      max: 100,
+      fieldName: 'Default profit percentage',
+    })
+    if (profitErr) {
+      toastError(profitErr)
+      return
+    }
 
-    const result = await updateDefaults(payload)
+    const taxNum = Number(defaultTaxValue)
+    const profitNum = Number(defaultProfitValue)
+
+    const result = await updateDefaults({
+      defaultTaxPercent: taxNum,
+      defaultProfitPercent: profitNum,
+      applyToAllProducts: false,
+    })
+
     if (!result.success) {
       toastError(result.error || 'Failed to update default setting')
       return
     }
 
     toastSuccess(
-      `Default ${type === 'profit' ? 'Profit' : 'Tax'} set to ${numVal}%. This will automatically apply to newly added products.`,
+      `Default Tax (${taxNum}%) and Profit (${profitNum}%) saved. This will automatically apply to newly created products.`,
     )
-    if (type === 'profit') setDefaultProfitDialogOpen(false)
-    if (type === 'tax') setDefaultTaxDialogOpen(false)
-  }
-
-  function handlePromptApplyToAll(type, value) {
-    const err = validatePercentage(value, {
-      min: 0,
-      max: 100,
-      fieldName: type === 'profit' ? 'Default profit percentage' : 'Default tax percentage',
-    })
-    if (err) {
-      toastError(err)
-      return
-    }
-
-    setPendingApplyAction({ type, value: Number(value) })
-    setConfirmApplyModalOpen(true)
-  }
-
-  async function handleConfirmApplyToAll() {
-    if (!pendingApplyAction) return
-
-    const { type, value } = pendingApplyAction
-    const payload =
-      type === 'profit'
-        ? { defaultProfitPercent: value, applyToAllProducts: true }
-        : { defaultTaxPercent: value, applyToAllProducts: true }
-
-    const result = await updateDefaults(payload)
-    if (!result.success) {
-      toastError(result.error || 'Failed to apply defaults to all products')
-      return
-    }
-
-    toastSuccess(
-      `Applied default ${type === 'profit' ? 'Profit' : 'Tax'} of ${value}% to all existing products and configured for newly added products.`,
-    )
-    setConfirmApplyModalOpen(false)
-    setPendingApplyAction(null)
-    if (type === 'profit') setDefaultProfitDialogOpen(false)
-    if (type === 'tax') setDefaultTaxDialogOpen(false)
+    setDefaultTaxProfitDialogOpen(false)
   }
 
   async function handleApplyBulkProfit(e) {
@@ -367,32 +345,15 @@ export function TaxProfitPage() {
           description="Global wholesale margin rules, sales tax compliance, and automated multi-branch price calculations"
           className="sm:items-center"
           actions={
-            <div className="flex flex-wrap items-center gap-2">
-              <Button
-                type="button"
-                onClick={() => {
-                  setDefaultTaxValue(String(meta?.defaults?.defaultTaxPercent ?? 0))
-                  setDefaultTaxDialogOpen(true)
-                }}
-                className="h-9 px-3.5 text-xs font-bold cursor-pointer text-white rounded-xl shadow-xs transition-opacity hover:opacity-90 flex items-center gap-1.5"
-                style={{ background: BRAND.deep }}
-              >
-                <Settings className="size-3.5" />
-                Set Default Tax %
-              </Button>
-              <Button
-                type="button"
-                onClick={() => {
-                  setDefaultProfitValue(String(meta?.defaults?.defaultProfitPercent ?? 0))
-                  setDefaultProfitDialogOpen(true)
-                }}
-                className="h-9 px-3.5 text-xs font-bold cursor-pointer text-white rounded-xl shadow-xs transition-opacity hover:opacity-90 flex items-center gap-1.5"
-                style={{ background: BRAND.purple }}
-              >
-                <Settings className="size-3.5" />
-                Set Default Profit %
-              </Button>
-            </div>
+            <Button
+              type="button"
+              onClick={handleOpenDefaultTaxProfit}
+              className="h-9 px-3.5 text-xs font-bold cursor-pointer text-white rounded-xl shadow-xs transition-opacity hover:opacity-90 flex items-center gap-1.5"
+              style={{ background: BRAND.purple }}
+            >
+              <Settings className="size-3.5" />
+              Set Default Tax & Profit
+            </Button>
           }
         />
       </MotionHeader>
@@ -585,9 +546,6 @@ export function TaxProfitPage() {
                 <Calculator className="mr-1.5 size-3.5" />
                 Set Tax %
               </Button>
-              <span className="text-xs font-medium text-slate-400 ml-1 hidden sm:inline">
-                {totalCatalog} records · {PAGE_SIZE} / page
-              </span>
             </div>
           }
         >
@@ -853,7 +811,6 @@ export function TaxProfitPage() {
                 </Table>
               </div>
 
-<<<<<<< HEAD
           <TablePagination
             page={pagination.page || page}
             pageCount={pagination.pageCount || 1}
@@ -866,213 +823,80 @@ export function TaxProfitPage() {
               setPage(1)
             }}
           />
-=======
-              <div className="pt-4 border-t border-slate-100">
-                <TablePagination
-                  page={pagination.page || page}
-                  pageCount={pagination.pageCount || 1}
-                  totalItems={pagination.total || 0}
-                  onPageChange={setPage}
-                />
-              </div>
->>>>>>> 386edce732e8d715faad700e3f93a54178c9501b
             </>
           )}
         </SurfaceCard>
       </MotionReveal>
 
       {/* Set Default Tax % Dialog */}
-      <Dialog open={defaultTaxDialogOpen} onOpenChange={setDefaultTaxDialogOpen}>
+      {/* Set Default Tax & Profit Dialog */}
+      <Dialog open={defaultTaxProfitDialogOpen} onOpenChange={setDefaultTaxProfitDialogOpen}>
         <DialogContent className="max-w-md">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <Settings className="size-4 text-purple-600" />
-              Set Default Sales Tax %
+              Set Default Tax & Profit
             </DialogTitle>
             <DialogDescription>
-              Configure the company-wide default tax rate.
+              Configure default Tax % and Profit % that automatically apply to newly created products.
             </DialogDescription>
           </DialogHeader>
 
-          <div className="space-y-4 pt-1">
+          <form onSubmit={handleSaveDefaults} className="space-y-4 pt-1">
             <div className="space-y-1.5">
               <Label htmlFor="defaultTaxInput" className="text-xs font-semibold">
-                Default Tax Percentage (%)
+                Default Tax %
               </Label>
               <Input
                 id="defaultTaxInput"
                 type="number"
                 min="0"
                 max="100"
-                step="1"
+                step="0.01"
                 value={defaultTaxValue}
                 onChange={(e) => setDefaultTaxValue(e.target.value)}
-                placeholder="e.g. 5"
+                placeholder="Enter tax percentage"
                 required
               />
-              <p className="text-[11px] text-slate-500">
-                This rate will automatically apply to newly created catalog products.
-              </p>
             </div>
 
-            <DialogFooter className="pt-2 flex flex-col sm:flex-row gap-2 sm:justify-between">
-              <Button
-                type="button"
-                variant="outline"
-                onClick={() => setDefaultTaxDialogOpen(false)}
-                disabled={mutating}
-              >
-                Cancel
-              </Button>
-              <div className="flex items-center gap-2">
-                <Button
-                  type="button"
-                  variant="secondary"
-                  onClick={() => handleSaveDefaultOnly('tax', defaultTaxValue)}
-                  disabled={mutating}
-                  className="font-semibold text-xs cursor-pointer"
-                >
-                  Save as Default
-                </Button>
-                <Button
-                  type="button"
-                  onClick={() => handlePromptApplyToAll('tax', defaultTaxValue)}
-                  disabled={mutating}
-                  className="text-white font-semibold text-xs cursor-pointer shadow-xs"
-                  style={{ background: BRAND.deep }}
-                >
-                  Apply to All Products
-                </Button>
-              </div>
-            </DialogFooter>
-          </div>
-        </DialogContent>
-      </Dialog>
-
-      {/* Set Default Profit % Dialog */}
-      <Dialog open={defaultProfitDialogOpen} onOpenChange={setDefaultProfitDialogOpen}>
-        <DialogContent className="max-w-md">
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
-              <Settings className="size-4 text-purple-600" />
-              Set Default Profit %
-            </DialogTitle>
-            <DialogDescription>
-              Configure the company-wide default profit margin percentage.
-            </DialogDescription>
-          </DialogHeader>
-
-          <div className="space-y-4 pt-1">
             <div className="space-y-1.5">
               <Label htmlFor="defaultProfitInput" className="text-xs font-semibold">
-                Default Profit Percentage (%)
+                Default Profit %
               </Label>
               <Input
                 id="defaultProfitInput"
                 type="number"
                 min="0"
                 max="100"
-                step="1"
+                step="0.01"
                 value={defaultProfitValue}
                 onChange={(e) => setDefaultProfitValue(e.target.value)}
-                placeholder="e.g. 20"
+                placeholder="Enter profit percentage"
                 required
               />
-              <p className="text-[11px] text-slate-500">
-                Selling prices for newly created products will calculate automatically from cost.
-              </p>
             </div>
 
-            <DialogFooter className="pt-2 flex flex-col sm:flex-row gap-2 sm:justify-between">
+            <DialogFooter className="pt-2 flex flex-col sm:flex-row gap-2 sm:justify-end">
               <Button
                 type="button"
                 variant="outline"
-                onClick={() => setDefaultProfitDialogOpen(false)}
+                onClick={() => setDefaultTaxProfitDialogOpen(false)}
                 disabled={mutating}
+                className="cursor-pointer"
               >
                 Cancel
               </Button>
-              <div className="flex items-center gap-2">
-                <Button
-                  type="button"
-                  variant="secondary"
-                  onClick={() => handleSaveDefaultOnly('profit', defaultProfitValue)}
-                  disabled={mutating}
-                  className="font-semibold text-xs cursor-pointer"
-                >
-                  Save as Default
-                </Button>
-                <Button
-                  type="button"
-                  onClick={() => handlePromptApplyToAll('profit', defaultProfitValue)}
-                  disabled={mutating}
-                  className="text-white font-semibold text-xs cursor-pointer shadow-xs"
-                  style={{ background: BRAND.purple }}
-                >
-                  Apply to All Products
-                </Button>
-              </div>
+              <Button
+                type="submit"
+                disabled={mutating}
+                className="text-white font-semibold text-xs cursor-pointer shadow-xs"
+                style={{ background: BRAND.purple }}
+              >
+                {mutating ? 'Saving…' : 'Set Default'}
+              </Button>
             </DialogFooter>
-          </div>
-        </DialogContent>
-      </Dialog>
-
-      {/* Confirmation Popup Before Applying Defaults to All Products */}
-      <Dialog open={confirmApplyModalOpen} onOpenChange={setConfirmApplyModalOpen}>
-        <DialogContent className="max-w-md">
-          <DialogHeader>
-            <DialogTitle className="text-base font-bold text-slate-900 flex items-center gap-2">
-              <div className="flex size-7 items-center justify-center rounded-full bg-purple-50 text-purple-700">
-                <Percent className="size-4" />
-              </div>
-              Apply Defaults to All Products?
-            </DialogTitle>
-            <DialogDescription className="text-sm font-medium text-slate-700 pt-1 leading-relaxed">
-              Apply these default Tax and Profit values to all products? Existing product-specific values will be replaced.
-            </DialogDescription>
-          </DialogHeader>
-
-          <div className="rounded-xl border border-amber-200/80 bg-amber-50/70 p-3.5 text-xs text-amber-900 space-y-1.5">
-            <div className="flex items-start gap-2">
-              <Info className="size-4 text-amber-600 shrink-0 mt-0.5" />
-              <div className="space-y-1">
-                <p className="font-medium">
-                  This will update all existing products in your catalog to{' '}
-                  <strong className="font-bold text-amber-950">{pendingApplyAction?.value}%</strong>{' '}
-                  {pendingApplyAction?.type === 'profit' ? 'profit margin' : 'tax rate'}.
-                </p>
-                <p className="text-[11px] text-amber-800">
-                  Newly added products will also automatically use this configured default.
-                </p>
-              </div>
-            </div>
-          </div>
-
-          <DialogFooter className="pt-2 flex gap-2 sm:justify-end">
-            <Button
-              type="button"
-              variant="outline"
-              onClick={() => {
-                setConfirmApplyModalOpen(false)
-                setPendingApplyAction(null)
-              }}
-              disabled={mutating}
-              className="cursor-pointer"
-            >
-              Cancel
-            </Button>
-            <Button
-              type="button"
-              onClick={handleConfirmApplyToAll}
-              disabled={mutating}
-              className="text-white font-semibold cursor-pointer shadow-xs"
-              style={{
-                background: pendingApplyAction?.type === 'tax' ? BRAND.deep : BRAND.purple,
-              }}
-            >
-              {mutating ? 'Applying…' : 'Confirm & Apply'}
-            </Button>
-          </DialogFooter>
+          </form>
         </DialogContent>
       </Dialog>
 

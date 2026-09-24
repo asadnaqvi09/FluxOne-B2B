@@ -31,7 +31,7 @@ const TABS_WITH_ADD = new Set([
 
 const TABS_WITH_EDIT = new Set([MOVEMENT_TYPES.ADJUSTMENT, MOVEMENT_TYPES.DAMAGED])
 
-function ControlTabPanel({ tab }) {
+function ControlTabPanel({ tab, onTabChange }) {
   const {
     items: rawItems,
     pagination,
@@ -169,7 +169,16 @@ function ControlTabPanel({ tab }) {
     ) : null
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-6">
+      <MotionHeader>
+        <PageHeader
+          eyebrow="Inventory"
+          title="Control"
+          description="Live stock movements — stock in, out, adjustments, damaged, and expired."
+          actions={titleActions}
+        />
+      </MotionHeader>
+
       {error ? (
         <p className="rounded-xl bg-red-50 px-3 py-2 text-sm text-red-700 ring-1 ring-red-100">
           {error}
@@ -178,18 +187,8 @@ function ControlTabPanel({ tab }) {
 
       <SlowLoadingBanner show={slowHint} />
 
-      {titleActions ? (
-        <div className="flex flex-wrap items-center justify-end gap-2">{titleActions}</div>
-      ) : null}
-
-      {tab === MOVEMENT_TYPES.EXPIRED ? (
-        <p className="rounded-xl border border-dashed border-border bg-slate-50/80 px-3 py-2 text-sm text-slate-600">
-          Expired stock is processed automatically from stock-in lots past their expiry date. Set an
-          expiry when adding stock.
-        </p>
-      ) : null}
-
-      <MotionReveal delay={0.04}>
+      {/* Movement Filters: Category -> Sub-category -> Search -> Type -> Scale */}
+      <MotionReveal delay={0.02}>
         <MovementFilters
           q={localQ}
           type={filters.type || ''}
@@ -202,6 +201,18 @@ function ControlTabPanel({ tab }) {
           onChange={handleFilterChange}
         />
       </MotionReveal>
+
+      {/* Control Tabs */}
+      <MotionReveal delay={0.04}>
+        <InventoryControlTabs value={tab} onChange={onTabChange} />
+      </MotionReveal>
+
+      {tab === MOVEMENT_TYPES.EXPIRED ? (
+        <p className="rounded-xl border border-dashed border-border bg-slate-50/80 px-3 py-2 text-sm text-slate-600">
+          Expired stock is processed automatically from stock-in lots past their expiry date. Set an
+          expiry when adding stock.
+        </p>
+      ) : null}
 
       <MotionReveal delay={0.08}>
         {tab === MOVEMENT_TYPES.IN ? (
@@ -347,19 +358,7 @@ export function InventoryControlPage() {
 
   return (
     <div className="space-y-6">
-      <MotionHeader>
-        <PageHeader
-          eyebrow="Inventory"
-          title="Control"
-          description="Live stock movements — stock in, out, adjustments, damaged, and expired."
-        />
-      </MotionHeader>
-
-      <MotionReveal delay={0.02}>
-        <InventoryControlTabs value={tab} onChange={setTab} />
-      </MotionReveal>
-
-      <ControlTabPanel key={tab} tab={tab} />
+      <ControlTabPanel key={tab} tab={tab} onTabChange={setTab} />
     </div>
   )
 }

@@ -18,8 +18,8 @@ export const stockInSchema = z.object({
         z.object({
           productId: z.string().uuid(),
           scale: z.string().min(1),
-          quantity: z.coerce.number().positive(),
-          unitCost: z.coerce.number().nonnegative().optional(),
+          quantity: z.coerce.number().int().positive(),
+          unitCost: z.coerce.number().int().nonnegative().optional(),
           expiresAt: z.coerce.date().optional(),
         }),
       )
@@ -40,7 +40,7 @@ export const stockInFromOrderSchema = z.object({
 export const stockMovementSchema = z.object({
   body: z.object({
     productId: z.string().uuid(),
-    quantity: z.coerce.number(),
+    quantity: z.coerce.number().int(),
     scale: z.string().min(1),
     reason: z.string().min(3).optional(),
     supplierId: z.string().uuid().optional(),
@@ -54,7 +54,7 @@ export const stockMovementSchema = z.object({
 export const adjustmentSchema = stockMovementSchema.extend({
   body: stockMovementSchema.shape.body.extend({
     reason: z.string().min(3),
-    quantity: z.coerce.number().refine((n) => n !== 0, 'Adjustment quantity cannot be zero'),
+    quantity: z.coerce.number().int().refine((n) => n !== 0, 'Adjustment quantity cannot be zero'),
   }),
 })
 
@@ -63,19 +63,19 @@ export const damagedSchema = stockMovementSchema.extend({
     damagedByUserId: z.string().uuid(),
     damagedLocation: z.enum(['traveling', 'warehouse', 'item_transfer', 'other']),
     reason: z.string().min(3),
-    quantity: z.coerce.number().positive(),
+    quantity: z.coerce.number().int().positive(),
   }),
 })
 
 export const stockOutSchema = stockMovementSchema.extend({
   body: stockMovementSchema.shape.body.extend({
-    quantity: z.coerce.number().positive(),
+    quantity: z.coerce.number().int().positive(),
   }),
 })
 
 export const expiredSchema = stockMovementSchema.extend({
   body: stockMovementSchema.shape.body.extend({
-    quantity: z.coerce.number().positive(),
+    quantity: z.coerce.number().int().positive(),
     expiresAt: z.coerce.date(),
     supplierId: z.string().uuid().optional(),
     reason: z.string().min(3).optional(),
@@ -87,7 +87,7 @@ export const transferSchema = z.object({
     productId: z.string().uuid(),
     fromBranchId: z.string().uuid(),
     toBranchId: z.string().uuid(),
-    quantity: z.coerce.number().positive(),
+    quantity: z.coerce.number().int().positive(),
     scale: z.string().min(1),
     reason: z.string().min(3).optional(),
   }),
@@ -105,6 +105,7 @@ export const patchMovementSchema = z.object({
   body: z.object({
     quantity: z.coerce
       .number()
+      .int()
       .refine((n) => n !== 0, 'Quantity cannot be zero')
       .optional(),
     reason: z.string().min(3).optional(),

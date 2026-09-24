@@ -85,7 +85,9 @@ function StockAlertsTableComponent({
                 </div>
                 <div className="mt-3 flex flex-wrap items-center justify-between gap-2 text-xs">
                   <span className="text-slate-600">
-                    Remaining{' '}
+                    {row.source === 'branch_request' || row.source === 'branch_alert'
+                      ? 'Required'
+                      : 'Remaining'}{' '}
                     <span className="font-bold text-slate-900">{row.remainingNumber}</span>
                   </span>
                   <span className="truncate text-slate-500">{sourceLabel(row.source)}</span>
@@ -100,7 +102,7 @@ function StockAlertsTableComponent({
                 <TableRow className="text-xs tracking-wide text-slate-500 uppercase">
                   <TableHead className="w-[18%] px-2 py-3 font-semibold">Item code</TableHead>
                   <TableHead className="w-[28%] px-2 py-3 font-semibold">Name</TableHead>
-                  <TableHead className="w-[14%] px-2 py-3 font-semibold">Remaining</TableHead>
+                  <TableHead className="w-[14%] px-2 py-3 font-semibold">Qty</TableHead>
                   <TableHead className="w-[18%] px-2 py-3 font-semibold">Status</TableHead>
                   <TableHead className="w-[22%] px-2 py-3 font-semibold">Source</TableHead>
                 </TableRow>

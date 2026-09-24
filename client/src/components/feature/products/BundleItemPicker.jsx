@@ -3,6 +3,7 @@ import { Search, Trash2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import { WholeNumberInput } from '@/components/shared/WholeNumberInput'
 import { cn } from '@/lib/utils'
 
 // Pick existing single items for a bundle.
@@ -146,10 +147,8 @@ export function BundleItemPicker({
                     </div>
                     <div className="w-20 shrink-0 space-y-0.5">
                       <Label className="text-[10px] text-slate-400">Qty</Label>
-                      <Input
-                        type="number"
-                        min="0.01"
-                        step="0.01"
+                      <WholeNumberInput
+                        min={1}
                         value={row.quantity}
                         onChange={(event) => patchQuantity(row.itemId, event.target.value)}
                       />

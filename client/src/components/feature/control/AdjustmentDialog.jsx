@@ -9,11 +9,11 @@ import {
   DialogCancelButton,
 } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
 import { NativeSelect } from '@/components/ui/select'
 import { FieldError } from '@/components/shared/FieldError'
+import { WholeNumberInput } from '@/components/shared/WholeNumberInput'
 import { BRAND } from '@/lib/constants'
 import { SCALE_OPTIONS } from '@/lib/mapProduct'
 import { fieldErrorClass } from '@/lib/validation/fieldErrors'
@@ -277,10 +277,10 @@ export function AdjustmentDialog({
           ) : null}
           <div className={`space-y-1.5 ${isEdit ? 'col-span-2' : ''}`}>
             <Label htmlFor="adj-quantity">Quantity</Label>
-            <Input
+            <WholeNumberInput
               id="adj-quantity"
-              type="number"
-              step="any"
+              allowNegative
+              min={0}
               value={quantity}
               onChange={(e) => {
                 setQuantity(e.target.value)

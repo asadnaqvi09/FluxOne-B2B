@@ -20,6 +20,7 @@ function publicUser(user) {
     tenantId: user.tenantId,
     tenantSlug: user.tenantSlug || null,
     tenantName: user.tenantName || null,
+    defaultCurrency: user.defaultCurrency || 'PKR',
     branchId: user.branchId,
     branchName: user.branchName || null,
     openingTime: user.openingTime || null,

@@ -93,3 +93,54 @@ export async function changeAdminPassword({ currentPassword, newPassword }) {
     newPassword,
   })
 }
+
+// Admin Settings → Currency (tenant default display currency)
+export function useAdminCurrency() {
+  const [defaultCurrency, setDefaultCurrency] = useState('PKR')
+  const [options, setOptions] = useState([])
+  const [loading, setLoading] = useState(true)
+  const [saving, setSaving] = useState(false)
+  const [error, setError] = useState(null)
+
+  const load = useCallback(async () => {
+    setLoading(true)
+    setError(null)
+    const result = await apiClient.get(endpoints.admin.settings.currency)
+    if (!result.success) {
+      setError(result.error || 'Failed to load currency settings')
+      setLoading(false)
+      return result
+    }
+    setDefaultCurrency(result.data?.defaultCurrency || 'PKR')
+    setOptions(result.data?.options || [])
+    setLoading(false)
+    return result
+  }, [])
+
+  useEffect(() => {
+    void load()
+  }, [load])
+
+  const saveCurrency = useCallback(async (nextCurrency) => {
+    setSaving(true)
+    const result = await apiClient.patch(endpoints.admin.settings.currency, {
+      defaultCurrency: nextCurrency,
+    })
+    setSaving(false)
+    if (result.success) {
+      setDefaultCurrency(result.data?.defaultCurrency || nextCurrency)
+      if (result.data?.options?.length) setOptions(result.data.options)
+    }
+    return result
+  }, [])
+
+  return {
+    defaultCurrency,
+    options,
+    loading,
+    saving,
+    error,
+    reload: load,
+    saveCurrency,
+  }
+}

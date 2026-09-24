@@ -10,11 +10,11 @@ import {
   DialogCancelButton,
 } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
 import { NativeSelect } from '@/components/ui/select'
 import { FieldError } from '@/components/shared/FieldError'
+import { WholeNumberInput } from '@/components/shared/WholeNumberInput'
 import { BRAND } from '@/lib/constants'
 import { money } from '@/lib/mapProduct'
 import { fieldErrorClass } from '@/lib/validation/fieldErrors'
@@ -242,18 +242,14 @@ export function GenerateOrderDialog({
                         </option>
                       ))}
                     </NativeSelect>
-                    <Input
-                      type="number"
-                      min="0.01"
-                      step="0.01"
+                    <WholeNumberInput
+                      min={1}
                       value={line.quantity}
                       onChange={(e) => patchLine(index, 'quantity', e.target.value)}
                       placeholder="Qty"
                     />
-                    <Input
-                      type="number"
-                      min="0"
-                      step="0.01"
+                    <WholeNumberInput
+                      min={0}
                       value={line.unitCost}
                       onChange={(e) => patchLine(index, 'unitCost', e.target.value)}
                       placeholder="Price"

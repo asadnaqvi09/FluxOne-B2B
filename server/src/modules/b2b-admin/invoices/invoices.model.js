@@ -1,25 +1,25 @@
 import { tenantQuery } from '../../../config/db.js'
+import {
+  DEFAULT_CURRENCY,
+  formatMoney as formatCurrencyMoney,
+  normalizeCurrency,
+} from '../../../utils/currency.util.js'
 
-function formatMoney(amount) {
-  const n = Number(amount) || 0
-  return `Rs. ${n.toLocaleString('en-PK')}`
+async function getTenantCurrency(tenantId) {
+  const { rows } = await tenantQuery(
+    tenantId,
+    `
+      SELECT COALESCE(default_currency, $2) AS "defaultCurrency"
+      FROM tenants
+      WHERE id = $1
+      LIMIT 1
+    `,
+    [DEFAULT_CURRENCY],
+  )
+  return normalizeCurrency(rows[0]?.defaultCurrency || DEFAULT_CURRENCY)
 }
 
-function formatDateTime(value) {
-  if (!value) return ''
-  const d = value instanceof Date ? value : new Date(value)
-  if (Number.isNaN(d.getTime())) return ''
-  return d.toLocaleString('en-GB', {
-    day: '2-digit',
-    month: 'short',
-    year: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit',
-    hour12: true,
-  })
-}
-
-function mapInvoiceRow(row) {
+function mapInvoiceRow(row, currency = DEFAULT_CURRENCY) {
   if (!row) return null
   const billedAt = row.billedAt
   const d = billedAt instanceof Date ? billedAt : new Date(billedAt)
@@ -46,7 +46,8 @@ function mapInvoiceRow(row) {
     month,
     year,
     price,
-    formattedPrice: formatMoney(price),
+    currency,
+    formattedPrice: formatCurrencyMoney(price, currency),
     source: row.source || '',
     status: row.status === 'paid' ? 'Paid' : String(row.status || 'pending'),
     billingCycle: row.billingCycle || '',
@@ -58,6 +59,20 @@ function mapInvoiceRow(row) {
   }
 }
 
+function formatDateTime(value) {
+  if (!value) return ''
+  const d = value instanceof Date ? value : new Date(value)
+  if (Number.isNaN(d.getTime())) return ''
+  return d.toLocaleString('en-GB', {
+    day: '2-digit',
+    month: 'short',
+    year: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: true,
+  })
+}
+
 export async function listInvoices(tenantId, filters = {}) {
   const page = Math.max(1, Number(filters.page) || 1)
   const limit = Math.min(100, Math.max(1, Number(filters.limit) || 8))
@@ -65,6 +80,7 @@ export async function listInvoices(tenantId, filters = {}) {
   const q = filters.q?.trim() || null
   const month = filters.month ? Number(filters.month) : null
   const year = filters.year ? Number(filters.year) : null
+  const currency = await getTenantCurrency(tenantId)
 
   const { rows: countRows } = await tenantQuery(
     tenantId,
@@ -116,7 +132,7 @@ export async function listInvoices(tenantId, filters = {}) {
   )
 
   return {
-    items: rows.map(mapInvoiceRow),
+    items: rows.map((row) => mapInvoiceRow(row, currency)),
     total: countRows[0]?.total || 0,
     page,
     limit,
@@ -124,6 +140,7 @@ export async function listInvoices(tenantId, filters = {}) {
 }
 
 export async function getInvoiceById(tenantId, id) {
+  const currency = await getTenantCurrency(tenantId)
   const { rows } = await tenantQuery(
     tenantId,
     `
@@ -143,10 +160,11 @@ export async function getInvoiceById(tenantId, id) {
     `,
     [id],
   )
-  return mapInvoiceRow(rows[0] || null)
+  return mapInvoiceRow(rows[0] || null, currency)
 }
 
 export async function getInvoicesSummary(tenantId) {
+  const currency = await getTenantCurrency(tenantId)
   const [{ rows: subRows }, { rows: invRows }, { rows: branchRows }] = await Promise.all([
     tenantQuery(
       tenantId,
@@ -203,7 +221,8 @@ export async function getInvoicesSummary(tenantId) {
     paymentMethod: sub?.paymentMethod || null,
     isActive: sub ? sub.isActive !== false : false,
     ytdTotal,
-    ytdFormatted: `Rs. ${ytdTotal.toLocaleString('en-PK')}`,
+    currency,
+    ytdFormatted: formatCurrencyMoney(ytdTotal, currency),
     ytdCount: inv.ytdCount || 0,
     totalCount: inv.totalCount || 0,
   }

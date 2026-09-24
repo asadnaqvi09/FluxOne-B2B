@@ -9,11 +9,11 @@ import {
   DialogCancelButton,
 } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
 import { NativeSelect } from '@/components/ui/select'
 import { FieldError } from '@/components/shared/FieldError'
+import { WholeNumberInput } from '@/components/shared/WholeNumberInput'
 import { BRAND } from '@/lib/constants'
 import { SCALE_OPTIONS } from '@/lib/mapProduct'
 import { fieldErrorClass } from '@/lib/validation/fieldErrors'
@@ -195,11 +195,9 @@ export function StockOutDialog({
           </div>
           <div className="space-y-1.5">
             <Label htmlFor="stockout-quantity">Quantity</Label>
-            <Input
+            <WholeNumberInput
               id="stockout-quantity"
-              type="number"
-              min="0.001"
-              step="any"
+              min={1}
               value={quantity}
               onChange={(e) => {
                 setQuantity(e.target.value)

@@ -14,6 +14,7 @@ import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
 import { NativeSelect } from '@/components/ui/select'
 import { FieldError } from '@/components/shared/FieldError'
+import { WholeNumberInput } from '@/components/shared/WholeNumberInput'
 import { BRAND } from '@/lib/constants'
 import { SCALE_OPTIONS } from '@/lib/mapProduct'
 import { fieldErrorClass } from '@/lib/validation/fieldErrors'
@@ -280,11 +281,9 @@ export function ExpiredDialog({
         <div className="grid grid-cols-2 gap-3">
           <div className="space-y-1.5">
             <Label htmlFor="expired-quantity">Quantity</Label>
-            <Input
+            <WholeNumberInput
               id="expired-quantity"
-              type="number"
-              min="0.001"
-              step="any"
+              min={1}
               value={quantity}
               onChange={(e) => {
                 setQuantity(e.target.value)

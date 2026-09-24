@@ -14,6 +14,7 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { NativeSelect } from '@/components/ui/select'
 import { FieldError } from '@/components/shared/FieldError'
+import { WholeNumberInput } from '@/components/shared/WholeNumberInput'
 import { BRAND } from '@/lib/constants'
 import { fieldErrorClass } from '@/lib/validation/fieldErrors'
 import { useFieldErrors } from '@/hooks/useFieldErrors'
@@ -424,11 +425,9 @@ export function AddStockInDialog({
               </div>
               <div className="space-y-1.5">
                 <Label htmlFor="stockin-quantity">Quantity</Label>
-                <Input
+                <WholeNumberInput
                   id="stockin-quantity"
-                  type="number"
-                  min="0.001"
-                  step="any"
+                  min={1}
                   value={draft.quantity}
                   onChange={(e) => patchDraft('quantity', e.target.value)}
                   aria-invalid={Boolean(fieldErrors.quantity)}
@@ -438,10 +437,8 @@ export function AddStockInDialog({
               </div>
               <div className="space-y-1.5">
                 <Label>Unit cost (optional)</Label>
-                <Input
-                  type="number"
-                  min="0"
-                  step="any"
+                <WholeNumberInput
+                  min={0}
                   value={draft.unitCost}
                   onChange={(e) => patchDraft('unitCost', e.target.value)}
                 />

@@ -20,8 +20,8 @@ export const generateOrderSchema = z.object({
       .array(
         z.object({
           productId: z.string().uuid(),
-          quantity: z.coerce.number().positive(),
-          unitCost: z.coerce.number().nonnegative(),
+          quantity: z.coerce.number().int().positive(),
+          unitCost: z.coerce.number().int().nonnegative(),
           scale: z.string().min(1),
         }),
       )

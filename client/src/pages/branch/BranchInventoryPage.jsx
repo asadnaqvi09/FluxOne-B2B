@@ -8,6 +8,7 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { NativeSelect } from '@/components/ui/select'
 import { Badge } from '@/components/ui/badge'
+import { WholeNumberInput } from '@/components/shared/WholeNumberInput'
 import {
   Table,
   TableHeader,
@@ -56,7 +57,7 @@ export function BranchInventoryPage() {
   // Stock Request Dialog
   const [requestTarget, setRequestTarget] = useState(null)
   const [requestKind, setRequestKind] = useState('request') // 'alert' | 'request'
-  const [remainingQty, setRemainingQty] = useState(0)
+  const [requiredQty, setRequiredQty] = useState(1)
   const [submitting, setSubmitting] = useState(false)
 
   const fetchInventory = async () => {
@@ -101,18 +102,27 @@ export function BranchInventoryPage() {
   const handleOpenRequest = (prod) => {
     setRequestTarget(prod)
     setRequestKind('request')
-    setRemainingQty(parseFloat(prod.quantity || 0))
+    // Suggested fill qty: gap to reorder point (whole units), minimum 1
+    const current = Math.max(0, Math.floor(Number(prod.quantity) || 0))
+    const reorder = Math.max(0, Math.ceil(Number(prod.reorderPoint) || 0))
+    setRequiredQty(Math.max(1, reorder > current ? reorder - current : 1))
   }
 
   const handleSendRequest = async (e) => {
     e.preventDefault()
     if (!requestTarget) return
 
+    const qty = Math.floor(Number(requiredQty))
+    if (!Number.isFinite(qty) || qty < 1) {
+      toastError('Required quantity must be a whole number of at least 1')
+      return
+    }
+
     setSubmitting(true)
     const res = await apiClient.post('/branch/stock-requests', {
       productId: requestTarget.id,
       kind: requestKind,
-      remainingQuantity: remainingQty,
+      remainingQuantity: qty,
     })
     setSubmitting(false)
 
@@ -416,13 +426,12 @@ export function BranchInventoryPage() {
               </div>
 
               <div className="space-y-1.5">
-                <Label htmlFor="request-qty">Remaining Quantity</Label>
-                <Input
+                <Label htmlFor="request-qty">Required Quantity</Label>
+                <WholeNumberInput
                   id="request-qty"
-                  type="number"
-                  step="0.001"
-                  value={remainingQty}
-                  onChange={(e) => setRemainingQty(parseFloat(e.target.value))}
+                  min={1}
+                  value={requiredQty}
+                  onChange={(e) => setRequiredQty(e.target.value === '' ? '' : Number(e.target.value))}
                   required
                 />
               </div>

@@ -1,3 +1,5 @@
+import { formatMoney } from '@/lib/currency'
+
 function isPlainObject(value) {
   return value !== null && typeof value === 'object' && !Array.isArray(value)
 }
@@ -61,16 +63,8 @@ export function mergeBranchDashboard(apiData) {
 }
 
 export function formatCurrency(amount, currency = 'PKR') {
-  const n = Number(amount) || 0
-  try {
-    return new Intl.NumberFormat('en-PK', {
-      style: 'currency',
-      currency,
-      maximumFractionDigits: 0,
-    }).format(n)
-  } catch {
-    return `${currency} ${n.toLocaleString()}`
-  }
+  // Prefer shared formatter so Admin Settings currency applies everywhere
+  return formatMoney(amount, currency)
 }
 
 export function formatPct(value) {

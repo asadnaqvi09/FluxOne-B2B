@@ -1,4 +1,9 @@
 import { tenantQuery } from '../../../config/db.js'
+import {
+  DEFAULT_CURRENCY,
+  normalizeCurrency,
+  SUPPORTED_CURRENCIES,
+} from '../../../utils/currency.util.js'
 
 function mapDeviceRow(row) {
   if (!row) return null
@@ -173,4 +178,49 @@ export async function updateDeviceStatus(tenantId, id, status) {
   )
 
   return mapDeviceRow(full[0] || rows[0])
+}
+
+// Tenant default currency (display default across the company)
+export async function getCurrencySettings(tenantId) {
+  const { rows } = await tenantQuery(
+    tenantId,
+    `
+      SELECT COALESCE(default_currency, $2) AS "defaultCurrency"
+      FROM tenants
+      WHERE id = $1
+      LIMIT 1
+    `,
+    [DEFAULT_CURRENCY],
+  )
+
+  return {
+    defaultCurrency: normalizeCurrency(rows[0]?.defaultCurrency || DEFAULT_CURRENCY),
+    options: SUPPORTED_CURRENCIES,
+  }
+}
+
+export async function updateCurrencySettings(tenantId, currencyCode) {
+  const code = normalizeCurrency(currencyCode)
+
+  const { rows } = await tenantQuery(
+    tenantId,
+    `
+      UPDATE tenants
+      SET default_currency = $2
+      WHERE id = $1
+      RETURNING COALESCE(default_currency, $3) AS "defaultCurrency"
+    `,
+    [code, DEFAULT_CURRENCY],
+  )
+
+  if (!rows[0]) {
+    const error = new Error('Company not found')
+    error.status = 404
+    throw error
+  }
+
+  return {
+    defaultCurrency: normalizeCurrency(rows[0].defaultCurrency),
+    options: SUPPORTED_CURRENCIES,
+  }
 }

@@ -10,6 +10,7 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { NativeSelect } from '@/components/ui/select'
 import { Badge } from '@/components/ui/badge'
+import { WholeNumberInput } from '@/components/shared/WholeNumberInput'
 import {
   Table,
   TableHeader,
@@ -121,7 +122,11 @@ export function DiscountsPage() {
       return toastError(validationError)
     }
 
-    const value = parseFloat(percent)
+    const value = Math.trunc(Number(percent))
+    if (!Number.isFinite(value) || value < 0 || value > 100) {
+      toastError('Discount percentage must be a whole number between 0 and 100')
+      return
+    }
     const payload = {
       name: name.trim(),
       percent: value,
@@ -343,10 +348,10 @@ export function DiscountsPage() {
 
             <div className="space-y-1.5">
               <Label htmlFor="disc-form-pct">Discount Percentage (%)</Label>
-              <Input
+              <WholeNumberInput
                 id="disc-form-pct"
-                type="number"
-                step="0.01"
+                min={0}
+                max={100}
                 placeholder="e.g. 15"
                 value={percent}
                 onChange={(e) => setPercent(e.target.value)}

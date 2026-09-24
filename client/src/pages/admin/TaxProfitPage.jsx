@@ -9,6 +9,7 @@ import { Badge } from '@/components/ui/badge'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { NativeSelect } from '@/components/ui/select'
+import { WholeNumberInput } from '@/components/shared/WholeNumberInput'
 import {
   Table,
   TableHeader,
@@ -31,6 +32,7 @@ import {
   useAdminTaxProfit,
 } from '@/hooks/useAdminTaxProfit'
 import { useDebouncedValue } from '@/hooks/useDebouncedValue'
+import { useCurrency } from '@/hooks/useCurrency'
 import { BRAND } from '@/lib/constants'
 import { toastSuccess, toastError } from '@/lib/toast'
 import { validatePercentage } from '@/lib/validation/formValidators'
@@ -58,6 +60,7 @@ import {
 const PAGE_SIZE = ADMIN_TAX_PROFIT_PAGE_SIZE
 
 export function TaxProfitPage() {
+  const { format: money } = useCurrency()
   const [selectedIds, setSelectedIds] = useState([])
   const [searchQuery, setSearchQuery] = useState('')
   const debouncedQ = useDebouncedValue(searchQuery.trim(), 300)
@@ -674,14 +677,13 @@ export function TaxProfitPage() {
                           </div>
                           <div className="mt-2 flex items-end justify-between gap-2">
                             <div>
-                              <p className="text-[10px] text-slate-400">Base Rs. {Number(p.baseCost || 0).toLocaleString()}</p>
+                              <p className="text-[10px] text-slate-400">Base {money(p.baseCost)}</p>
                               <p className="text-sm font-extrabold text-purple-950">
-                                Rs. {Number(finalPrice).toLocaleString()}
+                                {money(finalPrice)}
                               </p>
                             </div>
                             <p className="text-[10px] text-slate-400">
-                              Margin Rs.{' '}
-                              {(Number(finalPrice) - Number(p.baseCost || 0)).toLocaleString()}
+                              Margin {money(Number(finalPrice) - Number(p.baseCost || 0))}
                             </p>
                           </div>
                         </div>
@@ -805,7 +807,7 @@ export function TaxProfitPage() {
 
                           {visibleColumns.baseCost && (
                             <TableCell className="px-3 py-3 font-semibold text-slate-800 text-xs">
-                              Rs. {Number(p.baseCost || 0).toLocaleString()}
+                              {money(p.baseCost)}
                             </TableCell>
                           )}
 
@@ -838,11 +840,10 @@ export function TaxProfitPage() {
                           {visibleColumns.finalPrice && (
                             <TableCell className="sticky right-0 z-[1] bg-white px-3 py-3 text-right group-hover:bg-slate-50/70">
                               <span className="font-extrabold text-sm text-purple-950 block">
-                                Rs. {Number(finalPrice).toLocaleString()}
+                                {money(finalPrice)}
                               </span>
                               <span className="text-[10px] text-slate-400">
-                                Margin: Rs.{' '}
-                                {(Number(finalPrice) - Number(p.baseCost || 0)).toLocaleString()}
+                                Margin: {money(Number(finalPrice) - Number(p.baseCost || 0))}
                               </span>
                             </TableCell>
                           )}
@@ -884,12 +885,10 @@ export function TaxProfitPage() {
               <Label htmlFor="defaultTaxInput" className="text-xs font-semibold">
                 Default Tax Percentage (%)
               </Label>
-              <Input
+              <WholeNumberInput
                 id="defaultTaxInput"
-                type="number"
-                min="0"
-                max="100"
-                step="1"
+                min={0}
+                max={100}
                 value={defaultTaxValue}
                 onChange={(e) => setDefaultTaxValue(e.target.value)}
                 placeholder="e.g. 5"
@@ -952,12 +951,10 @@ export function TaxProfitPage() {
               <Label htmlFor="defaultProfitInput" className="text-xs font-semibold">
                 Default Profit Percentage (%)
               </Label>
-              <Input
+              <WholeNumberInput
                 id="defaultProfitInput"
-                type="number"
-                min="0"
-                max="100"
-                step="1"
+                min={0}
+                max={100}
                 value={defaultProfitValue}
                 onChange={(e) => setDefaultProfitValue(e.target.value)}
                 placeholder="e.g. 20"
@@ -1082,7 +1079,7 @@ export function TaxProfitPage() {
               </div>
               <div className="flex justify-between">
                 <span className="text-slate-500">Base Cost:</span>
-                <span className="font-bold text-slate-800">Rs. {Number(singleItemTarget?.baseCost || 0).toLocaleString()}</span>
+                <span className="font-bold text-slate-800">{money(singleItemTarget?.baseCost)}</span>
               </div>
             </div>
 
@@ -1091,46 +1088,43 @@ export function TaxProfitPage() {
                 <Label htmlFor="singleProfitInput" className="text-xs font-semibold">
                   Profit Margin (%)
                 </Label>
-                <Input
-                  id="singleProfitInput"
-                  type="number"
-                  min="0"
-                  max="100"
-                  step="1"
-                  value={singleProfitValue}
-                  onChange={(e) => setSingleProfitValue(e.target.value)}
-                  placeholder="e.g. 20"
-                  required
-                />
+                <WholeNumberInput
+                id="singleProfitInput"
+                min={0}
+                max={100}
+                value={singleProfitValue}
+                onChange={(e) => setSingleProfitValue(e.target.value)}
+                placeholder="e.g. 20"
+                required
+              />
               </div>
 
               <div className="space-y-1.5">
                 <Label htmlFor="singleTaxInput" className="text-xs font-semibold">
                   Sales Tax (%)
                 </Label>
-                <Input
-                  id="singleTaxInput"
-                  type="number"
-                  min="0"
-                  max="100"
-                  step="1"
-                  value={singleTaxValue}
-                  onChange={(e) => setSingleTaxValue(e.target.value)}
-                  placeholder="e.g. 5"
-                  required
-                />
+                <WholeNumberInput
+                id="singleTaxInput"
+                min={0}
+                max={100}
+                value={singleTaxValue}
+                onChange={(e) => setSingleTaxValue(e.target.value)}
+                placeholder="e.g. 5"
+                required
+              />
               </div>
             </div>
 
             <div className="rounded-xl border border-purple-100 bg-purple-50/60 p-3 text-xs text-purple-950 flex items-center justify-between">
               <span>Calculated Final Price:</span>
               <span className="font-extrabold text-sm text-purple-950">
-                Rs.{' '}
-                {calculateFinalPrice(
-                  singleItemTarget?.baseCost || 0,
-                  Number(singleProfitValue) || 0,
-                  Number(singleTaxValue) || 0,
-                ).toLocaleString()}
+                {money(
+                  calculateFinalPrice(
+                    singleItemTarget?.baseCost || 0,
+                    Number(singleProfitValue) || 0,
+                    Number(singleTaxValue) || 0,
+                  ),
+                )}
               </span>
             </div>
 
@@ -1174,12 +1168,10 @@ export function TaxProfitPage() {
               <Label htmlFor="profitInput" className="text-xs font-semibold">
                 Profit Margin (%)
               </Label>
-              <Input
+              <WholeNumberInput
                 id="profitInput"
-                type="number"
-                min="0"
-                max="100"
-                step="1"
+                min={0}
+                max={100}
                 value={bulkProfitValue}
                 onChange={(e) => setBulkProfitValue(e.target.value)}
                 placeholder="e.g. 25"
@@ -1227,12 +1219,10 @@ export function TaxProfitPage() {
               <Label htmlFor="taxInput" className="text-xs font-semibold">
                 Tax Percentage (%)
               </Label>
-              <Input
+              <WholeNumberInput
                 id="taxInput"
-                type="number"
-                min="0"
-                max="100"
-                step="1"
+                min={0}
+                max={100}
                 value={bulkTaxValue}
                 onChange={(e) => setBulkTaxValue(e.target.value)}
                 placeholder="e.g. 5"

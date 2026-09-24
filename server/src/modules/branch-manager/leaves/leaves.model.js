@@ -150,6 +150,46 @@ export async function getLeaveById(tenantId, id) {
   return rows[0] || null
 }
 
+// Same-date policy: block when pending/approved leave already overlaps the range.
+// Rejected / cancelled leaves do not block a new request.
+export async function findOverlappingLeave(
+  tenantId,
+  {
+    leaveFor,
+    requestedBy = null,
+    staffId = null,
+    startDate,
+    endDate,
+    excludeId = null,
+  },
+) {
+  const { rows } = await tenantQuery(
+    tenantId,
+    `
+      SELECT
+        id,
+        start_date AS "startDate",
+        end_date AS "endDate",
+        status
+      FROM leaves
+      WHERE tenant_id = $1
+        AND leave_for = $2
+        AND status IN ('pending', 'approved')
+        AND start_date <= $3::date
+        AND end_date >= $4::date
+        AND (
+          ($2 = 'branch_manager' AND requested_by = $5)
+          OR ($2 = 'staff' AND staff_id = $6)
+        )
+        AND ($7::uuid IS NULL OR id <> $7)
+      ORDER BY created_at DESC
+      LIMIT 1
+    `,
+    [leaveFor, endDate, startDate, requestedBy, staffId, excludeId],
+  )
+  return rows[0] || null
+}
+
 export async function updateLeave(tenantId, id, { startDate, endDate, reason, status }) {
   const { rows } = await tenantQuery(
     tenantId,

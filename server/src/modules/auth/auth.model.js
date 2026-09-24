@@ -16,6 +16,7 @@ const AUTH_USER_SELECT = `
     r.slug AS role,
     t.slug AS "tenantSlug",
     t.name AS "tenantName",
+    COALESCE(t.default_currency, 'PKR') AS "defaultCurrency",
     b.name AS "branchName",
     to_char(b.opening_time, 'HH24:MI') AS "openingTime",
     to_char(b.closing_time, 'HH24:MI') AS "closingTime",

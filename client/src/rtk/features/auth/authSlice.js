@@ -107,6 +107,13 @@ const authSlice = createSlice({
     clearAuthError(state) {
       state.error = null
     },
+    // Keep session in sync after Admin Settings → Currency save
+    setDefaultCurrency(state, action) {
+      const code = action.payload
+      if (!state.user || !code) return
+      state.user = { ...state.user, defaultCurrency: code }
+      tokenStorage.setUser(state.user)
+    },
   },
   extraReducers: (builder) => {
     builder
@@ -162,5 +169,6 @@ const authSlice = createSlice({
   },
 })
 
-export const { hydrateSession, sessionExpired, clearAuthError } = authSlice.actions
+export const { hydrateSession, sessionExpired, clearAuthError, setDefaultCurrency } =
+  authSlice.actions
 export default authSlice.reducer

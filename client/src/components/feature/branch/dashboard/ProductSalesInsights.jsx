@@ -11,7 +11,8 @@ import {
 } from 'recharts'
 import { TrendingUp, TrendingDown, Layers, ArrowUpRight, ArrowDownRight } from 'lucide-react'
 import { SurfaceCard } from '@/components/shared/SurfaceCard'
-import { formatCurrency, formatPct } from '@/lib/mapBranchDashboard'
+import { useCurrency } from '@/hooks/useCurrency'
+import { formatPct } from '@/lib/mapBranchDashboard'
 import { Badge } from '@/components/ui/badge'
 
 const CHART_H = 260
@@ -59,6 +60,7 @@ export function ProductSalesInsights({
   lowProducts = [],
   className,
 }) {
+  const { format } = useCurrency()
   const [viewMode, setViewMode] = useState('chart') // 'chart' | 'top' | 'low'
 
   const rows = useMemo(
@@ -183,7 +185,7 @@ export function ProductSalesInsights({
                     </div>
                   </div>
                   <div className="text-right">
-                    <p className="font-bold text-xs sm:text-sm text-slate-900">{formatCurrency(item.sales)}</p>
+                    <p className="font-bold text-xs sm:text-sm text-slate-900">{format(item.sales)}</p>
                     <span className="inline-flex items-center text-[11px] font-bold text-emerald-600">
                       {formatPct(item.changePct)}
                     </span>
@@ -217,7 +219,7 @@ export function ProductSalesInsights({
                   </div>
                 </div>
                 <div className="text-right">
-                  <p className="font-bold text-xs sm:text-sm text-slate-900">{formatCurrency(item.sales)}</p>
+                  <p className="font-bold text-xs sm:text-sm text-slate-900">{format(item.sales)}</p>
                   <span className="inline-flex items-center text-[11px] font-bold text-rose-600">
                     {formatPct(item.changePct)}
                   </span>

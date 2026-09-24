@@ -32,6 +32,7 @@ import {
 } from '@/hooks/useAdminInvoices'
 import { useAdminCompany } from '@/hooks/useAdminCompany'
 import { useDebouncedValue } from '@/hooks/useDebouncedValue'
+import { useCurrency } from '@/hooks/useCurrency'
 import { BRAND } from '@/lib/constants'
 import { downloadBillingInvoicePdf } from '@/lib/pdfDownload'
 import {
@@ -81,6 +82,7 @@ function formatRenewal(dateValue) {
 }
 
 export function InvoicesPage() {
+  const { format: money, currency } = useCurrency()
   const [selectedMonth, setSelectedMonth] = useState('all')
   const [selectedYear, setSelectedYear] = useState(String(new Date().getFullYear()))
   const [searchQuery, setSearchQuery] = useState('')
@@ -161,6 +163,7 @@ export function InvoicesPage() {
         companyName: company?.name || 'FluxOne Enterprise Solutions',
         filterMonth: monthObj ? monthObj.label : selectedMonth,
         filterYear: selectedYear,
+        currency,
       })
       toastSuccess(`Exported ${invoices.length} invoice records to Excel (CSV)`)
     } catch (err) {
@@ -181,6 +184,7 @@ export function InvoicesPage() {
         filterYear: selectedYear,
         monthLabel: monthObj?.label || selectedMonth,
         searchQuery: debouncedQ,
+        currency,
       })
       toastSuccess(`Downloaded invoice report PDF (${invoices.length} records)`)
     } catch (err) {
@@ -244,7 +248,7 @@ export function InvoicesPage() {
           <StatCard
             index={2}
             label="YTD Total Invoiced"
-            value={summaryLoading ? '—' : summary.ytdFormatted || 'Rs. 0'}
+            value={summaryLoading ? '—' : summary.ytdFormatted || money(0)}
             subtitle={
               summary.ytdCount > 0
                 ? `${summary.ytdCount} invoice${summary.ytdCount === 1 ? '' : 's'} this year`
@@ -585,7 +589,7 @@ export function InvoicesPage() {
                       <TableRow key={i}>
                         <TableCell className="py-2 text-slate-700">{item.description}</TableCell>
                         <TableCell className="py-2 text-right font-semibold text-slate-900">
-                          Rs. {Number(item.amount || 0).toLocaleString()}
+                          {money(item.amount)}
                         </TableCell>
                       </TableRow>
                     ))}

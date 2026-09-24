@@ -13,7 +13,8 @@ export const createStockRequestSchema = z.object({
   body: z.object({
     productId: z.string().uuid(),
     kind: z.enum(['alert', 'request']),
-    remainingQuantity: z.coerce.number().nonnegative().optional(),
+    // BM enters how many units to request (whole numbers only)
+    remainingQuantity: z.coerce.number().int().positive(),
     branchId: z.string().uuid().optional(),
   }),
   query: empty,

@@ -34,12 +34,32 @@ export async function listStockRequests(tenantId, { status } = {}) {
 export async function createStockRequest(tenantId, payload) {
   const { rows: products } = await tenantQuery(
     tenantId,
-    `SELECT id, quantity FROM products WHERE tenant_id = $1 AND id = $2 LIMIT 1`,
+    `
+      SELECT id, name, quantity, item_code AS "itemCode"
+      FROM products
+      WHERE tenant_id = $1 AND id = $2
+      LIMIT 1
+    `,
     [payload.productId],
   )
   if (!products[0]) throw httpError(404, 'Product not found')
 
-  const remaining = payload.remainingQuantity ?? products[0].quantity
+  const requiredQty = Math.floor(Number(payload.remainingQuantity))
+  if (!Number.isFinite(requiredQty) || requiredQty < 1) {
+    throw httpError(400, 'Required quantity must be a whole number of at least 1')
+  }
+
+  const branchId = payload.branchId || null
+  let branchName = null
+  if (branchId) {
+    const { rows: branches } = await tenantQuery(
+      tenantId,
+      `SELECT name FROM branches WHERE tenant_id = $1 AND id = $2 LIMIT 1`,
+      [branchId],
+    )
+    branchName = branches[0]?.name || null
+  }
+
   const { rows } = await tenantQuery(
     tenantId,
     `
@@ -47,15 +67,30 @@ export async function createStockRequest(tenantId, payload) {
         tenant_id, branch_id, product_id, remaining_quantity, kind, status, created_by
       )
       VALUES ($1, $2, $3, $4, $5, 'open', $6)
-      RETURNING id, kind, status, remaining_quantity AS "remainingQuantity"
+      RETURNING
+        id,
+        kind,
+        status,
+        remaining_quantity AS "remainingQuantity",
+        branch_id AS "branchId",
+        product_id AS "productId",
+        created_by AS "createdBy",
+        created_at AS "createdAt"
     `,
     [
-      payload.branchId || null,
+      branchId,
       payload.productId,
-      remaining,
+      requiredQty,
       payload.kind,
       payload.createdBy || null,
     ],
   )
-  return rows[0]
+
+  const row = rows[0]
+  return {
+    ...row,
+    productName: products[0].name,
+    itemCode: products[0].itemCode,
+    branchName,
+  }
 }

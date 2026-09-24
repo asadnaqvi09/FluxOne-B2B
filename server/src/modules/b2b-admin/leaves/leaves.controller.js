@@ -6,6 +6,7 @@ import {
 import { notifyBmOfLeaveDecision } from '../../notifications/notifications.service.js'
 // import { sendLeaveDecisionEmail } from '../../../mail/mail.service.js'
 import { normalizeImageUrl } from '../../../utils/uploadUrl.util.js'
+import { matchesDisplayRef, normalizeSearchQuery } from '../../../utils/displayRef.util.js'
 import { tenantQuery } from '../../../config/db.js'
 import { success, fail } from '../../../utils/response.util.js'
 
@@ -13,7 +14,7 @@ import { success, fail } from '../../../utils/response.util.js'
 export async function managerLeavesList(req, res) {
   const branchId = req.query?.branchId || null
   const status = req.query?.status || null
-  const q = String(req.query?.q || '').trim().toLowerCase()
+  const q = normalizeSearchQuery(req.query?.q || '').toLowerCase()
   const rows = await listManagerLeaveRequests(req.tenantId, { branchId, status })
 
   const mapped = rows.map((row) => ({
@@ -21,12 +22,11 @@ export async function managerLeavesList(req, res) {
     managerImageUrl: normalizeImageUrl(row.managerImageUrl) || row.managerImageUrl || null,
   }))
 
-  // Optional search by leave id fragment or manager name
+  // Search by Leave ID (UUID or LV-XXXXXXXX) or manager name
   const filtered = q
     ? mapped.filter((row) => {
-        const id = String(row.id || '').toLowerCase()
         const name = String(row.managerName || '').toLowerCase()
-        return id.includes(q) || name.includes(q)
+        return matchesDisplayRef(row.id, q, 'LV') || name.includes(q)
       })
     : mapped
 

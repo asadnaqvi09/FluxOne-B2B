@@ -16,14 +16,16 @@ import { Button } from '@/components/ui/button'
 import { useBranchDashboard } from '@/hooks/useBranchDashboard'
 import { useAuthSession } from '@/hooks/useAuthSession'
 import { BRAND } from '@/lib/constants'
-import { formatCurrency, formatPct } from '@/lib/mapBranchDashboard'
+import { formatPct } from '@/lib/mapBranchDashboard'
 import { downloadBranchDashboardPdf } from '@/lib/pdfDownload'
 import { toastError, toastSuccess } from '@/lib/toast'
 import { cn } from '@/lib/utils'
+import { useCurrency } from '@/hooks/useCurrency'
 
 export function DashboardPage() {
   const { data, date, from, to, setRange, loading } = useBranchDashboard()
   const { user } = useAuthSession()
+  const { format: formatCurrency } = useCurrency()
   const pdfBusyRef = useRef(false)
   const [pdfBusy, setPdfBusy] = useState(false)
 

@@ -58,17 +58,17 @@ export const createProductSchema = z
       type: z.enum([PRODUCT_TYPES.SINGLE, PRODUCT_TYPES.BUNDLE]).default(PRODUCT_TYPES.SINGLE),
       scale: z.string().min(1),
       description: z.string().optional(),
-      purchasePrice: z.coerce.number().nonnegative().optional(),
-      sellingPrice: z.coerce.number().nonnegative().optional(),
+      purchasePrice: z.coerce.number().int().nonnegative().optional(),
+      sellingPrice: z.coerce.number().int().nonnegative().optional(),
       taxIds: z.array(looseUuid).optional(),
       offerId: optionalLooseUuid,
-      discountPercent: z.coerce.number().min(0).max(100).optional(),
+      discountPercent: z.coerce.number().int().min(0).max(100).optional(),
       confirmed: z.coerce.boolean().optional(),
       bundleItems: z
         .array(
           z.object({
             itemId: looseUuid,
-            quantity: z.coerce.number().positive(),
+            quantity: z.coerce.number().int().positive(),
           }),
         )
         .optional(),
@@ -100,10 +100,10 @@ export const importItemsSchema = z.object({
           name: z.string().min(1),
           barcode: z.string().optional(),
           type: z.enum([PRODUCT_TYPES.SINGLE, PRODUCT_TYPES.BUNDLE]).optional(),
-          quantity: z.coerce.number().nonnegative().optional(),
+          quantity: z.coerce.number().int().nonnegative().optional(),
           scale: z.string().optional(),
-          purchasePrice: z.coerce.number().nonnegative().optional(),
-          sellingPrice: z.coerce.number().nonnegative().optional(),
+          purchasePrice: z.coerce.number().int().nonnegative().optional(),
+          sellingPrice: z.coerce.number().int().nonnegative().optional(),
         }),
       )
       .min(1),
@@ -150,11 +150,11 @@ export const updateProductSchema = z
           if (value === 'close') return PRODUCT_STATUS.INACTIVE
           return value
         }),
-      sellingPrice: z.coerce.number().nonnegative().optional(),
-      purchasePrice: z.coerce.number().nonnegative().optional(),
+      sellingPrice: z.coerce.number().int().nonnegative().optional(),
+      purchasePrice: z.coerce.number().int().nonnegative().optional(),
       discountPercent: z.preprocess(
         (v) => (v === '' || v === undefined ? undefined : v === null ? null : v),
-        z.coerce.number().min(0).max(100).nullable().optional(),
+        z.coerce.number().int().min(0).max(100).nullable().optional(),
       ),
       offerId: nullableLooseUuid,
       description: z.string().optional(),
@@ -164,7 +164,7 @@ export const updateProductSchema = z
         .array(
           z.object({
             itemId: looseUuid,
-            quantity: z.coerce.number().positive(),
+            quantity: z.coerce.number().int().positive(),
           }),
         )
         .optional(),

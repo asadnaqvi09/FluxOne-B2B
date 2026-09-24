@@ -16,6 +16,19 @@ export function displayNotification(n = {}) {
     }
   }
 
+  if (type === 'stock_request') {
+    const product = meta.productName || 'product'
+    const qty = meta.requiredQuantity
+    const branch = meta.branchName || 'branch'
+    return {
+      title: n.title || 'Stock request',
+      body:
+        n.body && n.body !== n.title
+          ? n.body
+          : `${branch}: ${qty != null ? `${qty} unit(s) of ` : ''}${product}`,
+    }
+  }
+
   return {
     title: n.title || 'Notification',
     body: n.body && n.body !== n.title ? n.body : n.body || '',

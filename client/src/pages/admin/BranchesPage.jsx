@@ -47,7 +47,7 @@ import { useAuthSession } from '@/hooks/useAuthSession'
 import { useDebouncedValue } from '@/hooks/useDebouncedValue'
 import { useFormBaseline } from '@/hooks/useFormBaseline'
 import { useClientPagination } from '@/hooks/useClientPagination'
-import { displayBranchRef } from '@/lib/formatDisplayId'
+import { displayBranchRef, normalizeSearchQuery } from '@/lib/formatDisplayId'
 import {
   Plus,
   Search,
@@ -235,7 +235,7 @@ const BRANCH_FIELD_ORDER = [
 export function BranchesPage() {
   const { user } = useAuthSession()
   const [searchQuery, setSearchQuery] = useState('')
-  const debouncedQ = useDebouncedValue(searchQuery.trim(), 300)
+  const debouncedQ = useDebouncedValue(normalizeSearchQuery(searchQuery), 300)
   const [statusFilter, setStatusFilter] = useState('all')
   const [addDialogOpen, setAddDialogOpen] = useState(false)
   const [editingBranch, setEditingBranch] = useState(null)
@@ -552,6 +552,13 @@ export function BranchesPage() {
               value={searchQuery}
               onChange={(e) => {
                 setSearchQuery(e.target.value)
+                setPage(1)
+              }}
+              onPaste={(e) => {
+                // Normalize pasted Branch IDs (BRN-XXXXXXXX) before debounce
+                e.preventDefault()
+                const pasted = e.clipboardData?.getData('text') || ''
+                setSearchQuery(normalizeSearchQuery(pasted))
                 setPage(1)
               }}
               className="w-full rounded-xl border border-border bg-slate-50/70 py-2 pl-9 pr-4 text-xs sm:text-sm text-slate-900 outline-none focus:border-purple-300 focus:bg-white focus:ring-1 focus:ring-purple-300"

@@ -16,6 +16,7 @@ import { NativeSelect } from '@/components/ui/select'
 import { BundleItemPicker } from '@/components/feature/products/BundleItemPicker'
 import { TaxMultiSelect } from '@/components/feature/products/TaxMultiSelect'
 import { ImageUploadField } from '@/components/shared/ImageUploadField'
+import { WholeNumberInput } from '@/components/shared/WholeNumberInput'
 import { BRAND } from '@/lib/constants'
 import { PRODUCT_TYPES, SCALE_OPTIONS } from '@/lib/mapProduct'
 import { useFormBaseline } from '@/hooks/useFormBaseline'
@@ -571,11 +572,9 @@ export function ItemFormDialog({
 
                 <div className="space-y-1.5">
                   <Label htmlFor="product-purchase">Purchase price</Label>
-                  <Input
+                  <WholeNumberInput
                     id="product-purchase"
-                    type="number"
-                    min="0"
-                    step="0.01"
+                    min={0}
                     value={form.purchasePrice}
                     onChange={(event) => patch('purchasePrice', event.target.value)}
                   />
@@ -583,11 +582,9 @@ export function ItemFormDialog({
 
                 <div className="space-y-1.5">
                   <Label htmlFor="product-selling">Selling price</Label>
-                  <Input
+                  <WholeNumberInput
                     id="product-selling"
-                    type="number"
-                    min="0"
-                    step="0.01"
+                    min={0}
                     value={form.sellingPrice}
                     onChange={(event) => patch('sellingPrice', event.target.value)}
                   />

@@ -1,4 +1,5 @@
 import { jsPDF } from 'jspdf'
+import { DEFAULT_CURRENCY, formatMoney, normalizeCurrency } from '@/lib/currency'
 
 function safeFilename(value, fallback = 'download') {
   const base = String(value || fallback)
@@ -119,6 +120,10 @@ export function downloadPurchaseOrderPdf(order) {
 export function downloadBillingInvoicePdf(invoice, company = {}) {
   if (!invoice) throw new Error('Invoice is missing')
 
+  const currency = normalizeCurrency(invoice.currency || company.currency || DEFAULT_CURRENCY)
+  const money = (amount) => formatMoney(amount, currency)
+  const totalLabel = invoice.formattedPrice || money(invoice.price)
+
   const doc = new jsPDF({ unit: 'mm', format: 'a4' })
   const margin = 16
   let y = 20
@@ -180,9 +185,7 @@ export function downloadBillingInvoicePdf(invoice, company = {}) {
   const items = Array.isArray(invoice.items) ? invoice.items : []
   if (items.length === 0) {
     doc.text(String(invoice.source || 'Subscription charge'), margin, y)
-    doc.text(String(invoice.formattedPrice || `Rs. ${Number(invoice.price || 0).toLocaleString()}`), 196 - margin, y, {
-      align: 'right',
-    })
+    doc.text(String(totalLabel), 196 - margin, y, { align: 'right' })
     y += 7
   } else {
     for (const item of items) {
@@ -192,7 +195,7 @@ export function downloadBillingInvoicePdf(invoice, company = {}) {
       }
       const desc = doc.splitTextToSize(String(item.description || 'Line item'), 130)
       doc.text(desc, margin, y)
-      doc.text(`Rs. ${Number(item.amount || 0).toLocaleString()}`, 196 - margin, y, { align: 'right' })
+      doc.text(money(item.amount), 196 - margin, y, { align: 'right' })
       y += Math.max(desc.length * 5, 7)
     }
   }
@@ -204,9 +207,7 @@ export function downloadBillingInvoicePdf(invoice, company = {}) {
   doc.setFont('helvetica', 'bold')
   doc.setFontSize(12)
   doc.text('Total', margin, y)
-  doc.text(String(invoice.formattedPrice || `Rs. ${Number(invoice.price || 0).toLocaleString()}`), 196 - margin, y, {
-    align: 'right',
-  })
+  doc.text(String(totalLabel), 196 - margin, y, { align: 'right' })
 
   const filename = `${safeFilename(invoice.trackingId || 'invoice')}.pdf`
   doc.save(filename)

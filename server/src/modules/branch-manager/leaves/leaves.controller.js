@@ -4,6 +4,7 @@ import {
   listStaffLeaves,
   listMyLeaves,
   getLeaveById,
+  findOverlappingLeave,
   updateLeave,
   deleteLeave,
 } from './leaves.model.js'
@@ -46,6 +47,14 @@ function requireBranchId(req) {
   }
 }
 
+function overlapMessage(existing) {
+  const start = toIsoDate(existing?.startDate) || 'that date'
+  const end = toIsoDate(existing?.endDate) || start
+  const range = start === end ? start : `${start} – ${end}`
+  const status = existing?.status === 'pending' ? 'pending' : 'approved'
+  return `A ${status} leave already covers ${range}. Same-date leave is not allowed while that request is active.`
+}
+
 // ── Staff Leave (BM appoints employees) ─────────────────────────────────────
 
 export async function leavesList(req, res) {
@@ -68,6 +77,17 @@ export async function addLeave(req, res) {
       const staffRow = await getStaffById(req.tenantId, employeeId, { branchId })
       if (!staffRow) {
         return fail(res, 'One or more employees were not found in this branch', 404)
+      }
+
+      // Same-date policy: block if pending/approved leave already overlaps
+      const overlap = await findOverlappingLeave(req.tenantId, {
+        leaveFor: 'staff',
+        staffId: employeeId,
+        startDate,
+        endDate,
+      })
+      if (overlap) {
+        return fail(res, overlapMessage(overlap), 409)
       }
 
       const leave = await createStaffLeave(req.tenantId, {
@@ -118,6 +138,19 @@ export async function editLeave(req, res) {
     const nextEnd = endDate || existing.endDate
     const nextReason = reason !== undefined ? reason : existing.reason
     const nextStatus = status || existing.status
+
+    if (nextStatus === 'pending' || nextStatus === 'approved') {
+      const overlap = await findOverlappingLeave(req.tenantId, {
+        leaveFor: 'staff',
+        staffId: existing.staffId,
+        startDate: nextStart,
+        endDate: nextEnd,
+        excludeId: id,
+      })
+      if (overlap) {
+        return fail(res, overlapMessage(overlap), 409)
+      }
+    }
 
     const oldDates = getDatesInRange(existing.startDate, existing.endDate)
     await clearAttendanceMarks(req.tenantId, {
@@ -192,6 +225,17 @@ export async function addMyLeave(req, res) {
   const branchId = requireBranchId(req)
 
   try {
+    // Same-date policy: block another request while pending/approved leave overlaps
+    const overlap = await findOverlappingLeave(req.tenantId, {
+      leaveFor: 'branch_manager',
+      requestedBy: req.user.id,
+      startDate,
+      endDate,
+    })
+    if (overlap) {
+      return fail(res, overlapMessage(overlap), 409)
+    }
+
     const leave = await createMyLeave(req.tenantId, {
       branchId,
       requestedBy: req.user.id,
@@ -255,9 +299,23 @@ export async function editMyLeave(req, res) {
       return fail(res, 'Only pending leave requests can be edited', 400)
     }
 
+    const nextStart = startDate || existing.startDate
+    const nextEnd = endDate || existing.endDate
+
+    const overlap = await findOverlappingLeave(req.tenantId, {
+      leaveFor: 'branch_manager',
+      requestedBy: req.user.id,
+      startDate: nextStart,
+      endDate: nextEnd,
+      excludeId: id,
+    })
+    if (overlap) {
+      return fail(res, overlapMessage(overlap), 409)
+    }
+
     const updated = await updateLeave(req.tenantId, id, {
-      startDate: startDate || existing.startDate,
-      endDate: endDate || existing.endDate,
+      startDate: nextStart,
+      endDate: nextEnd,
       reason: reason !== undefined ? reason : existing.reason,
       status: 'pending',
     })

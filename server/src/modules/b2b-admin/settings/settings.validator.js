@@ -1,5 +1,8 @@
 import { z } from 'zod'
 import { empty, optionalString, paginationQuery } from '../../branch-manager/shared.validator.js'
+import { SUPPORTED_CURRENCIES } from '../../../utils/currency.util.js'
+
+const currencyCodes = SUPPORTED_CURRENCIES.map((c) => c.code)
 
 const looseUuid = z
   .string()
@@ -36,4 +39,24 @@ export const updateDeviceStatusSchema = z.object({
   params: z.object({
     id: looseUuid,
   }),
+})
+
+export const getCurrencySchema = z.object({
+  body: empty,
+  params: empty,
+  query: empty,
+})
+
+export const updateCurrencySchema = z.object({
+  body: z.object({
+    defaultCurrency: z
+      .string()
+      .trim()
+      .toUpperCase()
+      .refine((v) => currencyCodes.includes(v), {
+        message: `Currency must be one of: ${currencyCodes.join(', ')}`,
+      }),
+  }),
+  params: empty,
+  query: empty,
 })

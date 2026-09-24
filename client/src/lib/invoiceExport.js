@@ -1,5 +1,6 @@
 import { jsPDF } from 'jspdf'
 import { downloadBillingInvoicePdf } from '@/lib/pdfDownload'
+import { currencyAmountLabel, DEFAULT_CURRENCY, formatMoney, normalizeCurrency } from '@/lib/currency'
 
 function safeFilename(value, fallback = 'download') {
   const base = String(value || fallback)
@@ -30,11 +31,13 @@ function downloadTextFile(filename, content, mime = 'text/csv;charset=utf-8') {
  */
 export function exportInvoicesToExcel(
   invoices = [],
-  { companyName = 'FluxOne', filterMonth = 'all', filterYear = 'all' } = {},
+  { companyName = 'FluxOne', filterMonth = 'all', filterYear = 'all', currency } = {},
 ) {
   if (!invoices.length) {
     throw new Error('No invoices to export')
   }
+
+  const code = normalizeCurrency(currency || invoices[0]?.currency || DEFAULT_CURRENCY)
 
   const lines = [
     `"${companyName} - Invoices & Payment History Report"`,
@@ -46,7 +49,7 @@ export function exportInvoicesToExcel(
       'Tracking ID',
       'Date & Time',
       'Plan / Source',
-      'Price (PKR)',
+      currencyAmountLabel('Price', code),
       'Status',
       'Billing Cycle',
       'Payment Method',
@@ -90,6 +93,7 @@ export function exportSingleInvoiceToExcel(invoice, company = {}) {
   if (!invoice) throw new Error('Invoice is missing')
 
   const companyName = company.name || 'FluxOne Enterprise Solutions'
+  const code = normalizeCurrency(invoice.currency || company.currency || DEFAULT_CURRENCY)
   const lines = [
     `"${companyName} - Official Billing Invoice"`,
     `"Tracking ID:",${escapeCsvCell(invoice.trackingId || '')}`,
@@ -98,7 +102,7 @@ export function exportSingleInvoiceToExcel(invoice, company = {}) {
     `"Status:",${escapeCsvCell(invoice.status || 'Paid')}`,
     `"Billing Cycle:",${escapeCsvCell(invoice.billingCycle || 'Monthly')}`,
     `"Payment Method:",${escapeCsvCell(invoice.paymentMethod || 'Manual')}`,
-    `"Total Amount (PKR):",${Number(invoice.price || 0)}`,
+    `"${currencyAmountLabel('Total Amount', code)}:",${Number(invoice.price || 0)}`,
   ]
 
   const items = Array.isArray(invoice.items) && invoice.items.length
@@ -106,7 +110,7 @@ export function exportSingleInvoiceToExcel(invoice, company = {}) {
     : [{ description: invoice.source || 'Platform Subscription', amount: invoice.price }]
 
   lines.push('')
-  lines.push('"Line Item Description","Amount (PKR)"')
+  lines.push(`"${'Line Item Description'}","${currencyAmountLabel('Amount', code)}"`)
   items.forEach((item) => {
     lines.push(`${escapeCsvCell(item.description || '')},${Number(item.amount || 0)}`)
   })
@@ -131,11 +135,17 @@ export function downloadInvoicesTablePdf(
     filterYear = 'all',
     monthLabel = 'All Months',
     searchQuery = '',
+    currency,
   } = {},
 ) {
   if (!invoices.length) {
     throw new Error('No invoices to export')
   }
+
+  const reportCurrency = normalizeCurrency(
+    currency || invoices[0]?.currency || DEFAULT_CURRENCY,
+  )
+  const money = (amount) => formatMoney(amount, reportCurrency)
 
   const doc = new jsPDF({ unit: 'mm', format: 'a4', orientation: 'portrait' })
   const margin = 14
@@ -186,7 +196,7 @@ export function downloadInvoicesTablePdf(
     { label: 'Date & Time', x: margin + 35, w: 38 },
     { label: 'Plan / Source', x: margin + 74, w: 56 },
     { label: 'Status', x: margin + 132, w: 22 },
-    { label: 'Price (PKR)', x: 194, w: 26, align: 'right' },
+    { label: currencyAmountLabel('Price', reportCurrency), x: 194, w: 26, align: 'right' },
   ]
 
   function renderTableHeader() {
@@ -230,7 +240,7 @@ export function downloadInvoicesTablePdf(
     doc.text(sourceText[0] || '—', cols[2].x, y)
     doc.text(String(inv.status || 'Paid'), cols[3].x, y)
     doc.text(
-      String(inv.formattedPrice || `Rs. ${priceNum.toLocaleString()}`),
+      String(inv.formattedPrice || money(priceNum)),
       cols[4].x,
       y,
       { align: 'right' },
@@ -247,7 +257,7 @@ export function downloadInvoicesTablePdf(
   doc.setFont('helvetica', 'bold')
   doc.setFontSize(9)
   doc.text('Total Invoiced Amount', cols[0].x, y)
-  doc.text(`Rs. ${totalAmount.toLocaleString()}`, cols[4].x, y, { align: 'right' })
+  doc.text(money(totalAmount), cols[4].x, y, { align: 'right' })
 
   const filename = `fluxone-invoices-report-${new Date().toISOString().slice(0, 10)}.pdf`
   doc.save(filename)

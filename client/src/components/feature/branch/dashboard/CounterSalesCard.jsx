@@ -1,13 +1,14 @@
 import { Monitor } from 'lucide-react'
 import { EmptyState } from '@/components/shared/EmptyState'
 import { SurfaceCard } from '@/components/shared/SurfaceCard'
+import { useCurrency } from '@/hooks/useCurrency'
 import { BRAND } from '@/lib/constants'
-import { formatCurrency } from '@/lib/mapBranchDashboard'
 import { cn } from '@/lib/utils'
 
 const COUNTER_COLORS = [BRAND.purple, BRAND.deep, '#2563eb', '#16a34a']
 
 export function CounterSalesCard({ counters = [], className }) {
+  const { format } = useCurrency()
   const list = Array.isArray(counters) ? counters : []
   const total = list.reduce((sum, c) => sum + (Number(c.sales) || 0), 0)
 
@@ -26,7 +27,7 @@ export function CounterSalesCard({ counters = [], className }) {
       actions={
         list.length > 0 ? (
           <span className="rounded-full bg-purple-50 px-3 py-1 text-xs font-semibold text-purple-900 border border-purple-100">
-            {formatCurrency(total)} combined turnover
+            {format(total)} combined turnover
           </span>
         ) : null
       }
@@ -65,7 +66,7 @@ export function CounterSalesCard({ counters = [], className }) {
                   </div>
 
                   <div className="text-right">
-                    <p className="text-base font-extrabold text-slate-900">{formatCurrency(salesNum)}</p>
+                    <p className="text-base font-extrabold text-slate-900">{format(salesNum)}</p>
                     <p className="text-xs font-semibold text-purple-700">{share}% share</p>
                   </div>
                 </div>

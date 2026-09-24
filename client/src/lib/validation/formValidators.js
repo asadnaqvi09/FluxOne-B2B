@@ -93,10 +93,11 @@ export function validateUrl(url, { required = false, fieldName = 'URL' } = {}) {
   return null
 }
 
-// Validates numeric range percentage
+// Validates numeric range percentage (whole numbers only)
 export function validatePercentage(val, { min = 0, max = 100, fieldName = 'Percentage' } = {}) {
   const num = Number(val)
   if (isNaN(num)) return `${fieldName} must be a valid number`
+  if (!Number.isInteger(num)) return `${fieldName} must be a whole number`
   if (num < min || num > max) return `${fieldName} must be between ${min}% and ${max}%`
   return null
 }

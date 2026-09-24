@@ -2,6 +2,10 @@ import crypto from 'crypto'
 import { tenantClientQuery, tenantQuery, withTransaction } from '../../../config/db.js'
 import { ROLE_IDS, ROLES, BRANCH_STATUS } from '../../../config/constants.js'
 import { normalizeImageUrl } from '../../../utils/uploadUrl.util.js'
+import {
+  displayRefSearchHex,
+  normalizeSearchQuery,
+} from '../../../utils/displayRef.util.js'
 
 function httpError(status, message) {
   const error = new Error(message)
@@ -120,7 +124,9 @@ export async function listBranches(tenantId, filters = {}) {
   const page = Math.max(1, Number(filters.page) || 1)
   const limit = Math.min(100, Math.max(1, Number(filters.limit) || 50))
   const offset = (page - 1) * limit
-  const q = filters.q?.trim() || null
+  const q = normalizeSearchQuery(filters.q) || null
+  // Hex from BRN-XXXXXXXX (or bare UUID fragment) for compact-id match
+  const qHex = q ? displayRefSearchHex(q, 'BRN') : null
   const status = filters.status || null
 
   const { rows: countRows } = await tenantQuery(
@@ -134,6 +140,10 @@ export async function listBranches(tenantId, filters = {}) {
           $3::text IS NULL
           OR b.name ILIKE '%' || $3 || '%'
           OR b.id::text ILIKE '%' || $3 || '%'
+          OR (
+            $4::text IS NOT NULL
+            AND REPLACE(LOWER(b.id::text), '-', '') ILIKE '%' || $4 || '%'
+          )
           OR COALESCE(b.location, '') ILIKE '%' || $3 || '%'
           OR EXISTS (
             SELECT 1 FROM users u
@@ -147,7 +157,7 @@ export async function listBranches(tenantId, filters = {}) {
           )
         )
     `,
-    [status, q],
+    [status, q, qHex],
   )
 
   const { rows } = await tenantQuery(
@@ -193,14 +203,18 @@ export async function listBranches(tenantId, filters = {}) {
           $3::text IS NULL
           OR b.name ILIKE '%' || $3 || '%'
           OR b.id::text ILIKE '%' || $3 || '%'
+          OR (
+            $4::text IS NOT NULL
+            AND REPLACE(LOWER(b.id::text), '-', '') ILIKE '%' || $4 || '%'
+          )
           OR COALESCE(b.location, '') ILIKE '%' || $3 || '%'
           OR COALESCE(u.full_name, '') ILIKE '%' || $3 || '%'
           OR COALESCE(u.email, '') ILIKE '%' || $3 || '%'
         )
       ORDER BY b.name ASC, b.created_at ASC
-      LIMIT $4 OFFSET $5
+      LIMIT $5 OFFSET $6
     `,
-    [status, q, limit, offset],
+    [status, q, qHex, limit, offset],
   )
 
   return {

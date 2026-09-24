@@ -32,7 +32,7 @@ import {
 import { apiClient } from '@/api/api'
 import { endpoints } from '@/api/endpoints'
 import { BRAND } from '@/lib/constants'
-import { referenceFromUuid, displayStaffRef } from '@/lib/formatDisplayId'
+import { referenceFromUuid, displayStaffRef, matchesDisplayRef, normalizeSearchQuery } from '@/lib/formatDisplayId'
 import { toastError, toastSuccess } from '@/lib/toast'
 import { useClientPagination } from '@/hooks/useClientPagination'
 import { useDebouncedValue } from '@/hooks/useDebouncedValue'
@@ -119,7 +119,7 @@ export function LeavesPage() {
   const [branchFilter, setBranchFilter] = useState('')
   const [branchMenuOpen, setBranchMenuOpen] = useState(false)
   const [searchQuery, setSearchQuery] = useState('')
-  const debouncedQ = useDebouncedValue(searchQuery.trim(), 300)
+  const debouncedQ = useDebouncedValue(normalizeSearchQuery(searchQuery), 300)
 
   const [detailRow, setDetailRow] = useState(null)
   const [presetDecision, setPresetDecision] = useState(null)
@@ -174,10 +174,9 @@ export function LeavesPage() {
     if (!debouncedQ) return items
     const q = debouncedQ.toLowerCase()
     return items.filter((r) => {
-      const id = String(r.id || '').toLowerCase()
-      const leaveRef = displayLeaveRef(r).toLowerCase()
       const name = String(r.managerName || '').toLowerCase()
-      return id.includes(q) || leaveRef.includes(q) || name.includes(q)
+      // Match Leave ID as UUID or LV-XXXXXXXX (paste-safe)
+      return matchesDisplayRef(r.id, debouncedQ, 'LV') || name.includes(q)
     })
   }, [items, debouncedQ])
 
@@ -329,6 +328,12 @@ export function LeavesPage() {
                 placeholder="Search by Leave ID or Employee name..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
+                onPaste={(e) => {
+                  // Normalize pasted Leave IDs (ZWSP / fancy dashes) before debounce
+                  e.preventDefault()
+                  const pasted = e.clipboardData?.getData('text') || ''
+                  setSearchQuery(normalizeSearchQuery(pasted))
+                }}
               />
             </div>
 

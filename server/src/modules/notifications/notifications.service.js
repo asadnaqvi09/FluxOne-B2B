@@ -1,8 +1,10 @@
 import {
   createNotificationsForUsers,
   listTenantAdminUserIds,
+  listUserIdsByRole,
   createNotification,
 } from './notifications.model.js'
+import { ROLES } from '../../config/constants.js'
 
 // BM submitted personal leave → notify all tenant admins
 export async function notifyAdminsOfLeaveRequest(tenantId, leave, { managerName, branchName }) {
@@ -60,6 +62,47 @@ export async function notifyBmOfLeaveDecision(tenantId, leave, { status, decisio
       decidedByName: decidedByName || null,
       startDate: leave.startDate,
       endDate: leave.endDate,
+    },
+  })
+}
+
+// BM replenishment / low-stock request → notify Inventory Managers
+export async function notifyInventoryManagersOfStockRequest(
+  tenantId,
+  request,
+  { managerName, branchName } = {},
+) {
+  const imIds = await listUserIdsByRole(tenantId, ROLES.INVENTORY_MANAGER)
+  if (!imIds.length) return []
+
+  const name = managerName || 'Branch Manager'
+  const branch = branchName || 'a branch'
+  const product = request.productName || 'a product'
+  const qty = Number(request.remainingQuantity)
+  const qtyLabel = Number.isFinite(qty) ? String(Math.floor(qty)) : '—'
+  const isAlert = request.kind === 'alert'
+  const title = isAlert
+    ? 'Low Stock Alert From Branch'
+    : 'New Replenishment Request'
+  const body = isAlert
+    ? `${name} (${branch}) flagged low stock for ${product}. Required quantity: ${qtyLabel}.`
+    : `${name} (${branch}) requested ${qtyLabel} unit(s) of ${product}. Open Stock Alerts to process.`
+
+  return createNotificationsForUsers(tenantId, imIds, {
+    type: 'stock_request',
+    title,
+    body,
+    linkPath: `/inventory`,
+    entityType: 'stock_request',
+    entityId: request.id,
+    meta: {
+      stockRequestId: request.id,
+      productId: request.productId || null,
+      productName: product,
+      branchName: branch,
+      managerName: name,
+      kind: request.kind,
+      requiredQuantity: Number.isFinite(qty) ? Math.floor(qty) : null,
     },
   })
 }

@@ -1,9 +1,16 @@
 import { Router } from 'express'
 import { asyncHandler } from '../../../middlewares/error.middleware.js'
 import { validate } from '../../../middlewares/validate.middleware.js'
-import { devicesList, patchDeviceStatus } from './settings.controller.js'
 import {
+  currencyGet,
+  currencyPatch,
+  devicesList,
+  patchDeviceStatus,
+} from './settings.controller.js'
+import {
+  getCurrencySchema,
   listDevicesQuerySchema,
+  updateCurrencySchema,
   updateDeviceStatusSchema,
 } from './settings.validator.js'
 
@@ -15,5 +22,8 @@ router.patch(
   validate(updateDeviceStatusSchema),
   asyncHandler(patchDeviceStatus),
 )
+
+router.get('/currency', validate(getCurrencySchema), asyncHandler(currencyGet))
+router.patch('/currency', validate(updateCurrencySchema), asyncHandler(currencyPatch))
 
 export default router

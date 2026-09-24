@@ -97,6 +97,7 @@ const router = createBrowserRouter([
               { path: 'suppliers', element: <SuppliersPage /> },
               { path: 'orders', element: <PurchaseOrdersPage /> },
               { path: 'categories', element: <CategoriesPage /> },
+              { path: 'notifications', element: <NotificationsPage /> },
               { path: 'profile', element: <ProfilePage /> },
             ],
           },

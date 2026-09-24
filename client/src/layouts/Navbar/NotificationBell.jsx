@@ -23,7 +23,7 @@ function formatRelative(value) {
   return `${days}d ago`
 }
 
-// Shared Admin + BM bell — dropdown + deep-link via notification.linkPath
+// Shared Admin + BM + IM bell — dropdown + deep-link via notification.linkPath
 export function NotificationBell({ className }) {
   const { role } = useAuthSession()
   const navigate = useNavigate()
@@ -34,7 +34,11 @@ export function NotificationBell({ className }) {
   const rootRef = useRef(null)
 
   const notificationsPath =
-    role === ROLES.B2B_ADMIN ? PATHS.admin.notifications : PATHS.branch.notifications
+    role === ROLES.B2B_ADMIN
+      ? PATHS.admin.notifications
+      : role === ROLES.INVENTORY_MANAGER
+        ? PATHS.inventory.notifications
+        : PATHS.branch.notifications
 
   const refresh = useCallback(async () => {
     setLoading(true)

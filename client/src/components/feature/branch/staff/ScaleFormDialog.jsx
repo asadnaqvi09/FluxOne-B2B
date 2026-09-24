@@ -4,6 +4,7 @@ import { FieldError } from '@/components/shared/FieldError'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import { WholeNumberInput } from '@/components/shared/WholeNumberInput'
 import { parseScaleMaxPoints, sumScalePoints } from '@/lib/performanceScales'
 import { fieldErrorClass } from '@/lib/validation/fieldErrors'
 import { useFieldErrors } from '@/hooks/useFieldErrors'
@@ -173,11 +174,9 @@ export function ScaleFormDialog({
 
         <div className="space-y-1.5">
           <Label htmlFor="scale-points">Maximum Score Points</Label>
-          <Input
+          <WholeNumberInput
             id="scale-points"
-            type="number"
             min={1}
-            step={1}
             placeholder="e.g. 50"
             value={form.maxPoints}
             onChange={(e) => {

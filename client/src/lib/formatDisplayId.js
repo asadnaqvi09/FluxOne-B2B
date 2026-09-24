@@ -5,6 +5,33 @@ export function referenceFromUuid(id, prefix = 'REF') {
   return `${prefix}-${compact}`
 }
 
+// Strip paste artifacts (ZWSP/BOM/odd dashes) so LV-… / BRN-… searches match.
+export function normalizeSearchQuery(value) {
+  return String(value || '')
+    .replace(/[\u200B-\u200D\uFEFF]/g, '')
+    .replace(/[\u2010-\u2015\u2212]/g, '-')
+    .replace(/\s+/g, ' ')
+    .trim()
+}
+
+// Match UUID, compact hex, or UI display ref (e.g. LV-3C72E1AB / BRN-C5C490DB).
+export function matchesDisplayRef(entityId, query, prefix) {
+  const q = normalizeSearchQuery(query).toLowerCase()
+  if (!q || !entityId) return false
+
+  const id = String(entityId).toLowerCase()
+  const compact = id.replace(/-/g, '')
+  const display = referenceFromUuid(entityId, prefix).toLowerCase()
+  const prefixRe = new RegExp(`^${String(prefix).toLowerCase()}[-_\\s]?`)
+  const qHex = q.replace(prefixRe, '').replace(/-/g, '')
+
+  if (id.includes(q) || display.includes(q) || compact.includes(q.replace(/-/g, ''))) {
+    return true
+  }
+  // Pasted display ID or hex fragment (min 4 chars to avoid noise)
+  return qHex.length >= 4 && compact.includes(qHex)
+}
+
 export function displayMovementRef(row = {}) {
   return row.id ? referenceFromUuid(row.id, 'STK') : '—'
 }

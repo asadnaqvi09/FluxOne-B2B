@@ -8,6 +8,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Badge } from '@/components/ui/badge'
+import { NativeSelect } from '@/components/ui/select'
 import {
   Table,
   TableHeader,
@@ -24,9 +25,12 @@ import { toastSuccess, toastError } from '@/lib/toast'
 import {
   ADMIN_DEVICES_PAGE_SIZE,
   changeAdminPassword,
+  useAdminCurrency,
   useAdminDevices,
 } from '@/hooks/useAdminSettings'
 import { useDebouncedValue } from '@/hooks/useDebouncedValue'
+import { useAppDispatch } from '@/rtk/hooks'
+import { setDefaultCurrency } from '@/rtk/features/auth/authSlice'
 import {
   KeyRound,
   Monitor,
@@ -41,6 +45,7 @@ import {
   Search,
   Loader2,
   MonitorOff,
+  Coins,
 } from 'lucide-react'
 
 function formatLastActive(value) {
@@ -59,6 +64,7 @@ function formatLastActive(value) {
 }
 
 export function SettingsPage() {
+  const dispatch = useAppDispatch()
   const [activeTab, setActiveTab] = useState('security')
 
   const [currentPassword, setCurrentPassword] = useState('')
@@ -66,6 +72,21 @@ export function SettingsPage() {
   const [confirmPassword, setConfirmPassword] = useState('')
   const [showPassword, setShowPassword] = useState(false)
   const [passwordSaving, setPasswordSaving] = useState(false)
+
+  // Currency Settings (local draft until Save)
+  const {
+    defaultCurrency,
+    options: currencyOptions,
+    loading: currencyLoading,
+    saving: currencySaving,
+    error: currencyError,
+    saveCurrency,
+  } = useAdminCurrency()
+  const [selectedCurrency, setSelectedCurrency] = useState('PKR')
+
+  useEffect(() => {
+    if (defaultCurrency) setSelectedCurrency(defaultCurrency)
+  }, [defaultCurrency])
 
   const [searchQuery, setSearchQuery] = useState('')
   const debouncedQ = useDebouncedValue(searchQuery.trim(), 300)
@@ -97,6 +118,7 @@ export function SettingsPage() {
 
   const slowHint = useSlowLoadingHint(loading && activeTab === 'systems')
   const hasDeviceFilters = Boolean(debouncedQ) || statusFilter !== 'all'
+  const currencyDirty = selectedCurrency !== defaultCurrency
 
   async function handleChangePassword(e) {
     e.preventDefault()
@@ -131,6 +153,28 @@ export function SettingsPage() {
     setConfirmPassword('')
   }
 
+  async function handleSaveCurrency(e) {
+    e.preventDefault()
+    if (!selectedCurrency) {
+      toastError('Please select a default currency')
+      return
+    }
+    if (!currencyDirty) {
+      toastSuccess('Currency is already up to date')
+      return
+    }
+
+    const result = await saveCurrency(selectedCurrency)
+    if (!result.success) {
+      toastError(result.error || 'Failed to save currency')
+      return
+    }
+
+    // Sync session so products / invoices / reports pick up the new default
+    dispatch(setDefaultCurrency(result.data?.defaultCurrency || selectedCurrency))
+    toastSuccess('Default currency saved')
+  }
+
   function handlePromptBlockSystem(sys) {
     setTargetSystem(sys)
     setConfirmDialogOpen(true)
@@ -162,12 +206,12 @@ export function SettingsPage() {
         <PageHeader
           eyebrow="System Configuration & Security"
           title="Admin Settings"
-          description="Security testing, administrator credential updates, and hardware signature system access controls"
+          description="Security, default currency, and hardware signature system access controls"
         />
       </MotionHeader>
 
       <MotionReveal delay={0.05}>
-        <div className="flex rounded-xl bg-slate-100 p-1 border border-slate-200 w-fit">
+        <div className="flex flex-wrap rounded-xl bg-slate-100 p-1 border border-slate-200 w-fit">
           <button
             type="button"
             onClick={() => setActiveTab('security')}
@@ -179,6 +223,18 @@ export function SettingsPage() {
           >
             <KeyRound className="size-4" />
             Security & Password Change
+          </button>
+          <button
+            type="button"
+            onClick={() => setActiveTab('currency')}
+            className={`rounded-lg px-4 py-2 text-xs sm:text-sm font-semibold transition-all cursor-pointer flex items-center gap-2 ${
+              activeTab === 'currency'
+                ? 'bg-white text-purple-900 shadow-xs font-bold'
+                : 'text-slate-600 hover:text-slate-900'
+            }`}
+          >
+            <Coins className="size-4" />
+            Currency Settings
           </button>
           <button
             type="button"
@@ -321,6 +377,89 @@ export function SettingsPage() {
                     </Badge>
                   </div>
                 </div>
+              </SurfaceCard>
+            </div>
+          </div>
+        </MotionReveal>
+      )}
+
+      {activeTab === 'currency' && (
+        <MotionReveal delay={0.1}>
+          <div className="grid grid-cols-1 gap-6 lg:grid-cols-12 items-start">
+            <div className="lg:col-span-7">
+              <SurfaceCard className="p-6">
+                <div className="flex items-center gap-3 border-b border-border pb-4 mb-5">
+                  <div
+                    className="flex size-10 shrink-0 items-center justify-center rounded-xl text-white"
+                    style={{ background: BRAND.purple }}
+                  >
+                    <Coins className="size-5" />
+                  </div>
+                  <div>
+                    <h3 className="font-bold text-base text-slate-900">Currency Settings</h3>
+                    <p className="text-xs text-slate-500">
+                      System-wide default for prices, orders, invoices, and reports
+                    </p>
+                  </div>
+                </div>
+
+                {currencyError ? (
+                  <div className="mb-4 rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-800">
+                    {currencyError}
+                  </div>
+                ) : null}
+
+                {currencyLoading ? (
+                  <div className="flex items-center justify-center gap-2 py-12 text-sm text-slate-500">
+                    <Loader2 className="size-4 animate-spin" />
+                    Loading currency settings…
+                  </div>
+                ) : (
+                  <form onSubmit={handleSaveCurrency} className="space-y-4">
+                    <div className="space-y-1.5">
+                      <Label className="text-xs font-bold text-slate-700">
+                        Default Currency <span className="text-rose-600">*</span>
+                      </Label>
+                      <NativeSelect
+                        value={selectedCurrency}
+                        onChange={(e) => setSelectedCurrency(e.target.value)}
+                        className="h-10 text-sm"
+                        required
+                      >
+                        {currencyOptions.map((opt) => (
+                          <option key={opt.code} value={opt.code}>
+                            {opt.label}
+                          </option>
+                        ))}
+                      </NativeSelect>
+                      <p className="text-[11px] text-slate-500">
+                        Select the default currency to be used across the system.
+                      </p>
+                    </div>
+
+                    <div className="pt-2">
+                      <Button
+                        type="submit"
+                        disabled={currencySaving || !currencyDirty}
+                        className="w-full text-white font-semibold cursor-pointer shadow-sm disabled:opacity-60"
+                        style={{ background: BRAND.purple }}
+                      >
+                        {currencySaving ? 'Saving…' : 'Save'}
+                      </Button>
+                    </div>
+                  </form>
+                )}
+              </SurfaceCard>
+            </div>
+
+            <div className="lg:col-span-5">
+              <SurfaceCard className="p-5">
+                <h4 className="font-bold text-sm text-slate-900 mb-2">How it applies</h4>
+                <p className="text-xs text-slate-500 leading-relaxed">
+                  Changing the default currency updates labels and formatting only. Stored amounts
+                  are not converted. New product prices, orders, invoices, payments, and financial
+                  reports will display using this currency.
+                </p>
               </SurfaceCard>
             </div>
           </div>

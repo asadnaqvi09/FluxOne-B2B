@@ -39,6 +39,7 @@ export const endpoints = {
     settings: {
       devices: '/admin/settings/devices',
       deviceStatus: (id) => `/admin/settings/devices/${id}/status`,
+      currency: '/admin/settings/currency',
     },
     invoices: {
       list: '/admin/invoices',

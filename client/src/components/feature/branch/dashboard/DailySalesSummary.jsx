@@ -1,13 +1,15 @@
 import { Clock3, Package, ShoppingBag } from 'lucide-react'
 import { SurfaceCard } from '@/components/shared/SurfaceCard'
+import { useCurrency } from '@/hooks/useCurrency'
 import { BRAND } from '@/lib/constants'
-import { formatCurrency } from '@/lib/mapBranchDashboard'
 
 export function DailySalesSummary({ summary = {}, className }) {
+  const { format } = useCurrency()
+
   const items = [
     {
       label: 'Today revenue',
-      value: formatCurrency(summary.revenue),
+      value: format(summary.revenue),
       icon: ShoppingBag,
     },
     {
@@ -18,7 +20,7 @@ export function DailySalesSummary({ summary = {}, className }) {
     {
       label: 'Peak window',
       value: summary.peakHour || '—',
-      sub: summary.peakHourSales != null ? formatCurrency(summary.peakHourSales) : null,
+      sub: summary.peakHourSales != null ? format(summary.peakHourSales) : null,
       icon: Clock3,
     },
   ]

@@ -46,7 +46,10 @@ export function AppTopNav({ className }) {
   const { role } = useAuthSession()
   const items = getNavItemsForRole(role)
   const sideItems = getSideNavItemsForRole(role)
-  const showBell = role === ROLES.B2B_ADMIN || role === ROLES.BRANCH_MANAGER
+  const showBell =
+    role === ROLES.B2B_ADMIN ||
+    role === ROLES.BRANCH_MANAGER ||
+    role === ROLES.INVENTORY_MANAGER
   const showSideNav = role === ROLES.B2B_ADMIN && sideItems.length > 0
   const [sideOpen, setSideOpen] = useState(false)
 

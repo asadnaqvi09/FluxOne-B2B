@@ -5,7 +5,7 @@ import {
   Receipt,
   TrendingUp,
 } from 'lucide-react'
-import { formatCurrency } from '@/lib/mapBranchDashboard'
+import { useCurrency } from '@/hooks/useCurrency'
 import { cn } from '@/lib/utils'
 
 const KPI_META = [
@@ -14,44 +14,49 @@ const KPI_META = [
     label: 'Total Sales',
     subtitle: 'Daily branch turnover',
     icon: CircleDollarSign,
-    format: formatCurrency,
+    money: true,
   },
   {
     key: 'profit',
     label: 'Gross Profit',
     subtitle: 'Net margin earnings today',
     icon: TrendingUp,
-    format: formatCurrency,
+    money: true,
   },
   {
     key: 'saleCount',
     label: 'Transactions',
     subtitle: 'POS checkouts processed',
     icon: Receipt,
-    format: (n) => Number(n || 0).toLocaleString(),
+    money: false,
   },
   {
     key: 'avgTicket',
     label: 'Average Ticket',
     subtitle: 'Average basket size per order',
     icon: Banknote,
-    format: formatCurrency,
+    money: true,
   },
 ]
 
 export function BranchKpiCards({ kpis = {}, className }) {
+  const { format } = useCurrency()
+
   return (
     <div className={cn('grid grid-cols-1 gap-4 sm:grid-cols-2 md:grid-cols-4', className)}>
       {KPI_META.map((meta, index) => {
         const Icon = meta.icon
         const value = kpis[meta.key]
+        const display = meta.money
+          ? format(value)
+          : Number(value || 0).toLocaleString()
 
         return (
           <StatCard
             key={meta.key}
             index={index}
             label={meta.label}
-            value={meta.format(value)}
+            value={display}
             subtitle={meta.subtitle}
             icon={Icon}
           />
@@ -62,4 +67,3 @@ export function BranchKpiCards({ kpis = {}, className }) {
 }
 
 export default BranchKpiCards
-

@@ -10,6 +10,7 @@ export const PATHS = {
     suppliers: '/inventory/suppliers',
     orders: '/inventory/orders',
     categories: '/inventory/categories',
+    notifications: '/inventory/notifications',
     profile: '/inventory/profile',
   },
   branch: {

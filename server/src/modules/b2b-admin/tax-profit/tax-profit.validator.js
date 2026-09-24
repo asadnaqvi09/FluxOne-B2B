@@ -10,7 +10,7 @@ const looseUuid = z
 
 const sortEnum = z.enum(['all', 'top_sales', 'top_profit', 'slow_moving']).default('all')
 
-const percentField = z.coerce.number().min(0).max(100)
+const percentField = z.coerce.number().int().min(0).max(100)
 
 export const listTaxProfitQuerySchema = z.object({
   body: empty,

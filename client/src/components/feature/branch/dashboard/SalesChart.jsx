@@ -8,12 +8,13 @@ import {
   YAxis,
 } from 'recharts'
 import { SurfaceCard } from '@/components/shared/SurfaceCard'
+import { useCurrency } from '@/hooks/useCurrency'
 import { BRAND } from '@/lib/constants'
-import { formatCurrency } from '@/lib/mapBranchDashboard'
 
 const CHART_H = 260
 
 function SalesTooltip({ active, payload, label }) {
+  const { format } = useCurrency()
   if (!active || !payload?.length) return null
   const row = payload[0]?.payload
   const revenue = Number(row?.revenue ?? row?.sales ?? 0)
@@ -22,7 +23,7 @@ function SalesTooltip({ active, payload, label }) {
     <div className="rounded-xl border border-border bg-white px-3 py-2 text-xs shadow-lg">
       <p className="font-semibold text-slate-800">{label}</p>
       <p className="mt-1 text-slate-600">
-        Revenue: <span className="font-semibold text-slate-900">{formatCurrency(revenue)}</span>
+        Revenue: <span className="font-semibold text-slate-900">{format(revenue)}</span>
       </p>
       {txCount ? (
         <p className="mt-0.5 text-slate-500">{txCount} transaction{txCount === 1 ? '' : 's'}</p>

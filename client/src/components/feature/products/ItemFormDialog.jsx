@@ -16,10 +16,7 @@ import { NativeSelect } from '@/components/ui/select'
 import { BundleItemPicker } from '@/components/feature/products/BundleItemPicker'
 import { TaxMultiSelect } from '@/components/feature/products/TaxMultiSelect'
 import { ImageUploadField } from '@/components/shared/ImageUploadField'
-import { FieldError } from '@/components/shared/FieldError'
 import { BRAND } from '@/lib/constants'
-import { fieldErrorClass } from '@/lib/validation/fieldErrors'
-import { useFieldErrors } from '@/hooks/useFieldErrors'
 import { PRODUCT_TYPES, SCALE_OPTIONS } from '@/lib/mapProduct'
 import { useFormBaseline } from '@/hooks/useFormBaseline'
 import { useItemScales } from '@/hooks/useItemScales'
@@ -74,8 +71,7 @@ export function ItemFormDialog({
   const [step, setStep] = useState('form')
   const [form, setForm] = useState(EMPTY)
   const [confirmed, setConfirmed] = useState(false)
-  const { fieldErrors, formError, setFormError, resetErrors, clearField, applyErrors } =
-    useFieldErrors()
+  const [error, setError] = useState(null)
   const [created, setCreated] = useState(null)
   const [imageWarning, setImageWarning] = useState(null)
   const { captureBaseline, isDirty } = useFormBaseline(open)
@@ -99,7 +95,7 @@ export function ItemFormDialog({
   // Reset dialog when opened / mode changes (do not depend on categories — avoids wiping typed fields)
   useEffect(() => {
     if (!open) return
-    resetErrors()
+    setError(null)
     setImageWarning(null)
     setCreated(null)
     setStep('form')
@@ -166,6 +162,17 @@ export function ItemFormDialog({
   //   setForm((prev) => ({ ...prev, categoryId: categories[0].id }))
   // }, [open, isEdit, categories, form.categoryId])
 
+<<<<<<< HEAD
+=======
+  function patch(field, value) {
+    setForm((prev) => {
+      const next = { ...prev, [field]: value }
+      if (field === 'categoryId') next.subcategoryId = ''
+      return next
+    })
+  }
+
+>>>>>>> 386edce732e8d715faad700e3f93a54178c9501b
   function handleDiscountOfferChange(selectedId) {
     const selectedOffer = offers.find((o) => o.id === selectedId)
     setForm((prev) => ({
@@ -176,75 +183,68 @@ export function ItemFormDialog({
     }))
   }
 
+<<<<<<< HEAD
   // Field-level validation for Review & Confirm (stay on form until resolved)
   function validateFields() {
     const errors = {}
 
     if (!form.name.trim()) errors.name = 'Name is required'
     if (!form.scale) errors.scale = 'Scale is required'
+=======
+  function validate() {
+    if (!form.name.trim()) return 'Name is required'
+    if (!form.scale) return 'Scale is required'
+>>>>>>> 386edce732e8d715faad700e3f93a54178c9501b
 
     if (isBundle) {
       if (!form.bundleItems || form.bundleItems.length === 0) {
-        errors.bundleItems = 'Select at least one item for this bundle'
-      } else {
-        for (const row of form.bundleItems) {
-          if (!row.itemId) {
-            errors.bundleItems = 'Select an item for each bundle line'
-            break
-          }
-          if (!row.quantity || Number(row.quantity) <= 0) {
-            errors.bundleItems = 'Quantity must be greater than 0 for each selected item'
-            break
-          }
+        return 'Select at least one item for this bundle'
+      }
+      for (const row of form.bundleItems) {
+        if (!row.itemId) return 'Select an item for each bundle line'
+        if (!row.quantity || Number(row.quantity) <= 0) {
+          return 'Quantity must be greater than 0 for each selected item'
         }
       }
-    } else {
-      if (!form.categoryId) {
-        errors.categoryId = categories.length
-          ? 'Category is required'
-          : 'Create a category first (Categories page), then add products'
-      }
-      if (form.purchasePrice === '' || Number.isNaN(Number(form.purchasePrice)) || Number(form.purchasePrice) < 0) {
-        errors.purchasePrice = 'Purchase price is required'
-      }
-      if (form.sellingPrice === '' || Number.isNaN(Number(form.sellingPrice)) || Number(form.sellingPrice) < 0) {
-        errors.sellingPrice = 'Selling price is required'
-      }
+      return null
     }
 
-    const order = isBundle
-      ? ['bundleItems', 'name', 'scale']
-      : ['name', 'scale', 'categoryId', 'purchasePrice', 'sellingPrice']
-    return { errors, order }
-  }
-
-  const FIELD_FOCUS_IDS = {
-    name: 'product-name',
-    scale: 'product-scale',
-    categoryId: 'product-category',
-    purchasePrice: 'product-purchase',
-    sellingPrice: 'product-selling',
-    bundleItems: 'product-bundle-items',
+    if (!form.categoryId) {
+      return categories.length
+        ? 'Category is required'
+        : 'Create a category first (Categories page), then add products'
+    }
+    if (form.purchasePrice === '' || Number(form.purchasePrice) < 0) {
+      return 'Purchase price is required'
+    }
+    if (form.sellingPrice === '' || Number(form.sellingPrice) < 0) {
+      return 'Selling price is required'
+    }
+    return null
   }
 
   function goReview(event) {
     event.preventDefault()
-    const { errors, order } = validateFields()
-    if (Object.keys(errors).length) {
-      applyErrors(errors, FIELD_FOCUS_IDS, order)
+    const message = validate()
+    if (message) {
+      setError(message)
       return
     }
-    resetErrors()
+    setError(null)
     setConfirmed(false)
     setStep('confirm')
   }
 
   async function handleConfirm() {
     if (!confirmed) {
-      setFormError('Please confirm before saving')
+      setError('Please confirm before saving')
       return
     }
+<<<<<<< HEAD
     resetErrors()
+=======
+    setError(null)
+>>>>>>> 386edce732e8d715faad700e3f93a54178c9501b
     const selectedOffer = offers.find((o) => o.id === form.offerId)
     const payload = {
       name: form.name,
@@ -281,23 +281,18 @@ export function ItemFormDialog({
       taxIds: payload.taxIds,
       type: payload.type,
     })
-    try {
-      const result = await onSubmit?.(payload)
-      if (result?.success) {
-        const product = result.data || null
-        if (!isEdit && product?.id) {
-          setCreated(product)
-          setImageWarning(result.imageWarning || null)
-          setStep('success')
-          return
-        }
-        onOpenChange?.(false)
-      } else {
-        setFormError(result?.error || 'Save failed. Please try again.')
-        setStep('form')
+    const result = await onSubmit?.(payload)
+    if (result?.success) {
+      const product = result.data || null
+      if (!isEdit && product?.id) {
+        setCreated(product)
+        setImageWarning(result.imageWarning || null)
+        setStep('success')
+        return
       }
-    } catch (err) {
-      setFormError(err?.message || 'Save failed. Please try again.')
+      onOpenChange?.(false)
+    } else if (result?.error) {
+      setError(result.error)
       setStep('form')
     }
   }
@@ -337,8 +332,8 @@ export function ItemFormDialog({
           </DialogDescription>
         </DialogHeader>
 
-        {formError ? (
-          <p className="mb-3 rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">{formError}</p>
+        {error ? (
+          <p className="mb-3 rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">{error}</p>
         ) : null}
 
         {step === 'form' ? (
@@ -372,16 +367,13 @@ export function ItemFormDialog({
                     </div>
                   )}
 
-                  <div id="product-bundle-items" tabIndex={-1} className="outline-none">
-                    <BundleItemPicker
-                      catalogItems={catalogItems}
-                      value={form.bundleItems}
-                      excludeId={initialProduct?.id}
-                      loading={catalogItemsLoading}
-                      onChange={(bundleItems) => patch('bundleItems', bundleItems)}
-                    />
-                    <FieldError message={fieldErrors.bundleItems} />
-                  </div>
+                  <BundleItemPicker
+                    catalogItems={catalogItems}
+                    value={form.bundleItems}
+                    excludeId={initialProduct?.id}
+                    loading={catalogItemsLoading}
+                    onChange={(bundleItems) => patch('bundleItems', bundleItems)}
+                  />
 
                   <div className="space-y-1.5">
                     <Label htmlFor="product-name">Name</Label>
@@ -390,10 +382,7 @@ export function ItemFormDialog({
                       value={form.name}
                       onChange={(event) => patch('name', event.target.value)}
                       placeholder="Bundle name"
-                      aria-invalid={Boolean(fieldErrors.name)}
-                      className={fieldErrorClass(fieldErrors.name)}
                     />
-                    <FieldError message={fieldErrors.name} />
                   </div>
 
                   <ImageUploadField
@@ -412,8 +401,6 @@ export function ItemFormDialog({
                         id="product-scale"
                         value={form.scale}
                         onChange={(event) => patch('scale', event.target.value)}
-                        aria-invalid={Boolean(fieldErrors.scale)}
-                        className={fieldErrorClass(fieldErrors.scale)}
                       >
                         <option value="">Select Scale</option>
                         {scaleChoices.map((scale) => (
@@ -422,7 +409,6 @@ export function ItemFormDialog({
                           </option>
                         ))}
                       </NativeSelect>
-                      <FieldError message={fieldErrors.scale} />
                     </div>
 
                     <div className="space-y-1.5">
@@ -522,10 +508,7 @@ export function ItemFormDialog({
                     value={form.name}
                     onChange={(event) => patch('name', event.target.value)}
                     placeholder="Product name"
-                    aria-invalid={Boolean(fieldErrors.name)}
-                    className={fieldErrorClass(fieldErrors.name)}
                   />
-                  <FieldError message={fieldErrors.name} />
                 </div>
 
                 <ImageUploadField
@@ -544,8 +527,6 @@ export function ItemFormDialog({
                     id="product-scale"
                     value={form.scale}
                     onChange={(event) => patch('scale', event.target.value)}
-                    aria-invalid={Boolean(fieldErrors.scale)}
-                    className={fieldErrorClass(fieldErrors.scale)}
                   >
                     <option value="">Select Scale</option>
                     {scaleChoices.map((scale) => (
@@ -554,7 +535,6 @@ export function ItemFormDialog({
                       </option>
                     ))}
                   </NativeSelect>
-                  <FieldError message={fieldErrors.scale} />
                 </div>
 
                 <div className="space-y-1.5">
@@ -574,8 +554,6 @@ export function ItemFormDialog({
                     id="product-category"
                     value={form.categoryId}
                     onChange={(event) => patch('categoryId', event.target.value)}
-                    aria-invalid={Boolean(fieldErrors.categoryId)}
-                    className={fieldErrorClass(fieldErrors.categoryId)}
                   >
                     <option value="">Select category</option>
                     {categories.map((cat) => (
@@ -584,8 +562,7 @@ export function ItemFormDialog({
                       </option>
                     ))}
                   </NativeSelect>
-                  <FieldError message={fieldErrors.categoryId} />
-                  {!categories.length && !fieldErrors.categoryId ? (
+                  {!categories.length ? (
                     <p className="text-[11px] text-amber-700">
                       No categories yet — add one on the Categories page first.
                     </p>
@@ -617,10 +594,7 @@ export function ItemFormDialog({
                     step="0.01"
                     value={form.purchasePrice}
                     onChange={(event) => patch('purchasePrice', event.target.value)}
-                    aria-invalid={Boolean(fieldErrors.purchasePrice)}
-                    className={fieldErrorClass(fieldErrors.purchasePrice)}
                   />
-                  <FieldError message={fieldErrors.purchasePrice} />
                 </div>
 
                 <div className="space-y-1.5">
@@ -632,10 +606,7 @@ export function ItemFormDialog({
                     step="0.01"
                     value={form.sellingPrice}
                     onChange={(event) => patch('sellingPrice', event.target.value)}
-                    aria-invalid={Boolean(fieldErrors.sellingPrice)}
-                    className={fieldErrorClass(fieldErrors.sellingPrice)}
                   />
-                  <FieldError message={fieldErrors.sellingPrice} />
                 </div>
 
                 <div className="space-y-1.5 sm:col-span-2">

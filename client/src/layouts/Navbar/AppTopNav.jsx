@@ -1,11 +1,13 @@
+import { useState } from 'react'
 import { NavLink } from 'react-router-dom'
 import { BrandLogo } from '@/components/shared/BrandLogo'
+import { AppSideNav } from '@/layouts/Navbar/AppSideNav'
 import { MobileNav } from '@/layouts/Navbar/MobileNav'
 import { UserMenu } from '@/layouts/Navbar/UserMenu'
 import { NotificationBell } from '@/layouts/Navbar/NotificationBell'
 import { useAuthSession } from '@/hooks/useAuthSession'
 import { BRAND, ROLES } from '@/lib/constants'
-import { getNavItemsForRole } from '@/lib/nav'
+import { getNavItemsForRole, getSideNavItemsForRole } from '@/lib/nav'
 import { cn } from '@/lib/utils'
 
 function DesktopNavLinks({ items }) {
@@ -43,7 +45,10 @@ function DesktopNavLinks({ items }) {
 export function AppTopNav({ className }) {
   const { role } = useAuthSession()
   const items = getNavItemsForRole(role)
+  const sideItems = getSideNavItemsForRole(role)
   const showBell = role === ROLES.B2B_ADMIN || role === ROLES.BRANCH_MANAGER
+  const showSideNav = role === ROLES.B2B_ADMIN && sideItems.length > 0
+  const [sideOpen, setSideOpen] = useState(false)
 
   return (
     <header
@@ -53,7 +58,12 @@ export function AppTopNav({ className }) {
       )}
     >
       <div className="flex h-full w-full min-w-0 items-center gap-2 sm:gap-4 lg:gap-8">
-        <BrandLogo size="sm" className="size-10 shrink-0 sm:size-12" />
+        <div className="flex shrink-0 items-center gap-1.5 sm:gap-2">
+          {showSideNav ? (
+            <AppSideNav items={sideItems} open={sideOpen} onOpenChange={setSideOpen} />
+          ) : null}
+          <BrandLogo size="sm" asLink={false} className="size-10 sm:size-12" />
+        </div>
         <DesktopNavLinks items={items} />
         <div className="ml-auto flex shrink-0 items-center gap-1.5 sm:gap-3">
           {showBell ? <NotificationBell /> : null}

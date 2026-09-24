@@ -326,6 +326,7 @@ export function StaffLeavesTab({
             </div>
           </div>
           <DialogFooter>
+            <DialogCancelButton onClick={() => setEditing(null)}>Cancel</DialogCancelButton>
             <Button
               onClick={handleUpdateLeave}
               disabled={mutating}

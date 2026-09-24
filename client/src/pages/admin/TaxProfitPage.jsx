@@ -32,7 +32,6 @@ import {
   useAdminTaxProfit,
 } from '@/hooks/useAdminTaxProfit'
 import { useDebouncedValue } from '@/hooks/useDebouncedValue'
-import { useFormBaseline } from '@/hooks/useFormBaseline'
 import { BRAND } from '@/lib/constants'
 import { toastSuccess, toastError } from '@/lib/toast'
 import { displayItemCode } from '@/lib/formatDisplayId'
@@ -74,7 +73,6 @@ export function TaxProfitPage() {
   const [bulkProfitValue, setBulkProfitValue] = useState('20')
   const [bulkTaxValue, setBulkTaxValue] = useState('5')
 
-<<<<<<< HEAD
   // Default Tax & Profit configuration states
   const [defaultTaxDialogOpen, setDefaultTaxDialogOpen] = useState(false)
   const [defaultProfitDialogOpen, setDefaultProfitDialogOpen] = useState(false)
@@ -88,22 +86,6 @@ export function TaxProfitPage() {
   const [singleItemTarget, setSingleItemTarget] = useState(null)
   const [singleProfitValue, setSingleProfitValue] = useState('0')
   const [singleTaxValue, setSingleTaxValue] = useState('0')
-=======
-  const profitBaseline = useFormBaseline(profitDialogOpen)
-  const taxBaseline = useFormBaseline(taxDialogOpen)
-
-  useEffect(() => {
-    if (!profitDialogOpen) return
-    profitBaseline.captureBaseline({ bulkProfitValue })
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [profitDialogOpen, profitBaseline.captureBaseline])
-
-  useEffect(() => {
-    if (!taxDialogOpen) return
-    taxBaseline.captureBaseline({ bulkTaxValue })
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [taxDialogOpen, taxBaseline.captureBaseline])
->>>>>>> eeeb612f2ec75787e21ba56a070cb842c7ce8ccc
 
   const [visibleColumns, setVisibleColumns] = useState({
     id: true,
@@ -888,7 +870,6 @@ export function TaxProfitPage() {
         </SurfaceCard>
       </MotionReveal>
 
-<<<<<<< HEAD
       {/* Set Default Tax % Dialog */}
       <Dialog open={defaultTaxDialogOpen} onOpenChange={setDefaultTaxDialogOpen}>
         <DialogContent className="max-w-md">
@@ -1184,13 +1165,6 @@ export function TaxProfitPage() {
 
       {/* Bulk Profit Dialog */}
       <Dialog open={profitDialogOpen} onOpenChange={setProfitDialogOpen}>
-=======
-      <Dialog
-        open={profitDialogOpen}
-        onOpenChange={setProfitDialogOpen}
-        dirty={profitBaseline.isDirty({ bulkProfitValue })}
-      >
->>>>>>> eeeb612f2ec75787e21ba56a070cb842c7ce8ccc
         <DialogContent className="max-w-md">
           <DialogHeader>
             <DialogTitle>Set Profit Margin Percentage</DialogTitle>
@@ -1235,16 +1209,8 @@ export function TaxProfitPage() {
         </DialogContent>
       </Dialog>
 
-<<<<<<< HEAD
       {/* Bulk Tax Dialog */}
       <Dialog open={taxDialogOpen} onOpenChange={setTaxDialogOpen}>
-=======
-      <Dialog
-        open={taxDialogOpen}
-        onOpenChange={setTaxDialogOpen}
-        dirty={taxBaseline.isDirty({ bulkTaxValue })}
-      >
->>>>>>> eeeb612f2ec75787e21ba56a070cb842c7ce8ccc
         <DialogContent className="max-w-md">
           <DialogHeader>
             <DialogTitle>Set Sales Tax Percentage</DialogTitle>

@@ -166,16 +166,6 @@ export function ItemFormDialog({
   //   setForm((prev) => ({ ...prev, categoryId: categories[0].id }))
   // }, [open, isEdit, categories, form.categoryId])
 
-  function patch(field, value) {
-    setForm((prev) => {
-      const next = { ...prev, [field]: value }
-      if (field === 'categoryId') next.subcategoryId = ''
-      return next
-    })
-    clearField(field)
-  }
-
-<<<<<<< HEAD
   function handleDiscountOfferChange(selectedId) {
     const selectedOffer = offers.find((o) => o.id === selectedId)
     setForm((prev) => ({
@@ -186,17 +176,12 @@ export function ItemFormDialog({
     }))
   }
 
-  function validate() {
-    if (!form.name.trim()) return 'Name is required'
-    if (!form.scale) return 'Scale is required'
-=======
   // Field-level validation for Review & Confirm (stay on form until resolved)
   function validateFields() {
     const errors = {}
 
     if (!form.name.trim()) errors.name = 'Name is required'
     if (!form.scale) errors.scale = 'Scale is required'
->>>>>>> eeeb612f2ec75787e21ba56a070cb842c7ce8ccc
 
     if (isBundle) {
       if (!form.bundleItems || form.bundleItems.length === 0) {
@@ -259,12 +244,8 @@ export function ItemFormDialog({
       setFormError('Please confirm before saving')
       return
     }
-<<<<<<< HEAD
-    setError(null)
-    const selectedOffer = offers.find((o) => o.id === form.offerId)
-=======
     resetErrors()
->>>>>>> eeeb612f2ec75787e21ba56a070cb842c7ce8ccc
+    const selectedOffer = offers.find((o) => o.id === form.offerId)
     const payload = {
       name: form.name,
       type,

@@ -20,6 +20,9 @@ export const ROLE_IDS = {
   [ROLES.WEBSITE_MANAGER]: 8,
 }
 
+// Password hashing work factor (bcrypt rounds)
+export const BCRYPT_COST = 12
+
 export const PRODUCT_TYPES = {
   SINGLE: 'single',
   BUNDLE: 'bundle',

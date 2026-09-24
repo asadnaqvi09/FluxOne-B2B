@@ -49,8 +49,9 @@ export function errorMiddleware(err, _req, res, _next) {
   }
 
   const status = err.status || err.statusCode || 500
-  const isProd = process.env.NODE_ENV === 'production'
-  const message = status >= 500 && isProd ? 'Internal server error' : err.message || 'Internal server error'
+  // Never leak DB/stack detail on 5xx (even outside production)
+  const message =
+    status >= 500 ? 'Internal server error' : err.message || 'Internal server error'
 
   if (status >= 500) {
     console.error(err)

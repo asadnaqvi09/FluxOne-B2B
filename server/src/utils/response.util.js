@@ -8,6 +8,18 @@ export function error(res, message = 'Request failed', httpStatus = 400) {
 
 export const fail = error
 
+/**
+ * Safe controller catch helper: 4xx keeps err.message; 5xx never leaks DB/stack detail.
+ */
+export function failFromError(res, err, fallbackMessage = 'Internal server error') {
+  const status = Number(err?.status || err?.statusCode || 500)
+  if (status >= 500) {
+    console.error(err)
+    return fail(res, fallbackMessage, status)
+  }
+  return fail(res, err?.message || fallbackMessage, status)
+}
+
 export function notImplemented(_req, res) {
   return error(res, 'Not implemented', 501)
 }

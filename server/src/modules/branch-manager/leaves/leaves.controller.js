@@ -16,7 +16,7 @@ import { getStaffById } from '../staff/staff.model.js'
 import { resolveListBranchId } from '../staff/staff.access.js'
 import { notifyAdminsOfLeaveRequest } from '../../notifications/notifications.service.js'
 import { tenantQuery } from '../../../config/db.js'
-import { success, fail } from '../../../utils/response.util.js'
+import { success, fail, failFromError } from '../../../utils/response.util.js'
 
 function toIsoDate(value) {
   if (!value) return null
@@ -119,7 +119,7 @@ export async function addLeave(req, res) {
       201,
     )
   } catch (err) {
-    return fail(res, err.message || 'Failed to create leave', err.status || 500)
+    return failFromError(res, err, 'Failed to create leave')
   }
 }
 
@@ -181,7 +181,7 @@ export async function editLeave(req, res) {
 
     return success(res, updated)
   } catch (err) {
-    return fail(res, err.message || 'Failed to update leave', err.status || 500)
+    return failFromError(res, err, 'Failed to update leave')
   }
 }
 
@@ -205,7 +205,7 @@ export async function removeLeave(req, res) {
     const deleted = await deleteLeave(req.tenantId, id)
     return success(res, deleted)
   } catch (err) {
-    return fail(res, err.message || 'Failed to delete leave', err.status || 500)
+    return failFromError(res, err, 'Failed to delete leave')
   }
 }
 
@@ -274,7 +274,7 @@ export async function addMyLeave(req, res) {
       201,
     )
   } catch (err) {
-    return fail(res, err.message || 'Failed to submit leave request', err.status || 500)
+    return failFromError(res, err, 'Failed to submit leave request')
   }
 }
 
@@ -321,7 +321,7 @@ export async function editMyLeave(req, res) {
     })
     return success(res, updated)
   } catch (err) {
-    return fail(res, err.message || 'Failed to update leave request', err.status || 500)
+    return failFromError(res, err, 'Failed to update leave request')
   }
 }
 
@@ -347,6 +347,6 @@ export async function removeMyLeave(req, res) {
     const deleted = await deleteLeave(req.tenantId, id)
     return success(res, deleted)
   } catch (err) {
-    return fail(res, err.message || 'Failed to delete leave request', err.status || 500)
+    return failFromError(res, err, 'Failed to delete leave request')
   }
 }

@@ -27,13 +27,15 @@ export const loginUser = createAsyncThunk('auth/login', async (credentials, { re
   return result.data
 })
 
-// Optimistic logout: session is cleared on `pending` so LoginPage never
-// bounces back to the dashboard while the API request is in flight.
+// Optimistic logout: UI signs out on pending; tokens stay in storage until revoke API runs.
 export const logoutUser = createAsyncThunk('auth/logout', async () => {
+  const refreshToken = tokenStorage.getRefreshToken()
   try {
-    await apiClient.post(endpoints.auth.logout, {})
+    await apiClient.post(endpoints.auth.logout, refreshToken ? { refreshToken } : {})
   } catch {
-    // Client session already cleared — ignore network errors
+    // Ignore network errors — local session is cleared either way
+  } finally {
+    tokenStorage.clear()
   }
 })
 
@@ -140,15 +142,15 @@ const authSlice = createSlice({
         state.error = action.payload || action.error.message || 'Login failed'
       })
       .addCase(logoutUser.pending, (state) => {
-        tokenStorage.clear()
+        // Optimistic UI only — keep tokenStorage so revoke can send refreshToken
         invalidateProductCatalog()
         clearSessionState(state)
       })
       .addCase(logoutUser.fulfilled, (state) => {
+        tokenStorage.clear()
         clearSessionState(state)
       })
       .addCase(logoutUser.rejected, (state) => {
-        // Still signed out locally even if API failed
         tokenStorage.clear()
         invalidateProductCatalog()
         clearSessionState(state)

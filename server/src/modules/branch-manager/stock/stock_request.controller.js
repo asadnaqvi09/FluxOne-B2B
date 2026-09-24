@@ -1,6 +1,6 @@
 import { createStockRequest, listStockRequests } from './stock_request.model.js'
 import { notifyInventoryManagersOfStockRequest } from '../../notifications/notifications.service.js'
-import { success, fail } from '../../../utils/response.util.js'
+import { success, fail, failFromError } from '../../../utils/response.util.js'
 
 export async function stockRequestList(req, res) {
   return success(res, await listStockRequests(req.tenantId, req.validated.query))
@@ -29,6 +29,6 @@ export async function addStockRequest(req, res) {
 
     return success(res, row, 201)
   } catch (err) {
-    return fail(res, err.message || 'Failed to create stock request', err.status || 500)
+    return failFromError(res, err, 'Failed to create stock request')
   }
 }

@@ -15,7 +15,7 @@ import {
 } from './staff.access.js'
 import { validateShiftAgainstBranchHours } from './schedule.validation.js'
 import { getBranchHours } from '../../b2b-admin/branches/branches.model.js'
-import { ROLE_IDS, ROLES } from '../../../config/constants.js'
+import { ROLE_IDS, ROLES, BCRYPT_COST } from '../../../config/constants.js'
 import { fail, success } from '../../../utils/response.util.js'
 import { paginatedResult } from '../../../utils/pagination.util.js'
 import { resolveUploadUrl } from '../../../utils/uploadUrl.util.js'
@@ -64,7 +64,7 @@ export async function createStaff(req, res) {
   const hoursError = await rejectIfShiftOutsideBranchHours(res, req.tenantId, branchId, body)
   if (hoursError) return hoursError
 
-  const passwordHash = await bcrypt.hash(body.password, 10)
+  const passwordHash = await bcrypt.hash(body.password, BCRYPT_COST)
   const created = await createStaffUser(req.tenantId, {
     ...body,
     role: body.role,
@@ -88,7 +88,7 @@ export async function staffDetail(req, res) {
 export async function patchStaff(req, res) {
   const body = sanitizeStaffWritePayload(req, { ...req.validated.body })
   if (body.password) {
-    body.passwordHash = await bcrypt.hash(body.password, 10)
+    body.passwordHash = await bcrypt.hash(body.password, BCRYPT_COST)
     delete body.password
   }
   const imageUrl = resolveUploadUrl(req.file, req)

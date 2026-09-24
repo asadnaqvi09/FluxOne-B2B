@@ -1,12 +1,12 @@
 import { listSales, refundSale } from './sales.model.js'
-import { success, fail } from '../../../utils/response.util.js'
+import { success, fail, failFromError } from '../../../utils/response.util.js'
 
 export async function salesList(req, res) {
   try {
     const filters = {
-      q: req.query.q,
-      date: req.query.date,
-      category_id: req.query.categoryId,
+      q: req.validated.query.q,
+      date: req.validated.query.date,
+      category_id: req.validated.query.categoryId,
     }
     const rows = await listSales(req.tenantId, filters)
 
@@ -24,12 +24,12 @@ export async function salesList(req, res) {
       },
     })
   } catch (err) {
-    return fail(res, err.message || 'Failed to retrieve sales logs', 500)
+    return failFromError(res, err, 'Failed to retrieve sales logs')
   }
 }
 
 export async function processRefund(req, res) {
-  const { id } = req.params
+  const { id } = req.validated.params
   try {
     const row = await refundSale(req.tenantId, id)
     if (!row) {
@@ -37,6 +37,6 @@ export async function processRefund(req, res) {
     }
     return success(res, row)
   } catch (err) {
-    return fail(res, err.message || 'Failed to process refund', 500)
+    return failFromError(res, err, 'Failed to process refund')
   }
 }

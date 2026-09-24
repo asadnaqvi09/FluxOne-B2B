@@ -31,6 +31,14 @@ export const refreshSchema = z.object({
   params: z.object({}).optional(),
 })
 
+export const logoutSchema = z.object({
+  body: z.object({
+    refreshToken: z.string().min(10).optional(),
+  }),
+  query: z.object({}).optional(),
+  params: z.object({}).optional(),
+})
+
 export const changePasswordSchema = z.object({
   body: z.object({
     currentPassword: z.string().min(8).max(72),

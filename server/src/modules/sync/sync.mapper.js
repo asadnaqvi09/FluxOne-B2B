@@ -17,8 +17,10 @@ export {
 }
 
 function mapUser(user) {
+  // Never ship password hashes to POS — offline auth must use a separate mechanism
+  const { passwordHash: _passwordHash, password_hash: _password_hash, ...safe } = user
   return {
-    ...user,
+    ...safe,
     name: user.fullName,
     email: user.loginId,
   }

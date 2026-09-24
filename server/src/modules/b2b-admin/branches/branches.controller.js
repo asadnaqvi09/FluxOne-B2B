@@ -13,6 +13,7 @@ import {
 } from './branches.model.js'
 import { sendLoginCredentialsEmail } from '../../../mail/mail.service.js'
 import { resolveUploadUrl } from '../../../utils/uploadUrl.util.js'
+import { BCRYPT_COST } from '../../../config/constants.js'
 import { fail, success } from '../../../utils/response.util.js'
 import { paginatedResult } from '../../../utils/pagination.util.js'
 
@@ -88,7 +89,7 @@ export async function createBranch(req, res) {
   }
 
   const temporaryPassword = generateTemporaryPassword()
-  const passwordHash = await bcrypt.hash(temporaryPassword, 10)
+  const passwordHash = await bcrypt.hash(temporaryPassword, BCRYPT_COST)
 
   let created
   try {
@@ -187,7 +188,7 @@ export async function patchBranchStatus(req, res) {
 export async function resetPassword(req, res) {
   const override = req.validated.body?.password
   const temporaryPassword = override || generateTemporaryPassword()
-  const passwordHash = await bcrypt.hash(temporaryPassword, 10)
+  const passwordHash = await bcrypt.hash(temporaryPassword, BCRYPT_COST)
 
   let branch
   try {

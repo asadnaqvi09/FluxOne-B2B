@@ -10,7 +10,7 @@ import {
   clearHolidayAttendanceByDate,
 } from '../attendance/attendance.model.js'
 import { tenantQuery } from '../../../config/db.js'
-import { success, fail } from '../../../utils/response.util.js'
+import { success, fail, failFromError } from '../../../utils/response.util.js'
 
 function getDatesInRange(startDate, endDate) {
   const dates = []
@@ -82,11 +82,7 @@ export async function addHoliday(req, res) {
     isAllEmployees = true,
     employeeIds = [],
     status = 'active',
-  } = req.body
-
-  if (!name || !startDate) {
-    return fail(res, 'Holiday name and start date are required', 400)
-  }
+  } = req.validated.body
 
   try {
     const schedule = await createHolidaySchedule(req.tenantId, {
@@ -108,12 +104,12 @@ export async function addHoliday(req, res) {
 
     return success(res, schedule, 201)
   } catch (err) {
-    return fail(res, err.message || 'Failed to create holiday schedule', 500)
+    return failFromError(res, err, 'Failed to create holiday schedule')
   }
 }
 
 export async function editHoliday(req, res) {
-  const { id } = req.params
+  const { id } = req.validated.params
   const {
     name,
     startDate,
@@ -122,7 +118,7 @@ export async function editHoliday(req, res) {
     isAllEmployees,
     employeeIds,
     status,
-  } = req.body
+  } = req.validated.body
 
   try {
     const existing = await getHolidayScheduleById(req.tenantId, id)
@@ -159,12 +155,12 @@ export async function editHoliday(req, res) {
 
     return success(res, updated)
   } catch (err) {
-    return fail(res, err.message || 'Failed to update holiday schedule', 500)
+    return failFromError(res, err, 'Failed to update holiday schedule')
   }
 }
 
 export async function removeHoliday(req, res) {
-  const { id } = req.params
+  const { id } = req.validated.params
 
   try {
     const existing = await getHolidayScheduleById(req.tenantId, id)
@@ -181,6 +177,6 @@ export async function removeHoliday(req, res) {
     const deleted = await deleteHolidaySchedule(req.tenantId, id)
     return success(res, deleted)
   } catch (err) {
-    return fail(res, err.message || 'Failed to delete holiday schedule', 500)
+    return failFromError(res, err, 'Failed to delete holiday schedule')
   }
 }

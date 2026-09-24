@@ -7,6 +7,7 @@ import { validate } from '../../middlewares/validate.middleware.js'
 import {
   changePasswordSchema,
   loginSchema,
+  logoutSchema,
   refreshSchema,
   updateProfileSchema,
 } from './auth.validator.js'
@@ -25,7 +26,8 @@ function clearEmptyMultipartFields(req, _res, next) {
 
 router.post('/login', validate(loginSchema), asyncHandler(login))
 router.post('/refresh', validate(refreshSchema), asyncHandler(refresh))
-router.post('/logout', authMiddleware, asyncHandler(logout))
+// No authMiddleware: client clears access token before logout; revoke via refreshToken body
+router.post('/logout', validate(logoutSchema), asyncHandler(logout))
 router.get('/me', authMiddleware, asyncHandler(me))
 router.patch(
   '/me',

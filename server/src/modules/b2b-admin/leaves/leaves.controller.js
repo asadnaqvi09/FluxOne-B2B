@@ -8,7 +8,7 @@ import { notifyBmOfLeaveDecision } from '../../notifications/notifications.servi
 import { normalizeImageUrl } from '../../../utils/uploadUrl.util.js'
 import { matchesDisplayRef, normalizeSearchQuery } from '../../../utils/displayRef.util.js'
 import { tenantQuery } from '../../../config/db.js'
-import { success, fail } from '../../../utils/response.util.js'
+import { success, fail, failFromError } from '../../../utils/response.util.js'
 
 // Admin inbox of BM self-leave requests
 export async function managerLeavesList(req, res) {
@@ -106,6 +106,6 @@ export async function decideManagerLeave(req, res) {
       leave: updated,
     })
   } catch (err) {
-    return fail(res, err.message || 'Failed to decide leave request', err.status || 500)
+    return failFromError(res, err, 'Failed to decide leave request')
   }
 }

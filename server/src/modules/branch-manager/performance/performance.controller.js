@@ -1,5 +1,5 @@
 import { tenantQuery } from '../../../config/db.js'
-import { success, fail } from '../../../utils/response.util.js'
+import { success, fail, failFromError } from '../../../utils/response.util.js'
 
 function slugify(text) {
   return String(text || '')
@@ -9,8 +9,6 @@ function slugify(text) {
     .replace(/[\s_-]+/g, '_')
     .replace(/^-+|-+$/g, '')
 }
-
-const SCALE_MAX_POINTS_MSG = 'Maximum points must be a whole number greater than 0.'
 
 const SCALE_RETURNING = `
   id,
@@ -50,21 +48,6 @@ const WEIGHTED_RATING_SQL = `
   , 0)
 `
 
-function parseMaxPoints(raw) {
-  const points = Number(raw)
-  if (!Number.isFinite(points) || !Number.isInteger(points) || points < 1) {
-    return { ok: false, error: SCALE_MAX_POINTS_MSG }
-  }
-  return { ok: true, value: points }
-}
-
-function parseIsActive(raw) {
-  if (raw === undefined || raw === null || raw === '') return undefined
-  if (raw === true || raw === 'true') return true
-  if (raw === false || raw === 'false') return false
-  return undefined
-}
-
 export async function listScales(req, res) {
   const { rows } = await tenantQuery(
     req.tenantId,
@@ -79,17 +62,10 @@ export async function listScales(req, res) {
 }
 
 export async function createScale(req, res) {
-  const { name, maxPoints, isActive } = req.body
-  if (!name || maxPoints === undefined || maxPoints === null || maxPoints === '') {
-    return fail(res, 'Scale name and max points are required', 400)
-  }
-
-  const parsed = parseMaxPoints(maxPoints)
-  if (!parsed.ok) return fail(res, parsed.error, 400)
-  const points = parsed.value
+  const { name, maxPoints, isActive } = req.validated.body
+  const points = maxPoints
   const code = slugify(name)
-  const active = parseIsActive(isActive)
-  const activeValue = active === undefined ? true : active
+  const activeValue = isActive === undefined ? true : isActive
 
   try {
     const { rows } = await tenantQuery(
@@ -107,17 +83,15 @@ export async function createScale(req, res) {
     )
     return success(res, rows[0], 201)
   } catch (err) {
-    return fail(res, err.message || 'Failed to create scale', 500)
+    return failFromError(res, err, 'Failed to create scale')
   }
 }
 
 export async function updateScale(req, res) {
-  const { id } = req.params
-  const { name, maxPoints, isActive } = req.body
+  const { id } = req.validated.params
+  const { name, maxPoints, isActive } = req.validated.body
   const activeOnly =
-    parseIsActive(isActive) !== undefined &&
-    (name === undefined || name === null || name === '') &&
-    (maxPoints === undefined || maxPoints === null || maxPoints === '')
+    isActive !== undefined && name === undefined && maxPoints === undefined
 
   try {
     // Quick Enable / Disable toggle without renaming the factor
@@ -130,21 +104,18 @@ export async function updateScale(req, res) {
           WHERE tenant_id = $1 AND id = $3
           RETURNING ${SCALE_RETURNING}
         `,
-        [parseIsActive(isActive), id],
+        [isActive, id],
       )
       if (rows.length === 0) return fail(res, 'Scale not found', 404)
       return success(res, rows[0])
     }
 
-    if (!name || maxPoints === undefined || maxPoints === null || maxPoints === '') {
+    if (!name || maxPoints === undefined) {
       return fail(res, 'Scale name and max points are required', 400)
     }
 
-    const parsed = parseMaxPoints(maxPoints)
-    if (!parsed.ok) return fail(res, parsed.error, 400)
-    const points = parsed.value
+    const points = maxPoints
     const code = slugify(name)
-    const active = parseIsActive(isActive)
 
     // tenantQuery prepends tenantId as $1 — do not pass it again in params
     const { rows } = await tenantQuery(
@@ -159,19 +130,19 @@ export async function updateScale(req, res) {
         WHERE tenant_id = $1 AND id = $6
         RETURNING ${SCALE_RETURNING}
       `,
-      [name.trim(), points, code, active === undefined ? null : active, id],
+      [name.trim(), points, code, isActive === undefined ? null : isActive, id],
     )
     if (rows.length === 0) {
       return fail(res, 'Scale not found', 404)
     }
     return success(res, rows[0])
   } catch (err) {
-    return fail(res, err.message || 'Failed to update scale', 500)
+    return failFromError(res, err, 'Failed to update scale')
   }
 }
 
 export async function deleteScale(req, res) {
-  const { id } = req.params
+  const { id } = req.validated.params
   try {
     // Drop related scores so deleted factors leave the weighted calc
     await tenantQuery(
@@ -189,20 +160,13 @@ export async function deleteScale(req, res) {
     }
     return success(res, { message: 'Scale deleted successfully' })
   } catch (err) {
-    return fail(res, err.message || 'Failed to delete scale', 500)
+    return failFromError(res, err, 'Failed to delete scale')
   }
 }
 
 export async function scoreStaff(req, res) {
-  const { staffId, scaleId, points } = req.body
-  if (!staffId || !scaleId || points === undefined) {
-    return fail(res, 'Staff ID, scale ID, and points are required', 400)
-  }
-
-  const numericPoints = Number(points)
-  if (!Number.isFinite(numericPoints) || numericPoints < 0) {
-    return fail(res, 'Points must be a non-negative number', 400)
-  }
+  const { staffId, scaleId, points } = req.validated.body
+  const numericPoints = points
 
   try {
     const { rows: scaleRows } = await tenantQuery(
@@ -222,9 +186,9 @@ export async function scoreStaff(req, res) {
       return fail(res, 'Cannot score against a disabled scoring factor', 400)
     }
 
-    const maxPoints = Number(scaleRows[0].maxPoints)
-    if (numericPoints > maxPoints) {
-      return fail(res, `Points cannot exceed the factor maximum of ${maxPoints}`, 400)
+    const maxAllowed = Number(scaleRows[0].maxPoints)
+    if (numericPoints > maxAllowed) {
+      return fail(res, `Points cannot exceed the factor maximum of ${maxAllowed}`, 400)
     }
 
     // Keep one score row per staff + factor (replace prior value)
@@ -245,7 +209,7 @@ export async function scoreStaff(req, res) {
     )
     return success(res, rows[0], 201)
   } catch (err) {
-    return fail(res, err.message || 'Failed to score staff', 500)
+    return failFromError(res, err, 'Failed to score staff')
   }
 }
 
@@ -271,7 +235,7 @@ export async function getStaffScores(req, res) {
     )
     return success(res, rows)
   } catch (err) {
-    return fail(res, err.message || 'Failed to fetch performance scores', 500)
+    return failFromError(res, err, 'Failed to fetch performance scores')
   }
 }
 

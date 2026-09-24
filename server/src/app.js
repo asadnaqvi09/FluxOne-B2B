@@ -6,6 +6,8 @@ import morgan from 'morgan'
 import path from 'path'
 import { fileURLToPath } from 'url'
 import { pool } from './config/db.js'
+// Redis before rate-limit middleware so REDIS_URL client exists at store create
+import './config/redis.js'
 import { authMiddleware } from './middlewares/auth.middleware.js'
 import { errorMiddleware, notFoundMiddleware } from './middlewares/error.middleware.js'
 import {
@@ -15,6 +17,7 @@ import {
   inventoryLimiter,
   syncLimiter,
   adminLimiter,
+  notificationsLimiter,
 } from './middlewares/rateLimit.middleware.js'
 import authRoutes from './modules/auth/auth.routes.js'
 import inventoryRoutes from './modules/inventory-manager/inventory.routes.js'
@@ -62,7 +65,8 @@ app.use(
 )
 app.use(compression())
 app.use(express.json({ limit: '2mb' }))
-app.use(express.urlencoded({ extended: true }))
+// Cap urlencoded bodies (was unlimited — DoS vector)
+app.use(express.urlencoded({ extended: true, limit: '2mb' }))
 app.use(morgan(isProd ? 'combined' : 'dev'))
 app.use('/uploads', express.static(localUploadsDir))
 app.use(globalLimiter)
@@ -81,7 +85,7 @@ app.use('/api/inventory', inventoryLimiter, authMiddleware, inventoryRoutes)
 app.use('/api/branch', branchLimiter, authMiddleware, branchRoutes)
 app.use('/api/sync', syncLimiter, authMiddleware, syncRoutes)
 app.use('/api/admin', adminLimiter, authMiddleware, adminRoutes)
-app.use('/api/notifications', authMiddleware, notificationsRoutes)
+app.use('/api/notifications', notificationsLimiter, authMiddleware, notificationsRoutes)
 
 app.use(notFoundMiddleware)
 app.use(errorMiddleware)

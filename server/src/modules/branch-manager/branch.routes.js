@@ -70,8 +70,39 @@ import { asyncHandler } from '../../middlewares/error.middleware.js'
 import { requirePermission } from '../../middlewares/role.middleware.js'
 import { validate } from '../../middlewares/validate.middleware.js'
 import { upload } from '../../middlewares/upload.middleware.js'
-import { attendanceSchema } from './attendance/attendance.validator.js'
+import { attendanceSchema, listAttendanceSchema } from './attendance/attendance.validator.js'
 import { createStockRequestSchema, listStockRequestsSchema } from './stock/stock_request.validator.js'
+import {
+  listHolidaysSchema,
+  createHolidaySchema,
+  updateHolidaySchema,
+  holidayIdParamsSchema,
+} from './holidays/holidays.validator.js'
+import { listSalesSchema, refundSaleSchema } from './sales/sales.validator.js'
+import {
+  listDiscountsSchema,
+  createDiscountSchema,
+  updateDiscountSchema,
+  discountIdParamsSchema,
+} from './discounts/discounts.validator.js'
+import {
+  listScalesSchema,
+  listScoresSchema,
+  createScaleSchema,
+  updateScaleSchema,
+  scaleIdParamsSchema,
+  scoreStaffSchema,
+} from './performance/performance.validator.js'
+import {
+  listHardwareSchema,
+  createHardwareSchema,
+  updateHardwareSchema,
+  hardwareIdParamsSchema,
+  listItemScalesSchema,
+  createItemScaleSchema,
+  updateItemScaleSchema,
+  itemScaleIdParamsSchema,
+} from './resources/resources.validator.js'
 
 const router = Router()
 
@@ -82,7 +113,12 @@ router.use('/designations', designationRoutes)
 router.use('/activity-logs', activityLogsRoutes)
 
 // Attendance
-router.get('/attendance', requirePermission('attendance:write'), asyncHandler(attendanceList))
+router.get(
+  '/attendance',
+  requirePermission('attendance:write'),
+  validate(listAttendanceSchema),
+  asyncHandler(attendanceList),
+)
 router.post(
   '/attendance',
   requirePermission('attendance:write'),
@@ -91,10 +127,30 @@ router.post(
 )
 
 // Holidays
-router.get('/holidays', requirePermission('staff:read'), asyncHandler(holidaysList))
-router.post('/holidays', requirePermission('staff:write'), asyncHandler(addHoliday))
-router.put('/holidays/:id', requirePermission('staff:write'), asyncHandler(editHoliday))
-router.delete('/holidays/:id', requirePermission('staff:write'), asyncHandler(removeHoliday))
+router.get(
+  '/holidays',
+  requirePermission('staff:read'),
+  validate(listHolidaysSchema),
+  asyncHandler(holidaysList),
+)
+router.post(
+  '/holidays',
+  requirePermission('staff:write'),
+  validate(createHolidaySchema),
+  asyncHandler(addHoliday),
+)
+router.put(
+  '/holidays/:id',
+  requirePermission('staff:write'),
+  validate(updateHolidaySchema),
+  asyncHandler(editHoliday),
+)
+router.delete(
+  '/holidays/:id',
+  requirePermission('staff:write'),
+  validate(holidayIdParamsSchema),
+  asyncHandler(removeHoliday),
+)
 
 // Leaves — My Leave (BM self) must be registered before /leaves/:id
 router.get('/leaves/me', requirePermission('staff:read'), asyncHandler(myLeavesList))
@@ -144,43 +200,134 @@ router.delete(
 )
 
 // Sales
-router.get('/sales', requirePermission('branch-dashboard:read'), asyncHandler(salesList))
-router.post('/sales/:id/refund', requirePermission('staff:write'), asyncHandler(processRefund))
+router.get(
+  '/sales',
+  requirePermission('branch-dashboard:read'),
+  validate(listSalesSchema),
+  asyncHandler(salesList),
+)
+router.post(
+  '/sales/:id/refund',
+  requirePermission('staff:write'),
+  validate(refundSaleSchema),
+  asyncHandler(processRefund),
+)
 
 // Performance Scoring & Scales
-router.get('/performance/scales', requirePermission('performance:read'), asyncHandler(listScales))
-router.post('/performance/scales', requirePermission('staff:write'), asyncHandler(createScale))
-router.put('/performance/scales/:id', requirePermission('staff:write'), asyncHandler(updateScale))
-router.delete('/performance/scales/:id', requirePermission('staff:write'), asyncHandler(deleteScale))
-router.get('/performance/scores', requirePermission('performance:read'), asyncHandler(getStaffScores))
-router.post('/performance/scores', requirePermission('staff:write'), asyncHandler(scoreStaff))
+router.get(
+  '/performance/scales',
+  requirePermission('performance:read'),
+  validate(listScalesSchema),
+  asyncHandler(listScales),
+)
+router.post(
+  '/performance/scales',
+  requirePermission('staff:write'),
+  validate(createScaleSchema),
+  asyncHandler(createScale),
+)
+router.put(
+  '/performance/scales/:id',
+  requirePermission('staff:write'),
+  validate(updateScaleSchema),
+  asyncHandler(updateScale),
+)
+router.delete(
+  '/performance/scales/:id',
+  requirePermission('staff:write'),
+  validate(scaleIdParamsSchema),
+  asyncHandler(deleteScale),
+)
+router.get(
+  '/performance/scores',
+  requirePermission('performance:read'),
+  validate(listScoresSchema),
+  asyncHandler(getStaffScores),
+)
+router.post(
+  '/performance/scores',
+  requirePermission('staff:write'),
+  validate(scoreStaffSchema),
+  asyncHandler(scoreStaff),
+)
 
 // Discounts
-router.get('/discounts', requirePermission('items:read'), asyncHandler(getDiscounts))
-router.post('/discounts', requirePermission('items:write'), asyncHandler(addDiscount))
-router.put('/discounts/:id', requirePermission('items:write'), asyncHandler(editDiscount))
-router.delete('/discounts/:id', requirePermission('items:write'), asyncHandler(removeDiscount))
+router.get(
+  '/discounts',
+  requirePermission('items:read'),
+  validate(listDiscountsSchema),
+  asyncHandler(getDiscounts),
+)
+router.post(
+  '/discounts',
+  requirePermission('items:write'),
+  validate(createDiscountSchema),
+  asyncHandler(addDiscount),
+)
+router.put(
+  '/discounts/:id',
+  requirePermission('items:write'),
+  validate(updateDiscountSchema),
+  asyncHandler(editDiscount),
+)
+router.delete(
+  '/discounts/:id',
+  requirePermission('items:write'),
+  validate(discountIdParamsSchema),
+  asyncHandler(removeDiscount),
+)
 
 // Resources — POS hardware + item scales
-router.get('/resources/hardware', requirePermission('resources:read'), asyncHandler(hardwareList))
+router.get(
+  '/resources/hardware',
+  requirePermission('resources:read'),
+  validate(listHardwareSchema),
+  asyncHandler(hardwareList),
+)
 router.post(
   '/resources/hardware',
   requirePermission('resources:write'),
   upload.single('image'),
+  validate(createHardwareSchema),
   asyncHandler(hardwareCreate),
 )
 router.put(
   '/resources/hardware/:id',
   requirePermission('resources:write'),
   upload.single('image'),
+  validate(updateHardwareSchema),
   asyncHandler(hardwareUpdate),
 )
-router.delete('/resources/hardware/:id', requirePermission('resources:write'), asyncHandler(hardwareRemove))
-router.get('/resources/scales', requirePermission('resources:read'), asyncHandler(scalesList))
-router.post('/resources/scales', requirePermission('resources:write'), asyncHandler(scalesCreate))
-router.put('/resources/scales/:id', requirePermission('resources:write'), asyncHandler(scalesUpdate))
-router.delete('/resources/scales/:id', requirePermission('resources:write'), asyncHandler(scalesRemove))
-
+router.delete(
+  '/resources/hardware/:id',
+  requirePermission('resources:write'),
+  validate(hardwareIdParamsSchema),
+  asyncHandler(hardwareRemove),
+)
+router.get(
+  '/resources/scales',
+  requirePermission('resources:read'),
+  validate(listItemScalesSchema),
+  asyncHandler(scalesList),
+)
+router.post(
+  '/resources/scales',
+  requirePermission('resources:write'),
+  validate(createItemScaleSchema),
+  asyncHandler(scalesCreate),
+)
+router.put(
+  '/resources/scales/:id',
+  requirePermission('resources:write'),
+  validate(updateItemScaleSchema),
+  asyncHandler(scalesUpdate),
+)
+router.delete(
+  '/resources/scales/:id',
+  requirePermission('resources:write'),
+  validate(itemScaleIdParamsSchema),
+  asyncHandler(scalesRemove),
+)
 // Resources — Variant Types & Values (parallel to item_scales)
 router.get(
   '/resources/variant-types',

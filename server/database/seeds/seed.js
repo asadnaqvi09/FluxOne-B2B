@@ -2,13 +2,14 @@ import fs from 'fs'
 import path from 'path'
 import { fileURLToPath } from 'url'
 import bcrypt from 'bcryptjs'
+import { BCRYPT_COST } from '../../src/config/constants.js'
 import { pool, query } from '../../src/config/db.js'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 
 async function seed() {
-  const passwordHash = await bcrypt.hash('password', 10)
-  const admin123Hash = await bcrypt.hash('admin123', 10)
+  const passwordHash = await bcrypt.hash('password', BCRYPT_COST)
+  const admin123Hash = await bcrypt.hash('admin123', BCRYPT_COST)
   const sql = fs
     .readFileSync(path.join(__dirname, 'dummy_data.sql'), 'utf8')
     .replaceAll('{{PASSWORD_HASH}}', passwordHash)

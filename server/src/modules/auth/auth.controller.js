@@ -5,11 +5,29 @@ import {
   updateAuthProfile,
   updatePasswordHash,
 } from './auth.model.js'
-import { signAuthTokens, verifyRefreshToken } from '../../utils/jwt.util.js'
+import {
+  findRefreshTokenByJti,
+  insertRefreshToken,
+  revokeAllRefreshTokensForUser,
+  revokeRefreshTokenByHash,
+  revokeRefreshTokenByJti,
+} from './refresh_tokens.model.js'
+import {
+  getRefreshTokenExpiresAt,
+  hashToken,
+  signAuthTokens,
+  verifyAccessToken,
+  verifyRefreshToken,
+} from '../../utils/jwt.util.js'
 import { listBranchesForLookup } from '../inventory-manager/lookups/lookup.model.js'
-import { ROLES } from '../../config/constants.js'
+import { ROLES, BCRYPT_COST } from '../../config/constants.js'
 import { fail, success } from '../../utils/response.util.js'
 import { resolveUploadUrl } from '../../utils/uploadUrl.util.js'
+import {
+  clearLoginFailures,
+  isLoginLocked,
+  recordLoginFailure,
+} from '../../services/authLockout.service.js'
 
 function publicUser(user) {
   return {
@@ -54,12 +72,48 @@ function authPayload(user, tokens) {
   }
 }
 
+function requestMeta(req) {
+  return {
+    userAgent: req.get?.('user-agent') || null,
+    ipAddress: req.ip || req.socket?.remoteAddress || null,
+  }
+}
+
+/** Sign JWTs and persist refresh token hash for rotation/revocation. */
+async function issueSession(user, req) {
+  const tokens = signAuthTokens(user)
+  const meta = requestMeta(req)
+  await insertRefreshToken({
+    jti: tokens.jti,
+    userId: user.id,
+    tenantId: user.tenantId,
+    tokenHash: hashToken(tokens.refreshToken),
+    expiresAt: getRefreshTokenExpiresAt(),
+    userAgent: meta.userAgent,
+    ipAddress: meta.ipAddress,
+  })
+  return tokens
+}
+
 export async function login(req, res) {
   const { password } = req.validated.body
   const loginId = (req.validated.body.id || req.validated.body.email || '').trim()
+  const ip = req.ip || req.socket?.remoteAddress || 'unknown'
+
+  // Account lockout after repeated failures (Redis when available)
+  const lockState = await isLoginLocked(loginId, ip)
+  if (lockState.locked) {
+    res.set('Retry-After', String(lockState.retryAfterSec || 60))
+    return fail(
+      res,
+      `Too many failed login attempts. Try again in ${lockState.retryAfterSec || 60} seconds.`,
+      429,
+    )
+  }
 
   const candidates = await findAuthUsersByLoginId(loginId)
   if (!candidates.length) {
+    await recordLoginFailure(loginId, ip)
     return fail(res, 'Invalid id or password', 401)
   }
 
@@ -70,6 +124,15 @@ export async function login(req, res) {
   }
 
   if (!matched.length) {
+    const afterFail = await recordLoginFailure(loginId, ip)
+    if (afterFail.locked) {
+      res.set('Retry-After', String(afterFail.retryAfterSec || 60))
+      return fail(
+        res,
+        `Too many failed login attempts. Try again in ${afterFail.retryAfterSec || 60} seconds.`,
+        429,
+      )
+    }
     return fail(res, 'Invalid id or password', 401)
   }
 
@@ -81,8 +144,11 @@ export async function login(req, res) {
     )
   }
 
+  // Successful auth — clear failure counters for this id+IP
+  await clearLoginFailures(loginId, ip)
+
   const user = matched[0]
-  const tokens = signAuthTokens(user)
+  const tokens = await issueSession(user, req)
   const payload = authPayload(user, tokens)
   payload.branches = await branchesForUser(user)
   return success(res, payload)
@@ -119,8 +185,9 @@ export async function updateMe(req, res) {
     }
 
     if (newPassword) {
-      const nextHash = await bcrypt.hash(newPassword, 10)
+      const nextHash = await bcrypt.hash(newPassword, BCRYPT_COST)
       await updatePasswordHash(req.user.id, req.tenantId, nextHash)
+      await revokeAllRefreshTokensForUser(req.user.id, req.tenantId)
     }
   } catch (err) {
     if (err.status === 409) return fail(res, err.message, 409)
@@ -137,12 +204,42 @@ export async function updateMe(req, res) {
 
 export async function refresh(req, res) {
   try {
-    const decoded = verifyRefreshToken(req.validated.body.refreshToken)
-    const user = await findAuthUserById(decoded.sub, decoded.tenantId)
-    if (!user || !user.isActive) {
+    const rawToken = req.validated.body.refreshToken
+    const decoded = verifyRefreshToken(rawToken)
+    if (!decoded?.jti || !decoded?.sub || !decoded?.tenantId) {
       return fail(res, 'Invalid refresh token', 401)
     }
-    const tokens = signAuthTokens(user)
+
+    const stored = await findRefreshTokenByJti(decoded.jti)
+    if (!stored) {
+      return fail(res, 'Invalid refresh token', 401)
+    }
+
+    const incomingHash = hashToken(rawToken)
+    if (stored.tokenHash !== incomingHash) {
+      return fail(res, 'Invalid refresh token', 401)
+    }
+
+    // Reuse of a rotated/revoked token → kill all sessions for this user
+    if (stored.revokedAt) {
+      await revokeAllRefreshTokensForUser(stored.userId, stored.tenantId)
+      return fail(res, 'Invalid refresh token', 401)
+    }
+
+    if (new Date(stored.expiresAt).getTime() <= Date.now()) {
+      await revokeRefreshTokenByJti(decoded.jti)
+      return fail(res, 'Invalid refresh token', 401)
+    }
+
+    const user = await findAuthUserById(decoded.sub, decoded.tenantId)
+    if (!user || !user.isActive) {
+      await revokeAllRefreshTokensForUser(decoded.sub, decoded.tenantId)
+      return fail(res, 'Invalid refresh token', 401)
+    }
+
+    const tokens = await issueSession(user, req)
+    await revokeRefreshTokenByJti(decoded.jti, { replacedByJti: tokens.jti })
+
     const payload = authPayload(user, tokens)
     payload.branches = await branchesForUser(user)
     return success(res, payload)
@@ -161,11 +258,43 @@ export async function changePassword(req, res) {
   if (!match) {
     return fail(res, 'Current password is incorrect', 401)
   }
-  const nextHash = await bcrypt.hash(newPassword, 10)
+  const nextHash = await bcrypt.hash(newPassword, BCRYPT_COST)
   await updatePasswordHash(user.id, req.tenantId, nextHash)
+  await revokeAllRefreshTokensForUser(user.id, req.tenantId)
   return success(res, { updated: true })
 }
 
-export async function logout(_req, res) {
+/**
+ * Revoke refresh session(s). Accepts refreshToken in body and/or Bearer access token.
+ * Always returns success so clients can clear local state without leaking validity.
+ */
+export async function logout(req, res) {
+  const rawRefresh = req.validated?.body?.refreshToken || req.body?.refreshToken
+
+  if (rawRefresh && String(rawRefresh).length >= 10) {
+    try {
+      const decoded = verifyRefreshToken(rawRefresh)
+      if (decoded?.jti) {
+        await revokeRefreshTokenByJti(decoded.jti)
+      } else {
+        await revokeRefreshTokenByHash(hashToken(rawRefresh))
+      }
+    } catch {
+      await revokeRefreshTokenByHash(hashToken(rawRefresh))
+    }
+  }
+
+  const header = req.headers.authorization || ''
+  if (header.startsWith('Bearer ')) {
+    try {
+      const access = verifyAccessToken(header.slice(7))
+      if (access?.sub && access?.tenantId) {
+        await revokeAllRefreshTokensForUser(access.sub, access.tenantId)
+      }
+    } catch {
+      // Access may already be expired — refresh revoke above is enough
+    }
+  }
+
   return success(res, { loggedOut: true })
 }

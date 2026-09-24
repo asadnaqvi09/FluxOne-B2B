@@ -1029,7 +1029,6 @@ async function fetchBootstrapUsers(tenantId, branchId, since = null) {
       SELECT
         u.id,
         u.email AS "loginId",
-        u.password_hash AS "passwordHash",
         r.slug AS role,
         u.full_name AS "fullName",
         u.branch_id AS "branchId",

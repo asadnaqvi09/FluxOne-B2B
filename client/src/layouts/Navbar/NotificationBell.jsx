@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Bell } from 'lucide-react'
+import { Bell, X } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { apiClient } from '@/api/api'
 import { endpoints } from '@/api/endpoints'
@@ -57,8 +57,21 @@ export function NotificationBell({ className }) {
     const onDoc = (e) => {
       if (rootRef.current && !rootRef.current.contains(e.target)) setOpen(false)
     }
+    const onKey = (e) => {
+      if (e.key === 'Escape') setOpen(false)
+    }
     document.addEventListener('mousedown', onDoc)
-    return () => document.removeEventListener('mousedown', onDoc)
+    document.addEventListener('keydown', onKey)
+    const previous = document.body.style.overflow
+    // Prevent background scroll when panel is open on small screens
+    if (typeof window !== 'undefined' && window.matchMedia('(max-width: 639px)').matches) {
+      document.body.style.overflow = 'hidden'
+    }
+    return () => {
+      document.removeEventListener('mousedown', onDoc)
+      document.removeEventListener('keydown', onKey)
+      document.body.style.overflow = previous
+    }
   }, [open])
 
   const openDropdown = () => {
@@ -85,6 +98,7 @@ export function NotificationBell({ className }) {
         size="icon"
         className="relative size-9 rounded-full text-slate-700 hover:bg-slate-100"
         aria-label="Notifications"
+        aria-expanded={open}
         onClick={openDropdown}
       >
         <Bell className="size-5" />
@@ -96,70 +110,99 @@ export function NotificationBell({ className }) {
       </Button>
 
       {open ? (
-        <div className="absolute top-full right-0 z-50 mt-2 w-[min(26rem,calc(100vw-1.5rem))] overflow-hidden rounded-xl border border-border bg-white shadow-lg">
-          <div className="flex items-center justify-between border-b border-border px-3 py-2.5">
-            <p className="text-sm font-semibold text-slate-900">Notifications</p>
-            {unreadCount > 0 ? (
-              <button
-                type="button"
-                className="cursor-pointer text-xs font-medium text-[#8E238F] hover:underline"
-                onClick={async () => {
-                  await apiClient.patch(endpoints.notifications.readAll)
-                  void refresh()
-                }}
-              >
-                Mark all read
-              </button>
-            ) : null}
-          </div>
-
-          <div className="max-h-96 overflow-y-auto">
-            {loading && !items.length ? (
-              <p className="px-3 py-6 text-center text-xs text-slate-400">Loading…</p>
-            ) : items.length === 0 ? (
-              <p className="px-3 py-6 text-center text-xs text-slate-400">No notifications yet</p>
-            ) : (
-              items.map((n) => {
-                const { title, body } = displayNotification(n)
-                return (
-                  <button
-                    key={n.id}
-                    type="button"
-                    onClick={() => handleClickItem(n)}
-                    className={cn(
-                      'flex w-full cursor-pointer flex-col gap-1 border-b border-slate-100 px-3 py-2.5 text-left transition-colors hover:bg-slate-50',
-                      !n.isRead && 'bg-purple-50/40',
-                    )}
-                  >
-                    <div className="flex items-start justify-between gap-2">
-                      <p className="text-sm font-semibold leading-snug text-slate-900">{title}</p>
-                      {!n.isRead ? (
-                        <span className="mt-1 size-2 shrink-0 rounded-full bg-[#8E238F]" />
-                      ) : null}
-                    </div>
-                    {body ? (
-                      <p className="whitespace-normal break-words text-xs leading-relaxed text-slate-600">
-                        {body}
-                      </p>
-                    ) : null}
-                    <p className="text-[11px] text-slate-400">{formatRelative(n.createdAt)}</p>
-                  </button>
-                )
-              })
-            )}
-          </div>
-
+        <>
+          {/* Mobile scrim — keeps panel readable / tappable outside */}
           <button
             type="button"
-            className="w-full cursor-pointer border-t border-border px-3 py-2.5 text-center text-xs font-semibold text-[#8E238F] hover:bg-slate-50"
-            onClick={() => {
-              setOpen(false)
-              navigate(notificationsPath)
-            }}
+            aria-label="Close notifications"
+            className="fixed inset-0 z-40 bg-slate-900/30 sm:hidden"
+            onClick={() => setOpen(false)}
+          />
+          <div
+            className={cn(
+              'z-50 overflow-hidden rounded-xl border border-border bg-white shadow-lg',
+              // Mobile: fixed sheet under header (avoids viewport overflow)
+              'fixed top-14 right-3 left-3 max-h-[min(28rem,calc(100dvh-4.5rem))]',
+              // Desktop: anchored to bell
+              'sm:absolute sm:top-full sm:right-0 sm:left-auto sm:mt-2 sm:w-[min(26rem,calc(100vw-1.5rem))] sm:max-h-96',
+            )}
           >
-            View all notifications
-          </button>
-        </div>
+            <div className="flex items-center justify-between border-b border-border px-3 py-2.5">
+              <p className="text-sm font-semibold text-slate-900">Notifications</p>
+              <div className="flex items-center gap-2">
+                {unreadCount > 0 ? (
+                  <button
+                    type="button"
+                    className="cursor-pointer text-xs font-medium text-[#8E238F] hover:underline"
+                    onClick={async () => {
+                      await apiClient.patch(endpoints.notifications.readAll)
+                      void refresh()
+                    }}
+                  >
+                    Mark all read
+                  </button>
+                ) : null}
+                <button
+                  type="button"
+                  aria-label="Close notifications"
+                  className="flex size-8 cursor-pointer items-center justify-center rounded-lg text-slate-500 hover:bg-slate-100 sm:hidden"
+                  onClick={() => setOpen(false)}
+                >
+                  <X className="size-4" />
+                </button>
+              </div>
+            </div>
+
+            <div className="max-h-[min(20rem,calc(100dvh-11rem))] overflow-y-auto overscroll-contain sm:max-h-80">
+              {loading && !items.length ? (
+                <p className="px-3 py-6 text-center text-xs text-slate-400">Loading…</p>
+              ) : items.length === 0 ? (
+                <p className="px-3 py-6 text-center text-xs text-slate-400">No notifications yet</p>
+              ) : (
+                items.map((n) => {
+                  const { title, body } = displayNotification(n)
+                  return (
+                    <button
+                      key={n.id}
+                      type="button"
+                      onClick={() => handleClickItem(n)}
+                      className={cn(
+                        'flex w-full cursor-pointer flex-col gap-1 border-b border-slate-100 px-3 py-2.5 text-left transition-colors hover:bg-slate-50',
+                        !n.isRead && 'bg-purple-50/40',
+                      )}
+                    >
+                      <div className="flex items-start justify-between gap-2">
+                        <p className="min-w-0 flex-1 text-sm font-semibold leading-snug break-words text-slate-900">
+                          {title}
+                        </p>
+                        {!n.isRead ? (
+                          <span className="mt-1 size-2 shrink-0 rounded-full bg-[#8E238F]" />
+                        ) : null}
+                      </div>
+                      {body ? (
+                        <p className="whitespace-normal break-words text-xs leading-relaxed text-slate-600">
+                          {body}
+                        </p>
+                      ) : null}
+                      <p className="text-[11px] text-slate-400">{formatRelative(n.createdAt)}</p>
+                    </button>
+                  )
+                })
+              )}
+            </div>
+
+            <button
+              type="button"
+              className="w-full cursor-pointer border-t border-border px-3 py-2.5 text-center text-xs font-semibold text-[#8E238F] hover:bg-slate-50"
+              onClick={() => {
+                setOpen(false)
+                navigate(notificationsPath)
+              }}
+            >
+              View all notifications
+            </button>
+          </div>
+        </>
       ) : null}
     </div>
   )

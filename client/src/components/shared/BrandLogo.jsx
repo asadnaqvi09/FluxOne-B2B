@@ -10,9 +10,8 @@ const sizes = {
   xl: 'size-[min(160px,42vw)]',
 }
 
-export function BrandLogo({ className, size = 'md', withGlow = false }) {
-  return (
-    <NavLink to="/">
+export function BrandLogo({ className, size = 'md', withGlow = false, asLink = true }) {
+  const mark = (
     <div
       className={cn(
         'relative shrink-0 overflow-hidden rounded-full border border-gray-200',
@@ -29,8 +28,11 @@ export function BrandLogo({ className, size = 'md', withGlow = false }) {
         height={200}
         className="size-full object-contain"
         draggable={false}
-        />
-      </div>
-    </NavLink>
+      />
+    </div>
   )
+
+  if (!asLink) return mark
+
+  return <NavLink to="/">{mark}</NavLink>
 }

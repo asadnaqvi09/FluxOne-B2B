@@ -96,7 +96,7 @@ function MobileDrawer({ open, onClose, items }) {
           >
             <div className="flex items-center justify-between border-b border-border px-4 py-3">
               <div className="flex items-center gap-2">
-                <BrandLogo size="sm" />
+                <BrandLogo size="sm" asLink={false} />
                 <p className="text-sm font-semibold text-slate-800">{BRAND.product.split(' ')[0]}</p>
               </div>
               <button

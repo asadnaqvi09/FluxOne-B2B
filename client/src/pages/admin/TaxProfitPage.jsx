@@ -20,7 +20,6 @@ import {
 } from '@/components/ui/table'
 import {
   Dialog,
-  DialogCancelButton,
   DialogContent,
   DialogDescription,
   DialogFooter,
@@ -32,10 +31,8 @@ import {
   useAdminTaxProfit,
 } from '@/hooks/useAdminTaxProfit'
 import { useDebouncedValue } from '@/hooks/useDebouncedValue'
-import { useFormBaseline } from '@/hooks/useFormBaseline'
 import { BRAND } from '@/lib/constants'
 import { toastSuccess, toastError } from '@/lib/toast'
-import { displayItemCode } from '@/lib/formatDisplayId'
 import { validatePercentage } from '@/lib/validation/formValidators'
 import {
   Percent,
@@ -58,6 +55,8 @@ import {
   Info,
 } from 'lucide-react'
 
+const PAGE_SIZE = ADMIN_TAX_PROFIT_PAGE_SIZE
+
 export function TaxProfitPage() {
   const [selectedIds, setSelectedIds] = useState([])
   const [searchQuery, setSearchQuery] = useState('')
@@ -67,14 +66,12 @@ export function TaxProfitPage() {
   const [selectedScale, setSelectedScale] = useState('')
   const [presetFilter, setPresetFilter] = useState('all')
   const [page, setPage] = useState(1)
-  const [limit, setLimit] = useState(ADMIN_TAX_PROFIT_PAGE_SIZE)
 
   const [profitDialogOpen, setProfitDialogOpen] = useState(false)
   const [taxDialogOpen, setTaxDialogOpen] = useState(false)
   const [bulkProfitValue, setBulkProfitValue] = useState('20')
   const [bulkTaxValue, setBulkTaxValue] = useState('5')
 
-<<<<<<< HEAD
   // Default Tax & Profit configuration states
   const [defaultTaxDialogOpen, setDefaultTaxDialogOpen] = useState(false)
   const [defaultProfitDialogOpen, setDefaultProfitDialogOpen] = useState(false)
@@ -88,22 +85,6 @@ export function TaxProfitPage() {
   const [singleItemTarget, setSingleItemTarget] = useState(null)
   const [singleProfitValue, setSingleProfitValue] = useState('0')
   const [singleTaxValue, setSingleTaxValue] = useState('0')
-=======
-  const profitBaseline = useFormBaseline(profitDialogOpen)
-  const taxBaseline = useFormBaseline(taxDialogOpen)
-
-  useEffect(() => {
-    if (!profitDialogOpen) return
-    profitBaseline.captureBaseline({ bulkProfitValue })
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [profitDialogOpen, profitBaseline.captureBaseline])
-
-  useEffect(() => {
-    if (!taxDialogOpen) return
-    taxBaseline.captureBaseline({ bulkTaxValue })
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [taxDialogOpen, taxBaseline.captureBaseline])
->>>>>>> eeeb612f2ec75787e21ba56a070cb842c7ce8ccc
 
   const [visibleColumns, setVisibleColumns] = useState({
     id: true,
@@ -140,7 +121,7 @@ export function TaxProfitPage() {
     scale: selectedScale,
     sort: presetFilter,
     page,
-    limit,
+    limit: PAGE_SIZE,
   })
 
   // Sync current defaults from meta
@@ -467,7 +448,7 @@ export function TaxProfitPage() {
               <Search className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-slate-400" />
               <input
                 type="text"
-                placeholder="Search by item code, name, or barcode..."
+                placeholder="Search by SKU, name, or barcode..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 className="h-10 w-full rounded-xl border border-border bg-slate-50/70 py-2 pl-9 pr-4 text-xs sm:text-sm text-slate-900 outline-none focus:border-purple-300 focus:bg-white focus:ring-1 focus:ring-purple-300"
@@ -557,7 +538,6 @@ export function TaxProfitPage() {
                       />
                       {colKey
                         .replace('Pct', ' %')
-                        .replace('id', 'Item code')
                         .replace('baseCost', 'Base Cost')
                         .replace('finalPrice', 'Final Price')}
                     </label>
@@ -605,6 +585,9 @@ export function TaxProfitPage() {
                 <Calculator className="mr-1.5 size-3.5" />
                 Set Tax %
               </Button>
+              <span className="text-xs font-medium text-slate-400 ml-1 hidden sm:inline">
+                {totalCatalog} records · {PAGE_SIZE} / page
+              </span>
             </div>
           }
         >
@@ -665,7 +648,7 @@ export function TaxProfitPage() {
                         <div className="min-w-0 flex-1">
                           <p className="truncate text-sm font-bold text-slate-900">{p.name}</p>
                           <p className="font-mono text-[11px] text-slate-400">
-                            {displayItemCode(p)}
+                            {p.itemCode || p.id}
                           </p>
                           <p className="mt-1 text-xs text-slate-500">
                             {p.category || 'Uncategorized'}
@@ -721,7 +704,7 @@ export function TaxProfitPage() {
                         />
                       </TableHead>
                       {visibleColumns.id && (
-                        <TableHead className="px-3 py-3 font-medium">Item code</TableHead>
+                        <TableHead className="px-3 py-3 font-medium">SKU ID</TableHead>
                       )}
                       {visibleColumns.image && (
                         <TableHead className="px-3 py-3 font-medium">Image</TableHead>
@@ -747,7 +730,7 @@ export function TaxProfitPage() {
                         <TableHead className="px-3 py-3 font-medium">Tax %</TableHead>
                       )}
                       {visibleColumns.finalPrice && (
-                        <TableHead className="sticky right-0 z-[1] bg-slate-200/80 px-3 py-3 font-bold text-slate-900">
+                        <TableHead className="sticky right-0 z-[1] bg-white px-3 py-3 text-right font-bold text-slate-900">
                           Final Price
                         </TableHead>
                       )}
@@ -777,8 +760,8 @@ export function TaxProfitPage() {
                           </TableCell>
 
                           {visibleColumns.id && (
-                            <TableCell className="px-3 py-3 font-mono text-xs font-bold text-slate-700 whitespace-nowrap">
-                              {displayItemCode(p)}
+                            <TableCell className="px-3 py-3 font-mono text-xs font-bold text-slate-700">
+                              {p.itemCode || p.id}
                             </TableCell>
                           )}
 
@@ -853,7 +836,7 @@ export function TaxProfitPage() {
                           )}
 
                           {visibleColumns.finalPrice && (
-                            <TableCell className="sticky right-0 z-[1] bg-white px-3 py-3 group-hover:bg-slate-50/70">
+                            <TableCell className="sticky right-0 z-[1] bg-white px-3 py-3 text-right group-hover:bg-slate-50/70">
                               <span className="font-extrabold text-sm text-purple-950 block">
                                 Rs. {Number(finalPrice).toLocaleString()}
                               </span>
@@ -875,12 +858,7 @@ export function TaxProfitPage() {
                   page={pagination.page || page}
                   pageCount={pagination.pageCount || 1}
                   totalItems={pagination.total || 0}
-                  pageSize={limit}
                   onPageChange={setPage}
-                  onPageSizeChange={(next) => {
-                    setLimit(next)
-                    setPage(1)
-                  }}
                 />
               </div>
             </>
@@ -888,7 +866,6 @@ export function TaxProfitPage() {
         </SurfaceCard>
       </MotionReveal>
 
-<<<<<<< HEAD
       {/* Set Default Tax % Dialog */}
       <Dialog open={defaultTaxDialogOpen} onOpenChange={setDefaultTaxDialogOpen}>
         <DialogContent className="max-w-md">
@@ -1184,13 +1161,6 @@ export function TaxProfitPage() {
 
       {/* Bulk Profit Dialog */}
       <Dialog open={profitDialogOpen} onOpenChange={setProfitDialogOpen}>
-=======
-      <Dialog
-        open={profitDialogOpen}
-        onOpenChange={setProfitDialogOpen}
-        dirty={profitBaseline.isDirty({ bulkProfitValue })}
-      >
->>>>>>> eeeb612f2ec75787e21ba56a070cb842c7ce8ccc
         <DialogContent className="max-w-md">
           <DialogHeader>
             <DialogTitle>Set Profit Margin Percentage</DialogTitle>
@@ -1221,7 +1191,14 @@ export function TaxProfitPage() {
             </div>
 
             <DialogFooter className="pt-2">
-              <DialogCancelButton disabled={mutating} />
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => setProfitDialogOpen(false)}
+                disabled={mutating}
+              >
+                Cancel
+              </Button>
               <Button
                 type="submit"
                 disabled={mutating}
@@ -1235,16 +1212,8 @@ export function TaxProfitPage() {
         </DialogContent>
       </Dialog>
 
-<<<<<<< HEAD
       {/* Bulk Tax Dialog */}
       <Dialog open={taxDialogOpen} onOpenChange={setTaxDialogOpen}>
-=======
-      <Dialog
-        open={taxDialogOpen}
-        onOpenChange={setTaxDialogOpen}
-        dirty={taxBaseline.isDirty({ bulkTaxValue })}
-      >
->>>>>>> eeeb612f2ec75787e21ba56a070cb842c7ce8ccc
         <DialogContent className="max-w-md">
           <DialogHeader>
             <DialogTitle>Set Sales Tax Percentage</DialogTitle>
@@ -1275,7 +1244,14 @@ export function TaxProfitPage() {
             </div>
 
             <DialogFooter className="pt-2">
-              <DialogCancelButton disabled={mutating} />
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => setTaxDialogOpen(false)}
+                disabled={mutating}
+              >
+                Cancel
+              </Button>
               <Button
                 type="submit"
                 disabled={mutating}

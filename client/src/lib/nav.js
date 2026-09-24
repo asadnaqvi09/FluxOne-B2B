@@ -11,14 +11,22 @@ const INVENTORY_NAV = [
   { to: PATHS.inventory.orders, label: 'Orders', end: false },
 ]
 
+// Primary top-nav modules only (utility pages live in Admin side nav)
 const ADMIN_NAV = [
   { to: PATHS.admin.dashboard, label: 'Dashboard', end: false },
   { to: PATHS.admin.reports, label: 'Reports', end: false },
   { to: PATHS.admin.branches, label: 'Manage Branches', end: false },
-  { to: PATHS.admin.leaves, label: 'Leave Management', end: false },
   { to: PATHS.admin.invoices, label: 'Invoices', end: false },
   { to: PATHS.admin.taxProfit, label: 'Tax & Profit', end: false },
+]
+
+// Admin hamburger side menu (Leave, Notifications, Company, Profile, Settings)
+const ADMIN_SIDE_NAV = [
+  { to: PATHS.admin.leaves, label: 'Leave Management', end: false },
+  { to: PATHS.admin.notifications, label: 'Notifications', end: false },
   { to: PATHS.admin.company, label: 'Company & Policies', end: false },
+  { to: PATHS.admin.profile, label: 'Profile', end: false },
+  { to: PATHS.admin.settings, label: 'Settings', end: false },
 ]
 
 export const NAV_BY_ROLE = {
@@ -39,8 +47,16 @@ export const NAV_BY_ROLE = {
   [ROLES.DELIVERY_STAFF]: [],
 }
 
+export const SIDE_NAV_BY_ROLE = {
+  [ROLES.B2B_ADMIN]: ADMIN_SIDE_NAV,
+}
+
 export function getNavItemsForRole(role) {
   return NAV_BY_ROLE[role] || []
+}
+
+export function getSideNavItemsForRole(role) {
+  return SIDE_NAV_BY_ROLE[role] || []
 }
 
 export function roleDisplayName(role) {

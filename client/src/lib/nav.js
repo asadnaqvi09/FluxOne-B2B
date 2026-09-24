@@ -15,6 +15,7 @@ const ADMIN_NAV = [
   { to: PATHS.admin.dashboard, label: 'Dashboard', end: false },
   { to: PATHS.admin.reports, label: 'Reports', end: false },
   { to: PATHS.admin.branches, label: 'Manage Branches', end: false },
+  { to: PATHS.admin.leaves, label: 'Leave Management', end: false },
   { to: PATHS.admin.invoices, label: 'Invoices', end: false },
   { to: PATHS.admin.taxProfit, label: 'Tax & Profit', end: false },
   { to: PATHS.admin.company, label: 'Company & Policies', end: false },

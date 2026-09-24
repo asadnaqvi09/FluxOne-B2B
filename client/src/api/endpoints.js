@@ -45,6 +45,17 @@ export const endpoints = {
       summary: '/admin/invoices/summary',
       detail: (id) => `/admin/invoices/${id}`,
     },
+    leaves: {
+      list: '/admin/leaves',
+      decide: (id) => `/admin/leaves/${id}/decide`,
+    },
+  },
+  notifications: {
+    list: '/notifications',
+    unreadCount: '/notifications/unread-count',
+    read: (id) => `/notifications/${id}/read`,
+    readAll: '/notifications/read-all',
+    remove: (id) => `/notifications/${id}`,
   },
   dashboard: {
     overview: '/inventory/dashboard/overview',

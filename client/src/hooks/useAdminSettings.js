@@ -2,7 +2,7 @@ import { useCallback, useEffect, useState } from 'react'
 import { apiClient } from '@/api/api'
 import { endpoints } from '@/api/endpoints'
 
-export const ADMIN_DEVICES_PAGE_SIZE = 6
+export const ADMIN_DEVICES_PAGE_SIZE = 8
 
 // Live B2B Admin hardware devices (/api/admin/settings/devices).
 export function useAdminDevices({

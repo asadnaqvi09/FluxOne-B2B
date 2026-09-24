@@ -1,8 +1,9 @@
-import { Package, Pencil, Printer, Trash2 } from 'lucide-react'
+import { Package, Printer } from 'lucide-react'
 import { BarcodeCell } from '@/components/feature/products/BarcodeCell'
 import { PricingColumns } from '@/components/feature/products/PricingColumns'
 import { ProductImageCell, ProductStatusToggle } from '@/components/feature/products/ProductStatusToggle'
 import { PromotionColumns } from '@/components/feature/products/PromotionColumns'
+import { ActionIconButton } from '@/components/shared/ActionIconButton'
 import { EmptyState } from '@/components/shared/EmptyState'
 import { SurfaceCard } from '@/components/shared/SurfaceCard'
 import { Button } from '@/components/ui/button'
@@ -13,10 +14,56 @@ import {
   TableHead,
   TableRow,
   TableCell,
+  TableActionsHead,
+  TableActionsCell,
   TablePagination,
 } from '@/components/ui/table'
 import { TableRowsSkeleton } from '@/components/ui/skeleton'
-import { money } from '@/lib/mapProduct'
+import { formatInventoryStock, money } from '@/lib/mapProduct'
+import { displayItemCode } from '@/lib/formatDisplayId'
+
+// Print / Edit / Delete for one catalog row
+function ProductRowActions({ row, onPrintBarcode, onEdit, onDelete }) {
+  return (
+    <>
+      <Button
+        type="button"
+        size="icon"
+        variant="ghost"
+        className="size-8 cursor-pointer text-slate-500 hover:bg-slate-100 hover:text-slate-900"
+        title="Download barcode PDF"
+        aria-label="Download barcode PDF"
+        onClick={() => onPrintBarcode?.(row)}
+      >
+        <Printer className="size-4" />
+      </Button>
+      <ActionIconButton
+        action="edit"
+        label="Edit product"
+        className="size-8"
+        onClick={() => onEdit?.(row)}
+      />
+      <ActionIconButton
+        action="delete"
+        label="Delete product"
+        className="size-8"
+        onClick={() => onDelete?.(row)}
+      />
+    </>
+  )
+}
+
+function InventoryStockCell({ row, className = '' }) {
+  const stock = formatInventoryStock(row.quantity, row.reorderPoint, row.scale)
+  return (
+    <span
+      className={`text-xs font-medium whitespace-nowrap ${stock.className} ${className}`.trim()}
+      title={stock.display}
+    >
+      {stock.display}
+    </span>
+  )
+}
 
 export function ProductTable({
   items = [],
@@ -24,6 +71,7 @@ export function ProductTable({
   pagination,
   statusUpdatingId = null,
   onPageChange,
+  onPageSizeChange,
   onEdit,
   onPrintBarcode,
   onStatusChange,
@@ -35,17 +83,13 @@ export function ProductTable({
   const page = pagination?.page || 1
   const pageCount = Math.max(1, pagination?.pageCount || 1)
   const total = pagination?.total ?? list.length
+  const pageSize = pagination?.limit || 8
 
   return (
     <SurfaceCard
       className={className}
       title="Product catalog"
       description="Single items & bundles for this company"
-      actions={
-        <span className="text-xs font-medium text-slate-400">
-          {total} records · 8 / page
-        </span>
-      }
     >
       {loading ? (
         <TableRowsSkeleton rows={6} />
@@ -70,7 +114,7 @@ export function ProductTable({
                     <div className="flex items-start justify-between gap-2">
                       <div className="min-w-0">
                         <p className="truncate text-sm font-semibold text-slate-900">{row.name}</p>
-                        <p className="font-mono text-[11px] text-slate-400">{row.itemCode}</p>
+                        <p className="font-mono text-[11px] text-slate-400">{displayItemCode(row)}</p>
                       </div>
                       <ProductStatusToggle
                         status={row.status}
@@ -105,50 +149,30 @@ export function ProductTable({
                         <span className="text-slate-400">Current selling</span>{' '}
                         {money(row.sellingPrice)}
                       </p>
+                      <p>
+                        <span className="text-slate-400">Inventory stock</span>{' '}
+                        <InventoryStockCell row={row} />
+                      </p>
                     </div>
-                    <div className="mt-3 flex flex-wrap gap-1.5">
-                      <Button
-                        type="button"
-                        size="sm"
-                        variant="outline"
-                        className="cursor-pointer"
-                        onClick={() => onPrintBarcode?.(row)}
-                      >
-                        <Printer className="size-3.5" />
-                        PDF
-                      </Button>
-                      <Button
-                        type="button"
-                        size="sm"
-                        variant="outline"
-                        className="cursor-pointer"
-                        onClick={() => onEdit?.(row)}
-                      >
-                        <Pencil className="size-3.5" />
-                        Edit
-                      </Button>
-                      <Button
-                        type="button"
-                        size="sm"
-                        variant="outline"
-                        className="cursor-pointer text-red-600 hover:text-red-700"
-                        onClick={() => onDelete?.(row)}
-                      >
-                        <Trash2 className="size-3.5" />
-                        Delete
-                      </Button>
+                    <div className="mt-3 flex flex-wrap items-center gap-1">
+                      <ProductRowActions
+                        row={row}
+                        onPrintBarcode={onPrintBarcode}
+                        onEdit={onEdit}
+                        onDelete={onDelete}
+                      />
                     </div>
                   </div>
                 </div>
               </article>
             ))}
           </div>
-          {/* Desktop table */}
+          {/* Desktop table — Action uses nowrap cell so Delete is not clipped */}
           <div className="hidden overflow-x-auto md:block">
-            <Table className="min-w-[1100px] text-left text-sm">
+            <Table className="min-w-[1280px] text-left text-sm">
               <TableHeader>
                 <TableRow className="text-[11px] tracking-wide text-slate-500 uppercase">
-                  <TableHead className="px-2 py-3 font-semibold">Image</TableHead>
+                  <TableHead className="px-2 py-3 font-semibold">Name</TableHead>
                   <TableHead className="px-2 py-3 font-semibold">Scale</TableHead>
                   <TableHead className="px-2 py-3 font-semibold">Item code</TableHead>
                   <TableHead className="px-2 py-3 font-semibold">Barcode</TableHead>
@@ -160,8 +184,11 @@ export function ProductTable({
                   <TableHead className="px-2 py-3 font-semibold">
                     Last / Current selling
                   </TableHead>
+                  <TableHead className="px-2 py-3 font-semibold whitespace-nowrap">
+                    Inventory Stock
+                  </TableHead>
                   <TableHead className="px-2 py-3 font-semibold">Status</TableHead>
-                  <TableHead className="px-2 py-3 font-semibold">Action</TableHead>
+                  <TableActionsHead className="px-2 py-3 font-semibold">Action</TableActionsHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -182,8 +209,10 @@ export function ProductTable({
                       </div>
                     </TableCell>
                     <TableCell className="px-2 py-3 text-slate-700">{row.scale}</TableCell>
-                    <TableCell className="px-2 py-3 font-mono text-xs text-slate-600">{row.itemCode}</TableCell>
-                    <TableCell className="max-w-[120px] px-2 py-3">
+                    <TableCell className="px-2 py-3 font-mono text-xs text-slate-600 whitespace-nowrap">
+                      {displayItemCode(row)}
+                    </TableCell>
+                    <TableCell className="max-w-[140px] px-2 py-3 whitespace-nowrap">
                       <BarcodeCell value={row.barcode} />
                     </TableCell>
                     <TableCell className="px-2 py-3">
@@ -229,46 +258,23 @@ export function ProductTable({
                       </p>
                     </TableCell>
                     <TableCell className="px-2 py-3">
+                      <InventoryStockCell row={row} />
+                    </TableCell>
+                    <TableCell className="px-2 py-3">
                       <ProductStatusToggle
                         status={row.status}
                         loading={statusUpdatingId === row.id}
                         onChange={(status) => onStatusChange?.(row, status)}
                       />
                     </TableCell>
-                    <TableCell className="px-2 py-3">
-                      <div className="flex items-center gap-1">
-                        <Button
-                          type="button"
-                          size="icon"
-                          variant="ghost"
-                          className="cursor-pointer"
-                          title="Download barcode PDF"
-                          onClick={() => onPrintBarcode?.(row)}
-                        >
-                          <Printer className="size-4" />
-                        </Button>
-                        <Button
-                          type="button"
-                          size="icon"
-                          variant="ghost"
-                          className="cursor-pointer"
-                          title="Edit"
-                          onClick={() => onEdit?.(row)}
-                        >
-                          <Pencil className="size-4" />
-                        </Button>
-                        <Button
-                          type="button"
-                          size="icon"
-                          variant="ghost"
-                          className="cursor-pointer text-red-600 hover:text-red-700"
-                          title="Delete"
-                          onClick={() => onDelete?.(row)}
-                        >
-                          <Trash2 className="size-4" />
-                        </Button>
-                      </div>
-                    </TableCell>
+                    <TableActionsCell>
+                      <ProductRowActions
+                        row={row}
+                        onPrintBarcode={onPrintBarcode}
+                        onEdit={onEdit}
+                        onDelete={onDelete}
+                      />
+                    </TableActionsCell>
                   </TableRow>
                 ))}
               </TableBody>
@@ -279,8 +285,10 @@ export function ProductTable({
             page={page}
             pageCount={pageCount}
             totalItems={total}
+            pageSize={pageSize}
             loading={loading}
             onPageChange={onPageChange}
+            onPageSizeChange={onPageSizeChange}
           />
         </>
       )}

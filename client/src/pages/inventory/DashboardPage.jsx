@@ -19,6 +19,7 @@ export function DashboardPage() {
     alertsPagination,
     stockOutPie,
     setAlertsPage,
+    setAlertsPageSize,
     loading,
     alertsLoading,
     error,
@@ -77,6 +78,7 @@ export function DashboardPage() {
               loading={alertsLoading || loading}
               pagination={alertsPagination}
               onPageChange={setAlertsPage}
+              onPageSizeChange={setAlertsPageSize}
             />
           </MotionReveal>
           <MotionReveal delay={0.1}>

@@ -1,4 +1,4 @@
-// useInventoryDashboard — RTK dashboard slice wrapper (Express → RTK → hook → UI)
+// useInventoryDashboard — RTK dashboard slice wrapper (Express → RTK → useInventoryDashboard)
 import { useCallback, useEffect } from 'react'
 import { useAppDispatch, useAppSelector } from '@/rtk/hooks'
 import {
@@ -17,6 +17,7 @@ export function useInventoryDashboard() {
     alertsPagination,
     stockOutPie,
     alertsPage,
+    alertsLimit,
     loading,
     alertsLoading,
     error,
@@ -30,9 +31,18 @@ export function useInventoryDashboard() {
     async (nextPage) => {
       const page = Math.max(1, Number(nextPage) || 1)
       if (page === alertsPage) return
-      await dispatch(fetchInventoryAlertsPage(page))
+      await dispatch(fetchInventoryAlertsPage({ page, limit: alertsLimit }))
     },
-    [alertsPage, dispatch],
+    [alertsPage, alertsLimit, dispatch],
+  )
+
+  const setAlertsPageSize = useCallback(
+    async (nextLimit) => {
+      const limit = Math.max(1, Number(nextLimit) || ALERTS_PAGE_SIZE)
+      if (limit === alertsLimit && alertsPage === 1) return
+      await dispatch(fetchInventoryAlertsPage({ page: 1, limit }))
+    },
+    [alertsLimit, alertsPage, dispatch],
   )
 
   return {
@@ -41,7 +51,9 @@ export function useInventoryDashboard() {
     alertsPagination,
     stockOutPie,
     alertsPage,
+    alertsLimit,
     setAlertsPage,
+    setAlertsPageSize,
     loading,
     alertsLoading,
     error,

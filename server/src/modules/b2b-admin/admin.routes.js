@@ -8,6 +8,7 @@ import policiesRoutes from './policies/policies.routes.js'
 import taxProfitRoutes from './tax-profit/tax-profit.routes.js'
 import settingsRoutes from './settings/settings.routes.js'
 import invoicesRoutes from './invoices/invoices.routes.js'
+import leavesRoutes from './leaves/leaves.routes.js'
 
 const router = Router()
 
@@ -15,6 +16,7 @@ const router = Router()
 router.use(requireRoles(ROLES.B2B_ADMIN, ROLES.BRANCH_ADMIN))
 router.use('/dashboard', dashboardRoutes)
 router.use('/branches', branchesRoutes)
+router.use('/leaves', leavesRoutes)
 router.use('/company', companyRoutes)
 router.use('/policies', policiesRoutes)
 router.use('/tax-profit', taxProfitRoutes)

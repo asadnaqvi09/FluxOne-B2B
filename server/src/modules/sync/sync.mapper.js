@@ -1,4 +1,20 @@
 // Dual cloud + POS field names for bootstrap/delta responses.
+//
+// FluxOne-POS invoice slip policies:
+// See ./posSlipPolicies.contract.js — after sync, print company.slipPolicies
+// (or returnInstructions fallback) on the sale receipt footer.
+
+import {
+  POS_SLIP_POLICY_FIELDS,
+  resolveSlipPoliciesForPrint,
+  formatSlipPolicyPrintLines,
+} from './posSlipPolicies.contract.js'
+
+export {
+  POS_SLIP_POLICY_FIELDS,
+  resolveSlipPoliciesForPrint,
+  formatSlipPolicyPrintLines,
+}
 
 function mapUser(user) {
   return {
@@ -41,11 +57,17 @@ export function mapSnapshotForPos(snapshot) {
   const taxes = (snapshot.taxes || []).map(mapTax)
   const productTaxes = flattenProductTaxes(products)
 
+  // Enabled Admin policies for POS receipt footer (FluxOne-POS must print these)
+  const slipPolicies = Array.isArray(snapshot.company?.slipPolicies)
+    ? snapshot.company.slipPolicies
+    : snapshot.policies || []
+
   const company = snapshot.company
     ? {
         ...snapshot.company,
         phone: snapshot.company.contactPhone ?? snapshot.company.phone ?? null,
         address: snapshot.company.address ?? null,
+        slipPolicies,
       }
     : snapshot.company
 
@@ -55,6 +77,7 @@ export function mapSnapshotForPos(snapshot) {
     products,
     taxes,
     productTaxes,
+    policies: slipPolicies,
     company,
   }
 }

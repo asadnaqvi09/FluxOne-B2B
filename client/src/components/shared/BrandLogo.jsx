@@ -1,5 +1,6 @@
 import fluxOneLogo from '@/assets/FluxOne(2).png'
 import { cn } from '@/lib/utils'
+import { NavLink } from 'react-router-dom'
 import { BRAND } from '@/lib/constants'
 
 const sizes = {
@@ -11,6 +12,7 @@ const sizes = {
 
 export function BrandLogo({ className, size = 'md', withGlow = false }) {
   return (
+    <NavLink to="/">
     <div
       className={cn(
         'relative shrink-0 overflow-hidden rounded-full border border-gray-200',
@@ -27,7 +29,8 @@ export function BrandLogo({ className, size = 'md', withGlow = false }) {
         height={200}
         className="size-full object-contain"
         draggable={false}
-      />
-    </div>
+        />
+      </div>
+    </NavLink>
   )
 }

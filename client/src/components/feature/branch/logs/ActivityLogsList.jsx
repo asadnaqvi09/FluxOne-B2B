@@ -56,6 +56,7 @@ export function ActivityLogsList({
   error,
   pagination,
   onPageChange,
+  onPageSizeChange,
 }) {
   if (loading && items.length === 0) {
     return <p className="py-10 text-center text-sm text-slate-400">Loading activity logs…</p>
@@ -90,12 +91,9 @@ export function ActivityLogsList({
 
   return (
     <div className="space-y-1">
-      <div className="mb-3 flex items-center justify-between gap-2">
-        <p className="text-xs font-medium text-slate-400">
-          {total} record{total === 1 ? '' : 's'} · {limit} / page
-          {loading ? ' · refreshing…' : ''}
-        </p>
-      </div>
+      {loading ? (
+        <p className="mb-3 text-xs font-medium text-slate-400">Refreshing…</p>
+      ) : null}
 
       <ResponsiveDataShell
         mobile={items.map((log) => (
@@ -148,7 +146,15 @@ export function ActivityLogsList({
         }
       />
 
-      <TablePagination page={page} pageCount={pageCount} loading={loading} onPageChange={onPageChange} />
+      <TablePagination
+        page={page}
+        pageCount={pageCount}
+        totalItems={total}
+        pageSize={limit}
+        loading={loading}
+        onPageChange={onPageChange}
+        onPageSizeChange={onPageSizeChange}
+      />
     </div>
   )
 }

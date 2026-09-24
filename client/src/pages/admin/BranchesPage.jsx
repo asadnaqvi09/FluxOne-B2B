@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { SurfaceCard } from '@/components/shared/SurfaceCard'
 import { StatCard } from '@/components/shared/StatsCards'
 import { PageHeader } from '@/components/shared/PageHeader'
@@ -20,6 +20,7 @@ import {
 } from '@/components/ui/table'
 import {
   Dialog,
+  DialogCancelButton,
   DialogContent,
   DialogDescription,
   DialogFooter,
@@ -27,18 +28,26 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog'
 import { ConfirmDialog } from '@/components/shared/ConfirmDialog'
+import { DeleteEntityDialog } from '@/components/shared/DeleteEntityDialog'
 import { ImageUploadField } from '@/components/shared/ImageUploadField'
+import { FieldError } from '@/components/shared/FieldError'
 import { PhoneInput } from '@/components/shared/PhoneInput'
 import { TimePicker } from '@/components/shared/TimePicker'
+import { DataCard, ResponsiveDataShell } from '@/components/shared/ResponsiveDataShell'
 import { BRAND } from '@/lib/constants'
 import { toastSuccess, toastError } from '@/lib/toast'
 import {
   validatePhone,
   validateEmail,
 } from '@/lib/validation/formValidators'
+import { fieldErrorClass } from '@/lib/validation/fieldErrors'
+import { useFieldErrors } from '@/hooks/useFieldErrors'
 import { useAdminBranches } from '@/hooks/useAdminBranches'
 import { useAuthSession } from '@/hooks/useAuthSession'
 import { useDebouncedValue } from '@/hooks/useDebouncedValue'
+import { useFormBaseline } from '@/hooks/useFormBaseline'
+import { useClientPagination } from '@/hooks/useClientPagination'
+import { displayBranchRef } from '@/lib/formatDisplayId'
 import {
   Plus,
   Search,
@@ -52,11 +61,10 @@ import {
   KeyRound,
   Loader2,
   Trash2,
-  Eye,
+  Unlock,
   Pencil,
 } from 'lucide-react'
 
-const PAGE_SIZE = 8
 const DEFAULT_BRANCH_IMAGE =
   'https://images.unsplash.com/photo-1578916171728-46686eac8d58?w=500&auto=format&fit=crop&q=60'
 const AVATAR_MALE =
@@ -75,13 +83,6 @@ function formatCreatedAt(value) {
     hour: '2-digit',
     minute: '2-digit',
   })
-}
-
-function shortId(id) {
-  if (!id) return '—'
-  const raw = String(id).trim()
-  if (raw.length <= 20) return raw
-  return `${raw.slice(0, 8)}…${raw.slice(-6)}`
 }
 
 function managerAvatar(manager) {
@@ -139,12 +140,103 @@ function formatHoursRange(openingTime, closingTime) {
   return `${open}–${close}`
 }
 
+function BranchRowActions({
+  branch: b,
+  mutating,
+  onEdit,
+  onResetPassword,
+  onToggleStatus,
+  onDelete,
+}) {
+  const isOpen = b.status === 'open'
+  return (
+    // Left-aligned action icons (table consistency)
+    <div className="inline-flex items-center justify-start gap-1">
+      <Button
+        type="button"
+        variant="ghost"
+        size="icon"
+        onClick={() => onEdit(b)}
+        disabled={mutating}
+        title="Edit"
+        aria-label={`Edit ${b.name}`}
+        className="size-8 text-purple-800 hover:bg-purple-50 hover:text-purple-950"
+      >
+        <Pencil className="size-4" />
+      </Button>
+      {b.manager?.id && !b.manager?.credentialsEmailed ? (
+        <Button
+          type="button"
+          variant="ghost"
+          size="icon"
+          onClick={() => onResetPassword(b)}
+          disabled={mutating}
+          title="Manage credentials"
+          aria-label={`Manage credentials for ${b.name}`}
+          className="size-8 text-amber-700 hover:bg-amber-50 hover:text-amber-900"
+        >
+          <KeyRound className="size-4" />
+        </Button>
+      ) : null}
+      <Button
+        type="button"
+        variant="ghost"
+        size="icon"
+        onClick={() => onToggleStatus(b)}
+        disabled={mutating}
+        title={isOpen ? 'Block' : 'Unblock'}
+        aria-label={isOpen ? `Block ${b.name}` : `Unblock ${b.name}`}
+        className={`size-8 ${
+          isOpen
+            ? 'text-rose-600 hover:bg-rose-50 hover:text-rose-800'
+            : 'text-emerald-700 hover:bg-emerald-50 hover:text-emerald-900'
+        }`}
+      >
+        {isOpen ? <Ban className="size-4" /> : <Unlock className="size-4" />}
+      </Button>
+      <Button
+        type="button"
+        variant="ghost"
+        size="icon"
+        onClick={() => onDelete(b)}
+        disabled={mutating}
+        title="Delete"
+        aria-label={`Delete ${b.name}`}
+        className="size-8 text-slate-500 hover:bg-slate-100 hover:text-slate-900"
+      >
+        <Trash2 className="size-4" />
+      </Button>
+    </div>
+  )
+}
+
+const BRANCH_FIELD_IDS = {
+  name: 'branchName',
+  location: 'branchLocation',
+  managerName: 'mgrName',
+  managerEmail: 'mgrEmail',
+  managerContact: 'mgrContact',
+  managerOtherContact: 'mgrOtherContact',
+  openingTime: 'branchOpeningTime',
+  closingTime: 'branchClosingTime',
+}
+
+const BRANCH_FIELD_ORDER = [
+  'name',
+  'location',
+  'openingTime',
+  'closingTime',
+  'managerName',
+  'managerEmail',
+  'managerContact',
+  'managerOtherContact',
+]
+
 export function BranchesPage() {
   const { user } = useAuthSession()
   const [searchQuery, setSearchQuery] = useState('')
   const debouncedQ = useDebouncedValue(searchQuery.trim(), 300)
   const [statusFilter, setStatusFilter] = useState('all')
-  const [page, setPage] = useState(1)
   const [addDialogOpen, setAddDialogOpen] = useState(false)
   const [editingBranch, setEditingBranch] = useState(null)
   const [confirmStatusOpen, setConfirmStatusOpen] = useState(false)
@@ -153,6 +245,7 @@ export function BranchesPage() {
   const [resetTarget, setResetTarget] = useState(null)
   const [deleteTarget, setDeleteTarget] = useState(null)
   const [formData, setFormData] = useState(emptyForm)
+  const { fieldErrors, formError, resetErrors, clearField, applyErrors } = useFieldErrors()
 
   const {
     items,
@@ -166,7 +259,16 @@ export function BranchesPage() {
     deleteBranch,
   } = useAdminBranches({ q: debouncedQ, limit: 100 })
 
+  const { captureBaseline, isDirty } = useFormBaseline(addDialogOpen)
   const slowHint = useSlowLoadingHint(loading)
+
+  // Snapshot form when Add/Edit opens so Esc/X only prompt when fields changed
+  useEffect(() => {
+    if (!addDialogOpen) return
+    resetErrors()
+    captureBaseline(formData)
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- capture once per open
+  }, [addDialogOpen, captureBaseline, resetErrors])
 
   const stats = useMemo(() => {
     const total = items.length
@@ -181,12 +283,15 @@ export function BranchesPage() {
     return items.filter((b) => (statusFilter === 'all' ? true : b.status === statusFilter))
   }, [items, statusFilter])
 
-  const totalPages = Math.max(1, Math.ceil(filteredBranches.length / PAGE_SIZE))
-
-  const pagedBranches = useMemo(() => {
-    const start = (page - 1) * PAGE_SIZE
-    return filteredBranches.slice(start, start + PAGE_SIZE)
-  }, [filteredBranches, page])
+  const {
+    page,
+    setPage,
+    pageSize,
+    setPageSize,
+    pageCount,
+    total,
+    slice: pagedBranches,
+  } = useClientPagination(filteredBranches)
 
   function handleOpenAdd() {
     setFormData({
@@ -256,61 +361,79 @@ export function BranchesPage() {
     setResetDialogOpen(false)
   }
 
-  async function handleConfirmDelete() {
+  async function handleSoftDeleteFromTrash() {
+    if (!deleteTarget) return
+    if (deleteTarget.status === 'blocked') {
+      setDeleteTarget(null)
+      return
+    }
+    const result = await setBranchStatus(deleteTarget.id, 'blocked')
+    if (!result.success) {
+      toastError(result.error || 'Failed to block branch')
+      return
+    }
+    toastSuccess(`Branch "${deleteTarget.name}" blocked — data kept. Open it anytime from Blocked.`)
+    setDeleteTarget(null)
+  }
+
+  async function handleHardDeleteBranch() {
     if (!deleteTarget) return
     const result = await deleteBranch(deleteTarget.id)
     if (!result.success) {
       toastError(result.error || 'Failed to delete branch')
       return
     }
-    toastSuccess(`Branch "${deleteTarget.name}" deleted`)
+    toastSuccess(`Branch "${deleteTarget.name}" permanently deleted`)
     setDeleteTarget(null)
   }
 
+  const deleteHasStaff = Number(deleteTarget?.totalStaff || 0) > 0
+  const deleteCanHard = Boolean(deleteTarget) && !deleteHasStaff
+  const deleteShowSoft = Boolean(deleteTarget) && deleteTarget.status === 'open'
+
   async function handleSubmitBranch(e) {
     e.preventDefault()
+    const errors = {}
     if (!formData.name.trim() || !formData.location.trim()) {
-      toastError('Please fill in Branch Name and Location')
-      return
+      if (!formData.name.trim()) {
+        errors.name = 'Please fill in Branch Name and Location'
+      }
+      if (!formData.location.trim()) {
+        errors.location = 'Please fill in Branch Name and Location'
+      }
     }
     if (!formData.managerName.trim()) {
-      toastError('Please fill in Branch Manager Name')
-      return
+      errors.managerName = 'Please fill in Branch Manager Name'
     }
 
     const emailErr = validateEmail(formData.managerEmail, { fieldName: 'Manager Email' })
-    if (emailErr) {
-      toastError(emailErr)
-      return
-    }
+    if (emailErr) errors.managerEmail = emailErr
 
     const phoneErr = validatePhone(formData.managerContact, { fieldName: 'Manager Contact Phone' })
-    if (phoneErr) {
-      toastError(phoneErr)
-      return
-    }
+    if (phoneErr) errors.managerContact = phoneErr
 
     if (formData.managerOtherContact.trim()) {
       const otherErr = validatePhone(formData.managerOtherContact, {
         fieldName: 'Other contact number',
         required: false,
       })
-      if (otherErr) {
-        toastError(otherErr)
-        return
-      }
+      if (otherErr) errors.managerOtherContact = otherErr
     }
 
     const hasOpen = Boolean(formData.openingTime?.trim())
     const hasClose = Boolean(formData.closingTime?.trim())
     if (hasOpen !== hasClose) {
-      toastError('Set both opening and closing time, or leave both empty')
+      errors.openingTime = 'Set both opening and closing time, or leave both empty'
+      errors.closingTime = 'Set both opening and closing time, or leave both empty'
+    } else if (hasOpen && hasClose && formData.openingTime >= formData.closingTime) {
+      errors.closingTime = 'Closing time must be after opening time'
+    }
+
+    if (Object.keys(errors).length) {
+      applyErrors(errors, BRANCH_FIELD_IDS, BRANCH_FIELD_ORDER)
       return
     }
-    if (hasOpen && hasClose && formData.openingTime >= formData.closingTime) {
-      toastError('Closing time must be after opening time')
-      return
-    }
+    resetErrors()
 
     const payload = {
       name: formData.name.trim(),
@@ -328,23 +451,32 @@ export function BranchesPage() {
     }
 
     if (editingBranch) {
-      const result = await updateBranch(editingBranch.id, payload)
-      if (!result.success) {
-        toastError(result.error || 'Failed to update branch')
-        return
+      try {
+        const result = await updateBranch(editingBranch.id, payload)
+        if (!result.success) {
+          toastError(result.error || 'Failed to update branch')
+          return
+        }
+        toastSuccess(`Branch details updated for "${formData.name}"`)
+        setAddDialogOpen(false)
+        setEditingBranch(null)
+      } catch (err) {
+        toastError(err?.message || 'Failed to update branch')
       }
-      toastSuccess(`Branch details updated for "${formData.name}"`)
     } else {
-      const result = await createBranch(payload)
-      if (!result.success) {
-        toastError(result.error || 'Failed to create branch')
-        return
+      try {
+        const result = await createBranch(payload)
+        if (!result.success) {
+          toastError(result.error || 'Failed to create branch')
+          return
+        }
+        credentialsToast(`Branch "${formData.name}" created.`, result.data?.credentials)
+        setAddDialogOpen(false)
+        setEditingBranch(null)
+      } catch (err) {
+        toastError(err?.message || 'Failed to create branch')
       }
-      credentialsToast(`Branch "${formData.name}" created.`, result.data?.credentials)
     }
-
-    setAddDialogOpen(false)
-    setEditingBranch(null)
   }
 
   return (
@@ -459,125 +591,47 @@ export function BranchesPage() {
         <SurfaceCard
           title="List of branches"
           description="Registered branch network, branch manager assignments, locations & access statuses"
-          actions={
-            <span className="text-xs font-medium text-slate-400 whitespace-nowrap">
-              {filteredBranches.length} records · {PAGE_SIZE} / page
-            </span>
-          }
         >
-          <div className="-mx-1 overflow-x-auto sm:mx-0">
-            <Table className="min-w-[42rem] w-full text-left text-sm sm:min-w-[52rem]">
-              <TableHeader>
-                <TableRow className="text-xs text-slate-500 uppercase">
-                  <TableHead className="px-2 py-3 font-medium whitespace-nowrap sm:px-3">Branch ID</TableHead>
-                  <TableHead className="px-2 py-3 font-medium whitespace-nowrap sm:px-3">Image</TableHead>
-                  <TableHead className="px-2 py-3 font-medium whitespace-nowrap sm:px-3 min-w-[10rem]">Branch</TableHead>
-                  <TableHead className="hidden px-2 py-3 font-medium whitespace-nowrap sm:table-cell sm:px-3 min-w-[9rem]">
-                    Location
-                  </TableHead>
-                  <TableHead className="px-2 py-3 font-medium whitespace-nowrap sm:px-3 min-w-[12rem]">
-                    Manager
-                  </TableHead>
-                  <TableHead className="px-2 py-3 font-medium whitespace-nowrap sm:px-3">Status</TableHead>
-                  <TableHead className="sticky right-0 z-[1] bg-white px-2 py-3 text-right font-medium whitespace-nowrap sm:px-3">
-                    Action
-                  </TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {loading && items.length === 0 ? (
-                  <TableRow>
-                    <TableCell colSpan={7} className="py-10 text-center text-xs text-slate-400">
-                      <span className="inline-flex items-center gap-2">
-                        <Loader2 className="size-4 animate-spin" />
-                        Loading branches…
-                      </span>
-                    </TableCell>
-                  </TableRow>
-                ) : filteredBranches.length === 0 ? (
-                  <TableRow>
-                    <TableCell colSpan={7} className="py-8 text-center text-xs text-slate-400">
-                      No branches match the filter criteria. Add a branch to start the SoftFlux upward flow.
-                    </TableCell>
-                  </TableRow>
-                ) : (
-                  pagedBranches.map((b) => {
-                    const isOpen = b.status === 'open'
-                    const imageSrc = b.image || DEFAULT_BRANCH_IMAGE
-                    return (
-                      <TableRow key={b.id} className="group hover:bg-slate-50/80">
-                        <TableCell className="px-2 py-3 font-mono text-xs whitespace-nowrap sm:px-3">
-                          <span
-                            title={b.id}
-                            className="inline-flex items-center font-mono text-xs font-medium text-slate-800 bg-slate-100/80 border border-slate-200/80 px-2 py-0.5 rounded select-all hover:bg-slate-200/60 transition-colors"
-                          >
-                            {shortId(b.id)}
-                          </span>
-                        </TableCell>
-                        <TableCell className="px-2 py-3 whitespace-nowrap sm:px-3">
-                          <img
-                            src={imageSrc}
-                            alt={b.name}
-                            className="size-9 sm:size-11 rounded-md object-cover border border-slate-200 shrink-0 shadow-2xs"
-                          />
-                        </TableCell>
-                        <TableCell className="px-2 py-3 sm:px-3">
-                          <p className="font-bold text-slate-900 text-xs sm:text-sm">{b.name}</p>
-                          <span className="text-[10px] sm:text-[11px] text-slate-400 whitespace-nowrap">
-                            Est. {formatCreatedAt(b.createdAt)}
-                          </span>
-                          {formatHoursRange(b.openingTime, b.closingTime) ? (
-                            <p className="mt-0.5 text-[10px] font-medium text-purple-800 whitespace-nowrap">
-                              Hours {formatHoursRange(b.openingTime, b.closingTime)}
+          {loading && items.length === 0 ? (
+            <div className="flex items-center justify-center gap-2 py-10 text-xs text-slate-400">
+              <Loader2 className="size-4 animate-spin" />
+              Loading branches…
+            </div>
+          ) : filteredBranches.length === 0 ? (
+            <p className="py-8 text-center text-xs text-slate-400">
+              No branches match the filter criteria. Add a branch to start the SoftFlux upward flow.
+            </p>
+          ) : (
+            <ResponsiveDataShell
+              mobile={pagedBranches.map((b) => {
+                const isOpen = b.status === 'open'
+                const imageSrc = b.image || DEFAULT_BRANCH_IMAGE
+                return (
+                  <DataCard key={b.id}>
+                    <div className="flex items-start gap-3">
+                      <img
+                        src={imageSrc}
+                        alt={b.name}
+                        className="size-12 shrink-0 rounded-md border border-slate-200 object-cover shadow-2xs"
+                      />
+                      <div className="min-w-0 flex-1">
+                        <div className="flex items-start justify-between gap-2">
+                          <div className="min-w-0">
+                            <p className="truncate text-sm font-bold text-slate-900">{b.name}</p>
+                            {/* Human-readable ID; title shows full UUID on hover */}
+                            <p
+                              title={b.id || undefined}
+                              className="mt-0.5 font-mono text-[11px] font-semibold text-purple-800"
+                            >
+                              {displayBranchRef(b)}
                             </p>
-                          ) : null}
-                          <p className="mt-1 flex items-start gap-1 text-[10px] text-slate-500 sm:hidden">
-                            <MapPin className="mt-0.5 size-3 shrink-0 text-slate-400" />
-                            <span className="line-clamp-2">{b.location || '—'}</span>
-                          </p>
-                        </TableCell>
-                        <TableCell className="hidden px-2 py-3 text-xs text-slate-600 sm:table-cell sm:px-3">
-                          <div className="flex items-start gap-1">
-                            <MapPin className="mt-0.5 size-3.5 text-slate-400 shrink-0" />
-                            <span className="line-clamp-2">{b.location || '—'}</span>
                           </div>
-                        </TableCell>
-                        <TableCell className="px-2 py-3 sm:px-3">
-                          <div className="flex items-center gap-2 sm:gap-2.5">
-                            <img
-                              src={managerAvatar(b.manager)}
-                              alt={b.manager?.name || 'Manager'}
-                              className="size-8 sm:size-9 rounded-full object-cover border border-slate-200 shrink-0"
-                            />
-                            <div className="min-w-0">
-                              <div className="flex items-center gap-1.5">
-                                <p className="font-bold text-slate-900 text-xs truncate">
-                                  {b.manager?.name || '—'}
-                                </p>
-                                {b.manager?.gender ? (
-                                  <span className="hidden text-[9px] bg-slate-100 text-slate-600 px-1.5 py-0.2 rounded font-medium shrink-0 sm:inline">
-                                    {b.manager.gender}
-                                  </span>
-                                ) : null}
-                              </div>
-                              <p className="text-[10px] sm:text-[11px] text-slate-500 truncate flex items-center gap-1 mt-0.5">
-                                <Mail className="size-3 text-slate-400 shrink-0" />
-                                <span className="truncate">{b.manager?.email || '—'}</span>
-                              </p>
-                              <p className="hidden text-[11px] text-slate-400 truncate sm:flex items-center gap-1">
-                                <Phone className="size-3 text-slate-400 shrink-0" />
-                                <span className="whitespace-nowrap">{b.manager?.contact || '—'}</span>
-                              </p>
-                            </div>
-                          </div>
-                        </TableCell>
-                        <TableCell className="px-2 py-3 whitespace-nowrap sm:px-3">
                           <Badge
                             variant="outline"
                             className={
                               isOpen
-                                ? 'bg-purple-50 text-purple-900 border-purple-200 font-bold whitespace-nowrap'
-                                : 'bg-rose-50 text-rose-700 border-rose-200 font-bold whitespace-nowrap'
+                                ? 'shrink-0 bg-purple-50 text-purple-900 border-purple-200 font-bold'
+                                : 'shrink-0 bg-rose-50 text-rose-700 border-rose-200 font-bold'
                             }
                           >
                             {isOpen ? (
@@ -587,79 +641,182 @@ export function BranchesPage() {
                             )}
                             {isOpen ? 'Open' : 'Blocked'}
                           </Badge>
-                        </TableCell>
-                        <TableCell className="sticky right-0 z-[1] bg-white px-1.5 py-3 text-right whitespace-nowrap sm:px-3 group-hover:bg-slate-50/80">
-                          <div className="inline-flex items-center justify-end gap-0.5 sm:gap-1">
-                            <Button
-                              type="button"
-                              variant="ghost"
-                              size="icon"
-                              onClick={() => handleOpenEdit(b)}
-                              disabled={mutating}
-                              title="Edit branch"
-                              aria-label={`Edit ${b.name}`}
-                              className="size-8 text-purple-800 hover:bg-purple-50 hover:text-purple-950"
-                            >
-                              <Pencil className="size-4" />
-                            </Button>
-                            {b.manager?.id && !b.manager?.credentialsEmailed ? (
-                              <Button
-                                type="button"
-                                variant="ghost"
-                                size="icon"
-                                onClick={() => handlePromptResetPassword(b)}
-                                disabled={mutating}
-                                title="Email failed — reset & resend credentials"
-                                aria-label={`Resend credentials for ${b.name}`}
-                                className="size-8 text-amber-700 hover:bg-amber-50 hover:text-amber-900"
-                              >
-                                <KeyRound className="size-4" />
-                              </Button>
-                            ) : null}
-                            <Button
-                              type="button"
-                              variant="ghost"
-                              size="icon"
-                              onClick={() => setDeleteTarget(b)}
-                              disabled={mutating}
-                              title="Delete branch"
-                              aria-label={`Delete ${b.name}`}
-                              className="size-8 text-slate-500 hover:bg-slate-100 hover:text-slate-900"
-                            >
-                              <Trash2 className="size-4" />
-                            </Button>
-                            <Button
-                              type="button"
-                              variant="ghost"
-                              size="icon"
-                              onClick={() => handlePromptToggleStatus(b)}
-                              disabled={mutating}
-                              title={isOpen ? 'Block branch' : 'Open branch'}
-                              aria-label={isOpen ? `Block ${b.name}` : `Open ${b.name}`}
-                              className={`size-8 ${
-                                isOpen
-                                  ? 'text-rose-600 hover:bg-rose-50 hover:text-rose-800'
-                                  : 'text-emerald-700 hover:bg-emerald-50 hover:text-emerald-900'
-                              }`}
-                            >
-                              {isOpen ? <Ban className="size-4" /> : <Eye className="size-4" />}
-                            </Button>
+                        </div>
+                        <p className="mt-1.5 flex items-start gap-1 text-xs text-slate-500">
+                          <MapPin className="mt-0.5 size-3 shrink-0 text-slate-400" />
+                          <span className="line-clamp-2">{b.location || '—'}</span>
+                        </p>
+                        {formatHoursRange(b.openingTime, b.closingTime) ? (
+                          <p className="mt-0.5 text-[10px] font-medium text-purple-800">
+                            Hours {formatHoursRange(b.openingTime, b.closingTime)}
+                          </p>
+                        ) : null}
+                        <div className="mt-2 flex items-center gap-2">
+                          <img
+                            src={managerAvatar(b.manager)}
+                            alt={b.manager?.name || 'Manager'}
+                            className="size-8 shrink-0 rounded-full border border-slate-200 object-cover"
+                          />
+                          <div className="min-w-0">
+                            <p className="truncate text-xs font-bold text-slate-900">
+                              {b.manager?.name || '—'}
+                            </p>
+                            <p className="truncate text-[10px] text-slate-500">
+                              {b.manager?.email || '—'}
+                            </p>
                           </div>
-                        </TableCell>
-                      </TableRow>
-                    )
-                  })
-                )}
-              </TableBody>
-            </Table>
-          </div>
+                        </div>
+                        <div className="mt-3 flex justify-end">
+                          <BranchRowActions
+                            branch={b}
+                            mutating={mutating}
+                            onEdit={handleOpenEdit}
+                            onResetPassword={handlePromptResetPassword}
+                            onToggleStatus={handlePromptToggleStatus}
+                            onDelete={setDeleteTarget}
+                          />
+                        </div>
+                      </div>
+                    </div>
+                  </DataCard>
+                )
+              })}
+              desktop={
+                <Table className="min-w-[42rem] w-full text-left text-sm sm:min-w-[52rem]">
+                  <TableHeader>
+                    <TableRow className="text-xs text-slate-500 uppercase">
+                      <TableHead className="px-2 py-3 font-medium whitespace-nowrap sm:px-3">Branch ID</TableHead>
+                      <TableHead className="px-2 py-3 font-medium whitespace-nowrap sm:px-3">Image</TableHead>
+                      <TableHead className="px-2 py-3 font-medium whitespace-nowrap sm:px-3 min-w-[10rem]">Branch</TableHead>
+                      <TableHead className="hidden px-2 py-3 font-medium whitespace-nowrap sm:table-cell sm:px-3 min-w-[9rem]">
+                        Location
+                      </TableHead>
+                      <TableHead className="px-2 py-3 font-medium whitespace-nowrap sm:px-3 min-w-[12rem]">
+                        Manager
+                      </TableHead>
+                      <TableHead className="px-2 py-3 font-medium whitespace-nowrap sm:px-3">Status</TableHead>
+                      <TableHead className="sticky right-0 z-[1] bg-slate-200/80 px-2 py-3 font-medium whitespace-nowrap sm:px-3">
+                        Actions
+                      </TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {pagedBranches.map((b) => {
+                      const isOpen = b.status === 'open'
+                      const imageSrc = b.image || DEFAULT_BRANCH_IMAGE
+                      return (
+                        <TableRow key={b.id} className="group hover:bg-slate-50/80">
+                          {/* Compact ID cell — aligned with other modules (no pill / truncation) */}
+                          <TableCell className="px-2 py-3 align-middle whitespace-nowrap sm:px-3">
+                            <span
+                              title={b.id || undefined}
+                              className="font-mono text-xs font-bold text-purple-800 select-all"
+                            >
+                              {displayBranchRef(b)}
+                            </span>
+                          </TableCell>
+                          <TableCell className="px-2 py-3 whitespace-nowrap sm:px-3">
+                            <img
+                              src={imageSrc}
+                              alt={b.name}
+                              className="size-9 sm:size-11 rounded-md object-cover border border-slate-200 shrink-0 shadow-2xs"
+                            />
+                          </TableCell>
+                          <TableCell className="px-2 py-3 sm:px-3">
+                            <p className="font-bold text-slate-900 text-xs sm:text-sm">{b.name}</p>
+                            <span className="text-[10px] sm:text-[11px] text-slate-400 whitespace-nowrap">
+                              Est. {formatCreatedAt(b.createdAt)}
+                            </span>
+                            {formatHoursRange(b.openingTime, b.closingTime) ? (
+                              <p className="mt-0.5 text-[10px] font-medium text-purple-800 whitespace-nowrap">
+                                Hours {formatHoursRange(b.openingTime, b.closingTime)}
+                              </p>
+                            ) : null}
+                          </TableCell>
+                          <TableCell className="hidden px-2 py-3 text-xs text-slate-600 sm:table-cell sm:px-3">
+                            <div className="flex items-start gap-1">
+                              <MapPin className="mt-0.5 size-3.5 text-slate-400 shrink-0" />
+                              <span className="line-clamp-2">{b.location || '—'}</span>
+                            </div>
+                          </TableCell>
+                          <TableCell className="px-2 py-3 sm:px-3">
+                            <div className="flex items-center gap-2 sm:gap-2.5">
+                              <img
+                                src={managerAvatar(b.manager)}
+                                alt={b.manager?.name || 'Manager'}
+                                className="size-8 sm:size-9 rounded-full object-cover border border-slate-200 shrink-0"
+                              />
+                              <div className="min-w-0">
+                                <div className="flex items-center gap-1.5">
+                                  <p className="font-bold text-slate-900 text-xs truncate">
+                                    {b.manager?.name || '—'}
+                                  </p>
+                                  {b.manager?.gender ? (
+                                    <span className="hidden text-[9px] bg-slate-100 text-slate-600 px-1.5 py-0.2 rounded font-medium shrink-0 sm:inline">
+                                      {b.manager.gender}
+                                    </span>
+                                  ) : null}
+                                </div>
+                                <p className="text-[10px] sm:text-[11px] text-slate-500 truncate flex items-center gap-1 mt-0.5">
+                                  <Mail className="size-3 text-slate-400 shrink-0" />
+                                  <span className="truncate">{b.manager?.email || '—'}</span>
+                                </p>
+                                <p className="hidden text-[11px] text-slate-400 truncate sm:flex items-center gap-1">
+                                  <Phone className="size-3 text-slate-400 shrink-0" />
+                                  <span className="whitespace-nowrap">{b.manager?.contact || '—'}</span>
+                                </p>
+                              </div>
+                            </div>
+                          </TableCell>
+                          <TableCell className="px-2 py-3 whitespace-nowrap sm:px-3">
+                            <Badge
+                              variant="outline"
+                              className={
+                                isOpen
+                                  ? 'bg-purple-50 text-purple-900 border-purple-200 font-bold whitespace-nowrap'
+                                  : 'bg-rose-50 text-rose-700 border-rose-200 font-bold whitespace-nowrap'
+                              }
+                            >
+                              {isOpen ? (
+                                <CheckCircle className="mr-1 size-3 text-purple-700" />
+                              ) : (
+                                <Ban className="mr-1 size-3 text-rose-600" />
+                              )}
+                              {isOpen ? 'Open' : 'Blocked'}
+                            </Badge>
+                          </TableCell>
+                          <TableCell className="sticky right-0 z-[1] bg-white px-1.5 py-3 whitespace-nowrap sm:px-3 group-hover:bg-slate-50/80">
+                            <BranchRowActions
+                              branch={b}
+                              mutating={mutating}
+                              onEdit={handleOpenEdit}
+                              onResetPassword={handlePromptResetPassword}
+                              onToggleStatus={handlePromptToggleStatus}
+                              onDelete={setDeleteTarget}
+                            />
+                          </TableCell>
+                        </TableRow>
+                      )
+                    })}
+                  </TableBody>
+                </Table>
+              }
+            />
+          )}
 
-          <TablePagination page={page} pageCount={totalPages} onPageChange={setPage} />
+          <TablePagination
+            page={page}
+            pageCount={pageCount}
+            totalItems={total}
+            pageSize={pageSize}
+            onPageChange={setPage}
+            onPageSizeChange={setPageSize}
+          />
         </SurfaceCard>
       </MotionReveal>
 
-      <Dialog open={addDialogOpen} onOpenChange={setAddDialogOpen}>
-        <DialogContent className="max-w-xl max-h-[90vh] overflow-y-auto">
+      <Dialog open={addDialogOpen} onOpenChange={setAddDialogOpen} dirty={isDirty(formData)}>
+        <DialogContent className="max-w-full sm:max-w-xl md:max-w-2xl">
           <DialogHeader>
             <DialogTitle>{editingBranch ? 'Edit Branch Details' : 'Add New Branch'}</DialogTitle>
             <DialogDescription>
@@ -669,7 +826,11 @@ export function BranchesPage() {
             </DialogDescription>
           </DialogHeader>
 
-          <form onSubmit={handleSubmitBranch} className="space-y-4 pt-2">
+          {formError ? (
+            <p className="mb-3 rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">{formError}</p>
+          ) : null}
+
+          <form onSubmit={handleSubmitBranch} className="space-y-4 pt-2" noValidate>
             <div className="space-y-3">
               <h5 className="text-xs font-bold uppercase tracking-wider text-purple-900 border-b border-slate-100 pb-1">
                 Branch Details
@@ -709,9 +870,14 @@ export function BranchesPage() {
                     id="branchName"
                     placeholder="e.g. Wah Cantt SoftFlux"
                     value={formData.name}
-                    onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                    required
+                    onChange={(e) => {
+                      setFormData({ ...formData, name: e.target.value })
+                      clearField('name')
+                    }}
+                    aria-invalid={Boolean(fieldErrors.name)}
+                    className={fieldErrorClass(fieldErrors.name)}
                   />
+                  <FieldError message={fieldErrors.name} />
                 </div>
 
                 <div className="space-y-1">
@@ -722,9 +888,14 @@ export function BranchesPage() {
                     id="branchLocation"
                     placeholder="e.g. Main GT Road, Wah Cantt"
                     value={formData.location}
-                    onChange={(e) => setFormData({ ...formData, location: e.target.value })}
-                    required
+                    onChange={(e) => {
+                      setFormData({ ...formData, location: e.target.value })
+                      clearField('location')
+                    }}
+                    aria-invalid={Boolean(fieldErrors.location)}
+                    className={fieldErrorClass(fieldErrors.location)}
                   />
+                  <FieldError message={fieldErrors.location} />
                 </div>
 
                 <div className="space-y-1">
@@ -734,8 +905,15 @@ export function BranchesPage() {
                   <TimePicker
                     id="branchOpeningTime"
                     value={formData.openingTime}
-                    onChange={(e) => setFormData({ ...formData, openingTime: e.target.value })}
+                    onChange={(e) => {
+                      setFormData({ ...formData, openingTime: e.target.value })
+                      clearField('openingTime')
+                      clearField('closingTime')
+                    }}
+                    aria-invalid={Boolean(fieldErrors.openingTime)}
+                    className={fieldErrorClass(fieldErrors.openingTime)}
                   />
+                  <FieldError message={fieldErrors.openingTime} />
                 </div>
 
                 <div className="space-y-1">
@@ -745,8 +923,15 @@ export function BranchesPage() {
                   <TimePicker
                     id="branchClosingTime"
                     value={formData.closingTime}
-                    onChange={(e) => setFormData({ ...formData, closingTime: e.target.value })}
+                    onChange={(e) => {
+                      setFormData({ ...formData, closingTime: e.target.value })
+                      clearField('openingTime')
+                      clearField('closingTime')
+                    }}
+                    aria-invalid={Boolean(fieldErrors.closingTime)}
+                    className={fieldErrorClass(fieldErrors.closingTime)}
                   />
+                  <FieldError message={fieldErrors.closingTime} />
                 </div>
 
                 <p className="text-[11px] text-slate-500 sm:col-span-2">
@@ -792,9 +977,14 @@ export function BranchesPage() {
                     id="mgrName"
                     placeholder="e.g. Farhan Ali"
                     value={formData.managerName}
-                    onChange={(e) => setFormData({ ...formData, managerName: e.target.value })}
-                    required
+                    onChange={(e) => {
+                      setFormData({ ...formData, managerName: e.target.value })
+                      clearField('managerName')
+                    }}
+                    aria-invalid={Boolean(fieldErrors.managerName)}
+                    className={fieldErrorClass(fieldErrors.managerName)}
                   />
+                  <FieldError message={fieldErrors.managerName} />
                 </div>
 
                 <div className="space-y-1">
@@ -806,9 +996,14 @@ export function BranchesPage() {
                     type="email"
                     placeholder="e.g. bm.wah@softwareflux.com"
                     value={formData.managerEmail}
-                    onChange={(e) => setFormData({ ...formData, managerEmail: e.target.value })}
-                    required
+                    onChange={(e) => {
+                      setFormData({ ...formData, managerEmail: e.target.value })
+                      clearField('managerEmail')
+                    }}
+                    aria-invalid={Boolean(fieldErrors.managerEmail)}
+                    className={fieldErrorClass(fieldErrors.managerEmail)}
                   />
+                  <FieldError message={fieldErrors.managerEmail} />
                 </div>
 
                 <div className="space-y-1">
@@ -818,9 +1013,14 @@ export function BranchesPage() {
                   <PhoneInput
                     id="mgrContact"
                     value={formData.managerContact}
-                    onChange={(val) => setFormData({ ...formData, managerContact: val })}
-                    required
+                    onChange={(val) => {
+                      setFormData({ ...formData, managerContact: val })
+                      clearField('managerContact')
+                    }}
+                    aria-invalid={Boolean(fieldErrors.managerContact)}
+                    className={fieldErrorClass(fieldErrors.managerContact)}
                   />
+                  <FieldError message={fieldErrors.managerContact} />
                 </div>
 
                 <div className="space-y-1">
@@ -830,8 +1030,14 @@ export function BranchesPage() {
                   <PhoneInput
                     id="mgrOtherContact"
                     value={formData.managerOtherContact}
-                    onChange={(val) => setFormData({ ...formData, managerOtherContact: val })}
+                    onChange={(val) => {
+                      setFormData({ ...formData, managerOtherContact: val })
+                      clearField('managerOtherContact')
+                    }}
+                    aria-invalid={Boolean(fieldErrors.managerOtherContact)}
+                    className={fieldErrorClass(fieldErrors.managerOtherContact)}
                   />
+                  <FieldError message={fieldErrors.managerOtherContact} />
                 </div>
 
                 <div className="space-y-1">
@@ -874,9 +1080,7 @@ export function BranchesPage() {
             ) : null}
 
             <DialogFooter className="pt-3">
-              <Button type="button" variant="outline" onClick={() => setAddDialogOpen(false)} disabled={mutating}>
-                Cancel
-              </Button>
+              <DialogCancelButton disabled={mutating} />
               <Button
                 type="submit"
                 disabled={mutating}
@@ -921,6 +1125,8 @@ export function BranchesPage() {
           )
         }
         confirmLabel={targetBranch?.status === 'open' ? 'Yes, Block Branch' : 'Yes, Open Branch'}
+        // Block uses Ban (not trash); open uses Unlock
+        icon={targetBranch?.status === 'open' ? Ban : Unlock}
         variant={targetBranch?.status === 'open' ? 'destructive' : 'default'}
         loading={mutating}
         onConfirm={handleConfirmToggleStatus}
@@ -944,23 +1150,36 @@ export function BranchesPage() {
         onConfirm={handleConfirmResetPassword}
       />
 
-      <ConfirmDialog
+      <DeleteEntityDialog
         open={Boolean(deleteTarget)}
         onOpenChange={(open) => {
           if (!open) setDeleteTarget(null)
         }}
-        title="Delete Branch"
+        entityName={deleteTarget?.name}
+        title={deleteTarget ? `Remove “${deleteTarget.name}”?` : 'Remove branch?'}
         description={
           deleteTarget ? (
             <>
-              Are you sure you want to delete <strong>&ldquo;{deleteTarget.name}&rdquo;</strong> and its branch manager login?
+              Permanently remove <strong>{deleteTarget.name}</strong> and its branch manager login?
+              Prefer <strong>Block</strong> if you only want to stop access — sales and staff history stay
+              intact.
             </>
           ) : null
         }
-        warning="This action cannot be undone. Prefer Block if you only want to disable access temporarily."
-        confirmLabel="Delete Branch"
+        softLabel="Block branch"
+        softHint="Recommended when the branch has (or may have) staff, sales, or inventory history."
+        hardLabel="Permanently delete"
+        hardHint="Only use when this outlet was created by mistake and has no linked staff."
+        showSoftAction={deleteShowSoft}
+        canHardDelete={deleteCanHard}
+        hardDisabledReason={
+          deleteHasStaff
+            ? `This branch has ${deleteTarget.totalStaff} staff member(s). Block it instead of permanent delete.`
+            : 'Permanent delete is unavailable while linked records may exist.'
+        }
         loading={mutating}
-        onConfirm={handleConfirmDelete}
+        onSoftDelete={handleSoftDeleteFromTrash}
+        onHardDelete={handleHardDeleteBranch}
       />
     </div>
   )

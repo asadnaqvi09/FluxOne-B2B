@@ -113,7 +113,7 @@ export const createStaff = createAsyncThunk(
     if (!result.success) return rejectWithValue(result.error || 'Create failed')
     const filters = { ...getState().branchStaff.filters, page: 1 }
     dispatch(setStaffFilters(filters))
-    await dispatch(fetchBranchStaff(filters))
+    void dispatch(fetchBranchStaff(filters))
     return result
   },
 )
@@ -124,7 +124,7 @@ export const updateStaff = createAsyncThunk(
     const body = buildStaffPayload(fields)
     const result = await apiClient.patch(endpoints.branch.staff.update(id), body)
     if (!result.success) return rejectWithValue(result.error || 'Update failed')
-    await dispatch(fetchBranchStaff(getState().branchStaff.filters))
+    void dispatch(fetchBranchStaff(getState().branchStaff.filters))
     return result
   },
 )
@@ -143,7 +143,7 @@ export const deleteStaff = createAsyncThunk(
   async (id, { getState, dispatch, rejectWithValue }) => {
     const result = await apiClient.delete(endpoints.branch.staff.delete(id))
     if (!result.success) return rejectWithValue(result.error || 'Delete failed')
-    await dispatch(fetchBranchStaff(getState().branchStaff.filters))
+    void dispatch(fetchBranchStaff(getState().branchStaff.filters))
     return result
   },
 )
@@ -158,7 +158,12 @@ const branchStaffSlice = createSlice({
     patchStaffFilters(state, action) {
       const patch = action.payload || {}
       const next = { ...state.filters, ...patch }
-      if (patch.q !== undefined || patch.status !== undefined || patch.role !== undefined) {
+      if (
+        patch.q !== undefined ||
+        patch.status !== undefined ||
+        patch.role !== undefined ||
+        patch.limit !== undefined
+      ) {
         next.page = patch.page ?? 1
       }
       state.filters = next

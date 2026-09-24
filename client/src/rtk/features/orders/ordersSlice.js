@@ -129,7 +129,7 @@ export const generateOrder = createAsyncThunk(
     if (!result.success) return rejectWithValue(result.error || 'Generate failed')
     const filters = { ...getState().orders.filters, page: 1 }
     dispatch(setOrderFilters(filters))
-    await dispatch(fetchOrders(filters))
+    void dispatch(fetchOrders(filters))
     return { success: true, data: mapPurchaseOrder(result.data) }
   },
 )
@@ -139,7 +139,7 @@ export const approveOrder = createAsyncThunk(
   async (id, { getState, dispatch, rejectWithValue }) => {
     const result = await apiClient.post(endpoints.orders.approve(id))
     if (!result.success) return rejectWithValue(result.error || 'Approve failed')
-    await dispatch(fetchOrders(getState().orders.filters))
+    void dispatch(fetchOrders(getState().orders.filters))
     return result
   },
 )
@@ -149,7 +149,7 @@ export const cancelOrder = createAsyncThunk(
   async (id, { getState, dispatch, rejectWithValue }) => {
     const result = await apiClient.post(endpoints.orders.cancel(id))
     if (!result.success) return rejectWithValue(result.error || 'Cancel failed')
-    await dispatch(fetchOrders(getState().orders.filters))
+    void dispatch(fetchOrders(getState().orders.filters))
     return { ...result, clearedId: id }
   },
 )
@@ -189,7 +189,8 @@ const ordersSlice = createSlice({
       const resets =
         patch.q !== undefined ||
         patch.supplierId !== undefined ||
-        patch.status !== undefined
+        patch.status !== undefined ||
+        patch.limit !== undefined
       if (resets && patch.page === undefined) next.page = 1
       state.filters = next
     },

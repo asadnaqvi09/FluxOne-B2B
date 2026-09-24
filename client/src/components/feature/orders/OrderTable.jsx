@@ -12,6 +12,7 @@ import {
   TablePagination,
 } from '@/components/ui/table'
 import { TableRowsSkeleton } from '@/components/ui/skeleton'
+import { displayOrderRef } from '@/lib/formatDisplayId'
 
 function statusClass(status) {
   if (status === 'approved') return 'bg-emerald-50 text-emerald-700'
@@ -63,6 +64,7 @@ export function OrderTable({
   loading = false,
   pagination,
   onPageChange,
+  onPageSizeChange,
   onView,
   onHistory,
   onPrint,
@@ -73,17 +75,13 @@ export function OrderTable({
   const page = pagination?.page || 1
   const pageCount = Math.max(1, pagination?.pageCount || 1)
   const total = pagination?.total ?? list.length
+  const pageSize = pagination?.limit || 8
 
   return (
     <SurfaceCard
       className={className}
       title="Purchase orders"
       description="Orders placed with suppliers"
-      actions={
-        <span className="text-xs font-medium text-slate-400">
-          {total} records · 8 / page
-        </span>
-      }
     >
       {loading ? (
         <TableRowsSkeleton rows={5} />
@@ -104,7 +102,7 @@ export function OrderTable({
                 <div className="flex items-start justify-between gap-2">
                   <div className="min-w-0">
                     <p className="font-mono text-xs font-semibold text-slate-700">
-                      {row.orderNumber || row.id?.slice(0, 8)}
+                      {displayOrderRef(row)}
                     </p>
                     <p className="mt-0.5 truncate text-sm font-medium text-slate-900">
                       {row.companyName}
@@ -139,7 +137,7 @@ export function OrderTable({
             <Table className="min-w-[640px] text-left text-sm">
               <TableHeader>
                 <TableRow className="text-xs uppercase tracking-wide text-slate-400">
-                  <TableHead className="px-2 py-3 font-semibold">Order id</TableHead>
+                  <TableHead className="px-2 py-3 font-semibold">Order ID</TableHead>
                   <TableHead className="px-2 py-3 font-semibold">Company</TableHead>
                   <TableHead className="px-2 py-3 font-semibold">Items</TableHead>
                   <TableHead className="px-2 py-3 font-semibold">Status</TableHead>
@@ -150,7 +148,7 @@ export function OrderTable({
                 {list.map((row) => (
                   <TableRow key={row.id} className="hover:bg-slate-50/80">
                     <TableCell className="px-2 py-3 font-mono text-xs text-slate-700">
-                      {row.orderNumber || row.id?.slice(0, 8)}
+                      {displayOrderRef(row)}
                     </TableCell>
                     <TableCell className="px-2 py-3">
                       <span className="font-medium text-slate-800">{row.companyName}</span>
@@ -190,8 +188,10 @@ export function OrderTable({
           page={page}
           pageCount={pageCount}
           totalItems={total}
+          pageSize={pageSize}
           loading={loading}
           onPageChange={onPageChange}
+          onPageSizeChange={onPageSizeChange}
         />
       ) : null}
     </SurfaceCard>

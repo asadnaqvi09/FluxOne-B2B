@@ -4,6 +4,26 @@ import { endpoints } from '@/api/endpoints'
 
 const DEFAULT_PAGE_SIZE = 100
 
+function policyPayload(fields = {}, { partial = false } = {}) {
+  const body = {}
+  if (!partial || fields.name !== undefined) {
+    body.name = String(fields.name || '').trim()
+  }
+  if (!partial || fields.detail !== undefined) {
+    body.detail = String(fields.detail || '').trim()
+  }
+  if (fields.category !== undefined) {
+    body.category = fields.category?.trim() || undefined
+  }
+  if (fields.printOnSlip !== undefined) {
+    body.printOnSlip = Boolean(fields.printOnSlip)
+  }
+  if (fields.isActive !== undefined) {
+    body.isActive = Boolean(fields.isActive)
+  }
+  return body
+}
+
 // Live B2B Admin policies handbook (/api/admin/policies).
 export function useAdminPolicies({ q = '', category = 'all', page = 1, limit = DEFAULT_PAGE_SIZE } = {}) {
   const [items, setItems] = useState([])
@@ -52,11 +72,7 @@ export function useAdminPolicies({ q = '', category = 'all', page = 1, limit = D
   const createPolicy = useCallback(
     async (fields) => {
       setMutating(true)
-      const result = await apiClient.post(endpoints.admin.policies.create, {
-        name: String(fields.name || '').trim(),
-        detail: String(fields.detail || '').trim(),
-        category: fields.category?.trim() || undefined,
-      })
+      const result = await apiClient.post(endpoints.admin.policies.create, policyPayload(fields))
       setMutating(false)
       if (result.success) await load()
       return result
@@ -67,10 +83,23 @@ export function useAdminPolicies({ q = '', category = 'all', page = 1, limit = D
   const updatePolicy = useCallback(
     async (id, fields) => {
       setMutating(true)
+      const result = await apiClient.patch(
+        endpoints.admin.policies.update(id),
+        policyPayload(fields, { partial: true }),
+      )
+      setMutating(false)
+      if (result.success) await load()
+      return result
+    },
+    [load],
+  )
+
+  // Quick patch for Enable / Disable (invoice slip visibility)
+  const setPrintOnSlip = useCallback(
+    async (id, printOnSlip) => {
+      setMutating(true)
       const result = await apiClient.patch(endpoints.admin.policies.update(id), {
-        name: String(fields.name || '').trim(),
-        detail: String(fields.detail || '').trim(),
-        category: fields.category?.trim() || undefined,
+        printOnSlip: Boolean(printOnSlip),
       })
       setMutating(false)
       if (result.success) await load()
@@ -99,6 +128,7 @@ export function useAdminPolicies({ q = '', category = 'all', page = 1, limit = D
     reload: load,
     createPolicy,
     updatePolicy,
+    setPrintOnSlip,
     deletePolicy,
   }
 }

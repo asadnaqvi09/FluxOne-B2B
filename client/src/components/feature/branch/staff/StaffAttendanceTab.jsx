@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { Calendar as CalendarIcon, List, CheckSquare, ChevronLeft, ChevronRight } from 'lucide-react'
 import { SurfaceCard } from '@/components/shared/SurfaceCard'
 import { Button } from '@/components/ui/button'
@@ -17,22 +17,122 @@ import {
 import { apiClient } from '@/api/api'
 import { BRAND } from '@/lib/constants'
 import { toastError, toastSuccess } from '@/lib/toast'
+import { useClientPagination } from '@/hooks/useClientPagination'
+import { cn } from '@/lib/utils'
 
-const PAGE_SIZE = 8
+function todayIso() {
+  return new Date().toISOString().split('T')[0]
+}
+
+// Shared display format for both Attendance Logs and Manual Attendance
+function formatAttendanceDate(value) {
+  if (!value) return '—'
+  try {
+    const date = new Date(value)
+    if (Number.isNaN(date.getTime())) return '—'
+    return date.toLocaleDateString('en-GB', {
+      day: '2-digit',
+      month: 'short',
+      year: 'numeric',
+    })
+  } catch {
+    return '—'
+  }
+}
+
+function matchesDesignation(member, designationId) {
+  if (!designationId) return true
+  return member?.designationId === designationId
+}
+
+// Shared filter bar: Date | Designation | Show All Dates (optional)
+function AttendanceFilterBar({
+  dateLabel = 'Date',
+  dateId,
+  dateValue,
+  onDateChange,
+  dateDisabled = false,
+  designationId,
+  designationValue,
+  onDesignationChange,
+  designations = [],
+  showAllDates = false,
+  onShowAllDatesChange,
+}) {
+  return (
+    <div
+      className={cn(
+        'mb-4 grid grid-cols-1 gap-3 sm:grid-cols-2',
+        onShowAllDatesChange ? 'max-w-3xl lg:grid-cols-3' : 'max-w-lg',
+      )}
+    >
+      <div className="space-y-1.5">
+        <Label htmlFor={dateId}>{dateLabel}</Label>
+        <Input
+          id={dateId}
+          type="date"
+          value={dateValue}
+          disabled={dateDisabled}
+          onChange={(e) => onDateChange?.(e.target.value)}
+          className="h-9"
+        />
+      </div>
+
+      <div className="space-y-1.5">
+        <Label htmlFor={designationId}>Filter Designation</Label>
+        <NativeSelect
+          id={designationId}
+          value={designationValue}
+          onChange={(e) => onDesignationChange?.(e.target.value)}
+          className="h-9"
+        >
+          <option value="">All Designations</option>
+          {designations.map((d) => (
+            <option key={d.id} value={d.id}>
+              {d.name}
+            </option>
+          ))}
+        </NativeSelect>
+      </div>
+
+      {/* Align with inputs — not between date label and field */}
+      {onShowAllDatesChange ? (
+        <div className="space-y-1.5">
+          <Label htmlFor="attendance-show-all-dates" className="select-none text-transparent">
+            Options
+          </Label>
+          <label
+            htmlFor="attendance-show-all-dates"
+            className="flex h-9 cursor-pointer items-center gap-2 rounded-md border border-border bg-white px-3 text-sm text-slate-700"
+          >
+            <input
+              id="attendance-show-all-dates"
+              type="checkbox"
+              checked={showAllDates}
+              onChange={(e) => onShowAllDatesChange?.(e.target.checked)}
+              className="size-4 cursor-pointer accent-purple-700"
+            />
+            Show All Dates
+          </label>
+        </div>
+      ) : null}
+    </div>
+  )
+}
 
 export function StaffAttendanceTab({ designations = [], staff = [] }) {
   const [logs, setLogs] = useState([])
   const [loading, setLoading] = useState(false)
   const [mutating, setMutating] = useState(false)
-  
+
   const [subTab, setSubTab] = useState('overview') // 'overview' | 'mark'
   const [viewMode, setViewMode] = useState('list') // 'list' | 'calendar'
-  const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0])
-  const [filterLogDate, setFilterLogDate] = useState(new Date().toISOString().split('T')[0])
+  const [selectedDate, setSelectedDate] = useState(todayIso)
+  const [filterLogDate, setFilterLogDate] = useState(todayIso)
+  const [showAllDates, setShowAllDates] = useState(false)
   const [filterDesignation, setFilterDesignation] = useState('')
   const [currentDate, setCurrentDate] = useState(new Date())
   const [localAttendance, setLocalAttendance] = useState({})
-  const [logPage, setLogPage] = useState(1)
 
   const fetchLogs = async () => {
     setLoading(true)
@@ -74,24 +174,52 @@ export function StaffAttendanceTab({ designations = [], staff = [] }) {
 
   const monthsList = [
     'January', 'February', 'March', 'April', 'May', 'June',
-    'July', 'August', 'September', 'October', 'November', 'December'
+    'July', 'August', 'September', 'October', 'November', 'December',
   ]
 
   const prevMonth = () => setCurrentDate(new Date(year, month - 1, 1))
   const nextMonth = () => setCurrentDate(new Date(year, month + 1, 1))
 
-  const filteredLogs = logs.filter((log) => {
-    const matchedStaff = staff.find((s) => s.id === log.staffId)
-    if (!matchedStaff) return false
-    if (filterDesignation && matchedStaff.designationId !== filterDesignation) return false
-    const logDate = String(log.workDate || '').split('T')[0]
-    if (filterLogDate && logDate !== filterLogDate) return false
-    return true
-  })
+  const filteredLogs = useMemo(() => {
+    return logs.filter((log) => {
+      const matchedStaff = staff.find((s) => s.id === log.staffId)
+      if (!matchedStaff) return false
+      if (!matchesDesignation(matchedStaff, filterDesignation)) return false
+      const logDate = String(log.workDate || '').split('T')[0]
+      if (!showAllDates && filterLogDate && logDate !== filterLogDate) return false
+      return true
+    })
+  }, [logs, staff, filterDesignation, filterLogDate, showAllDates])
+
+  // Manual Attendance — same designation filter
+  const filteredStaff = useMemo(() => {
+    return staff.filter((m) => matchesDesignation(m, filterDesignation))
+  }, [staff, filterDesignation])
+
+  const {
+    page: logPage,
+    setPage: setLogPage,
+    pageSize: logPageSize,
+    setPageSize: setLogPageSize,
+    pageCount: logPageCount,
+    total: logTotal,
+    slice: pagedLogs,
+  } = useClientPagination(filteredLogs)
 
   const getLogsForDate = (dayNum) => {
     const dateStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(dayNum).padStart(2, '0')}`
-    return logs.filter((log) => log.workDate.split('T')[0] === dateStr)
+    return logs.filter((log) => String(log.workDate || '').split('T')[0] === dateStr)
+  }
+
+  function handleShowAllDates(checked) {
+    setShowAllDates(checked)
+    // Keep the date value visible; filtering ignores it while "all dates" is on
+    if (!checked && !filterLogDate) setFilterLogDate(todayIso())
+  }
+
+  function handleFilterLogDateChange(next) {
+    setShowAllDates(false)
+    setFilterLogDate(next)
   }
 
   const handleStatusChange = (staffId, status) => {
@@ -136,10 +264,11 @@ export function StaffAttendanceTab({ designations = [], staff = [] }) {
   const handleSaveAll = async () => {
     setMutating(true)
     let successCount = 0
-    for (const staffId of Object.keys(localAttendance)) {
-      const item = localAttendance[staffId]
+    for (const member of filteredStaff) {
+      const item = localAttendance[member.id]
+      if (!item) continue
       const res = await apiClient.post('/branch/attendance', {
-        staffId,
+        staffId: member.id,
         workDate: selectedDate,
         status: item.status,
         note: item.note || undefined,
@@ -151,8 +280,8 @@ export function StaffAttendanceTab({ designations = [], staff = [] }) {
       toastSuccess(`Recorded ${successCount} attendance records`)
       setLocalAttendance((prev) => {
         const next = { ...prev }
-        Object.keys(next).forEach((id) => {
-          next[id] = { ...next[id], isSaved: true }
+        filteredStaff.forEach((m) => {
+          if (next[m.id]) next[m.id] = { ...next[m.id], isSaved: true }
         })
         return next
       })
@@ -174,7 +303,7 @@ export function StaffAttendanceTab({ designations = [], staff = [] }) {
   return (
     <div className="space-y-4">
       {/* Sub tabs header */}
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between border-b border-border pb-3">
+      <div className="flex flex-col gap-3 border-b border-border pb-3 sm:flex-row sm:items-center sm:justify-between">
         <div className="flex gap-2">
           <Button
             size="sm"
@@ -224,94 +353,59 @@ export function StaffAttendanceTab({ designations = [], staff = [] }) {
       {subTab === 'overview' ? (
         <>
           {viewMode === 'list' ? (
-            <SurfaceCard
-              title="Daily Roster Logs"
-              actions={
-                <span className="text-xs font-medium text-slate-400">
-                  {filteredLogs.length} records · {PAGE_SIZE} / page
-                </span>
-              }
-            >
-              <div className="mb-4 grid grid-cols-1 gap-3 sm:grid-cols-2 max-w-lg">
-                <div className="space-y-1.5">
-                  <div className="flex items-center justify-between">
-                    <Label htmlFor="filter-log-date">Log Date</Label>
-                    {filterLogDate && (
-                      <button
-                        type="button"
-                        onClick={() => setFilterLogDate('')}
-                        className="text-[11px] text-purple-700 hover:underline"
-                      >
-                        Show All Dates
-                      </button>
-                    )}
-                  </div>
-                  <Input
-                    id="filter-log-date"
-                    type="date"
-                    value={filterLogDate}
-                    onChange={(e) => setFilterLogDate(e.target.value)}
-                    className="h-9"
-                  />
-                </div>
-                <div className="space-y-1.5">
-                  <Label htmlFor="filter-log-desig">Filter Designation</Label>
-                  <NativeSelect
-                    id="filter-log-desig"
-                    value={filterDesignation}
-                    onChange={(e) => setFilterDesignation(e.target.value)}
-                    className="h-9"
-                  >
-                    <option value="">All Designations</option>
-                    {designations.map((d) => (
-                      <option key={d.id} value={d.id}>{d.name}</option>
-                    ))}
-                  </NativeSelect>
-                </div>
-              </div>
+            <SurfaceCard title="Daily Roster Logs">
+              <AttendanceFilterBar
+                dateLabel="Log Date"
+                dateId="filter-log-date"
+                dateValue={filterLogDate}
+                onDateChange={handleFilterLogDateChange}
+                dateDisabled={showAllDates}
+                designationId="filter-log-desig"
+                designationValue={filterDesignation}
+                onDesignationChange={setFilterDesignation}
+                designations={designations}
+                showAllDates={showAllDates}
+                onShowAllDatesChange={handleShowAllDates}
+              />
+
               {loading ? (
                 <p className="py-8 text-center text-sm text-slate-400">Loading...</p>
               ) : filteredLogs.length === 0 ? (
-                <p className="py-8 text-center text-sm text-slate-400">No logs found for this date</p>
+                <p className="py-8 text-center text-sm text-slate-400">
+                  {showAllDates ? 'No logs found' : 'No logs found for this date'}
+                </p>
               ) : (
                 <>
                   <div className="space-y-3 md:hidden">
-                    {filteredLogs
-                      .slice((logPage - 1) * PAGE_SIZE, logPage * PAGE_SIZE)
-                      .map((log) => {
-                        const m = staff.find((s) => s.id === log.staffId)
-                        const logDateFormatted = new Date(log.workDate).toLocaleDateString('en-GB', {
-                          day: '2-digit',
-                          month: 'short',
-                          year: 'numeric',
-                        })
-                        return (
-                          <article
-                            key={log.id}
-                            className="rounded-xl border border-border bg-slate-50/60 px-3 py-3"
-                          >
-                            <div className="flex items-start justify-between gap-2">
-                              <div className="min-w-0">
-                                <p className="truncate text-sm font-semibold text-slate-900">
-                                  {m?.fullName || 'Employee'}
-                                </p>
-                                <p className="text-xs text-slate-500">{m?.designation || '—'}</p>
-                                <p className="mt-0.5 font-mono text-[11px] text-slate-400">
-                                  {logDateFormatted}
-                                </p>
-                              </div>
-                              <span
-                                className={`inline-flex shrink-0 items-center rounded-full px-2 py-0.5 text-xs font-semibold ring-1 ring-inset capitalize ${getStatusBadge(log.status)}`}
-                              >
-                                {log.status}
-                              </span>
+                    {pagedLogs.map((log) => {
+                      const m = staff.find((s) => s.id === log.staffId)
+                      return (
+                        <article
+                          key={log.id}
+                          className="rounded-xl border border-border bg-slate-50/60 px-3 py-3"
+                        >
+                          <div className="flex items-start justify-between gap-2">
+                            <div className="min-w-0">
+                              <p className="truncate text-sm font-semibold text-slate-900">
+                                {m?.fullName || 'Employee'}
+                              </p>
+                              <p className="text-xs text-slate-500">{m?.designation || '—'}</p>
+                              <p className="mt-0.5 font-mono text-[11px] text-slate-400">
+                                {formatAttendanceDate(log.workDate)}
+                              </p>
                             </div>
-                            {log.note ? (
-                              <p className="mt-2 text-xs text-slate-400 italic">{log.note}</p>
-                            ) : null}
-                          </article>
-                        )
-                      })}
+                            <span
+                              className={`inline-flex shrink-0 items-center rounded-full px-2 py-0.5 text-xs font-semibold ring-1 ring-inset capitalize ${getStatusBadge(log.status)}`}
+                            >
+                              {log.status}
+                            </span>
+                          </div>
+                          {log.note ? (
+                            <p className="mt-2 text-xs italic text-slate-400">{log.note}</p>
+                          ) : null}
+                        </article>
+                      )
+                    })}
                   </div>
 
                   <div className="hidden overflow-x-auto md:block">
@@ -326,38 +420,32 @@ export function StaffAttendanceTab({ designations = [], staff = [] }) {
                         </TableRow>
                       </TableHeader>
                       <TableBody>
-                        {filteredLogs
-                          .slice((logPage - 1) * PAGE_SIZE, logPage * PAGE_SIZE)
-                          .map((log) => {
-                            const m = staff.find((s) => s.id === log.staffId)
-                            const logDateFormatted = new Date(log.workDate).toLocaleDateString(
-                              'en-GB',
-                              { day: '2-digit', month: 'short', year: 'numeric' },
-                            )
-                            return (
-                              <TableRow key={log.id} className="hover:bg-slate-50/50">
-                                <TableCell className="px-3 py-2.5 font-semibold text-slate-900">
-                                  {m?.fullName || 'Employee'}
-                                </TableCell>
-                                <TableCell className="px-3 py-2.5 text-slate-600">
-                                  {m?.designation || '—'}
-                                </TableCell>
-                                <TableCell className="px-3 py-2.5 font-mono text-xs text-slate-600">
-                                  {logDateFormatted}
-                                </TableCell>
-                                <TableCell className="px-3 py-2.5">
-                                  <span
-                                    className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-semibold ring-1 ring-inset capitalize ${getStatusBadge(log.status)}`}
-                                  >
-                                    {log.status}
-                                  </span>
-                                </TableCell>
-                                <TableCell className="px-3 py-2.5 text-slate-400 italic">
-                                  {log.note || '—'}
-                                </TableCell>
-                              </TableRow>
-                            )
-                          })}
+                        {pagedLogs.map((log) => {
+                          const m = staff.find((s) => s.id === log.staffId)
+                          return (
+                            <TableRow key={log.id} className="hover:bg-slate-50/50">
+                              <TableCell className="px-3 py-2.5 font-semibold text-slate-900">
+                                {m?.fullName || 'Employee'}
+                              </TableCell>
+                              <TableCell className="px-3 py-2.5 text-slate-600">
+                                {m?.designation || '—'}
+                              </TableCell>
+                              <TableCell className="px-3 py-2.5 font-mono text-xs text-slate-600">
+                                {formatAttendanceDate(log.workDate)}
+                              </TableCell>
+                              <TableCell className="px-3 py-2.5">
+                                <span
+                                  className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-semibold ring-1 ring-inset capitalize ${getStatusBadge(log.status)}`}
+                                >
+                                  {log.status}
+                                </span>
+                              </TableCell>
+                              <TableCell className="px-3 py-2.5 italic text-slate-400">
+                                {log.note || '—'}
+                              </TableCell>
+                            </TableRow>
+                          )
+                        })}
                       </TableBody>
                     </Table>
                   </div>
@@ -366,9 +454,11 @@ export function StaffAttendanceTab({ designations = [], staff = [] }) {
 
               <TablePagination
                 page={logPage}
-                pageCount={Math.max(1, Math.ceil(filteredLogs.length / PAGE_SIZE))}
-                totalItems={filteredLogs.length}
+                pageCount={logPageCount}
+                totalItems={logTotal}
+                pageSize={logPageSize}
                 onPageChange={setLogPage}
+                onPageSizeChange={setLogPageSize}
               />
             </SurfaceCard>
           ) : (
@@ -385,9 +475,8 @@ export function StaffAttendanceTab({ designations = [], staff = [] }) {
                 </div>
               }
             >
-              {/* Compact month grid — no forced min-width crush on phones */}
               <div className="w-full">
-                <div className="mb-2 grid grid-cols-7 gap-1 text-center text-[10px] font-bold text-slate-400 uppercase sm:gap-2 sm:text-xs">
+                <div className="mb-2 grid grid-cols-7 gap-1 text-center text-[10px] font-bold uppercase text-slate-400 sm:gap-2 sm:text-xs">
                   <div>S</div>
                   <div>M</div>
                   <div>T</div>
@@ -428,7 +517,7 @@ export function StaffAttendanceTab({ designations = [], staff = [] }) {
                             )}
                           </div>
                         ) : (
-                          <span className="hidden text-[9px] text-slate-300 italic sm:inline">No logs</span>
+                          <span className="hidden text-[9px] italic text-slate-300 sm:inline">No logs</span>
                         )}
                       </div>
                     )
@@ -441,31 +530,38 @@ export function StaffAttendanceTab({ designations = [], staff = [] }) {
       ) : (
         <SurfaceCard
           title="Daily Attendance Registry"
+          description={`Marking attendance for ${formatAttendanceDate(selectedDate)}`}
           actions={
-            <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row sm:items-center">
-              <Input
-                type="date"
-                value={selectedDate}
-                onChange={(e) => setSelectedDate(e.target.value)}
-                className="h-9 w-full py-1 sm:w-36"
-              />
-              <Button
-                onClick={handleSaveAll}
-                disabled={mutating || staff.length === 0}
-                style={{ backgroundColor: BRAND.purple }}
-                className="w-full text-white sm:w-auto"
-              >
-                Save All
-              </Button>
-            </div>
+            <Button
+              onClick={handleSaveAll}
+              disabled={mutating || filteredStaff.length === 0}
+              variant="brand"
+              className="w-full sm:w-auto"
+            >
+              Save All
+            </Button>
           }
         >
-          {staff.length === 0 ? (
-            <p className="py-8 text-center text-sm text-slate-400">No staff to mark</p>
+          {/* Same filter layout as Attendance Logs (without Show All Dates) */}
+          <AttendanceFilterBar
+            dateLabel="Attendance Date"
+            dateId="manual-attendance-date"
+            dateValue={selectedDate}
+            onDateChange={setSelectedDate}
+            designationId="manual-filter-desig"
+            designationValue={filterDesignation}
+            onDesignationChange={setFilterDesignation}
+            designations={designations}
+          />
+
+          {filteredStaff.length === 0 ? (
+            <p className="py-8 text-center text-sm text-slate-400">
+              {staff.length === 0 ? 'No staff to mark' : 'No staff match this designation'}
+            </p>
           ) : (
             <>
               <div className="space-y-3 md:hidden">
-                {staff.map((m) => {
+                {filteredStaff.map((m) => {
                   const local = localAttendance[m.id] || { status: 'present', note: '', isSaved: false }
                   return (
                     <article
@@ -521,11 +617,11 @@ export function StaffAttendanceTab({ designations = [], staff = [] }) {
                       <TableHead className="px-3 py-2 font-medium">Designation</TableHead>
                       <TableHead className="px-3 py-2 font-medium">Mark Attendance</TableHead>
                       <TableHead className="px-3 py-2 font-medium">Shift Note</TableHead>
-                      <TableHead className="px-3 py-2 text-right font-medium">Action</TableHead>
+                      <TableHead className="px-3 py-2 font-medium">Action</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {staff.map((m) => {
+                    {filteredStaff.map((m) => {
                       const local = localAttendance[m.id] || {
                         status: 'present',
                         note: '',
@@ -561,7 +657,7 @@ export function StaffAttendanceTab({ designations = [], staff = [] }) {
                               className="h-8 max-w-[160px] py-0.5 text-xs"
                             />
                           </TableCell>
-                          <TableCell className="px-3 py-2.5 text-right">
+                          <TableCell className="px-3 py-2.5">
                             <Button
                               size="sm"
                               variant={local.isSaved ? 'outline' : 'default'}
@@ -590,4 +686,5 @@ export function StaffAttendanceTab({ designations = [], staff = [] }) {
     </div>
   )
 }
+
 export default StaffAttendanceTab

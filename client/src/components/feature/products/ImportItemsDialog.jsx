@@ -63,14 +63,18 @@ export function ImportItemsDialog({ open, onOpenChange, loading = false, onSubmi
       return
     }
     setError(null)
-    const result = await onSubmit?.(rows)
-    if (result?.success) {
-      setText('')
-      setFileName('')
-      if (fileRef.current) fileRef.current.value = ''
-      onOpenChange?.(false)
-    } else if (result?.error) {
-      setError(result.error)
+    try {
+      const result = await onSubmit?.(rows)
+      if (result?.success) {
+        setText('')
+        setFileName('')
+        if (fileRef.current) fileRef.current.value = ''
+        onOpenChange?.(false)
+      } else {
+        setError(result?.error || 'Import failed. Please try again.')
+      }
+    } catch (err) {
+      setError(err?.message || 'Import failed. Please try again.')
     }
   }
 

@@ -8,6 +8,7 @@ export function StockInTable({
   loading,
   pagination,
   onPageChange,
+  onPageSizeChange,
   className,
 }) {
   const columns = [
@@ -40,6 +41,7 @@ export function StockInTable({
       pagination={pagination}
       columns={columns}
       onPageChange={onPageChange}
+      onPageSizeChange={onPageSizeChange}
       emptyTitle="No stock-in records"
       emptyHint="Add stock manually or receive an approved purchase order."
       className={className}

@@ -1,8 +1,8 @@
-import { Package, Pencil, Trash2 } from 'lucide-react'
+import { Package } from 'lucide-react'
 import { ProductImageCell } from '@/components/feature/products/ProductStatusToggle'
 import { EmptyState } from '@/components/shared/EmptyState'
 import { SurfaceCard } from '@/components/shared/SurfaceCard'
-import { Button } from '@/components/ui/button'
+import { RowActionButtons } from '@/components/shared/ActionIconButton'
 import {
   Table,
   TableHeader,
@@ -14,37 +14,15 @@ import {
 } from '@/components/ui/table'
 import { TableRowsSkeleton } from '@/components/ui/skeleton'
 import { formatMovementDateTime } from '@/lib/mapStockMovement'
-import { displayMovementRef } from '@/lib/formatDisplayId'
+import { displayItemCode, displayMovementRef } from '@/lib/formatDisplayId'
 import { cn } from '@/lib/utils'
 
 function MovementRowActions({ row, onEdit, onDelete }) {
   return (
-    <div className="inline-flex items-center gap-1">
-      {onEdit ? (
-        <Button
-          type="button"
-          variant="ghost"
-          size="sm"
-          className="cursor-pointer"
-          onClick={() => onEdit(row)}
-          title="Edit"
-        >
-          <Pencil className="size-4" />
-        </Button>
-      ) : null}
-      {onDelete ? (
-        <Button
-          type="button"
-          variant="ghost"
-          size="sm"
-          className="cursor-pointer text-red-600 hover:text-red-700"
-          onClick={() => onDelete(row)}
-          title="Delete"
-        >
-          <Trash2 className="size-4" />
-        </Button>
-      ) : null}
-    </div>
+    <RowActionButtons
+      onEdit={onEdit ? () => onEdit(row) : undefined}
+      onDelete={onDelete ? () => onDelete(row) : undefined}
+    />
   )
 }
 
@@ -57,6 +35,7 @@ export function MovementHistoryTable({
   pagination,
   columns = [],
   onPageChange,
+  onPageSizeChange,
   onEdit,
   onDelete,
   emptyTitle = 'No movements yet',
@@ -68,6 +47,7 @@ export function MovementHistoryTable({
   const page = pagination?.page || 1
   const pageCount = Math.max(1, pagination?.pageCount || 1)
   const total = pagination?.total ?? list.length
+  const pageSize = pagination?.limit || 8
   const showActions = Boolean(onEdit || onDelete)
 
   return (
@@ -75,11 +55,6 @@ export function MovementHistoryTable({
       className={className}
       title={title}
       description={description}
-      actions={
-        <span className="text-xs font-medium text-slate-400">
-          {total} record{total === 1 ? '' : 's'} · 8 / page
-        </span>
-      }
     >
       {loading ? (
         <TableRowsSkeleton rows={6} />
@@ -104,7 +79,7 @@ export function MovementHistoryTable({
                   ))}
                 </div>
                 {showActions ? (
-                  <div className="mt-3 flex justify-end border-t border-border pt-2">
+                  <div className="mt-3 flex justify-start border-t border-border pt-2">
                     <MovementRowActions row={row} onEdit={onEdit} onDelete={onDelete} />
                   </div>
                 ) : null}
@@ -122,7 +97,7 @@ export function MovementHistoryTable({
                     </TableHead>
                   ))}
                   {showActions ? (
-                    <TableHead className="px-2 py-2 text-right font-semibold">Actions</TableHead>
+                    <TableHead className="px-2 py-2 font-semibold">Actions</TableHead>
                   ) : null}
                 </TableRow>
               </TableHeader>
@@ -135,7 +110,7 @@ export function MovementHistoryTable({
                       </TableCell>
                     ))}
                     {showActions ? (
-                      <TableCell className="px-2 py-3 text-right">
+                      <TableCell className="px-2 py-3">
                         <MovementRowActions row={row} onEdit={onEdit} onDelete={onDelete} />
                       </TableCell>
                     ) : null}
@@ -148,8 +123,10 @@ export function MovementHistoryTable({
             page={page}
             pageCount={pageCount}
             totalItems={total}
+            pageSize={pageSize}
             loading={loading}
             onPageChange={onPageChange}
+            onPageSizeChange={onPageSizeChange}
           />
         </>
       )}
@@ -161,7 +138,7 @@ export function movementImageNameColumns() {
   return [
     {
       key: 'reference',
-      label: 'Reference',
+      label: 'Stock ID',
       className: 'w-28',
       render: (row) => (
         <span className="font-mono text-xs text-slate-600" title={row.id}>
@@ -181,9 +158,9 @@ export function movementImageNameColumns() {
       render: (row) => (
         <div className="min-w-0">
           <p className="font-medium text-slate-900">{row.productName || '—'}</p>
-          {row.itemCode ? (
-            <p className="text-xs text-slate-400">{row.itemCode}</p>
-          ) : null}
+          <p className="text-xs text-slate-400">
+            {displayItemCode({ itemCode: row.itemCode, productId: row.productId })}
+          </p>
         </div>
       ),
     },

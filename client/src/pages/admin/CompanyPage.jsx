@@ -3,15 +3,17 @@ import { SurfaceCard } from '@/components/shared/SurfaceCard'
 import { PageHeader } from '@/components/shared/PageHeader'
 import { MotionHeader, MotionReveal } from '@/components/shared/MotionReveal'
 import { ImageUploadField } from '@/components/shared/ImageUploadField'
+import { FieldError } from '@/components/shared/FieldError'
 import { SlowLoadingBanner, useSlowLoadingHint } from '@/components/shared/SlowLoadingBanner'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
-import { Badge } from '@/components/ui/badge'
+import { Checkbox } from '@/components/ui/checkbox'
 import { NativeSelect } from '@/components/ui/select'
 import {
   Dialog,
+  DialogCancelButton,
   DialogContent,
   DialogDescription,
   DialogFooter,
@@ -19,8 +21,8 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog'
 import { ConfirmDialog } from '@/components/shared/ConfirmDialog'
-import { EmptyState } from '@/components/shared/EmptyState'
 import { PhoneInput } from '@/components/shared/PhoneInput'
+import { PoliciesTable } from '@/components/feature/admin/company/PoliciesTable'
 import { useAdminCompany } from '@/hooks/useAdminCompany'
 import { useAdminPolicies } from '@/hooks/useAdminPolicies'
 import { BRAND } from '@/lib/constants'
@@ -30,6 +32,22 @@ import {
   validatePhone,
   validateUrl,
 } from '@/lib/validation/formValidators'
+import { fieldErrorClass } from '@/lib/validation/fieldErrors'
+import { useFieldErrors } from '@/hooks/useFieldErrors'
+import { useFormBaseline } from '@/hooks/useFormBaseline'
+
+const COMPANY_FIELD_IDS = {
+  name: 'companyName',
+  contactNumbers: 'contacts',
+  whatsappNumber: 'whatsapp',
+  facebookUrl: 'facebook',
+  instagramUrl: 'instagram',
+}
+
+const COMPANY_FIELD_ORDER = ['name', 'contactNumbers', 'whatsappNumber', 'facebookUrl', 'instagramUrl']
+
+const POLICY_FIELD_IDS = { name: 'polName', detail: 'polDetail' }
+const POLICY_FIELD_ORDER = ['name', 'detail']
 import {
   Building2,
   Phone,
@@ -40,10 +58,7 @@ import {
   ShieldAlert,
   Plus,
   Search,
-  Edit2,
-  Trash2,
   Save,
-  CheckCircle2,
   FileText,
   Store,
   MapPin,
@@ -88,19 +103,6 @@ const CATEGORY_CONFIG = {
   },
 }
 
-function formatPolicyCreatedAt(value) {
-  if (!value) return '—'
-  const date = new Date(value)
-  if (Number.isNaN(date.getTime())) return String(value)
-  return date.toLocaleString(undefined, {
-    year: 'numeric',
-    month: 'short',
-    day: '2-digit',
-    hour: '2-digit',
-    minute: '2-digit',
-  })
-}
-
 const EMPTY_FORM = {
   name: '',
   contactNumbers: '',
@@ -134,9 +136,27 @@ export function CompanyPage() {
     name: '',
     detail: '',
     category: 'Retail Operations',
+    printOnSlip: false,
   })
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false)
   const [deleteTargetPolicy, setDeleteTargetPolicy] = useState(null)
+  const [viewPolicy, setViewPolicy] = useState(null)
+  const {
+    fieldErrors: companyFieldErrors,
+    formError: companyFormError,
+    setFormError: setCompanyFormError,
+    resetErrors: resetCompanyErrors,
+    clearField: clearCompanyField,
+    applyErrors: applyCompanyErrors,
+  } = useFieldErrors()
+  const {
+    fieldErrors: policyFieldErrors,
+    formError: policyFormError,
+    setFormError: setPolicyFormError,
+    resetErrors: resetPolicyErrors,
+    clearField: clearPolicyField,
+    applyErrors: applyPolicyErrors,
+  } = useFieldErrors()
 
   const {
     items: policies,
@@ -145,11 +165,19 @@ export function CompanyPage() {
     error: policiesError,
     createPolicy,
     updatePolicy,
+    setPrintOnSlip,
     deletePolicy,
   } = useAdminPolicies({ limit: 100 })
 
+  const { captureBaseline, isDirty } = useFormBaseline(policyDialogOpen)
   const slowCompany = useSlowLoadingHint(companyLoading)
   const slowPolicies = useSlowLoadingHint(policiesLoading)
+
+  useEffect(() => {
+    if (!policyDialogOpen) return
+    captureBaseline(policyForm)
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- capture once per open
+  }, [policyDialogOpen, captureBaseline])
 
   useEffect(() => {
     if (companyLoading || formHydrated) return
@@ -169,13 +197,12 @@ export function CompanyPage() {
 
   async function handleSaveCompanyDetails(e) {
     e.preventDefault()
+    const errors = {}
     if (!form.name.trim()) {
-      toastError('Please enter the registered company name')
-      return
+      errors.name = 'Please enter the registered company name'
     }
     if (!form.contactNumbers.trim()) {
-      toastError('Please provide company contact numbers')
-      return
+      errors.contactNumbers = 'Please provide company contact numbers'
     }
 
     if (form.whatsappNumber?.trim()) {
@@ -183,10 +210,7 @@ export function CompanyPage() {
         required: false,
         fieldName: 'WhatsApp number',
       })
-      if (waErr) {
-        toastError(waErr)
-        return
-      }
+      if (waErr) errors.whatsappNumber = waErr
     }
 
     if (form.facebookUrl?.trim()) {
@@ -194,10 +218,7 @@ export function CompanyPage() {
         required: false,
         fieldName: 'Facebook URL',
       })
-      if (fbErr) {
-        toastError(fbErr)
-        return
-      }
+      if (fbErr) errors.facebookUrl = fbErr
     }
 
     if (form.instagramUrl?.trim()) {
@@ -205,11 +226,14 @@ export function CompanyPage() {
         required: false,
         fieldName: 'Instagram URL',
       })
-      if (igErr) {
-        toastError(igErr)
-        return
-      }
+      if (igErr) errors.instagramUrl = igErr
     }
+
+    if (Object.keys(errors).length) {
+      applyCompanyErrors(errors, COMPANY_FIELD_IDS, COMPANY_FIELD_ORDER)
+      return
+    }
+    resetCompanyErrors()
 
     const result = await updateCompany({
       name: form.name,
@@ -224,7 +248,7 @@ export function CompanyPage() {
     })
 
     if (!result.success) {
-      toastError(result.error || 'Failed to save company details')
+      setCompanyFormError(result.error || 'Failed to save company details')
       return
     }
 
@@ -234,16 +258,24 @@ export function CompanyPage() {
 
   function handleOpenAddPolicy() {
     setEditingPolicy(null)
-    setPolicyForm({ name: '', detail: '', category: 'Retail Operations' })
+    resetPolicyErrors()
+    setPolicyForm({
+      name: '',
+      detail: '',
+      category: 'Retail Operations',
+      printOnSlip: false,
+    })
     setPolicyDialogOpen(true)
   }
 
   function handleOpenEditPolicy(policy) {
     setEditingPolicy(policy)
+    resetPolicyErrors()
     setPolicyForm({
       name: policy.name,
       detail: policy.detail,
       category: policy.category || 'Retail Operations',
+      printOnSlip: Boolean(policy.printOnSlip),
     })
     setPolicyDialogOpen(true)
   }
@@ -265,24 +297,45 @@ export function CompanyPage() {
     setDeleteConfirmOpen(false)
   }
 
-  async function handleSubmitPolicy(e) {
-    e.preventDefault()
-    if (!policyForm.name.trim() || !policyForm.detail.trim()) {
-      toastError('Please provide a policy name and description')
+  async function handleTogglePrintOnSlip(policy, next) {
+    const result = await setPrintOnSlip(policy.id, next)
+    if (!result.success) {
+      toastError(result.error || 'Failed to update print-on-slip setting')
       return
     }
+    toastSuccess(
+      next
+        ? `"${policy.name}" enabled on POS invoice slips`
+        : `"${policy.name}" disabled on POS invoice slips`,
+    )
+  }
+
+  async function handleSubmitPolicy(e) {
+    e.preventDefault()
+    const errors = {}
+    if (!policyForm.name.trim()) {
+      errors.name = 'Please provide a policy name and description'
+    }
+    if (!policyForm.detail.trim()) {
+      errors.detail = 'Please provide a policy name and description'
+    }
+    if (Object.keys(errors).length) {
+      applyPolicyErrors(errors, POLICY_FIELD_IDS, POLICY_FIELD_ORDER)
+      return
+    }
+    resetPolicyErrors()
 
     if (editingPolicy) {
       const result = await updatePolicy(editingPolicy.id, policyForm)
       if (!result.success) {
-        toastError(result.error || 'Failed to update policy')
+        setPolicyFormError(result.error || 'Failed to update policy')
         return
       }
       toastSuccess('Policy updated successfully')
     } else {
       const result = await createPolicy(policyForm)
       if (!result.success) {
-        toastError(result.error || 'Failed to create policy')
+        setPolicyFormError(result.error || 'Failed to create policy')
         return
       }
       toastSuccess('New policy created and published')
@@ -384,7 +437,12 @@ export function CompanyPage() {
                 Loading company details…
               </div>
             ) : (
-              <form onSubmit={handleSaveCompanyDetails} className="space-y-5">
+              <form onSubmit={handleSaveCompanyDetails} className="space-y-5" noValidate>
+                {companyFormError ? (
+                  <p className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">
+                    {companyFormError}
+                  </p>
+                ) : null}
                 <div className="flex flex-col sm:flex-row items-start gap-4 pb-4 border-b border-slate-100">
                   <div className="w-full sm:flex-1">
                     <ImageUploadField
@@ -403,10 +461,15 @@ export function CompanyPage() {
                     <Input
                       id="companyName"
                       value={form.name}
-                      onChange={(e) => setForm({ ...form, name: e.target.value })}
+                      onChange={(e) => {
+                        setForm({ ...form, name: e.target.value })
+                        clearCompanyField('name')
+                      }}
                       placeholder="e.g. FluxOne Enterprise Solutions Ltd."
-                      required
+                      aria-invalid={Boolean(companyFieldErrors.name)}
+                      className={fieldErrorClass(companyFieldErrors.name)}
                     />
+                    <FieldError message={companyFieldErrors.name} />
                     <p className="text-[11px] text-slate-400">
                       This name appears on wholesale supplier bills, tax invoices, and branch headers.
                     </p>
@@ -422,12 +485,15 @@ export function CompanyPage() {
                     <Input
                       id="contacts"
                       value={form.contactNumbers}
-                      onChange={(e) =>
+                      onChange={(e) => {
                         setForm({ ...form, contactNumbers: e.target.value })
-                      }
+                        clearCompanyField('contactNumbers')
+                      }}
                       placeholder="+92 51 2223344, +92 300 1234567"
-                      required
+                      aria-invalid={Boolean(companyFieldErrors.contactNumbers)}
+                      className={fieldErrorClass(companyFieldErrors.contactNumbers)}
                     />
+                    <FieldError message={companyFieldErrors.contactNumbers} />
                   </div>
 
                   <div className="space-y-1.5">
@@ -438,8 +504,14 @@ export function CompanyPage() {
                     <PhoneInput
                       id="whatsapp"
                       value={form.whatsappNumber}
-                      onChange={(val) => setForm({ ...form, whatsappNumber: val })}
+                      onChange={(val) => {
+                        setForm({ ...form, whatsappNumber: val })
+                        clearCompanyField('whatsappNumber')
+                      }}
+                      aria-invalid={Boolean(companyFieldErrors.whatsappNumber)}
+                      className={fieldErrorClass(companyFieldErrors.whatsappNumber)}
                     />
+                    <FieldError message={companyFieldErrors.whatsappNumber} />
                   </div>
 
                   <div className="space-y-1.5">
@@ -451,9 +523,15 @@ export function CompanyPage() {
                       id="facebook"
                       type="url"
                       value={form.facebookUrl}
-                      onChange={(e) => setForm({ ...form, facebookUrl: e.target.value })}
+                      onChange={(e) => {
+                        setForm({ ...form, facebookUrl: e.target.value })
+                        clearCompanyField('facebookUrl')
+                      }}
                       placeholder="https://facebook.com/your-business"
+                      aria-invalid={Boolean(companyFieldErrors.facebookUrl)}
+                      className={fieldErrorClass(companyFieldErrors.facebookUrl)}
                     />
+                    <FieldError message={companyFieldErrors.facebookUrl} />
                   </div>
 
                   <div className="space-y-1.5">
@@ -465,9 +543,15 @@ export function CompanyPage() {
                       id="instagram"
                       type="url"
                       value={form.instagramUrl}
-                      onChange={(e) => setForm({ ...form, instagramUrl: e.target.value })}
+                      onChange={(e) => {
+                        setForm({ ...form, instagramUrl: e.target.value })
+                        clearCompanyField('instagramUrl')
+                      }}
                       placeholder="https://instagram.com/your-business"
+                      aria-invalid={Boolean(companyFieldErrors.instagramUrl)}
+                      className={fieldErrorClass(companyFieldErrors.instagramUrl)}
                     />
+                    <FieldError message={companyFieldErrors.instagramUrl} />
                   </div>
 
                   <div className="space-y-1.5">
@@ -600,88 +684,17 @@ export function CompanyPage() {
                   <Loader2 className="size-4 animate-spin" />
                   Loading policies…
                 </div>
-              ) : filteredPolicies.length === 0 ? (
-                <EmptyState
-                  icon={FileText}
-                  title="No corporate policies found"
-                  description="Try searching with a different keyword or create a new policy."
-                  className="rounded-2xl border-border bg-white"
-                />
               ) : (
-                filteredPolicies.map((p) => {
-                  const cfg = CATEGORY_CONFIG[p.category] || CATEGORY_CONFIG['Retail Operations']
-                  const CategoryIcon = cfg.icon
-                  const displayId = referenceFromUuid(p.id, 'POL')
-
-                  return (
-                    <div
-                      key={p.id}
-                      className={`rounded-2xl border border-border bg-white p-5 sm:p-6 shadow-2xs hover:shadow-sm border-l-4 ${cfg.accentBorder} transition-all duration-200 space-y-4`}
-                    >
-                      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                        <div className="flex flex-wrap items-center gap-2.5">
-                          <div
-                            className={`flex size-8 shrink-0 items-center justify-center rounded-lg ${cfg.iconBg} border border-slate-200/60`}
-                          >
-                            <CategoryIcon className="size-4" />
-                          </div>
-
-                          <span className="font-mono text-xs font-bold text-purple-700 bg-purple-50 px-2.5 py-0.5 rounded-md border border-purple-100 whitespace-nowrap">
-                            {displayId}
-                          </span>
-
-                          <Badge variant="outline" className={`text-xs font-semibold ${cfg.badgeClass}`}>
-                            {p.category || 'Uncategorized'}
-                          </Badge>
-
-                          <h4 className="font-bold text-slate-900 text-base sm:text-lg">{p.name}</h4>
-                        </div>
-
-                        <div className="flex items-center gap-2 self-end sm:self-center">
-                          <span className="text-xs text-slate-400 font-medium whitespace-nowrap mr-1">
-                            {formatPolicyCreatedAt(p.createdAt)}
-                          </span>
-
-                          <Button
-                            type="button"
-                            variant="outline"
-                            size="sm"
-                            onClick={() => handleOpenEditPolicy(p)}
-                            className="h-8 px-3 text-xs font-semibold cursor-pointer border-purple-200 text-purple-900 hover:bg-purple-50"
-                          >
-                            <Edit2 className="mr-1.5 size-3.5" />
-                            Edit
-                          </Button>
-
-                          <Button
-                            type="button"
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => handlePromptDelete(p)}
-                            className="h-8 px-3 text-xs font-semibold text-rose-600 hover:bg-rose-50 hover:text-rose-700 cursor-pointer"
-                          >
-                            <Trash2 className="mr-1.5 size-3.5" />
-                            Delete
-                          </Button>
-                        </div>
-                      </div>
-
-                      <div className="rounded-xl border border-slate-100 bg-slate-50/80 p-4 text-xs sm:text-sm text-slate-700 leading-relaxed">
-                        <p className="whitespace-pre-line font-normal">{p.detail}</p>
-                      </div>
-
-                      <div className="flex items-center justify-between text-[11px] text-slate-400 pt-1 border-t border-slate-100">
-                        <span className="flex items-center gap-1.5 text-emerald-700 font-semibold">
-                          <CheckCircle2 className="size-3.5 text-emerald-600" />
-                          {p.isActive
-                            ? 'Active Governance Policy · Enforced across all branches'
-                            : 'Inactive policy'}
-                        </span>
-                        <span className="font-medium text-slate-400">Corporate Protocol</span>
-                      </div>
-                    </div>
-                  )
-                })
+                <PoliciesTable
+                  items={filteredPolicies}
+                  loading={false}
+                  mutating={policiesMutating}
+                  categoryConfig={CATEGORY_CONFIG}
+                  onView={setViewPolicy}
+                  onEdit={handleOpenEditPolicy}
+                  onDelete={handlePromptDelete}
+                  onTogglePrintOnSlip={handleTogglePrintOnSlip}
+                />
               )}
             </div>
           </div>
@@ -690,22 +703,70 @@ export function CompanyPage() {
 
       <ConfirmDialog
         open={deleteConfirmOpen}
-        onOpenChange={setDeleteConfirmOpen}
+        onOpenChange={(open) => {
+          setDeleteConfirmOpen(open)
+          if (!open) setDeleteTargetPolicy(null)
+        }}
         title="Delete Corporate Policy"
         description={
           deleteTargetPolicy ? (
             <>
-              Are you sure you want to delete <strong>&ldquo;{deleteTargetPolicy.name}&rdquo;</strong> ({referenceFromUuid(deleteTargetPolicy.id, 'POL')})?
+              Are you sure you want to delete &quot;{deleteTargetPolicy.name}&quot; (
+              {referenceFromUuid(deleteTargetPolicy.id, 'POL')})?
             </>
           ) : null
         }
         warning="This action cannot be undone and will immediately unpublish this policy across all branch portals."
         confirmLabel="Delete Policy"
+        variant="destructive"
         loading={policiesMutating}
         onConfirm={handleConfirmDelete}
       />
 
-      <Dialog open={policyDialogOpen} onOpenChange={setPolicyDialogOpen}>
+      <Dialog open={Boolean(viewPolicy)} onOpenChange={(open) => !open && setViewPolicy(null)}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle>{viewPolicy?.name || 'Policy details'}</DialogTitle>
+            <DialogDescription>
+              {viewPolicy
+                ? `${referenceFromUuid(viewPolicy.id, 'POL')} · ${viewPolicy.category || 'Uncategorized'}`
+                : null}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="rounded-xl border border-slate-100 bg-slate-50/80 p-4 text-sm leading-relaxed text-slate-700">
+            <p className="whitespace-pre-line">{viewPolicy?.detail}</p>
+          </div>
+          {viewPolicy ? (
+            <p className="text-xs text-slate-500">
+              Invoice slip:{' '}
+              <strong className={viewPolicy.printOnSlip ? 'text-emerald-700' : 'text-slate-600'}>
+                {viewPolicy.printOnSlip ? 'Enabled' : 'Disabled'}
+              </strong>
+            </p>
+          ) : null}
+          <DialogFooter>
+            <DialogCancelButton />
+            <Button
+              type="button"
+              className="text-white font-semibold"
+              style={{ background: BRAND.purple }}
+              onClick={() => {
+                const policy = viewPolicy
+                setViewPolicy(null)
+                if (policy) handleOpenEditPolicy(policy)
+              }}
+            >
+              Edit Policy
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog
+        open={policyDialogOpen}
+        onOpenChange={setPolicyDialogOpen}
+        dirty={isDirty(policyForm)}
+      >
         <DialogContent className="max-w-lg">
           <DialogHeader>
             <DialogTitle>
@@ -716,7 +777,13 @@ export function CompanyPage() {
             </DialogDescription>
           </DialogHeader>
 
-          <form onSubmit={handleSubmitPolicy} className="space-y-4 pt-2">
+          {policyFormError ? (
+            <p className="mb-3 rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">
+              {policyFormError}
+            </p>
+          ) : null}
+
+          <form onSubmit={handleSubmitPolicy} className="space-y-4 pt-2" noValidate>
             <div className="space-y-1.5">
               <Label htmlFor="polName" className="text-xs font-semibold">
                 Policy Name *
@@ -725,9 +792,14 @@ export function CompanyPage() {
                 id="polName"
                 placeholder="e.g. 7-Day Return & Replacement Policy"
                 value={policyForm.name}
-                onChange={(e) => setPolicyForm({ ...policyForm, name: e.target.value })}
-                required
+                onChange={(e) => {
+                  setPolicyForm({ ...policyForm, name: e.target.value })
+                  clearPolicyField('name')
+                }}
+                aria-invalid={Boolean(policyFieldErrors.name)}
+                className={fieldErrorClass(policyFieldErrors.name)}
               />
+              <FieldError message={policyFieldErrors.name} />
             </div>
 
             <div className="space-y-1.5">
@@ -756,20 +828,41 @@ export function CompanyPage() {
                 rows={4}
                 placeholder="Describe the conditions, timeframe, receipts required, and branch handling procedures..."
                 value={policyForm.detail}
-                onChange={(e) => setPolicyForm({ ...policyForm, detail: e.target.value })}
-                required
+                onChange={(e) => {
+                  setPolicyForm({ ...policyForm, detail: e.target.value })
+                  clearPolicyField('detail')
+                }}
+                aria-invalid={Boolean(policyFieldErrors.detail)}
+                className={fieldErrorClass(policyFieldErrors.detail)}
               />
+              <FieldError message={policyFieldErrors.detail} />
             </div>
 
+            <label
+              htmlFor="polPrintOnSlip"
+              className="flex cursor-pointer items-start gap-3 rounded-xl border border-slate-200 bg-slate-50/80 px-3 py-3"
+            >
+              <Checkbox
+                id="polPrintOnSlip"
+                checked={Boolean(policyForm.printOnSlip)}
+                onChange={(e) =>
+                  setPolicyForm({ ...policyForm, printOnSlip: e.target.checked })
+                }
+                className="mt-0.5"
+              />
+              <span className="min-w-0">
+                <span className="block text-sm font-semibold text-slate-900">
+                  Enable on invoice slip
+                </span>
+                <span className="mt-0.5 block text-xs text-slate-500">
+                  When enabled, this policy syncs to POS and appears on the customer receipt after a
+                  sale. Disabled policies are hidden from the slip.
+                </span>
+              </span>
+            </label>
+
             <DialogFooter className="pt-2">
-              <Button
-                type="button"
-                variant="outline"
-                onClick={() => setPolicyDialogOpen(false)}
-                disabled={policiesMutating}
-              >
-                Cancel
-              </Button>
+              <DialogCancelButton disabled={policiesMutating} />
               <Button
                 type="submit"
                 disabled={policiesMutating}

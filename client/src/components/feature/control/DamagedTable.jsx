@@ -13,6 +13,7 @@ export function DamagedTable({
   loading,
   pagination,
   onPageChange,
+  onPageSizeChange,
   onEdit,
   onDelete,
   className,
@@ -49,6 +50,7 @@ export function DamagedTable({
       pagination={pagination}
       columns={columns}
       onPageChange={onPageChange}
+      onPageSizeChange={onPageSizeChange}
       onEdit={onEdit}
       onDelete={onDelete}
       emptyTitle="No damaged records"

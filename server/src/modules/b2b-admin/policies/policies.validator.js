@@ -42,6 +42,14 @@ export const createPolicySchema = z.object({
         return undefined
       }, z.boolean().optional())
       .optional(),
+    // When true, POS includes this policy on printed sale slips
+    printOnSlip: z
+      .preprocess((value) => {
+        if (value === 'true' || value === true) return true
+        if (value === 'false' || value === false) return false
+        return undefined
+      }, z.boolean().optional())
+      .optional(),
   }),
   query: empty,
   params: empty,
@@ -53,6 +61,13 @@ export const updatePolicySchema = z.object({
     detail: z.string().trim().min(1).max(10000).optional(),
     category: optionalString,
     isActive: z
+      .preprocess((value) => {
+        if (value === 'true' || value === true) return true
+        if (value === 'false' || value === false) return false
+        return undefined
+      }, z.boolean().optional())
+      .optional(),
+    printOnSlip: z
       .preprocess((value) => {
         if (value === 'true' || value === true) return true
         if (value === 'false' || value === false) return false

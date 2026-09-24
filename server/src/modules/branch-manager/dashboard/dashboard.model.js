@@ -1,5 +1,35 @@
 import { pool, requireTenantId, tenantQuery } from '../../../config/db.js'
 
+// Final % = (Σ actual / Σ max) × 100 — enabled (is_active) factors only
+const WEIGHTED_RATING_SQL = `
+  COALESCE(
+    ROUND(
+      (
+        COALESCE((
+          SELECT SUM(lp.points)::numeric
+          FROM (
+            SELECT DISTINCT ON (ps.scale_id) ps.points
+            FROM performance_scores ps
+            INNER JOIN scoring_scales ss_live
+              ON ss_live.id = ps.scale_id
+              AND ss_live.tenant_id = ps.tenant_id
+              AND ss_live.is_active = true
+            WHERE ps.staff_id = s.id AND ps.tenant_id = s.tenant_id
+            ORDER BY ps.scale_id, ps.scored_on DESC, ps.id DESC
+          ) lp
+        ), 0)
+        /
+        NULLIF((
+          SELECT SUM(ss_all.max_points)::numeric
+          FROM scoring_scales ss_all
+          WHERE ss_all.tenant_id = s.tenant_id
+            AND ss_all.is_active = true
+        ), 0)
+      ) * 100
+    , 2)
+  , 0)
+`
+
 function toDateParam(value) {
   if (!value) return null
   if (value instanceof Date) return value.toISOString().slice(0, 10)
@@ -333,15 +363,22 @@ export async function listStaffPerformanceSnapshot(tenantId, filters = {}) {
         u.full_name AS "fullName",
         s.image_url AS "imageUrl",
         s.status,
-        COALESCE(ROUND(AVG((ps.points / NULLIF(ss.max_points, 0)) * 100), 2), 0) AS "rating",
-        COALESCE(SUM(ps.points), 0)::numeric AS "pointsRaw"
+        ${WEIGHTED_RATING_SQL} AS "rating",
+        COALESCE((
+          SELECT SUM(lp.points)::numeric
+          FROM (
+            SELECT DISTINCT ON (ps.scale_id) ps.points
+            FROM performance_scores ps
+            INNER JOIN scoring_scales ss_live
+              ON ss_live.id = ps.scale_id AND ss_live.tenant_id = ps.tenant_id
+            WHERE ps.staff_id = s.id AND ps.tenant_id = s.tenant_id
+            ORDER BY ps.scale_id, ps.scored_on DESC, ps.id DESC
+          ) lp
+        ), 0) AS "pointsRaw"
       FROM staff s
       JOIN users u ON u.id = s.user_id AND u.tenant_id = s.tenant_id
-      LEFT JOIN performance_scores ps ON ps.staff_id = s.id AND ps.tenant_id = s.tenant_id
-      LEFT JOIN scoring_scales ss ON ss.id = ps.scale_id AND ss.tenant_id = s.tenant_id
       WHERE s.tenant_id = $1
         AND ($2::uuid IS NULL OR s.branch_id = $2)
-      GROUP BY s.id, u.full_name, s.image_url, s.status
       ORDER BY "rating" DESC, u.full_name ASC
       LIMIT $3 OFFSET $4
     `,
@@ -474,16 +511,23 @@ async function getDashboardStaff(tenantId, branchId) {
         s.image_url AS "image",
         s.status,
         d.name AS "role",
-        COALESCE(ROUND(AVG((ps.points / NULLIF(ss.max_points, 0)) * 100), 2), 0) AS "rating",
-        COALESCE(SUM(ps.points), 0)::numeric AS "pointsRaw"
+        ${WEIGHTED_RATING_SQL} AS "rating",
+        COALESCE((
+          SELECT SUM(lp.points)::numeric
+          FROM (
+            SELECT DISTINCT ON (ps.scale_id) ps.points
+            FROM performance_scores ps
+            INNER JOIN scoring_scales ss_live
+              ON ss_live.id = ps.scale_id AND ss_live.tenant_id = ps.tenant_id
+            WHERE ps.staff_id = s.id AND ps.tenant_id = s.tenant_id
+            ORDER BY ps.scale_id, ps.scored_on DESC, ps.id DESC
+          ) lp
+        ), 0) AS "pointsRaw"
       FROM staff s
       JOIN users u ON u.id = s.user_id AND u.tenant_id = s.tenant_id
       LEFT JOIN designations d ON d.id = s.designation_id AND d.tenant_id = s.tenant_id
-      LEFT JOIN performance_scores ps ON ps.staff_id = s.id AND ps.tenant_id = s.tenant_id
-      LEFT JOIN scoring_scales ss ON ss.id = ps.scale_id AND ss.tenant_id = s.tenant_id
       WHERE s.tenant_id = $1
         AND ($2::uuid IS NULL OR s.branch_id = $2)
-      GROUP BY s.id, u.full_name, s.image_url, s.status, d.name
       ORDER BY "rating" DESC, u.full_name ASC
     `,
     [branchId],
@@ -699,16 +743,23 @@ export async function getFullBranchDashboard(tenantId, filters = {}) {
         s.image_url AS "image",
         s.status,
         d.name AS "role",
-        COALESCE(ROUND(AVG((ps.points / NULLIF(ss.max_points, 0)) * 100), 2), 0) AS "rating",
-        COALESCE(SUM(ps.points), 0)::numeric AS "pointsRaw"
+        ${WEIGHTED_RATING_SQL} AS "rating",
+        COALESCE((
+          SELECT SUM(lp.points)::numeric
+          FROM (
+            SELECT DISTINCT ON (ps.scale_id) ps.points
+            FROM performance_scores ps
+            INNER JOIN scoring_scales ss_live
+              ON ss_live.id = ps.scale_id AND ss_live.tenant_id = ps.tenant_id
+            WHERE ps.staff_id = s.id AND ps.tenant_id = s.tenant_id
+            ORDER BY ps.scale_id, ps.scored_on DESC, ps.id DESC
+          ) lp
+        ), 0) AS "pointsRaw"
       FROM staff s
       JOIN users u ON u.id = s.user_id AND u.tenant_id = s.tenant_id
       LEFT JOIN designations d ON d.id = s.designation_id AND d.tenant_id = s.tenant_id
-      LEFT JOIN performance_scores ps ON ps.staff_id = s.id AND ps.tenant_id = s.tenant_id
-      LEFT JOIN scoring_scales ss ON ss.id = ps.scale_id AND ss.tenant_id = s.tenant_id
       WHERE s.tenant_id = $1
         AND ($2::uuid IS NULL OR s.branch_id = $2)
-      GROUP BY s.id, u.full_name, s.image_url, s.status, d.name
       ORDER BY "rating" DESC, u.full_name ASC
     `
 

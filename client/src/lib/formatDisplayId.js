@@ -18,8 +18,21 @@ export function displayStaffRef(row = {}) {
   return id ? referenceFromUuid(id, 'STF') : '—'
 }
 
+// Human-readable branch ref (BRN-XXXXXXXX) — UI only, not stored in DB.
+export function displayBranchRef(row = {}) {
+  const id = row?.id || row?.branchId
+  return id ? referenceFromUuid(id, 'BRN') : '—'
+}
+
 export function displayDiscountRef(row = {}) {
   return row.id ? referenceFromUuid(row.id, 'OFF') : '—'
+}
+
+/** Prefer real order_number; fall back to PO-XXXXXXXX from UUID. */
+export function displayOrderRef(row = {}) {
+  if (row.orderNumber) return String(row.orderNumber)
+  const id = row.id || row.orderId
+  return id ? referenceFromUuid(id, 'PO') : '—'
 }
 
 /** Prefer real product item_code; fall back to ITM-XXXXXXXX from UUID. */

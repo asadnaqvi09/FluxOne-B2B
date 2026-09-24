@@ -27,10 +27,9 @@ export function getBranchHoursSoftWarning(branchHours) {
   return 'Branch opening hours are not set — shift is not limited to a branch window.'
 }
 
-// Validate staff shift + break window.
-// Rules: start < end; break must be a range inside the shift when any break field is set.
-// When branchHours are set, shift must fall inside opening→closing (same-day Phase 1).
-export function validateStaffSchedule(fields, branchHours = null) {
+// Validate staff shift + break window → field map
+export function validateStaffScheduleFields(fields, branchHours = null) {
+  const errors = {}
   const start = parseTimeToMinutes(fields.scheduleStart)
   const end = parseTimeToMinutes(fields.scheduleEnd)
   const breakStart = parseTimeToMinutes(fields.scheduleBreakStart)
@@ -44,18 +43,13 @@ export function validateStaffSchedule(fields, branchHours = null) {
     fields.scheduleBreakEnd != null && String(fields.scheduleBreakEnd).trim() !== ''
 
   if (hasStart !== hasEnd) {
-    return 'Set both start and end time, or leave both empty'
-  }
-
-  if (hasStart && hasEnd) {
+    errors.scheduleEnd = 'Set both start and end time, or leave both empty'
+  } else if (hasStart && hasEnd) {
     if (start == null || end == null) {
-      return 'Start and end time must be valid (HH:MM)'
-    }
-    if (start >= end) {
-      return 'End time must be after start time'
-    }
-
-    if (
+      errors.scheduleStart = 'Start and end time must be valid (HH:MM)'
+    } else if (start >= end) {
+      errors.scheduleEnd = 'End time must be after start time'
+    } else if (
       branchHours &&
       hasValue(branchHours.openingTime) &&
       hasValue(branchHours.closingTime)
@@ -63,61 +57,73 @@ export function validateStaffSchedule(fields, branchHours = null) {
       const open = parseTimeToMinutes(branchHours.openingTime)
       const close = parseTimeToMinutes(branchHours.closingTime)
       if (open != null && close != null && (start < open || end > close)) {
-        return `Shift must be within branch hours (${formatMinutesLabel(open)}–${formatMinutesLabel(close)})`
+        errors.scheduleEnd = `Shift must be within branch hours (${formatMinutesLabel(open)}–${formatMinutesLabel(close)})`
       }
     }
   }
 
   if (hasBreakStart !== hasBreakEnd) {
-    return 'Set both break start and break end, or leave break empty'
-  }
-
-  if (hasBreakStart && hasBreakEnd) {
+    errors.scheduleBreakEnd = 'Set both break start and break end, or leave break empty'
+  } else if (hasBreakStart && hasBreakEnd) {
     if (breakStart == null || breakEnd == null) {
-      return 'Break times must be valid (HH:MM)'
-    }
-    if (breakStart >= breakEnd) {
-      return 'Break end must be after break start'
-    }
-    if (!hasStart || !hasEnd) {
-      return 'Set shift start and end before adding a break'
-    }
-    if (breakStart < start || breakEnd > end) {
-      return 'Break must fall within the shift (between start and end time)'
+      errors.scheduleBreakStart = 'Break times must be valid (HH:MM)'
+    } else if (breakStart >= breakEnd) {
+      errors.scheduleBreakEnd = 'Break end must be after break start'
+    } else if (!hasStart || !hasEnd) {
+      errors.scheduleBreakStart = 'Set shift start and end before adding a break'
+    } else if (breakStart < start || breakEnd > end) {
+      errors.scheduleBreakStart = 'Break must fall within the shift (between start and end time)'
     }
   }
 
-  return null
+  return errors
 }
 
-// Staff create/edit fields (excludes schedule — use validateStaffSchedule).
-export function validateStaffForm(fields, { isEdit = false, branchHours = null } = {}) {
+export function validateStaffSchedule(fields, branchHours = null) {
+  const errors = validateStaffScheduleFields(fields, branchHours)
+  return Object.values(errors)[0] || null
+}
+
+export const STAFF_FIELD_ORDER = [
+  'fullName',
+  'email',
+  'password',
+  'role',
+  'scheduleStart',
+  'scheduleEnd',
+  'scheduleBreakStart',
+  'scheduleBreakEnd',
+]
+
+// Staff create/edit → field map
+export function validateStaffFormFields(fields, { isEdit = false, branchHours = null } = {}) {
+  const errors = {}
   const fullName = String(fields.fullName || '').trim()
   const loginId = String(fields.email || '').trim()
 
-  if (!fullName) {
-    return 'Name is required'
-  }
-  if (fullName.length < 2) {
-    return 'Name must be at least 2 characters'
-  }
-  if (!loginId) {
-    return 'ID (login) is required'
-  }
-  if (loginId.length < 3) {
-    return 'ID (login) must be at least 3 characters'
-  }
-  if (/\s/.test(loginId)) {
-    return 'ID (login) cannot contain spaces'
-  }
-  if (!fields.role) {
-    return 'System role is required'
-  }
+  if (!fullName) errors.fullName = 'Name is required'
+  else if (fullName.length < 2) errors.fullName = 'Name must be at least 2 characters'
+
+  if (!loginId) errors.email = 'ID (login) is required'
+  else if (loginId.length < 3) errors.email = 'ID (login) must be at least 3 characters'
+  else if (/\s/.test(loginId)) errors.email = 'ID (login) cannot contain spaces'
+
+  if (!fields.role) errors.role = 'System role is required'
+
   if (!isEdit && (!fields.password || String(fields.password).length < 8)) {
-    return 'Password must be at least 8 characters'
+    errors.password = 'Password must be at least 8 characters'
   }
   if (isEdit && fields.password && String(fields.password).length < 8) {
-    return 'Password must be at least 8 characters'
+    errors.password = 'Password must be at least 8 characters'
   }
-  return validateStaffSchedule(fields, branchHours)
+
+  return { ...errors, ...validateStaffScheduleFields(fields, branchHours) }
+}
+
+export function validateStaffForm(fields, opts = {}) {
+  const errors = validateStaffFormFields(fields, opts)
+  for (const key of STAFF_FIELD_ORDER) {
+    if (errors[key]) return errors[key]
+  }
+  return Object.values(errors)[0] || null
 }

@@ -1,0 +1,92 @@
+import { Check, Eye, Pencil, Trash2, X } from 'lucide-react'
+import { Button } from '@/components/ui/button'
+import { cn } from '@/lib/utils'
+
+// Reusable row action CTAs with hover scale / color feedback.
+const ACTION_STYLES = {
+  view: 'text-purple-700 hover:bg-purple-50 hover:text-purple-900 hover:scale-110 active:scale-95',
+  edit: 'text-slate-500 hover:bg-slate-100 hover:text-slate-900 hover:scale-110 active:scale-95',
+  delete: 'text-slate-500 hover:bg-rose-50 hover:text-rose-700 hover:scale-110 active:scale-95',
+  approve: 'text-emerald-600 hover:bg-emerald-50 hover:text-emerald-700 hover:scale-110 active:scale-95',
+  reject: 'text-red-600 hover:bg-rose-50 hover:text-rose-700 hover:scale-110 active:scale-95',
+}
+
+const ACTION_ICONS = {
+  view: Eye,
+  edit: Pencil,
+  delete: Trash2,
+  approve: Check,
+  reject: X,
+}
+
+const ACTION_LABELS = {
+  view: 'View',
+  edit: 'Edit',
+  delete: 'Delete',
+  approve: 'Approve',
+  reject: 'Reject',
+}
+
+export function ActionIconButton({
+  action = 'edit',
+  label,
+  onClick,
+  className,
+  iconClassName = 'size-4',
+  disabled = false,
+  type = 'button',
+  ...props
+}) {
+  const Icon = ACTION_ICONS[action] || Pencil
+  const tone = ACTION_STYLES[action] || ACTION_STYLES.edit
+  const resolvedLabel = label || ACTION_LABELS[action] || 'Edit'
+
+  return (
+    <Button
+      type={type}
+      variant="ghost"
+      size="icon"
+      disabled={disabled}
+      aria-label={resolvedLabel}
+      title={resolvedLabel}
+      onClick={onClick}
+      className={cn('cursor-pointer', tone, className)}
+      {...props}
+    >
+      <Icon className={cn(iconClassName, 'transition-transform duration-200')} />
+    </Button>
+  )
+}
+
+// Edit + Delete pair used in most data tables.
+export function RowActionButtons({
+  onEdit,
+  onDelete,
+  editLabel = 'Edit',
+  deleteLabel = 'Delete',
+  className,
+  iconClassName,
+}) {
+  return (
+    <div className={cn('flex items-center justify-start gap-1', className)}>
+      {onEdit ? (
+        <ActionIconButton
+          action="edit"
+          label={editLabel}
+          onClick={onEdit}
+          iconClassName={iconClassName}
+        />
+      ) : null}
+      {onDelete ? (
+        <ActionIconButton
+          action="delete"
+          label={deleteLabel}
+          onClick={onDelete}
+          iconClassName={iconClassName}
+        />
+      ) : null}
+    </div>
+  )
+}
+
+export default ActionIconButton

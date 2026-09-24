@@ -1,9 +1,10 @@
 import { useEffect, useState } from 'react'
-import { Plus, Tag, Pencil, Trash2 } from 'lucide-react'
+import { Plus } from 'lucide-react'
 import { PageHeader } from '@/components/shared/PageHeader'
 import { MotionHeader, MotionReveal } from '@/components/shared/MotionReveal'
 import { SurfaceCard } from '@/components/shared/SurfaceCard'
-import { ConfirmDialog } from '@/components/shared/ConfirmDialog'
+import { DeleteEntityDialog } from '@/components/shared/DeleteEntityDialog'
+import { RowActionButtons } from '@/components/shared/ActionIconButton'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -16,24 +17,34 @@ import {
   TableHead,
   TableRow,
   TableCell,
+  TableActionsHead,
+  TableActionsCell,
   TablePagination,
 } from '@/components/ui/table'
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogCancelButton } from '@/components/ui/dialog'
 import { apiClient } from '@/api/api'
 import { endpoints } from '@/api/endpoints'
-import { BRAND } from '@/lib/constants'
 import { displayDiscountRef } from '@/lib/formatDisplayId'
 import { toastError, toastSuccess } from '@/lib/toast'
 import { validateDiscountForm } from '@/lib/validation/branchForms'
-
-const PAGE_SIZE = 8
+import { useFormBaseline } from '@/hooks/useFormBaseline'
+import { useClientPagination } from '@/hooks/useClientPagination'
 
 export function DiscountsPage() {
   const [discounts, setDiscounts] = useState([])
   const [loading, setLoading] = useState(false)
   const [categories, setCategories] = useState([])
   const [filterCategory, setFilterCategory] = useState('')
-  const [page, setPage] = useState(1)
+  const filteredDiscounts = discounts
+  const {
+    page,
+    setPage,
+    pageSize,
+    setPageSize,
+    pageCount,
+    total,
+    slice: pagedDiscounts,
+  } = useClientPagination(filteredDiscounts)
 
   // Form states
   const [open, setOpen] = useState(false)
@@ -45,6 +56,15 @@ export function DiscountsPage() {
   const [categoryId, setCategoryId] = useState('')
   const [saving, setSaving] = useState(false)
   const [deleteTargetDiscount, setDeleteTargetDiscount] = useState(null)
+
+  const discountSnapshot = { name, percent, categoryId }
+  const { captureBaseline, isDirty } = useFormBaseline(open)
+
+  useEffect(() => {
+    if (!open) return
+    captureBaseline(discountSnapshot)
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- capture once per open
+  }, [open, captureBaseline])
 
   const fetchDiscounts = async () => {
     setLoading(true)
@@ -109,20 +129,25 @@ export function DiscountsPage() {
     }
 
     setSaving(true)
-    let res
-    if (mode === 'create') {
-      res = await apiClient.post(endpoints.branch.discounts.create, payload)
-    } else {
-      res = await apiClient.put(endpoints.branch.discounts.update(editing.id), payload)
-    }
-    setSaving(false)
+    try {
+      let res
+      if (mode === 'create') {
+        res = await apiClient.post(endpoints.branch.discounts.create, payload)
+      } else {
+        res = await apiClient.put(endpoints.branch.discounts.update(editing.id), payload)
+      }
 
-    if (res.success) {
-      toastSuccess(mode === 'create' ? 'Discount offer created' : 'Discount offer updated')
-      setOpen(false)
-      void fetchDiscounts()
-    } else {
-      toastError(res.error || 'Failed to save discount')
+      if (res.success) {
+        toastSuccess(mode === 'create' ? 'Discount offer created' : 'Discount offer updated')
+        setOpen(false)
+        void fetchDiscounts()
+      } else {
+        toastError(res.error || 'Failed to save discount')
+      }
+    } catch (err) {
+      toastError(err?.message || 'Failed to save discount')
+    } finally {
+      setSaving(false)
     }
   }
 
@@ -145,8 +170,6 @@ export function DiscountsPage() {
     }
   }
 
-  const filteredDiscounts = discounts
-
   return (
     <div className="space-y-6 pb-8">
       <MotionHeader>
@@ -155,12 +178,8 @@ export function DiscountsPage() {
           title="Discount Management"
           description="Manage promotional campaigns, store-wide sales, and percentage offers. Staff scoring scales live under Staff → Performance."
           actions={
-            <Button
-              style={{ backgroundColor: BRAND.purple }}
-              className="text-white"
-              onClick={handleOpenCreate}
-            >
-              <Plus className="size-4 mr-1.5" /> Add Discount
+            <Button variant="brand" onClick={handleOpenCreate}>
+              <Plus className="mr-1.5 size-4" /> Add Discount
             </Button>
           }
         />
@@ -190,11 +209,6 @@ export function DiscountsPage() {
         <SurfaceCard
           title="Active Discount Campaigns"
           description="Standard discount templates that can be applied to products."
-          actions={
-            <span className="text-xs font-medium text-slate-400">
-              {filteredDiscounts.length} records · {PAGE_SIZE} / page
-            </span>
-          }
         >
           {loading ? (
             <p className="py-8 text-center text-sm text-slate-400">Loading campaign offers...</p>
@@ -203,9 +217,7 @@ export function DiscountsPage() {
           ) : (
             <>
               <div className="space-y-3 md:hidden">
-                {filteredDiscounts
-                  .slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE)
-                  .map((disc) => (
+                {pagedDiscounts.map((disc) => (
                     <article
                       key={disc.id}
                       className="rounded-xl border border-border bg-slate-50/60 px-3 py-3"
@@ -222,29 +234,16 @@ export function DiscountsPage() {
                         </div>
                         <Badge
                           variant="success"
-                          className="inline-flex shrink-0 items-center gap-1 rounded border-none bg-emerald-50 px-2.5 py-1 text-xs font-bold text-emerald-800 hover:bg-emerald-100"
+                          className="inline-flex shrink-0 rounded border-none bg-emerald-50 px-2.5 py-1 text-xs font-bold text-emerald-800 hover:bg-emerald-100"
                         >
-                          <Tag className="size-3" />
                           {parseFloat(disc.percent)}% OFF
                         </Badge>
                       </div>
-                      <div className="mt-3 flex justify-end gap-3">
-                        <button
-                          type="button"
-                          className="text-slate-500 transition-colors hover:text-slate-800"
-                          onClick={() => handleOpenEdit(disc)}
-                          aria-label="Edit discount"
-                        >
-                          <Pencil className="size-4" />
-                        </button>
-                        <button
-                          type="button"
-                          className="text-slate-500 transition-colors hover:text-slate-800"
-                          onClick={() => handleDeleteDiscount(disc.id)}
-                          aria-label="Delete discount"
-                        >
-                          <Trash2 className="size-4" />
-                        </button>
+                      <div className="mt-3 flex justify-start">
+                        <RowActionButtons
+                          onEdit={() => handleOpenEdit(disc)}
+                          onDelete={() => handleDeleteDiscount(disc.id)}
+                        />
                       </div>
                     </article>
                   ))}
@@ -254,21 +253,17 @@ export function DiscountsPage() {
                 <Table className="min-w-[32rem] text-left text-sm">
                   <TableHeader>
                     <TableRow className="text-xs text-slate-500 uppercase">
-                      <TableHead className="px-2 py-3">Campaign Code</TableHead>
-                      <TableHead className="px-2 py-3">Campaign Name / Explanation</TableHead>
+                      <TableHead className="px-2 py-3">Offer ID</TableHead>
+                      <TableHead className="px-2 py-3">Offer name</TableHead>
                       <TableHead className="px-2 py-3">Category</TableHead>
-                      <TableHead className="px-2 py-3 text-center">Discount Percentage</TableHead>
-                      <TableHead className="sticky right-0 z-[1] bg-white px-2 py-3 text-right">
-                        Actions
-                      </TableHead>
+                      <TableHead className="px-2 py-3">Discount %</TableHead>
+                      <TableActionsHead sticky />
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {filteredDiscounts
-                      .slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE)
-                      .map((disc) => (
+                    {pagedDiscounts.map((disc) => (
                         <TableRow key={disc.id} className="group">
-                          <TableCell className="px-2 py-3 font-mono font-bold text-slate-900">
+                          <TableCell className="px-2 py-3 font-mono font-bold text-purple-800">
                             {displayDiscountRef(disc)}
                           </TableCell>
                           <TableCell className="px-2 py-3 font-semibold text-slate-800">
@@ -277,31 +272,20 @@ export function DiscountsPage() {
                           <TableCell className="px-2 py-3 text-slate-600">
                             {disc.categoryName || 'All categories'}
                           </TableCell>
-                          <TableCell className="px-2 py-3 text-center">
+                          <TableCell className="px-2 py-3">
                             <Badge
                               variant="success"
-                              className="inline-flex items-center gap-1 rounded border-none bg-emerald-50 px-2.5 py-1 text-xs font-bold text-emerald-800 hover:bg-emerald-100"
+                              className="inline-flex rounded border-none bg-emerald-50 px-2.5 py-1 text-xs font-bold text-emerald-800 hover:bg-emerald-100"
                             >
-                              <Tag className="size-3" />
                               {parseFloat(disc.percent)}% OFF
                             </Badge>
                           </TableCell>
-                          <TableCell className="sticky right-0 z-[1] space-x-3.5 bg-white px-2 py-3 text-right group-hover:bg-slate-50/80">
-                            <button
-                              type="button"
-                              className="inline-block align-middle text-slate-500 transition-colors hover:text-slate-800"
-                              onClick={() => handleOpenEdit(disc)}
-                            >
-                              <Pencil className="size-4" />
-                            </button>
-                            <button
-                              type="button"
-                              className="inline-block align-middle text-slate-500 transition-colors hover:text-slate-800"
-                              onClick={() => handleDeleteDiscount(disc.id)}
-                            >
-                              <Trash2 className="size-4" />
-                            </button>
-                          </TableCell>
+                          <TableActionsCell sticky>
+                            <RowActionButtons
+                              onEdit={() => handleOpenEdit(disc)}
+                              onDelete={() => handleDeleteDiscount(disc.id)}
+                            />
+                          </TableActionsCell>
                         </TableRow>
                       ))}
                   </TableBody>
@@ -312,15 +296,17 @@ export function DiscountsPage() {
 
           <TablePagination
             page={page}
-            pageCount={Math.max(1, Math.ceil(filteredDiscounts.length / PAGE_SIZE))}
-            totalItems={filteredDiscounts.length}
+            pageCount={pageCount}
+            totalItems={total}
+            pageSize={pageSize}
             onPageChange={setPage}
+            onPageSizeChange={setPageSize}
           />
         </SurfaceCard>
       </MotionReveal>
 
       {/* Add / Edit Form Dialog */}
-      <Dialog open={open} onOpenChange={setOpen}>
+      <Dialog open={open} onOpenChange={setOpen} dirty={isDirty(discountSnapshot)}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
             <DialogTitle>{mode === 'create' ? 'Add New Discount' : 'Edit Discount'}</DialogTitle>
@@ -373,8 +359,8 @@ export function DiscountsPage() {
               <Button
                 type="submit"
                 disabled={saving}
-                className="text-white w-full sm:w-auto"
-                style={{ backgroundColor: BRAND.purple }}
+                variant="brand"
+                className="w-full sm:w-auto"
               >
                 {saving ? 'Saving…' : 'Save Discount'}
               </Button>
@@ -383,14 +369,23 @@ export function DiscountsPage() {
         </DialogContent>
       </Dialog>
 
-      <ConfirmDialog
+      <DeleteEntityDialog
         open={Boolean(deleteTargetDiscount)}
-        onOpenChange={(open) => { if (!open) setDeleteTargetDiscount(null) }}
-        title="Delete discount campaign?"
-        description={`Delete promotional offer "${deleteTargetDiscount?.name || ''}"? This action cannot be undone.`}
-        confirmLabel="Delete"
-        onConfirm={confirmDeleteDiscount}
+        onOpenChange={(open) => {
+          if (!open) setDeleteTargetDiscount(null)
+        }}
+        entityName={deleteTargetDiscount?.name}
+        description={
+          deleteTargetDiscount
+            ? `Remove promotional offer “${deleteTargetDiscount.name}”? Discount campaigns have no Inactive state — this permanently deletes the offer.`
+            : null
+        }
+        showSoftAction={false}
+        canHardDelete
+        hardLabel="Permanently delete"
+        hardHint="This cannot be undone."
         loading={saving}
+        onHardDelete={confirmDeleteDiscount}
       />
     </div>
   )

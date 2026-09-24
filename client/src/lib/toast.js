@@ -10,27 +10,51 @@ const base = {
   draggable: true,
 }
 
-export function toastSuccess(message, options = {}) {
-  if (!message) return
-  return toast.success(String(message), {
+/** Stable id so the same message cannot stack while still visible (QA TC-Multiple notification-003). */
+function resolveToastId(type, message, customId) {
+  if (customId != null && customId !== '') return customId
+  return `${type}:${String(message)}`
+}
+
+function showToast(type, message, options = {}) {
+  if (!message) return undefined
+  const { toastId: customId, ...rest } = options
+  const toastId = resolveToastId(type, message, customId)
+
+  // Skip if an identical toast is already on screen.
+  if (toast.isActive(toastId)) return toastId
+
+  const payload = {
     ...base,
-    style: { borderLeft: `4px solid ${BRAND.purple}` },
-    ...options,
-  })
+    ...rest,
+    toastId,
+  }
+
+  if (type === 'success') {
+    return toast.success(String(message), {
+      ...payload,
+      style: { borderLeft: `4px solid ${BRAND.purple}`, ...(rest.style || {}) },
+    })
+  }
+  if (type === 'error') {
+    return toast.error(String(message), {
+      ...payload,
+      autoClose: rest.autoClose ?? 4000,
+    })
+  }
+  return toast.info(String(message), payload)
+}
+
+export function toastSuccess(message, options = {}) {
+  return showToast('success', message, options)
 }
 
 export function toastError(message, options = {}) {
-  if (!message) return
-  return toast.error(String(message), {
-    ...base,
-    autoClose: 4000,
-    ...options,
-  })
+  return showToast('error', message, options)
 }
 
 export function toastInfo(message, options = {}) {
-  if (!message) return
-  return toast.info(String(message), { ...base, ...options })
+  return showToast('info', message, options)
 }
 
 // Convenience: show success or error from an apiClient-style result.

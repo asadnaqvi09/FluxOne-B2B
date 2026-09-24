@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
+<<<<<<< HEAD
 import {
   Plus,
   Search,
@@ -10,13 +11,20 @@ import {
   Clock,
   Briefcase,
 } from 'lucide-react'
+=======
+>>>>>>> eeeb612f2ec75787e21ba56a070cb842c7ce8ccc
 import { SurfaceCard } from '@/components/shared/SurfaceCard'
 import { ConfirmDialog } from '@/components/shared/ConfirmDialog'
+import { RowActionButtons } from '@/components/shared/ActionIconButton'
+import { HolidayFormDialog } from '@/components/feature/branch/staff/HolidayFormDialog'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+<<<<<<< HEAD
 import { Badge } from '@/components/ui/badge'
 import { NativeSelect } from '@/components/ui/select'
+=======
+>>>>>>> eeeb612f2ec75787e21ba56a070cb842c7ce8ccc
 import {
   Table,
   TableHeader,
@@ -35,11 +43,16 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog'
 import { apiClient } from '@/api/api'
+<<<<<<< HEAD
 import { endpoints } from '@/api/endpoints'
 import { BRAND } from '@/lib/constants'
 import { toastError, toastSuccess } from '@/lib/toast'
 
 const PAGE_SIZE = 8
+=======
+import { toastError, toastSuccess } from '@/lib/toast'
+import { useClientPagination } from '@/hooks/useClientPagination'
+>>>>>>> eeeb612f2ec75787e21ba56a070cb842c7ce8ccc
 
 function formatDateDisplay(value) {
   if (!value) return '—'
@@ -76,10 +89,16 @@ function toInputDate(value) {
   return new Date(value).toISOString().slice(0, 10)
 }
 
-export function StaffHolidaysTab({ designations = [], staff = [] }) {
+export function StaffHolidaysTab({
+  designations = [],
+  staff = [],
+  createOpen = false,
+  onCreateOpenChange,
+}) {
   const [holidays, setHolidays] = useState([])
   const [loading, setLoading] = useState(false)
   const [mutating, setMutating] = useState(false)
+<<<<<<< HEAD
   const [page, setPage] = useState(1)
   const [searchQuery, setSearchQuery] = useState('')
 
@@ -131,6 +150,14 @@ export function StaffHolidaysTab({ designations = [], staff = [] }) {
   const [viewingTarget, setViewingTarget] = useState(null)
 
   // Delete Confirm State
+=======
+  const [listSearch, setListSearch] = useState('')
+
+  // Edit modal state (single holiday date/name)
+  const [editing, setEditing] = useState(null)
+  const [editName, setEditName] = useState('')
+  const [editDate, setEditDate] = useState('')
+>>>>>>> eeeb612f2ec75787e21ba56a070cb842c7ce8ccc
   const [deleteTarget, setDeleteTarget] = useState(null)
 
   const fetchHolidays = async () => {
@@ -148,15 +175,31 @@ export function StaffHolidaysTab({ designations = [], staff = [] }) {
     void fetchHolidays()
   }, [])
 
+<<<<<<< HEAD
   // Filter holidays by Holiday Name
   const filteredHolidays = useMemo(() => {
     const q = searchQuery.trim().toLowerCase()
+=======
+  const filteredList = useMemo(() => {
+    const q = listSearch.trim().toLowerCase()
+>>>>>>> eeeb612f2ec75787e21ba56a070cb842c7ce8ccc
     if (!q) return holidays
     return holidays.filter((h) => String(h.name || '').toLowerCase().includes(q))
   }, [holidays, searchQuery])
 
+  const {
+    page,
+    setPage,
+    pageSize,
+    setPageSize,
+    pageCount,
+    total,
+    slice: pageRows,
+  } = useClientPagination(filteredList)
+
   useEffect(() => {
     setPage(1)
+<<<<<<< HEAD
   }, [searchQuery])
 
   // Calculated calendar days for the form
@@ -278,6 +321,32 @@ export function StaffHolidaysTab({ designations = [], staff = [] }) {
       void fetchHolidays()
     } else {
       toastError(res.error || 'Failed to save holiday schedule')
+=======
+  }, [listSearch, setPage])
+
+  const openEdit = (row) => {
+    setEditing(row)
+    setEditName(row.name || '')
+    setEditDate(toInputDate(row.holidayDate))
+  }
+
+  const handleUpdateHoliday = async () => {
+    if (!editing) return
+    if (!editName.trim()) return toastError('Holiday name is required')
+    if (!editDate) return toastError('Holiday date is required')
+    setMutating(true)
+    const res = await apiClient.put(`/branch/holidays/${editing.id}`, {
+      name: editName.trim(),
+      holidayDate: editDate,
+    })
+    setMutating(false)
+    if (res.success) {
+      toastSuccess('Holiday updated')
+      setEditing(null)
+      void fetchHolidays()
+    } else {
+      toastError(res.error || 'Failed to update holiday')
+>>>>>>> eeeb612f2ec75787e21ba56a070cb842c7ce8ccc
     }
   }
 
@@ -295,6 +364,7 @@ export function StaffHolidaysTab({ designations = [], staff = [] }) {
     }
   }
 
+<<<<<<< HEAD
   // Pagination slice
   const pageRows = filteredHolidays.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE)
   const totalPages = Math.max(1, Math.ceil(filteredHolidays.length / PAGE_SIZE))
@@ -354,10 +424,33 @@ export function StaffHolidaysTab({ designations = [], staff = [] }) {
         ) : (
           <>
             {/* Mobile Card View */}
+=======
+  return (
+    <div className="space-y-4">
+      <SurfaceCard
+        title="Branch Holiday Schedule"
+        description="Scheduled store closures and holidays"
+      >
+        <div className="mb-4">
+          <Input
+            placeholder="Filter holidays by name…"
+            value={listSearch}
+            onChange={(e) => setListSearch(e.target.value)}
+          />
+        </div>
+
+        {loading ? (
+          <p className="py-8 text-center text-sm text-slate-400">Loading...</p>
+        ) : filteredList.length === 0 ? (
+          <p className="py-8 text-center text-sm text-slate-400">No holidays scheduled</p>
+        ) : (
+          <>
+>>>>>>> eeeb612f2ec75787e21ba56a070cb842c7ce8ccc
             <div className="space-y-3 md:hidden">
               {pageRows.map((h) => (
                 <article
                   key={h.id}
+<<<<<<< HEAD
                   className="rounded-xl border border-border bg-white p-4 shadow-xs"
                 >
                   <div className="flex items-start justify-between gap-2">
@@ -795,6 +888,81 @@ export function StaffHolidaysTab({ designations = [], staff = [] }) {
             )}
 
             {/* Status Field */}
+=======
+                  className="rounded-xl border border-border bg-slate-50/60 px-3 py-3"
+                >
+                    <div className="flex items-start justify-between gap-2">
+                      <div>
+                        <p className="text-sm font-semibold text-slate-900">{h.name}</p>
+                        <p className="mt-1 text-xs text-slate-600">{formatDate(h.holidayDate)}</p>
+                      </div>
+                      <RowActionButtons
+                        onEdit={() => openEdit(h)}
+                        onDelete={() => setDeleteTarget(h)}
+                      />
+                    </div>
+                </article>
+              ))}
+            </div>
+
+            <div className="hidden overflow-x-auto md:block">
+              <Table className="w-full text-left text-sm">
+                <TableHeader>
+                  <TableRow className="text-xs text-slate-500 uppercase">
+                    <TableHead className="px-3 py-2 font-medium">Holiday Date</TableHead>
+                    <TableHead className="px-3 py-2 font-medium">Holiday Name</TableHead>
+                    <TableHead className="px-3 py-2 font-medium">Actions</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {pageRows.map((h) => (
+                    <TableRow key={h.id} className="hover:bg-slate-50/50">
+                      <TableCell className="px-3 py-3 font-semibold text-slate-900">
+                        {formatDate(h.holidayDate)}
+                      </TableCell>
+                      <TableCell className="px-3 py-3 text-slate-700">{h.name}</TableCell>
+                        <TableCell className="px-3 py-3">
+                          <RowActionButtons
+                            onEdit={() => openEdit(h)}
+                            onDelete={() => setDeleteTarget(h)}
+                          />
+                        </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
+          </>
+        )}
+
+        <TablePagination
+          page={page}
+          pageCount={pageCount}
+          totalItems={total}
+          pageSize={pageSize}
+          onPageChange={setPage}
+          onPageSizeChange={setPageSize}
+        />
+      </SurfaceCard>
+
+      {/* Create — driven by page header “Add Holidays” CTA */}
+      <HolidayFormDialog
+        open={createOpen}
+        onOpenChange={onCreateOpenChange}
+        designations={designations}
+        staff={staff}
+        onSuccess={fetchHolidays}
+      />
+
+      {/* Edit holiday */}
+      <Dialog open={!!editing} onOpenChange={(open) => !open && setEditing(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Edit Holiday</DialogTitle>
+            <DialogDescription>Update holiday name or date.</DialogDescription>
+          </DialogHeader>
+          <div className="space-y-3 py-2">
+>>>>>>> eeeb612f2ec75787e21ba56a070cb842c7ce8ccc
             <div className="space-y-1.5">
               <Label htmlFor="holiday-status" className="text-xs font-semibold">
                 Status
@@ -808,6 +976,7 @@ export function StaffHolidaysTab({ designations = [], staff = [] }) {
                 <option value="inactive">Inactive</option>
               </NativeSelect>
             </div>
+<<<<<<< HEAD
 
             <DialogFooter className="pt-2">
               <Button
@@ -829,6 +998,23 @@ export function StaffHolidaysTab({ designations = [], staff = [] }) {
               </Button>
             </DialogFooter>
           </form>
+=======
+            <div className="space-y-1.5">
+              <Label>Holiday Date</Label>
+              <Input type="date" value={editDate} onChange={(e) => setEditDate(e.target.value)} />
+            </div>
+          </div>
+          <DialogFooter>
+            <DialogCancelButton onClick={() => setEditing(null)}>Cancel</DialogCancelButton>
+            <Button
+              onClick={handleUpdateHoliday}
+              disabled={mutating}
+              variant="brand"
+            >
+              {mutating ? 'Saving…' : 'Save changes'}
+            </Button>
+          </DialogFooter>
+>>>>>>> eeeb612f2ec75787e21ba56a070cb842c7ce8ccc
         </DialogContent>
       </Dialog>
 

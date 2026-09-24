@@ -1,4 +1,3 @@
-import { useMemo, useState } from 'react'
 import { Users } from 'lucide-react'
 import { DataCard, ResponsiveDataShell } from '@/components/shared/ResponsiveDataShell'
 import { EmptyState } from '@/components/shared/EmptyState'
@@ -13,6 +12,7 @@ import {
   TableCell,
   TablePagination,
 } from '@/components/ui/table'
+import { useClientPagination } from '@/hooks/useClientPagination'
 import { displayStaffRef } from '@/lib/formatDisplayId'
 import { cn } from '@/lib/utils'
 
@@ -38,18 +38,10 @@ function formatScore(person) {
   return `${scoreValue(person).toFixed(2)}%`
 }
 
-const PAGE_SIZE = 8
-
 export function StaffPerformanceTable({ staff = [], className }) {
-  const [page, setPage] = useState(1)
   const list = Array.isArray(staff) ? staff : []
-  const totalPages = Math.max(1, Math.ceil(list.length / PAGE_SIZE))
-  const safePage = Math.min(page, totalPages)
-
-  const rows = useMemo(() => {
-    const start = (safePage - 1) * PAGE_SIZE
-    return list.slice(start, start + PAGE_SIZE)
-  }, [list, safePage])
+  const { page, setPage, pageSize, setPageSize, pageCount, total, slice } =
+    useClientPagination(list)
 
   const isEmpty = list.length === 0
 
@@ -58,12 +50,7 @@ export function StaffPerformanceTable({ staff = [], className }) {
       className={cn('flex h-full flex-col justify-between', className)}
       bodyClassName="flex flex-1 flex-col justify-between"
       title="Staff List"
-      description="Name, code, status & score rating"
-      actions={
-        <span className="text-xs font-medium text-slate-400">
-          {list.length} records · {PAGE_SIZE} / page
-        </span>
-      }
+      description="Name, staff ID, status & score rating"
     >
       {isEmpty ? (
         <EmptyState
@@ -75,7 +62,7 @@ export function StaffPerformanceTable({ staff = [], className }) {
       ) : (
         <div className="flex flex-1 flex-col justify-between">
           <ResponsiveDataShell
-            mobile={rows.map((person) => (
+            mobile={slice.map((person) => (
               <DataCard key={person.id}>
                 <div className="flex items-start gap-3">
                   <UserAvatar name={person.name} imageUrl={person.image} className="size-10 shrink-0" />
@@ -95,7 +82,10 @@ export function StaffPerformanceTable({ staff = [], className }) {
                       </span>
                     </div>
                     <div className="mt-2 flex items-center justify-between gap-2">
-                      <span className="inline-block rounded border border-purple-100 bg-purple-50 px-2 py-0.5 font-mono text-[11px] font-semibold whitespace-nowrap text-purple-800">
+                      <span
+                        title={person.id || undefined}
+                        className="font-mono text-[11px] font-bold whitespace-nowrap text-purple-800 select-all"
+                      >
                         {displayStaffRef(person)}
                       </span>
                       <p className="text-sm font-semibold text-slate-900">{formatScore(person)}</p>
@@ -109,13 +99,13 @@ export function StaffPerformanceTable({ staff = [], className }) {
                 <TableHeader>
                   <TableRow className="text-xs tracking-wide text-slate-500 uppercase">
                     <TableHead className="px-2 py-2.5 font-medium">Employee</TableHead>
-                    <TableHead className="px-2 py-2.5 font-medium">Code</TableHead>
+                    <TableHead className="px-2 py-2.5 font-medium">Staff ID</TableHead>
                     <TableHead className="px-2 py-2.5 font-medium">Status</TableHead>
-                    <TableHead className="px-2 py-2.5 text-right font-medium">Score</TableHead>
+                    <TableHead className="px-2 py-2.5 font-medium">Score</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {rows.map((person) => (
+                  {slice.map((person) => (
                     <TableRow key={person.id} className="hover:bg-slate-50/80">
                       <TableCell className="px-2 py-3">
                         <div className="flex items-center gap-3">
@@ -131,7 +121,10 @@ export function StaffPerformanceTable({ staff = [], className }) {
                         </div>
                       </TableCell>
                       <TableCell className="px-2 py-3">
-                        <span className="inline-block rounded border border-purple-100 bg-purple-50 px-2 py-0.5 font-mono text-[11px] font-semibold whitespace-nowrap text-purple-800">
+                        <span
+                          title={person.id || undefined}
+                          className="font-mono text-xs font-bold text-purple-800 select-all"
+                        >
                           {displayStaffRef(person)}
                         </span>
                       </TableCell>
@@ -145,7 +138,7 @@ export function StaffPerformanceTable({ staff = [], className }) {
                           {statusLabel(person.status)}
                         </span>
                       </TableCell>
-                      <TableCell className="px-2 py-3 text-right font-semibold text-slate-900">
+                      <TableCell className="px-2 py-3 font-semibold text-slate-900">
                         {formatScore(person)}
                       </TableCell>
                     </TableRow>
@@ -156,10 +149,12 @@ export function StaffPerformanceTable({ staff = [], className }) {
           />
 
           <TablePagination
-            page={safePage}
-            pageCount={totalPages}
-            totalItems={list.length}
+            page={page}
+            pageCount={pageCount}
+            totalItems={total}
+            pageSize={pageSize}
             onPageChange={setPage}
+            onPageSizeChange={setPageSize}
           />
         </div>
       )}

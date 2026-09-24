@@ -12,8 +12,19 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { ImageUploadField } from '@/components/shared/ImageUploadField'
-import { BRAND } from '@/lib/constants'
+import { FieldError } from '@/components/shared/FieldError'
+import { fieldErrorClass } from '@/lib/validation/fieldErrors'
+import { useFieldErrors } from '@/hooks/useFieldErrors'
 import { useFormBaseline } from '@/hooks/useFormBaseline'
+
+const PROFILE_FIELD_IDS = {
+  name: 'profile-name',
+  loginId: 'profile-login-id',
+  password: 'profile-password',
+  confirmPassword: 'profile-confirm-password',
+}
+
+const PROFILE_FIELD_ORDER = ['name', 'loginId', 'password', 'confirmPassword']
 
 // Shared edit profile modal (Admin / BM / IM / etc.).
 // View card never shows password — only this dialog does.
@@ -32,7 +43,8 @@ export function ProfileEditDialog({
   const [password, setPassword] = useState('')
   const [confirmPassword, setConfirmPassword] = useState('')
   const [image, setImage] = useState(null)
-  const [error, setError] = useState(null)
+  const { fieldErrors, formError, setFormError, resetErrors, clearField, applyErrors } =
+    useFieldErrors()
   const { captureBaseline, isDirty } = useFormBaseline(open)
 
   useEffect(() => {
@@ -49,52 +61,52 @@ export function ProfileEditDialog({
     setPassword('')
     setConfirmPassword('')
     setImage(null)
-    setError(null)
+    resetErrors()
     captureBaseline(snapshot)
-  }, [open, initialName, initialLoginId, captureBaseline])
+  }, [open, initialName, initialLoginId, captureBaseline, resetErrors])
 
-  async function handleSubmit(event) {
-    event.preventDefault()
-    setError(null)
-
+  function validateProfileForm() {
+    const errors = {}
     const nextName = name.trim()
     const nextId = loginId.trim()
     const nextPassword = password
     const nextConfirm = confirmPassword
 
-    if (!nextName) {
-      setError('Name is required')
-      return
-    }
+    if (!nextName) errors.name = 'Name is required'
     if (!nextId || nextId.length < 3) {
-      setError('User ID or Email must be at least 3 characters')
-      return
+      errors.loginId = 'User ID or Email must be at least 3 characters'
     }
 
     const changingPassword = Boolean(nextPassword || nextConfirm)
     if (changingPassword) {
       if (!nextPassword || nextPassword.length < 8) {
-        setError('Password must be at least 8 characters')
-        return
-      }
-      if (nextPassword.length > 72) {
-        setError('Password must be at most 72 characters')
-        return
-      }
-      if (nextPassword !== nextConfirm) {
-        setError('Password and Confirm Password do not match')
-        return
+        errors.password = 'Password must be at least 8 characters'
+      } else if (nextPassword.length > 72) {
+        errors.password = 'Password must be at most 72 characters'
+      } else if (nextPassword !== nextConfirm) {
+        errors.confirmPassword = 'Password and Confirm Password do not match'
       }
     }
 
-    // Build payload — image File triggers multipart on the API layer
+    return { errors, nextName, nextId, nextPassword, changingPassword }
+  }
+
+  async function handleSubmit(event) {
+    event.preventDefault()
+    const { errors, nextName, nextId, nextPassword, changingPassword } = validateProfileForm()
+    if (Object.keys(errors).length) {
+      applyErrors(errors, PROFILE_FIELD_IDS, PROFILE_FIELD_ORDER)
+      return
+    }
+    resetErrors()
+
     const payload = { name: nextName, id: nextId }
     if (changingPassword) payload.password = nextPassword
     if (image instanceof File && image.size > 0) payload.image = image
 
     const result = await onSubmit?.(payload)
     if (result && result.success === false) {
-      setError(result.error || 'Update failed')
+      setFormError(result.error || 'Update failed')
       return
     }
     onOpenChange?.(false)
@@ -113,8 +125,13 @@ export function ProfileEditDialog({
           </DialogDescription>
         </DialogHeader>
 
-        <form className="space-y-4" onSubmit={handleSubmit}>
-          {/* Upload new photo or replace existing one */}
+        {formError ? (
+          <p className="mb-3 rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700 ring-1 ring-red-100">
+            {formError}
+          </p>
+        ) : null}
+
+        <form className="space-y-4" onSubmit={handleSubmit} noValidate>
           <ImageUploadField
             id="profile-image"
             label="Profile photo"
@@ -129,21 +146,33 @@ export function ProfileEditDialog({
             <Input
               id="profile-name"
               value={name}
-              onChange={(e) => setName(e.target.value)}
+              onChange={(e) => {
+                setName(e.target.value)
+                clearField('name')
+              }}
               placeholder="Full name"
               autoComplete="name"
+              aria-invalid={Boolean(fieldErrors.name)}
+              className={fieldErrorClass(fieldErrors.name)}
             />
+            <FieldError message={fieldErrors.name} />
           </div>
           <div className="space-y-1.5">
             <Label htmlFor="profile-login-id">User ID or Email</Label>
             <Input
               id="profile-login-id"
               value={loginId}
-              onChange={(e) => setLoginId(e.target.value)}
+              onChange={(e) => {
+                setLoginId(e.target.value)
+                clearField('loginId')
+              }}
               placeholder="Login ID or email"
               autoComplete="username"
+              aria-invalid={Boolean(fieldErrors.loginId)}
+              className={fieldErrorClass(fieldErrors.loginId)}
             />
             <p className="text-xs text-slate-500">Used with your password at login.</p>
+            <FieldError message={fieldErrors.loginId} />
           </div>
 
           <div className="space-y-1.5">
@@ -152,10 +181,17 @@ export function ProfileEditDialog({
               id="profile-password"
               type="password"
               value={password}
-              onChange={(e) => setPassword(e.target.value)}
+              onChange={(e) => {
+                setPassword(e.target.value)
+                clearField('password')
+                clearField('confirmPassword')
+              }}
               placeholder="Leave blank to keep current"
               autoComplete="new-password"
+              aria-invalid={Boolean(fieldErrors.password)}
+              className={fieldErrorClass(fieldErrors.password)}
             />
+            <FieldError message={fieldErrors.password} />
           </div>
           <div className="space-y-1.5">
             <Label htmlFor="profile-confirm-password">Confirm Password</Label>
@@ -163,28 +199,28 @@ export function ProfileEditDialog({
               id="profile-confirm-password"
               type="password"
               value={confirmPassword}
-              onChange={(e) => setConfirmPassword(e.target.value)}
+              onChange={(e) => {
+                setConfirmPassword(e.target.value)
+                clearField('confirmPassword')
+              }}
               placeholder="Repeat new password"
               autoComplete="new-password"
+              aria-invalid={Boolean(fieldErrors.confirmPassword)}
+              className={fieldErrorClass(fieldErrors.confirmPassword)}
             />
             <p className="text-xs text-slate-500">
               After a temporary password from email, set your own password here.
             </p>
+            <FieldError message={fieldErrors.confirmPassword} />
           </div>
-
-          {error ? (
-            <p className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700 ring-1 ring-red-100">
-              {error}
-            </p>
-          ) : null}
 
           <DialogFooter>
             <DialogCancelButton disabled={loading} className="w-full sm:w-auto" />
             <Button
               type="submit"
               disabled={loading}
-              style={{ background: BRAND.purple }}
-              className="w-full text-white hover:opacity-90 sm:w-auto"
+              variant="brand"
+              className="w-full sm:w-auto"
             >
               {loading ? 'Saving…' : 'Save changes'}
             </Button>

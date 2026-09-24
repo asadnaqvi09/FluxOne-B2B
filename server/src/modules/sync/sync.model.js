@@ -1228,6 +1228,8 @@ async function fetchTenantBranchMeta(tenantId, branchId) {
         t.id AS "tenantId",
         t.name AS "tenantName",
         t.slug AS "tenantSlug",
+        t.contact_numbers AS "contactNumbers",
+        t.business_address AS "businessAddress",
         b.id AS "branchId",
         b.name AS "branchName"
       FROM tenants t
@@ -1240,8 +1242,64 @@ async function fetchTenantBranchMeta(tenantId, branchId) {
   return rows[0] || null
 }
 
+// ---------------------------------------------------------------------------
+// Admin policies → POS invoice slip (FluxOne-POS consume contract)
+// Enabled policies only (print_on_slip = true). Helpers:
+//   posSlipPolicies.contract.js → resolveSlipPoliciesForPrint / formatSlipPolicyPrintLines
+// POS must print company.slipPolicies on each sale receipt; see that file when
+// implementing FluxOne-POS printer UI.
+// ---------------------------------------------------------------------------
+async function fetchSlipPolicies(tenantId) {
+  const { rows } = await tenantQuery(
+    tenantId,
+    `
+      SELECT
+        id,
+        name,
+        detail,
+        category,
+        print_on_slip AS "printOnSlip"
+      FROM policies
+      WHERE tenant_id = $1
+        AND is_active = true
+        AND print_on_slip = true
+      ORDER BY name ASC
+    `,
+  )
+  return rows.map((row) => ({
+    id: row.id,
+    name: row.name || '',
+    detail: row.detail || '',
+    category: row.category || null,
+    printOnSlip: true,
+    // Alias for TL "Enabled" wording on POS if needed
+    enabled: true,
+  }))
+}
+
+function buildCompanyPayload(meta, slipPolicies = []) {
+  // Flat text for simple / legacy thermal printers
+  const returnInstructions =
+    slipPolicies.length > 0
+      ? slipPolicies.map((p) => `${p.name}: ${p.detail}`).join('\n\n')
+      : null
+  const warningMessage =
+    slipPolicies.length > 0 ? slipPolicies.map((p) => p.name).join(' · ') : null
+
+  return {
+    name: meta.tenantName,
+    contactPhone: meta.contactNumbers || null,
+    phone: meta.contactNumbers || null,
+    address: meta.businessAddress || null,
+    warningMessage,
+    returnInstructions,
+    // Structured list — preferred source for FluxOne-POS receipt footer
+    slipPolicies,
+  }
+}
+
 async function buildSnapshotSections(tenantId, branchId, since = null) {
-  const [users, categories, rawProducts, branchInventory, counters, taxes, offers] =
+  const [users, categories, rawProducts, branchInventory, counters, taxes, offers, slipPolicies] =
     await Promise.all([
       fetchBootstrapUsers(tenantId, branchId, since),
       fetchBootstrapCategories(tenantId, branchId, since),
@@ -1250,6 +1308,7 @@ async function buildSnapshotSections(tenantId, branchId, since = null) {
       fetchCounters(tenantId, branchId, since),
       fetchTaxes(tenantId),
       fetchOffers(tenantId),
+      fetchSlipPolicies(tenantId),
     ])
 
   const products = await attachProductExtras(tenantId, rawProducts)
@@ -1262,6 +1321,8 @@ async function buildSnapshotSections(tenantId, branchId, since = null) {
     offers,
     branchInventory,
     counters,
+    // Only Admin-Enabled policies (print_on_slip) — POS prints these on sale slips
+    policies: slipPolicies,
   }
 }
 
@@ -1278,12 +1339,7 @@ export async function buildBootstrapSnapshot(tenantId, branchId) {
     tenant: { id: meta.tenantId, name: meta.tenantName, slug: meta.tenantSlug },
     branch: { id: meta.branchId, name: meta.branchName },
     ...sections,
-    company: {
-      name: meta.tenantName,
-      contactPhone: null,
-      warningMessage: null,
-      returnInstructions: null,
-    },
+    company: buildCompanyPayload(meta, sections.policies || []),
   }
 }
 
@@ -1300,11 +1356,6 @@ export async function buildDeltaSnapshot(tenantId, branchId, since) {
     tenant: { id: meta.tenantId, name: meta.tenantName, slug: meta.tenantSlug },
     branch: { id: meta.branchId, name: meta.branchName },
     ...sections,
-    company: {
-      name: meta.tenantName,
-      contactPhone: null,
-      warningMessage: null,
-      returnInstructions: null,
-    },
+    company: buildCompanyPayload(meta, sections.policies || []),
   }
 }

@@ -8,10 +8,23 @@ function mapPolicyRow(row) {
     detail: row.detail || '',
     category: row.category || '',
     isActive: row.isActive !== false,
+    // When true, POS prints this policy on the sale slip / invoice
+    printOnSlip: Boolean(row.printOnSlip),
     createdAt: row.createdAt,
     updatedAt: row.updatedAt,
   }
 }
+
+const POLICY_SELECT = `
+  id,
+  name,
+  detail,
+  category,
+  is_active AS "isActive",
+  print_on_slip AS "printOnSlip",
+  created_at AS "createdAt",
+  updated_at AS "updatedAt"
+`
 
 export async function listPolicies(tenantId, filters = {}) {
   const page = Math.max(1, Number(filters.page) || 1)
@@ -42,14 +55,7 @@ export async function listPolicies(tenantId, filters = {}) {
   const { rows } = await tenantQuery(
     tenantId,
     `
-      SELECT
-        id,
-        name,
-        detail,
-        category,
-        is_active AS "isActive",
-        created_at AS "createdAt",
-        updated_at AS "updatedAt"
+      SELECT ${POLICY_SELECT}
       FROM policies
       WHERE tenant_id = $1
         AND ($2::text IS NULL OR category = $2)
@@ -78,14 +84,7 @@ export async function getPolicyById(tenantId, id) {
   const { rows } = await tenantQuery(
     tenantId,
     `
-      SELECT
-        id,
-        name,
-        detail,
-        category,
-        is_active AS "isActive",
-        created_at AS "createdAt",
-        updated_at AS "updatedAt"
+      SELECT ${POLICY_SELECT}
       FROM policies
       WHERE tenant_id = $1 AND id = $2
       LIMIT 1
@@ -95,26 +94,36 @@ export async function getPolicyById(tenantId, id) {
   return mapPolicyRow(rows[0] || null)
 }
 
+// Active policies flagged for POS invoice / slip printing
+export async function listSlipPolicies(tenantId) {
+  const { rows } = await tenantQuery(
+    tenantId,
+    `
+      SELECT ${POLICY_SELECT}
+      FROM policies
+      WHERE tenant_id = $1
+        AND is_active = true
+        AND print_on_slip = true
+      ORDER BY name ASC
+    `,
+  )
+  return rows.map(mapPolicyRow)
+}
+
 export async function createPolicy(tenantId, payload) {
   const { rows } = await tenantQuery(
     tenantId,
     `
-      INSERT INTO policies (tenant_id, name, detail, category, is_active)
-      VALUES ($1, $2, $3, $4, COALESCE($5, true))
-      RETURNING
-        id,
-        name,
-        detail,
-        category,
-        is_active AS "isActive",
-        created_at AS "createdAt",
-        updated_at AS "updatedAt"
+      INSERT INTO policies (tenant_id, name, detail, category, is_active, print_on_slip)
+      VALUES ($1, $2, $3, $4, COALESCE($5, true), COALESCE($6, false))
+      RETURNING ${POLICY_SELECT}
     `,
     [
       payload.name.trim(),
       payload.detail.trim(),
       payload.category?.trim() || null,
       payload.isActive !== undefined ? payload.isActive : true,
+      payload.printOnSlip !== undefined ? Boolean(payload.printOnSlip) : false,
     ],
   )
   return mapPolicyRow(rows[0] || null)
@@ -137,16 +146,10 @@ export async function updatePolicy(tenantId, id, payload) {
         detail = CASE WHEN $4::text IS NOT NULL THEN $4 ELSE detail END,
         category = CASE WHEN $5::boolean THEN $6 ELSE category END,
         is_active = CASE WHEN $7::boolean THEN $8 ELSE is_active END,
+        print_on_slip = CASE WHEN $9::boolean THEN $10 ELSE print_on_slip END,
         updated_at = now()
       WHERE tenant_id = $1 AND id = $2
-      RETURNING
-        id,
-        name,
-        detail,
-        category,
-        is_active AS "isActive",
-        created_at AS "createdAt",
-        updated_at AS "updatedAt"
+      RETURNING ${POLICY_SELECT}
     `,
     [
       id,
@@ -156,6 +159,8 @@ export async function updatePolicy(tenantId, id, payload) {
       payload.category !== undefined ? payload.category?.trim() || null : null,
       payload.isActive !== undefined,
       payload.isActive !== undefined ? Boolean(payload.isActive) : null,
+      payload.printOnSlip !== undefined,
+      payload.printOnSlip !== undefined ? Boolean(payload.printOnSlip) : null,
     ],
   )
 

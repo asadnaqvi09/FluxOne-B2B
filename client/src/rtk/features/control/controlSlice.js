@@ -147,7 +147,7 @@ export const createMovement = createAsyncThunk(
     const result = await apiClient.post(path, body)
     if (!result.success) return rejectWithValue(result.error || 'Create failed')
     const filters = getState().control.byType[movementType]?.filters || defaultFilters()
-    await dispatch(fetchControlMovements({ movementType, filters }))
+    void dispatch(fetchControlMovements({ movementType, filters }))
     return result
   },
 )
@@ -160,7 +160,7 @@ export const updateMovement = createAsyncThunk(
     const result = await apiClient.patch(pathFn(id), body)
     if (!result.success) return rejectWithValue(result.error || 'Update failed')
     const filters = getState().control.byType[movementType]?.filters || defaultFilters()
-    await dispatch(fetchControlMovements({ movementType, filters }))
+    void dispatch(fetchControlMovements({ movementType, filters }))
     return result
   },
 )
@@ -173,7 +173,7 @@ export const deleteMovement = createAsyncThunk(
     const result = await apiClient.delete(pathFn(id))
     if (!result.success) return rejectWithValue(result.error || 'Delete failed')
     const filters = getState().control.byType[movementType]?.filters || defaultFilters()
-    await dispatch(fetchControlMovements({ movementType, filters }))
+    void dispatch(fetchControlMovements({ movementType, filters }))
     return result
   },
 )
@@ -186,7 +186,7 @@ export const stockInFromOrder = createAsyncThunk(
     })
     if (!result.success) return rejectWithValue(result.error || 'Stock-in failed')
     const filters = getState().control.byType[movementType]?.filters || defaultFilters()
-    await dispatch(fetchControlMovements({ movementType, filters }))
+    void dispatch(fetchControlMovements({ movementType, filters }))
     return result
   },
 )
@@ -278,7 +278,8 @@ const controlSlice = createSlice({
         patch.categoryId !== undefined ||
         patch.subcategoryId !== undefined ||
         patch.scale !== undefined ||
-        patch.type !== undefined
+        patch.type !== undefined ||
+        patch.limit !== undefined
       if (resets && patch.page === undefined) next.page = 1
       bucket.filters = next
     },

@@ -158,8 +158,7 @@ function ControlTabPanel({ tab }) {
         {canAdd ? (
           <Button
             type="button"
-            className="cursor-pointer text-white"
-            style={{ background: BRAND.purple }}
+            variant="brand"
             onClick={() => setAddOpen(true)}
           >
             <Plus className="size-4" />
@@ -211,6 +210,7 @@ function ControlTabPanel({ tab }) {
             loading={combinedLoading}
             pagination={pagination}
             onPageChange={setPage}
+            onPageSizeChange={(limit) => updateFilters({ limit })}
           />
         ) : null}
         {tab === MOVEMENT_TYPES.OUT ? (
@@ -219,6 +219,7 @@ function ControlTabPanel({ tab }) {
             loading={combinedLoading}
             pagination={pagination}
             onPageChange={setPage}
+            onPageSizeChange={(limit) => updateFilters({ limit })}
           />
         ) : null}
         {tab === MOVEMENT_TYPES.ADJUSTMENT ? (
@@ -227,6 +228,7 @@ function ControlTabPanel({ tab }) {
             loading={loading}
             pagination={pagination}
             onPageChange={setPage}
+            onPageSizeChange={(limit) => updateFilters({ limit })}
             onEdit={setEditTarget}
             onDelete={setDeleteTarget}
           />
@@ -237,6 +239,7 @@ function ControlTabPanel({ tab }) {
             loading={loading}
             pagination={pagination}
             onPageChange={setPage}
+            onPageSizeChange={(limit) => updateFilters({ limit })}
             onEdit={setEditTarget}
             onDelete={setDeleteTarget}
           />
@@ -247,6 +250,7 @@ function ControlTabPanel({ tab }) {
             loading={loading}
             pagination={pagination}
             onPageChange={setPage}
+            onPageSizeChange={(limit) => updateFilters({ limit })}
           />
         ) : null}
       </MotionReveal>

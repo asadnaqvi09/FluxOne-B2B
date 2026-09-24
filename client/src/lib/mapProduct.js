@@ -14,6 +14,50 @@ export const PRODUCT_STATUS = {
 
 export const SCALE_OPTIONS = ['unit', 'kg', 'g', 'liter', 'ml', 'pack', 'box', 'dozen']
 
+// Matches products.reorder_point DEFAULT 10 in schema.
+export const DEFAULT_REORDER_POINT = 10
+
+// Dynamic inventory stock indicator from live qty + product reorder point.
+export function getInventoryStockStatus(quantity, reorderPoint = DEFAULT_REORDER_POINT) {
+  const qty = Number(quantity ?? 0)
+  const point = Number(
+    reorderPoint == null || reorderPoint === '' ? DEFAULT_REORDER_POINT : reorderPoint,
+  )
+
+  if (qty <= 0) {
+    return {
+      quantity: qty,
+      key: 'out',
+      label: 'Out of Stock',
+      className: 'text-rose-700',
+    }
+  }
+  if (qty <= point) {
+    return {
+      quantity: qty,
+      key: 'low',
+      label: 'Low Stock',
+      className: 'text-amber-700',
+    }
+  }
+  return {
+    quantity: qty,
+    key: 'in',
+    label: 'In Stock',
+    className: 'text-emerald-700',
+  }
+}
+
+// e.g. "125 units — In Stock" / "8 pack — Low Stock"
+export function formatInventoryStock(quantity, reorderPoint, scale = 'unit') {
+  const status = getInventoryStockStatus(quantity, reorderPoint)
+  const unitLabel = !scale || scale === 'unit' ? 'units' : scale
+  return {
+    ...status,
+    display: `${status.quantity} ${unitLabel} — ${status.label}`,
+  }
+}
+
 // Zod rejects empty strings on optional UUID fields.
 // Use undefined so JSON.stringify / apiClient omit them.
 export function asOptionalUuid(value) {
@@ -36,6 +80,9 @@ export function mapProduct(row = {}) {
     type: row.type || PRODUCT_TYPES.SINGLE,
     scale: row.scale || 'unit',
     quantity: Number(row.quantity ?? 0),
+    reorderPoint: Number(
+      row.reorderPoint ?? row.reorder_point ?? DEFAULT_REORDER_POINT,
+    ),
     status:
       row.status === PRODUCT_STATUS.INACTIVE || row.status === 'close'
         ? PRODUCT_STATUS.INACTIVE

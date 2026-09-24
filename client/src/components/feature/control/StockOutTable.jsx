@@ -14,6 +14,7 @@ export function StockOutTable({
   loading,
   pagination,
   onPageChange,
+  onPageSizeChange,
   className,
 }) {
   const columns = [
@@ -50,6 +51,7 @@ export function StockOutTable({
       pagination={pagination}
       columns={columns}
       onPageChange={onPageChange}
+      onPageSizeChange={onPageSizeChange}
       emptyTitle="No stock-out records"
       emptyHint="Damaged, expired, and POS sales appear here automatically."
       className={className}

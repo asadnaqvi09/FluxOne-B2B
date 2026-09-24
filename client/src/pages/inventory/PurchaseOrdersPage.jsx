@@ -2,15 +2,13 @@ import { useState } from 'react'
 import { Plus } from 'lucide-react'
 import { GenerateOrderDialog } from '@/components/feature/orders/GenerateOrderDialog'
 import { OrderDetailPanel } from '@/components/feature/orders/OrderDetailPanel'
+import { OrderFilters } from '@/components/feature/orders/OrderFilters'
 import { OrderTable } from '@/components/feature/orders/OrderTable'
 import { PurchaseHistoryList } from '@/components/feature/orders/PurchaseHistoryList'
 import { MotionHeader, MotionReveal } from '@/components/shared/MotionReveal'
 import { PageHeader } from '@/components/shared/PageHeader'
 import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
-import { useDebouncedSearch } from '@/hooks/useDebouncedSearch'
 import { usePurchaseOrders } from '@/hooks/usePurchaseOrders'
-import { BRAND } from '@/lib/constants'
 import { toastError, toastSuccess } from '@/lib/toast'
 
 export function PurchaseOrdersPage() {
@@ -24,6 +22,7 @@ export function PurchaseOrdersPage() {
     history,
     supplierOptions,
     productOptions,
+    filters,
     updateFilters,
     setPage,
     loadFormOptions,
@@ -39,7 +38,6 @@ export function PurchaseOrdersPage() {
   const [generateOpen, setGenerateOpen] = useState(false)
   const [detailOpen, setDetailOpen] = useState(false)
   const [historyOpen, setHistoryOpen] = useState(false)
-  const { localQ, onSearchChange } = useDebouncedSearch(updateFilters)
 
   async function openGenerate() {
     await loadFormOptions()
@@ -106,8 +104,7 @@ export function PurchaseOrdersPage() {
           actions={
             <Button
               type="button"
-              className="cursor-pointer text-white"
-              style={{ background: BRAND.purple }}
+              variant="brand"
               onClick={openGenerate}
             >
               <Plus className="size-4" />
@@ -124,10 +121,11 @@ export function PurchaseOrdersPage() {
       ) : null}
 
       <MotionReveal delay={0.04}>
-        <Input
-          value={localQ}
-          onChange={(e) => onSearchChange(e.target.value)}
-          placeholder="Search by order number or company…"
+        <OrderFilters
+          q={filters.q || ''}
+          status={filters.status || ''}
+          onSearchChange={(q) => updateFilters({ q })}
+          onStatusChange={(status) => updateFilters({ status, page: 1 })}
         />
       </MotionReveal>
 
@@ -137,6 +135,7 @@ export function PurchaseOrdersPage() {
           loading={loading}
           pagination={pagination}
           onPageChange={setPage}
+          onPageSizeChange={(limit) => updateFilters({ limit })}
           onView={handleView}
           onHistory={handleHistory}
           onPrint={handlePrint}

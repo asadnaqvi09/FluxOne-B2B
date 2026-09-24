@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { Check, ChevronLeft, ChevronRight, Plus, Trash2 } from 'lucide-react'
 import {
   Dialog,
+  DialogCancelButton,
   DialogContent,
   DialogDescription,
   DialogFooter,
@@ -12,7 +13,10 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { NativeSelect } from '@/components/ui/select'
+import { FieldError } from '@/components/shared/FieldError'
 import { BRAND } from '@/lib/constants'
+import { fieldErrorClass } from '@/lib/validation/fieldErrors'
+import { useFieldErrors } from '@/hooks/useFieldErrors'
 import { SCALE_OPTIONS } from '@/lib/mapProduct'
 import {
   fetchControlProductOptions,
@@ -25,6 +29,15 @@ const STEPS = [
   { id: 2, label: '2. Review' },
   { id: 3, label: '3. Confirm' },
 ]
+
+const STOCKIN_FIELD_IDS = {
+  productId: 'stockin-product',
+  quantity: 'stockin-quantity',
+  expiresAt: 'stockin-expires-at',
+  lines: 'stockin-lines',
+}
+
+const STOCKIN_FIELD_ORDER = ['productId', 'quantity', 'expiresAt', 'lines']
 
 function getTomorrowDateString() {
   const tomorrow = new Date()
@@ -76,8 +89,11 @@ export function AddStockInDialog({
   const [products, setProducts] = useState([])
   const [suppliers, setSuppliers] = useState([])
   const [supplierId, setSupplierId] = useState('')
-  const [error, setError] = useState(null)
-  const [expiryError, setExpiryError] = useState('')
+  const { fieldErrors, formError, setFormError, resetErrors, clearField, applyErrors } =
+    useFieldErrors()
+
+  // Treat stock-in as dirty once the user added lines or picked a supplier
+  const dirty = lines.length > 0 || Boolean(supplierId) || step > 1
   const [loadingOptions, setLoadingOptions] = useState(false)
 
   const subs = useMemo(() => {
@@ -98,8 +114,7 @@ export function AddStockInDialog({
   useEffect(() => {
     if (!open) return
     setStep(1)
-    setError(null)
-    setExpiryError('')
+    resetErrors()
     setDraft(emptyDraft())
     setLines([])
     setSupplierId('')
@@ -143,6 +158,9 @@ export function AddStockInDialog({
       if (field === 'subcategoryId') next.productId = ''
       return next
     })
+    if (field === 'productId') clearField('productId')
+    if (field === 'quantity' || field === 'scale') clearField('quantity')
+    if (field === 'expiresAt') clearField('expiresAt')
   }
 
   function resetDraftAfterAdd() {
@@ -151,31 +169,32 @@ export function AddStockInDialog({
       categoryId: prev.categoryId,
       subcategoryId: prev.subcategoryId,
     }))
-    setExpiryError('')
   }
 
   function addLineToCart() {
-    setError(null)
-    setExpiryError('')
-
-    if (!draft.productId) {
-      setError('Select a product to add')
-      return
-    }
+    const errors = {}
+    if (!draft.productId) errors.productId = 'Select a product to add'
     if (!draft.scale || !(Number(draft.quantity) > 0)) {
-      setError('Enter a valid scale and positive quantity')
-      return
+      errors.quantity = 'Enter a valid scale and positive quantity'
     }
     if (draft.expiresAt && !validateExpiryDate(draft.expiresAt)) {
-      setExpiryError('Expiry must be a future date')
+      errors.expiresAt = 'Expiry must be a future date'
+    }
+    if (
+      draft.productId &&
+      lines.some((row) => row.productId === draft.productId)
+    ) {
+      errors.productId =
+        'This product is already in the list — remove it first or pick another item'
+    }
+    if (Object.keys(errors).length) {
+      applyErrors(errors, STOCKIN_FIELD_IDS, STOCKIN_FIELD_ORDER)
       return
     }
-    if (lines.some((row) => row.productId === draft.productId)) {
-      setError('This product is already in the list — remove it first or pick another item')
-      return
-    }
+    resetErrors()
 
     const product = selectedProduct || products.find((p) => p.id === draft.productId)
+    clearField('lines')
     setLines((prev) => [
       ...prev,
       {
@@ -196,17 +215,20 @@ export function AddStockInDialog({
 
   function removeLine(productId) {
     setLines((prev) => prev.filter((row) => row.productId !== productId))
+    clearField('lines')
   }
 
   function goNext() {
-    setError(null)
-    setExpiryError('')
-
     if (step === 1) {
       if (!lines.length) {
-        setError('Add at least one item before continuing')
+        applyErrors(
+          { lines: 'Add at least one item before continuing' },
+          STOCKIN_FIELD_IDS,
+          STOCKIN_FIELD_ORDER,
+        )
         return
       }
+      resetErrors()
       setStep(2)
       return
     }
@@ -217,26 +239,25 @@ export function AddStockInDialog({
   }
 
   function goBack() {
-    setError(null)
-    setExpiryError('')
+    resetErrors()
     setStep((s) => Math.max(1, s - 1))
   }
 
   async function handleSave() {
-    setError(null)
-    setExpiryError('')
-
     if (!lines.length) {
-      setError('Add at least one item')
+      applyErrors({ lines: 'Add at least one item' }, STOCKIN_FIELD_IDS, STOCKIN_FIELD_ORDER)
+      setStep(1)
       return
     }
 
     for (const row of lines) {
       if (row.expiresAt && !validateExpiryDate(row.expiresAt)) {
-        setExpiryError(`Invalid expiry date for ${row.productName}`)
+        setFormError(`Invalid expiry date for ${row.productName}`)
+        setStep(1)
         return
       }
     }
+    resetErrors()
 
     const payload = {
       supplierId: supplierId || undefined,
@@ -249,18 +270,18 @@ export function AddStockInDialog({
       })),
     }
 
-    const result = await onSubmit?.(payload)
-    if (result?.success) onOpenChange?.(false)
-    else if (result?.error) setError(result.error)
+    try {
+      const result = await onSubmit?.(payload)
+      if (result?.success) onOpenChange?.(false)
+      else setFormError(result?.error || 'Failed to save stock-in. Please try again.')
+    } catch (err) {
+      setFormError(err?.message || 'Failed to save stock-in. Please try again.')
+    }
   }
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent
-        className="max-w-lg"
-        onPointerDownOutside={(e) => e.preventDefault()}
-        onEscapeKeyDown={(e) => e.preventDefault()}
-      >
+    <Dialog open={open} onOpenChange={onOpenChange} dirty={dirty}>
+      <DialogContent className="max-w-lg">
         <DialogHeader>
           <DialogTitle>Add New Stock</DialogTitle>
           <DialogDescription>
@@ -296,6 +317,10 @@ export function AddStockInDialog({
             )
           })}
         </nav>
+
+        {formError ? (
+          <p className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">{formError}</p>
+        ) : null}
 
         {step === 1 ? (
           <div className="space-y-4 pt-2">
@@ -347,8 +372,9 @@ export function AddStockInDialog({
             </div>
 
             <div className="space-y-1.5">
-              <Label>Item</Label>
+              <Label htmlFor="stockin-product">Item</Label>
               <NativeSelect
+                id="stockin-product"
                 value={draft.productId}
                 onChange={(e) => {
                   const id = e.target.value
@@ -362,7 +388,10 @@ export function AddStockInDialog({
                         ? String(p.purchasePrice)
                         : prev.unitCost,
                   }))
+                  clearField('productId')
                 }}
+                aria-invalid={Boolean(fieldErrors.productId)}
+                className={fieldErrorClass(fieldErrors.productId)}
               >
                 <option value="">Select product</option>
                 {products.map((p) => (
@@ -376,6 +405,7 @@ export function AddStockInDialog({
               {!products.length && !loadingOptions ? (
                 <p className="text-xs text-amber-700">No products match these filters.</p>
               ) : null}
+              <FieldError message={fieldErrors.productId} />
             </div>
 
             <div className="grid gap-3 sm:grid-cols-2">
@@ -393,14 +423,18 @@ export function AddStockInDialog({
                 </NativeSelect>
               </div>
               <div className="space-y-1.5">
-                <Label>Quantity</Label>
+                <Label htmlFor="stockin-quantity">Quantity</Label>
                 <Input
+                  id="stockin-quantity"
                   type="number"
                   min="0.001"
                   step="any"
                   value={draft.quantity}
                   onChange={(e) => patchDraft('quantity', e.target.value)}
+                  aria-invalid={Boolean(fieldErrors.quantity)}
+                  className={fieldErrorClass(fieldErrors.quantity)}
                 />
+                <FieldError message={fieldErrors.quantity} />
               </div>
               <div className="space-y-1.5">
                 <Label>Unit cost (optional)</Label>
@@ -413,16 +447,17 @@ export function AddStockInDialog({
                 />
               </div>
               <div className="space-y-1.5">
-                <Label>Expiry (optional)</Label>
+                <Label htmlFor="stockin-expires-at">Expiry (optional)</Label>
                 <Input
+                  id="stockin-expires-at"
                   type="date"
                   value={draft.expiresAt}
                   min={getTomorrowDateString()}
-                  onChange={(e) => {
-                    patchDraft('expiresAt', e.target.value)
-                    if (expiryError) setExpiryError('')
-                  }}
+                  onChange={(e) => patchDraft('expiresAt', e.target.value)}
+                  aria-invalid={Boolean(fieldErrors.expiresAt)}
+                  className={fieldErrorClass(fieldErrors.expiresAt)}
                 />
+                <FieldError message={fieldErrors.expiresAt} />
               </div>
             </div>
 
@@ -437,6 +472,7 @@ export function AddStockInDialog({
               Add item to list
             </Button>
 
+            <div id="stockin-lines" tabIndex={-1} className="outline-none">
             {lines.length > 0 ? (
               <div className="space-y-2">
                 <p className="text-xs font-semibold text-slate-600">
@@ -471,6 +507,8 @@ export function AddStockInDialog({
             ) : (
               <p className="text-xs text-slate-400">No items added yet.</p>
             )}
+            <FieldError message={fieldErrors.lines} />
+            </div>
           </div>
         ) : null}
 
@@ -535,13 +573,6 @@ export function AddStockInDialog({
           </div>
         ) : null}
 
-        {expiryError ? (
-          <p className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">{expiryError}</p>
-        ) : null}
-        {error ? (
-          <p className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">{error}</p>
-        ) : null}
-
         <DialogFooter className="gap-2 sm:justify-end">
           {step > 1 ? (
             <Button
@@ -556,16 +587,7 @@ export function AddStockInDialog({
               Back
             </Button>
           ) : null}
-          <Button
-            type="button"
-            variant="outline"
-            className="cursor-pointer transition-none"
-            style={{ color: BRAND.purple, borderColor: BRAND.purple }}
-            disabled={loading}
-            onClick={() => onOpenChange?.(false)}
-          >
-            Cancel
-          </Button>
+          <DialogCancelButton disabled={loading} className="cursor-pointer" />
           {step < 3 ? (
             <Button
               type="button"

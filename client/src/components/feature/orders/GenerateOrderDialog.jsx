@@ -14,9 +14,19 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
 import { NativeSelect } from '@/components/ui/select'
+import { FieldError } from '@/components/shared/FieldError'
 import { BRAND } from '@/lib/constants'
 import { money } from '@/lib/mapProduct'
+import { fieldErrorClass } from '@/lib/validation/fieldErrors'
+import { useFieldErrors } from '@/hooks/useFieldErrors'
 import { useFormBaseline } from '@/hooks/useFormBaseline'
+
+const PO_FIELD_IDS = {
+  supplierId: 'po-supplier',
+  lines: 'po-lines',
+}
+
+const PO_FIELD_ORDER = ['supplierId', 'lines']
 
 // Generate PO: pick supplier, multi products with qty + unit cost (shows last purchase).
 export function GenerateOrderDialog({
@@ -30,7 +40,8 @@ export function GenerateOrderDialog({
   const [supplierId, setSupplierId] = useState('')
   const [lines, setLines] = useState([])
   const [explanation, setExplanation] = useState('')
-  const [error, setError] = useState(null)
+  const { fieldErrors, formError, setFormError, resetErrors, clearField, applyErrors } =
+    useFieldErrors()
   const { captureBaseline, isDirty } = useFormBaseline(open)
 
   const selectedSupplier = useMemo(
@@ -40,7 +51,7 @@ export function GenerateOrderDialog({
 
   useEffect(() => {
     if (!open) return
-    setError(null)
+    resetErrors()
     setExplanation('')
     const snapshot = {
       supplierId: suppliers[0]?.id || '',
@@ -54,6 +65,7 @@ export function GenerateOrderDialog({
 
   function addLine() {
     if (!products.length) return
+    clearField('lines')
     setLines((prev) => [
       ...prev,
       {
@@ -66,6 +78,7 @@ export function GenerateOrderDialog({
   }
 
   function patchLine(index, field, value) {
+    clearField('lines')
     setLines((prev) =>
       prev.map((row, i) => {
         if (i !== index) return row
@@ -91,22 +104,28 @@ export function GenerateOrderDialog({
     setLines((prev) => prev.filter((_, i) => i !== index))
   }
 
-  async function handleSave(andPrint) {
-    setError(null)
-    if (!supplierId) {
-      setError('Select a company / supplier')
-      return
-    }
-    if (!lines.length) {
-      setError('Add at least one item')
-      return
-    }
-    for (const line of lines) {
-      if (!line.productId || !(Number(line.quantity) > 0)) {
-        setError('Each line needs a product and positive quantity')
-        return
+  function validateOrderForm() {
+    const errors = {}
+    if (!supplierId) errors.supplierId = 'Select a company / supplier'
+    if (!lines.length) errors.lines = 'Add at least one item'
+    else {
+      for (const line of lines) {
+        if (!line.productId || !(Number(line.quantity) > 0)) {
+          errors.lines = 'Each line needs a product and positive quantity'
+          break
+        }
       }
     }
+    return errors
+  }
+
+  async function handleSave(andPrint) {
+    const errors = validateOrderForm()
+    if (Object.keys(errors).length) {
+      applyErrors(errors, PO_FIELD_IDS, PO_FIELD_ORDER)
+      return
+    }
+    resetErrors()
 
     const payload = {
       supplierId,
@@ -120,9 +139,13 @@ export function GenerateOrderDialog({
       printAfter: andPrint,
     }
     console.debug('[GenerateOrderDialog] submit', payload)
-    const result = await onSubmit?.(payload)
-    if (result?.success) onOpenChange?.(false)
-    else if (result?.error) setError(result.error)
+    try {
+      const result = await onSubmit?.(payload)
+      if (result?.success) onOpenChange?.(false)
+      else setFormError(result?.error || 'Failed to create order. Please try again.')
+    } catch (err) {
+      setFormError(err?.message || 'Failed to create order. Please try again.')
+    }
   }
 
   return (
@@ -135,8 +158,8 @@ export function GenerateOrderDialog({
           </DialogDescription>
         </DialogHeader>
 
-        {error ? (
-          <p className="mb-3 rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">{error}</p>
+        {formError ? (
+          <p className="mb-3 rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">{formError}</p>
         ) : null}
 
         <div className="space-y-4">
@@ -145,7 +168,12 @@ export function GenerateOrderDialog({
             <NativeSelect
               id="po-supplier"
               value={supplierId}
-              onChange={(e) => setSupplierId(e.target.value)}
+              onChange={(e) => {
+                setSupplierId(e.target.value)
+                clearField('supplierId')
+              }}
+              aria-invalid={Boolean(fieldErrors.supplierId)}
+              className={fieldErrorClass(fieldErrors.supplierId)}
             >
               <option value="">Select supplier</option>
               {suppliers.map((s) => (
@@ -165,9 +193,10 @@ export function GenerateOrderDialog({
                 No suppliers — add one on the Suppliers page first.
               </p>
             ) : null}
+            <FieldError message={fieldErrors.supplierId} />
           </div>
 
-          <div>
+          <div id="po-lines" tabIndex={-1} className="outline-none">
             <div className="mb-2 flex items-center justify-between">
               <Label>Items</Label>
               <Button
@@ -248,6 +277,7 @@ export function GenerateOrderDialog({
                 )
               })}
             </div>
+            <FieldError message={fieldErrors.lines} />
           </div>
 
           <div className="space-y-1.5">

@@ -30,10 +30,10 @@ export function EntityStatusToggle({
       disabled={loading}
       onClick={() => onChange?.(!isActive)}
       className={cn(
-        'inline-flex cursor-pointer items-center rounded-full px-2.5 py-1 text-xs font-semibold ring-1 transition-opacity disabled:cursor-not-allowed disabled:opacity-60',
+        'inline-flex cursor-pointer items-center rounded-full px-2.5 py-1 text-xs font-semibold ring-1 transition-all duration-200 ease-out hover:-translate-y-0.5 hover:shadow-sm hover:brightness-[1.03] active:translate-y-0 active:scale-[0.97] disabled:cursor-not-allowed disabled:opacity-60 disabled:hover:translate-y-0 disabled:hover:shadow-none',
         isActive
-          ? 'bg-emerald-50 text-emerald-800 ring-emerald-100'
-          : 'bg-slate-100 text-slate-600 ring-slate-200',
+          ? 'bg-emerald-50 text-emerald-800 ring-emerald-100 hover:bg-emerald-100'
+          : 'bg-slate-100 text-slate-600 ring-slate-200 hover:bg-slate-200/80',
         className,
       )}
       title={isActive ? activeTitle : inactiveTitle}

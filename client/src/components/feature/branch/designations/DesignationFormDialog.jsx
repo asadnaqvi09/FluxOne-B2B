@@ -11,11 +11,16 @@ import {
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { BRAND } from '@/lib/constants'
+import { FieldError } from '@/components/shared/FieldError'
+import { fieldErrorClass } from '@/lib/validation/fieldErrors'
+import { useFieldErrors } from '@/hooks/useFieldErrors'
 import { useFormBaseline } from '@/hooks/useFormBaseline'
 import { apiClient } from '@/api/api'
 import { endpoints } from '@/api/endpoints'
 import { toastSuccess } from '@/lib/toast'
+
+const FIELD_IDS = { name: 'designation-name' }
+const DESIGNATION_FIELD_ORDER = ['name']
 
 const EMPTY_FORM = {
   name: '',
@@ -27,31 +32,33 @@ export function DesignationFormDialog({
   onSubmitSuccess,
 }) {
   const [form, setForm] = useState(EMPTY_FORM)
-  const [error, setError] = useState(null)
   const [loading, setLoading] = useState(false)
+  const { fieldErrors, formError, setFormError, resetErrors, clearField, applyErrors } =
+    useFieldErrors()
   const { captureBaseline, isDirty } = useFormBaseline(open)
 
   useEffect(() => {
     if (!open) return
-    setError(null)
+    resetErrors()
     setForm(EMPTY_FORM)
     captureBaseline(EMPTY_FORM)
-  }, [open])
+  }, [open, captureBaseline, resetErrors])
 
   function patch(field, value) {
     setForm((prev) => ({ ...prev, [field]: value }))
+    clearField(field)
   }
 
   async function handleSubmit(event) {
     event.preventDefault()
-    setError(null)
 
     const name = String(form.name || '').trim()
     if (!name) {
-      setError('Designation name is required')
+      applyErrors({ name: 'Designation name is required' }, FIELD_IDS, DESIGNATION_FIELD_ORDER)
       return
     }
 
+    resetErrors()
     setLoading(true)
     const res = await apiClient.post(endpoints.branch.designations.create, { name })
     setLoading(false)
@@ -61,7 +68,7 @@ export function DesignationFormDialog({
       onSubmitSuccess?.(res.data)
       onOpenChange?.(false)
     } else {
-      setError(res.error || 'Failed to create designation')
+      setFormError(res.error || 'Failed to create designation')
     }
   }
 
@@ -75,7 +82,13 @@ export function DesignationFormDialog({
           </DialogDescription>
         </DialogHeader>
 
-        <form className="space-y-4" onSubmit={handleSubmit}>
+        {formError ? (
+          <p className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700 ring-1 ring-red-100">
+            {formError}
+          </p>
+        ) : null}
+
+        <form className="space-y-4" onSubmit={handleSubmit} noValidate>
           <div className="space-y-1.5">
             <Label htmlFor="designation-name">Designation Name</Label>
             <Input
@@ -83,15 +96,11 @@ export function DesignationFormDialog({
               placeholder="e.g. Floor Manager, Lead Cashier"
               value={form.name}
               onChange={(e) => patch('name', e.target.value)}
-              required
+              aria-invalid={Boolean(fieldErrors.name)}
+              className={fieldErrorClass(fieldErrors.name)}
             />
+            <FieldError message={fieldErrors.name} />
           </div>
-
-          {error ? (
-            <p className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700 ring-1 ring-red-100">
-              {error}
-            </p>
-          ) : null}
 
           <DialogFooter>
             <DialogCancelButton
@@ -101,8 +110,8 @@ export function DesignationFormDialog({
             <Button
               type="submit"
               disabled={loading}
-              style={{ background: BRAND.purple }}
-              className="w-full text-white hover:opacity-90 sm:w-auto"
+              variant="brand"
+              className="w-full sm:w-auto"
             >
               {loading ? 'Saving…' : 'Create Designation'}
             </Button>

@@ -8,7 +8,6 @@ import { ConfirmDialog } from '@/components/shared/ConfirmDialog'
 import { PageHeader } from '@/components/shared/PageHeader'
 import { Button } from '@/components/ui/button'
 import { useSuppliers } from '@/hooks/useSuppliers'
-import { BRAND } from '@/lib/constants'
 import { toastError, toastSuccess } from '@/lib/toast'
 
 export function SuppliersPage() {
@@ -93,8 +92,7 @@ export function SuppliersPage() {
           actions={
             <Button
               type="button"
-              className="cursor-pointer text-white"
-              style={{ background: BRAND.purple }}
+              variant="brand"
               onClick={openCreate}
             >
               <Plus className="size-4" />
@@ -125,6 +123,7 @@ export function SuppliersPage() {
           loading={loading}
           pagination={pagination}
           onPageChange={setPage}
+          onPageSizeChange={(limit) => updateFilters({ limit })}
           onEdit={openEdit}
           onStatusChange={handleStatusChange}
           statusUpdatingId={statusUpdatingId}

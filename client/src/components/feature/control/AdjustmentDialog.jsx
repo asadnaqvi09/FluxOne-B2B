@@ -13,10 +13,22 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
 import { NativeSelect } from '@/components/ui/select'
+import { FieldError } from '@/components/shared/FieldError'
 import { BRAND } from '@/lib/constants'
 import { SCALE_OPTIONS } from '@/lib/mapProduct'
+import { fieldErrorClass } from '@/lib/validation/fieldErrors'
+import { useFieldErrors } from '@/hooks/useFieldErrors'
 import { fetchControlProductOptions } from '@/hooks/useInventoryControl'
 import { useFormBaseline } from '@/hooks/useFormBaseline'
+
+const ADJ_FIELD_IDS = {
+  productId: 'adj-product',
+  scale: 'adj-scale',
+  quantity: 'adj-quantity',
+  reason: 'adj-reason',
+}
+
+const ADJ_FIELD_ORDER = ['productId', 'scale', 'quantity', 'reason']
 
 // Create / edit stock adjustment (reason required).
 export function AdjustmentDialog({
@@ -39,7 +51,8 @@ export function AdjustmentDialog({
   const [scale, setScale] = useState('unit')
   const [quantity, setQuantity] = useState('1')
   const [reason, setReason] = useState('')
-  const [error, setError] = useState(null)
+  const { fieldErrors, formError, setFormError, resetErrors, clearField, applyErrors } =
+    useFieldErrors()
   const { captureBaseline, isDirty } = useFormBaseline(open)
 
   const formSnapshot = useMemo(
@@ -61,7 +74,7 @@ export function AdjustmentDialog({
 
   useEffect(() => {
     if (!open) return
-    setError(null)
+    resetErrors()
     if (isEdit && initial) {
       const snapshot = {
         categoryId: '',
@@ -116,24 +129,27 @@ export function AdjustmentDialog({
     }
   }, [open, isEdit, categoryId, subcategoryId])
 
-  async function handleSave() {
-    setError(null)
-    if (!isEdit && !productId) {
-      setError('Select a product')
-      return
-    }
+  function validateAdjustmentForm() {
+    const errors = {}
+    if (!isEdit && !productId) errors.productId = 'Select a product'
     if (!scale || quantity === '' || Number.isNaN(Number(quantity))) {
-      setError('Enter a valid quantity and scale')
-      return
-    }
-    if (Number(quantity) === 0) {
-      setError('Adjustment quantity cannot be zero')
-      return
+      errors.quantity = 'Enter a valid quantity and scale'
+    } else if (Number(quantity) === 0) {
+      errors.quantity = 'Adjustment quantity cannot be zero'
     }
     if (!reason || reason.trim().length < 3) {
-      setError('Reason is required (min 3 characters)')
+      errors.reason = 'Reason is required (min 3 characters)'
+    }
+    return errors
+  }
+
+  async function handleSave() {
+    const errors = validateAdjustmentForm()
+    if (Object.keys(errors).length) {
+      applyErrors(errors, ADJ_FIELD_IDS, ADJ_FIELD_ORDER)
       return
     }
+    resetErrors()
     const payload = isEdit
       ? { quantity: Number(quantity), reason: reason.trim() }
       : {
@@ -142,9 +158,13 @@ export function AdjustmentDialog({
           quantity: Number(quantity),
           reason: reason.trim(),
         }
-    const result = await onSubmit?.(payload)
-    if (result?.success) onOpenChange?.(false)
-    else if (result?.error) setError(result.error)
+    try {
+      const result = await onSubmit?.(payload)
+      if (result?.success) onOpenChange?.(false)
+      else setFormError(result?.error || 'Save failed. Please try again.')
+    } catch (err) {
+      setFormError(err?.message || 'Save failed. Please try again.')
+    }
   }
 
   return (
@@ -158,6 +178,10 @@ export function AdjustmentDialog({
               : 'Positive qty increases stock; negative decreases it. Reason required.'}
           </DialogDescription>
         </DialogHeader>
+
+        {formError ? (
+          <p className="mb-3 rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">{formError}</p>
+        ) : null}
 
         {!isEdit ? (
           <div className="grid gap-3 sm:grid-cols-2">
@@ -194,15 +218,19 @@ export function AdjustmentDialog({
               </NativeSelect>
             </div>
             <div className="space-y-1.5 sm:col-span-2">
-              <Label>Product</Label>
+              <Label htmlFor="adj-product">Product</Label>
               <NativeSelect
+                id="adj-product"
                 value={productId}
                 onChange={(e) => {
                   const id = e.target.value
                   setProductId(id)
+                  clearField('productId')
                   const p = products.find((x) => x.id === id)
                   if (p) setScale(p.scale || 'unit')
                 }}
+                aria-invalid={Boolean(fieldErrors.productId)}
+                className={fieldErrorClass(fieldErrors.productId)}
               >
                 <option value="">Select product</option>
                 {products.map((p) => (
@@ -214,6 +242,7 @@ export function AdjustmentDialog({
               {!products.length ? (
                 <p className="text-xs text-amber-700">No products match these filters.</p>
               ) : null}
+              <FieldError message={fieldErrors.productId} />
             </div>
           </div>
         ) : (
@@ -225,40 +254,61 @@ export function AdjustmentDialog({
         <div className="grid grid-cols-2 gap-3">
           {!isEdit ? (
             <div className="space-y-1.5">
-              <Label>Scale</Label>
-              <NativeSelect value={scale} onChange={(e) => setScale(e.target.value)}>
+              <Label htmlFor="adj-scale">Scale</Label>
+              <NativeSelect
+                id="adj-scale"
+                value={scale}
+                onChange={(e) => {
+                  setScale(e.target.value)
+                  clearField('scale')
+                  clearField('quantity')
+                }}
+                aria-invalid={Boolean(fieldErrors.scale)}
+                className={fieldErrorClass(fieldErrors.scale)}
+              >
                 {SCALE_OPTIONS.map((s) => (
                   <option key={s} value={s}>
                     {s}
                   </option>
                 ))}
               </NativeSelect>
+              <FieldError message={fieldErrors.scale} />
             </div>
           ) : null}
           <div className={`space-y-1.5 ${isEdit ? 'col-span-2' : ''}`}>
-            <Label>Quantity</Label>
+            <Label htmlFor="adj-quantity">Quantity</Label>
             <Input
+              id="adj-quantity"
               type="number"
               step="any"
               value={quantity}
-              onChange={(e) => setQuantity(e.target.value)}
+              onChange={(e) => {
+                setQuantity(e.target.value)
+                clearField('quantity')
+              }}
+              aria-invalid={Boolean(fieldErrors.quantity)}
+              className={fieldErrorClass(fieldErrors.quantity)}
             />
+            <FieldError message={fieldErrors.quantity} />
           </div>
         </div>
 
         <div className="space-y-1.5">
-          <Label>Reason</Label>
+          <Label htmlFor="adj-reason">Reason</Label>
           <Textarea
+            id="adj-reason"
             rows={3}
             value={reason}
             placeholder="Why is this adjustment needed?"
-            onChange={(e) => setReason(e.target.value)}
+            onChange={(e) => {
+              setReason(e.target.value)
+              clearField('reason')
+            }}
+            aria-invalid={Boolean(fieldErrors.reason)}
+            className={fieldErrorClass(fieldErrors.reason)}
           />
+          <FieldError message={fieldErrors.reason} />
         </div>
-
-        {error ? (
-          <p className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">{error}</p>
-        ) : null}
 
         <DialogFooter>
           <DialogCancelButton disabled={loading} />

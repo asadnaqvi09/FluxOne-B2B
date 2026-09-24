@@ -25,23 +25,32 @@ import {
   TableHead,
   TableRow,
   TableCell,
+  TableActionsHead,
+  TableActionsCell,
   TablePagination,
 } from '@/components/ui/table'
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogCancelButton } from '@/components/ui/dialog'
 import { apiClient } from '@/api/api'
 import { endpoints } from '@/api/endpoints'
 import { useDebouncedValue } from '@/hooks/useDebouncedValue'
+import { useClientPagination } from '@/hooks/useClientPagination'
 import { BRAND } from '@/lib/constants'
 import { toastError, toastSuccess } from '@/lib/toast'
-
-const PAGE_SIZE = 8
 
 export function SalesPage() {
   const [sales, setSales] = useState([])
   const [kpis, setKpis] = useState({ totalSales: 0, totalRefunds: 0, transactionCount: 0, totalPaid: 0, totalReturns: 0 })
   const [loading, setLoading] = useState(false)
   const [categories, setCategories] = useState([])
-  const [page, setPage] = useState(1)
+  const {
+    page,
+    setPage,
+    pageSize,
+    setPageSize,
+    pageCount,
+    total,
+    slice: pagedSales,
+  } = useClientPagination(sales)
 
   // Filters — input is instant; API uses debounced query
   const [searchQuery, setSearchQuery] = useState('')
@@ -231,11 +240,6 @@ export function SalesPage() {
           title="Sales Transactions"
           description="POS and register transactions history"
           className="min-h-[400px]"
-          actions={
-            <span className="text-xs font-medium text-slate-400">
-              {sales.length} records · {PAGE_SIZE} / page
-            </span>
-          }
         >
           {loading ? (
             <p className="py-8 text-center text-sm text-slate-400">Loading transactions...</p>
@@ -244,7 +248,7 @@ export function SalesPage() {
           ) : (
             <>
               <div className="space-y-3 md:hidden">
-                {sales.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE).map((sale) => {
+                {pagedSales.map((sale) => {
                   const soldItems = (sale.items || []).filter((i) => !i.isExchange)
                   const exchangeItems = (sale.items || []).filter((i) => i.isExchange)
                   const indexStr = String(sale.saleNumber || sale.id.slice(0, 4))
@@ -266,12 +270,9 @@ export function SalesPage() {
                     >
                       <div className="flex items-start justify-between gap-2">
                         <div className="min-w-0">
-                          <Badge
-                            variant="secondary"
-                            className="rounded border-none bg-purple-50 font-semibold text-purple-700 hover:bg-purple-100"
-                          >
+                          <span className="font-mono text-xs font-bold text-purple-800 select-all">
                             {salId}
-                          </Badge>
+                          </span>
                           <p className="mt-0.5 font-mono text-[10px] text-slate-400">{trkId}</p>
                           <p className="mt-1 text-xs text-slate-500">{soldAtLabel}</p>
                         </div>
@@ -344,7 +345,7 @@ export function SalesPage() {
                 <Table className="min-w-[56rem]">
                   <TableHeader>
                     <TableRow className="text-xs text-slate-500">
-                      <TableHead>ID</TableHead>
+                      <TableHead>Sale ID</TableHead>
                       <TableHead>Date / Time</TableHead>
                       <TableHead>Sale items</TableHead>
                       <TableHead className="hidden lg:table-cell">Exchange item</TableHead>
@@ -353,11 +354,11 @@ export function SalesPage() {
                       <TableHead>Final</TableHead>
                       <TableHead>Paid</TableHead>
                       <TableHead className="hidden lg:table-cell">Return</TableHead>
-                      <TableHead className="sticky right-0 z-[1] bg-white text-right">Actions</TableHead>
+                      <TableActionsHead sticky />
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {sales.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE).map((sale) => {
+                    {pagedSales.map((sale) => {
                       const soldItems = (sale.items || []).filter((i) => !i.isExchange)
                       const exchangeItems = (sale.items || []).filter((i) => i.isExchange)
                       const indexStr = String(sale.saleNumber || sale.id.slice(0, 4))
@@ -367,12 +368,9 @@ export function SalesPage() {
                       return (
                         <TableRow key={sale.id} className="group">
                           <TableCell className="py-4">
-                            <Badge
-                              variant="secondary"
-                              className="rounded border-none bg-purple-50 font-semibold text-purple-700 hover:bg-purple-100"
-                            >
+                            <span className="font-mono text-xs font-bold text-purple-800 select-all">
                               {salId}
-                            </Badge>
+                            </span>
                             <div className="mt-0.5 font-mono text-[10px] text-slate-400">{trkId}</div>
                           </TableCell>
                           <TableCell className="text-slate-600">
@@ -405,18 +403,20 @@ export function SalesPage() {
                           <TableCell className="font-bold text-slate-900">
                             Rs. {formatPrice(sale.finalAmount)}
                           </TableCell>
-                          <TableCell className="text-slate-600">Rs. {formatPrice(sale.paidAmount)}</TableCell>
+                          <TableCell className="text-slate-600">
+                            Rs. {formatPrice(sale.paidAmount)}
+                          </TableCell>
                           <TableCell className="hidden text-slate-600 lg:table-cell">
                             {parseFloat(sale.returnAmount) > 0
                               ? `Rs. ${formatPrice(sale.returnAmount)}`
                               : '—'}
                           </TableCell>
-                          <TableCell className="sticky right-0 z-[1] space-x-2.5 bg-white text-right group-hover:bg-slate-50/80">
+                          <TableActionsCell sticky>
                             {sale.status !== 'refunded' ? (
                               <Button
                                 size="xs"
                                 variant="outline"
-                                className="h-7 border-slate-200 px-2 text-xs font-semibold text-slate-700 align-middle hover:bg-slate-50"
+                                className="h-7 border-slate-200 px-2 text-xs font-semibold text-slate-700 hover:bg-slate-50"
                                 onClick={() => setRefundTarget(sale)}
                               >
                                 Refund
@@ -424,19 +424,20 @@ export function SalesPage() {
                             ) : (
                               <Badge
                                 variant="destructive"
-                                className="rounded border-none bg-rose-50 font-semibold text-rose-700 align-middle hover:bg-rose-100"
+                                className="rounded border-none bg-rose-50 font-semibold text-rose-700 hover:bg-rose-100"
                               >
                                 Refunded
                               </Badge>
                             )}
                             <button
                               type="button"
-                              className="inline-block align-middle text-slate-500 transition-colors hover:text-slate-800"
+                              className="cursor-pointer text-slate-500 transition-colors hover:text-slate-800"
                               onClick={() => handlePrint(sale)}
+                              aria-label="Print invoice"
                             >
                               <Printer className="size-4" />
                             </button>
-                          </TableCell>
+                          </TableActionsCell>
                         </TableRow>
                       )
                     })}
@@ -448,9 +449,11 @@ export function SalesPage() {
 
           <TablePagination
             page={page}
-            pageCount={Math.max(1, Math.ceil(sales.length / PAGE_SIZE))}
-            totalItems={sales.length}
+            pageCount={pageCount}
+            totalItems={total}
+            pageSize={pageSize}
             onPageChange={setPage}
+            onPageSizeChange={setPageSize}
           />
         </SurfaceCard>
       </MotionReveal>

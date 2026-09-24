@@ -20,16 +20,24 @@ import {
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogCancelButton } from '@/components/ui/dialog'
 import { apiClient } from '@/api/api'
 import { useDebouncedValue } from '@/hooks/useDebouncedValue'
+import { useClientPagination } from '@/hooks/useClientPagination'
 import { BRAND } from '@/lib/constants'
+import { displayItemCode } from '@/lib/formatDisplayId'
 import { toastError, toastSuccess } from '@/lib/toast'
-
-const PAGE_SIZE = 8
 
 export function BranchInventoryPage() {
   const [products, setProducts] = useState([])
   const [categories, setCategories] = useState([])
   const [loading, setLoading] = useState(false)
-  const [page, setPage] = useState(1)
+  const {
+    page,
+    setPage,
+    pageSize,
+    setPageSize,
+    pageCount,
+    total,
+    slice: pagedProducts,
+  } = useClientPagination(products)
 
   // Filters — input instant; list fetch after debounce
   const [searchQuery, setSearchQuery] = useState('')
@@ -162,7 +170,7 @@ export function BranchInventoryPage() {
                 <Input
                   id="stock-search"
                   value={searchQuery}
-                  placeholder="Item name, SKU, or ID…"
+                  placeholder="Item name or item code…"
                   className="pl-9"
                   onChange={(e) => setSearchQuery(e.target.value)}
                 />
@@ -207,11 +215,6 @@ export function BranchInventoryPage() {
         <SurfaceCard
           title="Shelf Stock Levels"
           className="min-h-[400px]"
-          actions={
-            <span className="text-xs font-medium text-slate-400">
-              {products.length} records · {PAGE_SIZE} / page
-            </span>
-          }
         >
           {loading ? (
             <p className="py-8 text-center text-sm text-slate-400">Loading shelf stock...</p>
@@ -221,7 +224,7 @@ export function BranchInventoryPage() {
             <>
               {/* Mobile cards — table-fixed was crushing columns on narrow screens */}
               <div className="space-y-3 md:hidden">
-                {products.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE).map((prod) => {
+                {pagedProducts.map((prod) => {
                   const status = getStockStatus(prod.quantity, prod.reorderPoint)
                   const cat = categories.find((c) => c.id === prod.categoryId)?.name || '—'
                   const subcat = subcategories.find((s) => s.id === prod.subcategoryId)?.name || '—'
@@ -247,7 +250,9 @@ export function BranchInventoryPage() {
                           <div className="flex items-start justify-between gap-2">
                             <div className="min-w-0">
                               <p className="truncate text-sm font-bold text-slate-900">{prod.name}</p>
-                              <p className="font-mono text-[11px] text-slate-400">SKU: {prod.itemCode}</p>
+                              <p className="font-mono text-[11px] text-slate-400">
+                                Item code: {displayItemCode(prod)}
+                              </p>
                             </div>
                             <Badge variant={status.variant} className={`shrink-0 ${status.className}`}>
                               {status.label}
@@ -284,20 +289,20 @@ export function BranchInventoryPage() {
                   <TableHeader>
                     <TableRow className="text-xs text-slate-500 uppercase">
                       <TableHead className="px-2 py-3 whitespace-nowrap">Image</TableHead>
-                      <TableHead className="px-2 py-3 whitespace-nowrap min-w-[10rem]">ID / Name</TableHead>
+                      <TableHead className="px-2 py-3 whitespace-nowrap min-w-[10rem]">Name</TableHead>
                       <TableHead className="px-2 py-3 whitespace-nowrap">Category</TableHead>
                       <TableHead className="hidden px-2 py-3 whitespace-nowrap lg:table-cell">
                         Subcategory
                       </TableHead>
-                      <TableHead className="px-2 py-3 text-right whitespace-nowrap">In Stock</TableHead>
-                      <TableHead className="px-2 py-3 text-center whitespace-nowrap">Status</TableHead>
-                      <TableHead className="sticky right-0 z-[1] bg-white px-2 py-3 text-right whitespace-nowrap">
+                      <TableHead className="px-2 py-3 whitespace-nowrap">In Stock</TableHead>
+                      <TableHead className="px-2 py-3 whitespace-nowrap">Status</TableHead>
+                      <TableHead className="sticky right-0 z-[1] bg-slate-200/80 px-2 py-3 whitespace-nowrap">
                         Actions
                       </TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {products.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE).map((prod) => {
+                    {pagedProducts.map((prod) => {
                       const status = getStockStatus(prod.quantity, prod.reorderPoint)
                       const cat = categories.find((c) => c.id === prod.categoryId)?.name || '—'
                       const subcat = subcategories.find((s) => s.id === prod.subcategoryId)?.name || '—'
@@ -319,24 +324,26 @@ export function BranchInventoryPage() {
                           </TableCell>
                           <TableCell className="px-2 py-3">
                             <div className="font-bold text-slate-900">{prod.name}</div>
-                            <div className="font-mono text-[10px] text-slate-400">SKU: {prod.itemCode}</div>
+                            <div className="font-mono text-[10px] text-slate-400">
+                              Item code: {displayItemCode(prod)}
+                            </div>
                           </TableCell>
                           <TableCell className="px-2 py-3 text-slate-600">{cat}</TableCell>
                           <TableCell className="hidden px-2 py-3 text-slate-600 lg:table-cell">
                             {subcat}
                           </TableCell>
-                          <TableCell className="px-2 py-3 text-right font-mono font-bold text-slate-900 whitespace-nowrap">
+                          <TableCell className="px-2 py-3 font-mono font-bold text-slate-900 whitespace-nowrap">
                             {parseFloat(prod.quantity || 0).toLocaleString()}{' '}
                             <span className="text-[10px] font-normal text-slate-400">
                               {prod.scale || 'pcs'}
                             </span>
                           </TableCell>
-                          <TableCell className="px-2 py-3 text-center">
+                          <TableCell className="px-2 py-3">
                             <Badge variant={status.variant} className={status.className}>
                               {status.label}
                             </Badge>
                           </TableCell>
-                          <TableCell className="sticky right-0 z-[1] bg-white px-2 py-3 text-right group-hover:bg-slate-50/80">
+                          <TableCell className="sticky right-0 z-[1] bg-white px-2 py-3 group-hover:bg-slate-50/80">
                             <Button
                               size="sm"
                               variant="outline"
@@ -358,9 +365,11 @@ export function BranchInventoryPage() {
 
           <TablePagination
             page={page}
-            pageCount={Math.max(1, Math.ceil(products.length / PAGE_SIZE))}
-            totalItems={products.length}
+            pageCount={pageCount}
+            totalItems={total}
+            pageSize={pageSize}
             onPageChange={setPage}
+            onPageSizeChange={setPageSize}
           />
 
           <div className="mt-4 flex flex-col gap-2 border-t border-border pt-3 text-xs text-slate-500 sm:flex-row sm:flex-wrap sm:gap-4">

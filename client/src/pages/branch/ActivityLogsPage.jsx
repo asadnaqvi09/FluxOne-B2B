@@ -33,6 +33,7 @@ export function ActivityLogsPage() {
             error={error}
             pagination={pagination}
             onPageChange={setPage}
+            onPageSizeChange={(limit) => updateFilters({ limit })}
           />
         </SurfaceCard>
       </MotionReveal>

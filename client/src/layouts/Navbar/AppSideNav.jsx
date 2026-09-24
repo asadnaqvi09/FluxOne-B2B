@@ -1,26 +1,21 @@
 import { useEffect } from 'react'
-import { NavLink } from 'react-router-dom'
-import { Menu, X } from 'lucide-react'
+import { NavLink, useNavigate } from 'react-router-dom'
+import { LogOut, Menu, ScrollText, UserRound, X } from 'lucide-react'
 import { AnimatePresence, motion } from 'motion/react'
 import { BrandLogo } from '@/components/shared/BrandLogo'
-import { BRAND } from '@/lib/constants'
+import { UserAvatar } from '@/components/shared/UserAvatar'
+import { useAuthSession } from '@/hooks/useAuthSession'
+import { BRAND, ROLES } from '@/lib/constants'
+import { roleDisplayName } from '@/lib/nav'
 import { cn } from '@/lib/utils'
+import { PATHS, profilePathForRole } from '@/router/paths'
 
-const overlayMotion = {
-  initial: { opacity: 0 },
-  animate: { opacity: 1 },
-  exit: { opacity: 0 },
-  transition: { duration: 0.2 },
-}
-
-const drawerMotion = {
-  initial: { x: '-100%' },
-  animate: { x: 0 },
-  exit: { x: '-100%' },
-  transition: { type: 'spring', stiffness: 320, damping: 32 },
-}
+// Transform-only tween — smoother than spring, and no backdrop-blur (that caused the lag)
+const EASE = [0.22, 1, 0.36, 1]
 
 function SideNavLinks({ items, onNavigate }) {
+  if (!items?.length) return <div className="flex-1" />
+
   return (
     <nav className="flex flex-1 flex-col gap-1 overflow-y-auto px-3 py-4">
       {items.map((item) => (
@@ -55,7 +50,82 @@ function SideNavLinks({ items, onNavigate }) {
   )
 }
 
-function SideDrawer({ open, onClose, items }) {
+function AccountHeader() {
+  const { user, role } = useAuthSession()
+  const name = user?.name || 'User'
+  const roleLabel = roleDisplayName(role)
+  const userId = user?.email || user?.id || '—'
+
+  return (
+    <div className="flex items-center gap-3 border-b border-border px-4 py-4">
+      <UserAvatar
+        name={name}
+        loginId={user?.email}
+        imageUrl={user?.imageUrl || null}
+        className="size-11"
+        fallbackClassName="text-sm"
+      />
+      <div className="min-w-0">
+        <p className="truncate text-sm font-semibold text-slate-800">{name}</p>
+        <p className="truncate text-xs text-slate-500">{roleLabel}</p>
+        <p className="mt-0.5 truncate text-xs font-medium" style={{ color: BRAND.deep }}>
+          {userId}
+        </p>
+      </div>
+    </div>
+  )
+}
+
+function AccountActions({ onClose }) {
+  const navigate = useNavigate()
+  const { role, logout } = useAuthSession()
+  const profilePath = profilePathForRole(role)
+
+  return (
+    <div className="mt-auto space-y-1 border-t border-border p-3">
+      {role === ROLES.B2B_ADMIN ? null : (
+        <button
+          type="button"
+          className="flex w-full cursor-pointer items-center gap-2.5 rounded-xl px-3 py-3 text-sm font-medium text-slate-700 transition-colors hover:bg-slate-50 active:scale-[0.99]"
+          onClick={() => {
+            onClose()
+            navigate(profilePath)
+          }}
+        >
+          <UserRound className="size-4" />
+          Profile
+        </button>
+      )}
+      {role === ROLES.BRANCH_MANAGER ? (
+        <button
+          type="button"
+          className="flex w-full cursor-pointer items-center gap-2.5 rounded-xl px-3 py-3 text-sm font-medium text-slate-700 transition-colors hover:bg-slate-50 active:scale-[0.99]"
+          onClick={() => {
+            onClose()
+            navigate(PATHS.branch.logs)
+          }}
+        >
+          <ScrollText className="size-4" />
+          Logs
+        </button>
+      ) : null}
+      <button
+        type="button"
+        className="flex w-full cursor-pointer items-center gap-2.5 rounded-xl px-3 py-3 text-sm font-medium text-red-600 transition-colors hover:bg-red-50 active:scale-[0.99]"
+        onClick={() => {
+          onClose()
+          logout()
+          navigate(PATHS.login, { replace: true })
+        }}
+      >
+        <LogOut className="size-4" />
+        Logout
+      </button>
+    </div>
+  )
+}
+
+function SideDrawer({ open, onClose, items, showAccount }) {
   useEffect(() => {
     if (!open) return undefined
     const onKeyDown = (event) => {
@@ -75,15 +145,24 @@ function SideDrawer({ open, onClose, items }) {
       {open ? (
         <>
           <motion.button
+            key="nav-overlay"
             type="button"
             aria-label="Close side menu"
-            className="fixed inset-0 z-50 bg-slate-900/40 backdrop-blur-[1px]"
-            {...overlayMotion}
+            className="fixed inset-0 z-50 bg-slate-900/40"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.22, ease: 'easeOut' }}
             onClick={onClose}
           />
           <motion.aside
+            key="nav-drawer"
             className="fixed top-0 left-0 z-50 flex h-dvh w-[min(20rem,88vw)] flex-col bg-white shadow-2xl"
-            {...drawerMotion}
+            initial={{ x: '-100%' }}
+            animate={{ x: 0 }}
+            exit={{ x: '-100%' }}
+            transition={{ duration: 0.32, ease: EASE }}
+            style={{ willChange: 'transform' }}
             role="dialog"
             aria-modal="true"
             aria-label="Side navigation"
@@ -103,7 +182,9 @@ function SideDrawer({ open, onClose, items }) {
               </button>
             </div>
 
+            {showAccount ? <AccountHeader /> : null}
             <SideNavLinks items={items} onNavigate={onClose} />
+            {showAccount ? <AccountActions onClose={onClose} /> : null}
           </motion.aside>
         </>
       ) : null}
@@ -111,10 +192,8 @@ function SideDrawer({ open, onClose, items }) {
   )
 }
 
-// Admin utility side nav — hamburger left of logo; panel slides from left
-export function AppSideNav({ items, open, onOpenChange }) {
-  if (!items?.length) return null
-
+// Single hamburger, left of the logo. Parent decides which links to pass.
+export function AppSideNav({ items, open, onOpenChange, showAccount = false }) {
   return (
     <>
       <button
@@ -127,7 +206,12 @@ export function AppSideNav({ items, open, onOpenChange }) {
         <Menu className="size-5" />
       </button>
 
-      <SideDrawer open={open} onClose={() => onOpenChange(false)} items={items} />
+      <SideDrawer
+        open={open}
+        onClose={() => onOpenChange(false)}
+        items={items}
+        showAccount={showAccount}
+      />
     </>
   )
 }

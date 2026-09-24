@@ -47,6 +47,7 @@ import { CompanyPage as AdminCompanyPage } from '@/pages/admin/CompanyPage'
 import { SettingsPage as AdminSettingsPage } from '@/pages/admin/SettingsPage'
 import { AdminProfilePage } from '@/pages/admin/AdminProfilePage'
 import { NotificationsPage } from '@/pages/shared/NotificationsPage'
+import { NotFoundPage, RootNotFoundPage } from '@/pages/shared/NotFoundPage'
 import { useAuthSession } from '@/hooks/useAuthSession'
 import CategoriesPage from '@/pages/inventory/CategoriesPage'
 
@@ -76,6 +77,8 @@ const router = createBrowserRouter([
           { path: 'company', element: <AdminCompanyPage /> },
           { path: 'settings', element: <AdminSettingsPage /> },
           { path: 'profile', element: <AdminProfilePage /> },
+          // Unknown /admin/* — keep AdminLayout topbar
+          { path: '*', element: <NotFoundPage /> },
         ],
       },
     ],
@@ -99,6 +102,7 @@ const router = createBrowserRouter([
               { path: 'categories', element: <CategoriesPage /> },
               { path: 'notifications', element: <NotificationsPage /> },
               { path: 'profile', element: <ProfilePage /> },
+              { path: '*', element: <NotFoundPage /> },
             ],
           },
         ],
@@ -127,6 +131,7 @@ const router = createBrowserRouter([
               { path: 'logs', element: <ActivityLogsPage /> },
               { path: 'notifications', element: <NotificationsPage /> },
               { path: 'profile', element: <ProfilePage /> },
+              { path: '*', element: <NotFoundPage /> },
             ],
           },
         ],
@@ -140,12 +145,15 @@ const router = createBrowserRouter([
             children: [
               { index: true, element: <ComingSoonPage /> },
               { path: 'profile', element: <ProfilePage /> },
+              { path: '*', element: <NotFoundPage /> },
             ],
           },
         ],
       },
     ],
   },
+  // Outside every role prefix (or guest) — role topbar when logged in
+  { path: '*', element: <RootNotFoundPage /> },
 ])
 
 export function AppRouter() {

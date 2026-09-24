@@ -22,7 +22,12 @@ function clearSessionState(state) {
 export const loginUser = createAsyncThunk('auth/login', async (credentials, { rejectWithValue }) => {
   const result = await apiClient.post(endpoints.auth.login, credentials)
   if (!result?.success) {
-    return rejectWithValue(result?.error || 'Login failed')
+    // Pass retryAfterSec so LoginForm can show a live countdown while locked
+    return rejectWithValue({
+      message: result?.error || 'Login failed',
+      retryAfterSec: Number(result?.retryAfterSec) || 0,
+      status: result?.status || 0,
+    })
   }
   return result.data
 })
@@ -139,7 +144,11 @@ const authSlice = createSlice({
       })
       .addCase(loginUser.rejected, (state, action) => {
         state.status = 'failed'
-        state.error = action.payload || action.error.message || 'Login failed'
+        const payload = action.payload
+        state.error =
+          (typeof payload === 'string' ? payload : payload?.message) ||
+          action.error.message ||
+          'Login failed'
       })
       .addCase(logoutUser.pending, (state) => {
         // Optimistic UI only — keep tokenStorage so revoke can send refreshToken

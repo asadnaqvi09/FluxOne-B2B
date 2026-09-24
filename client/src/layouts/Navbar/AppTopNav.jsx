@@ -1,14 +1,42 @@
-import { useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { NavLink } from 'react-router-dom'
 import { BrandLogo } from '@/components/shared/BrandLogo'
 import { AppSideNav } from '@/layouts/Navbar/AppSideNav'
-import { MobileNav } from '@/layouts/Navbar/MobileNav'
 import { UserMenu } from '@/layouts/Navbar/UserMenu'
 import { NotificationBell } from '@/layouts/Navbar/NotificationBell'
 import { useAuthSession } from '@/hooks/useAuthSession'
 import { BRAND, ROLES } from '@/lib/constants'
 import { getNavItemsForRole, getSideNavItemsForRole } from '@/lib/nav'
 import { cn } from '@/lib/utils'
+
+const DESKTOP_QUERY = '(min-width: 768px)'
+
+function useIsDesktop() {
+  const [matches, setMatches] = useState(() =>
+    typeof window === 'undefined' ? true : window.matchMedia(DESKTOP_QUERY).matches,
+  )
+
+  useEffect(() => {
+    const media = window.matchMedia(DESKTOP_QUERY)
+    const onChange = () => setMatches(media.matches)
+    onChange()
+    media.addEventListener('change', onChange)
+    return () => media.removeEventListener('change', onChange)
+  }, [])
+
+  return matches
+}
+
+function mergeNav(primary, side) {
+  const seen = new Set()
+  const merged = []
+  for (const item of [...primary, ...side]) {
+    if (seen.has(item.to)) continue
+    seen.add(item.to)
+    merged.push(item)
+  }
+  return merged
+}
 
 function DesktopNavLinks({ items }) {
   return (
@@ -44,14 +72,27 @@ function DesktopNavLinks({ items }) {
 
 export function AppTopNav({ className }) {
   const { role } = useAuthSession()
+  const isDesktop = useIsDesktop()
   const items = getNavItemsForRole(role)
   const sideItems = getSideNavItemsForRole(role)
   const showBell =
     role === ROLES.B2B_ADMIN ||
     role === ROLES.BRANCH_MANAGER ||
     role === ROLES.INVENTORY_MANAGER
-  const showSideNav = role === ROLES.B2B_ADMIN && sideItems.length > 0
   const [sideOpen, setSideOpen] = useState(false)
+
+  // Desktop: utility links only. Small screens: every module link in the same drawer.
+  const drawerItems = useMemo(
+    () => (isDesktop ? sideItems : mergeNav(items, sideItems)),
+    [isDesktop, items, sideItems],
+  )
+
+  // Admin always has a hamburger. Other roles only need it below md (top links hide).
+  const showHamburger = isDesktop ? sideItems.length > 0 : true
+
+  useEffect(() => {
+    setSideOpen(false)
+  }, [isDesktop])
 
   return (
     <header
@@ -62,8 +103,13 @@ export function AppTopNav({ className }) {
     >
       <div className="flex h-full w-full min-w-0 items-center gap-2 sm:gap-4 lg:gap-8">
         <div className="flex shrink-0 items-center gap-1.5 sm:gap-2">
-          {showSideNav ? (
-            <AppSideNav items={sideItems} open={sideOpen} onOpenChange={setSideOpen} />
+          {showHamburger ? (
+            <AppSideNav
+              items={drawerItems}
+              open={sideOpen}
+              onOpenChange={setSideOpen}
+              showAccount={!isDesktop}
+            />
           ) : null}
           <BrandLogo size="sm" asLink={false} className="size-10 sm:size-12" />
         </div>
@@ -71,7 +117,6 @@ export function AppTopNav({ className }) {
         <div className="ml-auto flex shrink-0 items-center gap-1.5 sm:gap-3">
           {showBell ? <NotificationBell /> : null}
           <UserMenu className="hidden md:block" />
-          <MobileNav items={items} />
         </div>
       </div>
     </header>

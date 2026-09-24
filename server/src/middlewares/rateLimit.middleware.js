@@ -37,8 +37,9 @@ export const globalLimiter = createLimiter(
 )
 
 // Strict limiter for login / refresh / password endpoints
+// Keep above AUTH_LOCKOUT_MAX_ATTEMPTS so lockout messages win over generic rate-limit text
 export const authLimiter = createLimiter(
-  Number(process.env.RATE_LIMIT_AUTH_MAX || 20),
+  Number(process.env.RATE_LIMIT_AUTH_MAX || 30),
   'Too many authentication attempts. Please try again later.',
   'auth',
 )

@@ -290,7 +290,14 @@ export async function api(path, options = {}) {
         await clearSession()
         return fail('Session expired. Please sign in again.')
       }
-      return fail(getErrorMessage(payload, `HTTP ${response.status}`))
+      const retryAfterRaw = response.headers.get('Retry-After')
+      const retryAfterSec = retryAfterRaw ? Number(retryAfterRaw) : undefined
+      return fail(getErrorMessage(payload, `HTTP ${response.status}`), {
+        status: response.status,
+        ...(Number.isFinite(retryAfterSec) && retryAfterSec > 0
+          ? { retryAfterSec }
+          : {}),
+      })
     }
 
     if (payload && typeof payload === 'object' && 'success' in payload) {

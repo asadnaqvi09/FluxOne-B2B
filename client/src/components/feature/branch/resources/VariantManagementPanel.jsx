@@ -1,59 +1,29 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { ChevronDown, Layers, Pencil, Plus, Search, Trash2 } from 'lucide-react'
+import { Layers, Pencil, Plus, Trash2 } from 'lucide-react'
 import { VariantTypeDialog } from '@/components/feature/branch/resources/VariantTypeDialog'
 import { VariantValueDialog } from '@/components/feature/branch/resources/VariantValueDialog'
 import { ConfirmDialog } from '@/components/shared/ConfirmDialog'
 import { DeleteEntityDialog } from '@/components/shared/DeleteEntityDialog'
-import { EmptyState } from '@/components/shared/EmptyState'
 import { EntityStatusToggle } from '@/components/shared/EntityStatusToggle'
-import { MotionReveal } from '@/components/shared/MotionReveal'
-import { SurfaceCard } from '@/components/shared/SurfaceCard'
+import { ParentChildTreePanel } from '@/components/shared/ParentChildTreePanel'
 import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
-import { Label } from '@/components/ui/label'
-import { NativeSelect } from '@/components/ui/select'
-import { TableRowsSkeleton } from '@/components/ui/skeleton'
 import { apiClient } from '@/api/api'
 import { endpoints } from '@/api/endpoints'
-import { BRAND } from '@/lib/constants'
+import { useClientPagination } from '@/hooks/useClientPagination'
 import { useDebouncedValue } from '@/hooks/useDebouncedValue'
+import { filterParentChildRows } from '@/lib/filterParentChildRows'
+import { TABLE_PAGE_SIZE } from '@/lib/tablePagination'
 import { toastError, toastSuccess } from '@/lib/toast'
-import { cn } from '@/lib/utils'
-
-function filterTypes(types, statusFilter, search) {
-  const q = String(search || '')
-    .trim()
-    .toLowerCase()
-
-  return (types || [])
-    .filter((type) => {
-      if (statusFilter === 'active' && type.isActive === false) return false
-      if (statusFilter === 'inactive' && type.isActive !== false) return false
-      if (!q) return true
-      if (type.name?.toLowerCase().includes(q)) return true
-      return (type.values || []).some((value) => value.name?.toLowerCase().includes(q))
-    })
-    .map((type) => {
-      if (!q) return type
-      const nameHit = type.name?.toLowerCase().includes(q)
-      if (nameHit) return type
-      return {
-        ...type,
-        values: (type.values || []).filter((value) =>
-          value.name?.toLowerCase().includes(q),
-        ),
-      }
-    })
-}
 
 export function VariantManagementPanel() {
-  const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [types, setTypes] = useState([])
+  const [loading, setLoading] = useState(true)
   const [statusFilter, setStatusFilter] = useState('all')
   const [search, setSearch] = useState('')
   const debouncedSearch = useDebouncedValue(search, 300)
-  const [expandedId, setExpandedId] = useState(null)
+  // Multi-open — same expand model as Categories
+  const [openIds, setOpenIds] = useState(() => new Set())
   const [statusUpdatingId, setStatusUpdatingId] = useState(null)
 
   const [typeDialogOpen, setTypeDialogOpen] = useState(false)
@@ -82,18 +52,66 @@ export function VariantManagementPanel() {
     return false
   }, [])
 
+  // Mount fetch — setState only runs after the network response
   useEffect(() => {
-    setLoading(true)
-    void loadTypes().finally(() => setLoading(false))
-  }, [loadTypes])
+    let cancelled = false
+    ;(async () => {
+      const res = await apiClient.get(endpoints.branch.resources.variantTypes.list, {
+        active: 'all',
+        includeValues: true,
+      })
+      if (cancelled) return
+      if (res.success) setTypes(res.data || [])
+      else toastError(res.error || 'Failed to load variant types')
+      setLoading(false)
+    })()
+    return () => {
+      cancelled = true
+    }
+  }, [])
+
+  // Normalize types → shared tree row shape
+  const treeRows = useMemo(() => {
+    return types.map((type) => {
+      const values = type.values || []
+      return {
+        id: type.id,
+        name: type.name,
+        isActive: type.isActive,
+        valuesCount: type.valuesCount,
+        children: values.map((value) => ({
+          id: value.id,
+          name: value.name,
+          isActive: value.isActive,
+          variantTypeId: value.variantTypeId || type.id,
+        })),
+        _raw: type,
+      }
+    })
+  }, [types])
 
   const rows = useMemo(
-    () => filterTypes(types, statusFilter, debouncedSearch),
-    [types, statusFilter, debouncedSearch],
+    () => filterParentChildRows(treeRows, statusFilter, debouncedSearch),
+    [treeRows, statusFilter, debouncedSearch],
   )
 
-  function toggleExpand(typeId) {
-    setExpandedId((prev) => (prev === typeId ? null : typeId))
+  const {
+    page,
+    setPage,
+    pageSize,
+    setPageSize,
+    pageCount,
+    total,
+    slice: pageRows,
+  } = useClientPagination(rows, TABLE_PAGE_SIZE)
+
+  function toggleParent(parentId) {
+    setOpenIds((prev) => {
+      const next = new Set(prev)
+      if (next.has(parentId)) next.delete(parentId)
+      else next.add(parentId)
+      return next
+    })
   }
 
   function openCreateType() {
@@ -104,7 +122,7 @@ export function VariantManagementPanel() {
 
   function openEditType(type) {
     setTypeDialogMode('edit')
-    setEditingType(type)
+    setEditingType(type._raw || type)
     setTypeDialogOpen(true)
   }
 
@@ -162,7 +180,10 @@ export function VariantManagementPanel() {
 
       if (!res.success) return res
       toastSuccess(valueDialogMode === 'edit' ? 'Variant value updated' : 'Variant value created')
-      if (variantTypeId) setExpandedId(variantTypeId)
+      // Open the parent so the new value is visible
+      if (variantTypeId) {
+        setOpenIds((prev) => new Set(prev).add(variantTypeId))
+      }
       await loadTypes()
       return res
     } finally {
@@ -171,18 +192,19 @@ export function VariantManagementPanel() {
   }
 
   async function patchStatus(kind, row, isActive) {
-    if (!row?.id) return
+    const target = row._raw || row
+    if (!target?.id) return
     if (!isActive) {
-      setDeactivateTarget({ kind, row })
+      setDeactivateTarget({ kind, row: target })
       return
     }
 
-    setStatusUpdatingId(row.id)
+    setStatusUpdatingId(target.id)
     try {
       const endpoint =
         kind === 'type'
-          ? endpoints.branch.resources.variantTypes.update(row.id)
-          : endpoints.branch.resources.variantValues.update(row.id)
+          ? endpoints.branch.resources.variantTypes.update(target.id)
+          : endpoints.branch.resources.variantValues.update(target.id)
       const res = await apiClient.put(endpoint, { isActive: true })
       if (res.success) {
         toastSuccess(kind === 'type' ? 'Variant type activated' : 'Variant value activated')
@@ -219,7 +241,7 @@ export function VariantManagementPanel() {
 
   function requestDelete(kind, row) {
     setDeleteKind(kind)
-    setDeleteTarget(row)
+    setDeleteTarget(row._raw || row)
   }
 
   async function confirmDelete() {
@@ -242,7 +264,12 @@ export function VariantManagementPanel() {
             ? `Variant type deleted (${count} value${count === 1 ? '' : 's'} removed)`
             : 'Variant type deleted',
         )
-        if (expandedId === deleteTarget.id) setExpandedId(null)
+        setOpenIds((prev) => {
+          if (!prev.has(deleteTarget.id)) return prev
+          const next = new Set(prev)
+          next.delete(deleteTarget.id)
+          return next
+        })
       } else {
         toastSuccess('Variant value deleted')
       }
@@ -261,237 +288,161 @@ export function VariantManagementPanel() {
         : `Permanently remove variant type “${deleteTarget?.name}”? This cannot be undone.`
       : `Permanently remove variant value “${deleteTarget?.name}”? This cannot be undone.`
 
+  const hasActiveType = types.some((t) => t.isActive !== false)
+
   return (
     <>
-      <MotionReveal delay={0.02}>
-        <SurfaceCard padding="compact">
-          <div className="flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
-            <div className="grid w-full min-w-0 flex-1 gap-3 sm:grid-cols-2">
-              <div className="space-y-1.5">
-                <Label htmlFor="variant-search">Search</Label>
-                <div className="relative">
-                  <Search className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-slate-400" />
-                  <Input
-                    id="variant-search"
-                    value={search}
-                    placeholder="Search type or value…"
-                    className="pl-9"
-                    onChange={(e) => setSearch(e.target.value)}
-                  />
-                </div>
-              </div>
-              <div className="space-y-1.5">
-                <Label htmlFor="variant-status-filter">Status</Label>
-                <NativeSelect
-                  id="variant-status-filter"
-                  value={statusFilter}
+      <ParentChildTreePanel
+        search={search}
+        onSearchChange={(value) => {
+          setSearch(value)
+          setPage(1)
+        }}
+        searchId="variant-search"
+        searchPlaceholder="Search type or value…"
+        status={statusFilter}
+        onStatusChange={(value) => {
+          setStatusFilter(value)
+          setPage(1)
+        }}
+        statusId="variant-status-filter"
+        toolbarActions={
+          <>
+            <Button
+              type="button"
+              variant="outline"
+              className="cursor-pointer"
+              onClick={() => openCreateValue()}
+              disabled={!hasActiveType}
+            >
+              <Plus className="size-4" />
+              Add Value
+            </Button>
+            <Button
+              type="button"
+              variant="brand"
+              className="cursor-pointer"
+              onClick={openCreateType}
+            >
+              <Plus className="size-4" />
+              Add Variant Type
+            </Button>
+          </>
+        }
+        title="Variant Types"
+        description="Click the chevron to expand or collapse values"
+        countLabel={`${rows.length} type${rows.length === 1 ? '' : 's'}${
+          statusFilter !== 'all' ? ` · ${statusFilter}` : ''
+        }`}
+        emptyIcon={Layers}
+        emptyTitle={
+          debouncedSearch || statusFilter !== 'all'
+            ? 'No variant types match your filters.'
+            : 'No variant types yet. Create a type first, then add values.'
+        }
+        loading={loading}
+        rows={pageRows}
+        openIds={openIds}
+        onToggleParent={toggleParent}
+        renderParentMeta={(parent, children) => (
+          <p className="text-xs text-slate-400">
+            {parent.valuesCount ?? children.length} value
+            {(parent.valuesCount ?? children.length) === 1 ? '' : 's'}
+          </p>
+        )}
+        renderParentActions={(parent) => {
+          const inactive = parent.isActive === false
+          return (
+            <>
+              <EntityStatusToggle
+                status={inactive ? 'inactive' : 'active'}
+                loading={statusUpdatingId === parent.id}
+                onChange={(nextActive) => patchStatus('type', parent, nextActive)}
+              />
+              {!inactive ? (
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="outline"
                   className="cursor-pointer"
-                  onChange={(e) => setStatusFilter(e.target.value)}
+                  onClick={() => openCreateValue(parent)}
                 >
-                  <option value="all">All</option>
-                  <option value="active">Active</option>
-                  <option value="inactive">Inactive</option>
-                </NativeSelect>
-              </div>
-            </div>
-
-            <div className="flex w-full flex-col gap-2 sm:flex-row md:w-auto">
+                  <Plus className="size-3.5" />
+                  Add Values
+                </Button>
+              ) : null}
               <Button
                 type="button"
-                variant="outline"
-                className="w-full cursor-pointer md:w-auto"
-                onClick={() => openCreateValue()}
-                disabled={!types.some((t) => t.isActive !== false)}
+                size="icon"
+                variant="ghost"
+                className="cursor-pointer text-slate-500 hover:bg-slate-100 hover:text-slate-900 hover:scale-110"
+                title="Edit"
+                onClick={() => openEditType(parent)}
               >
-                <Plus className="mr-1.5 size-4" />
-                Add Value
+                <Pencil className="size-4" />
               </Button>
               <Button
                 type="button"
-                variant="brand"
-                className="w-full cursor-pointer md:w-auto"
-                onClick={openCreateType}
+                size="icon"
+                variant="ghost"
+                className="cursor-pointer text-slate-500 hover:bg-rose-50 hover:text-rose-700 hover:scale-110"
+                title="Delete"
+                aria-label={`Delete ${parent.name || 'variant type'}`}
+                onClick={() => requestDelete('type', parent)}
               >
-                <Plus className="mr-1.5 size-4" />
-                Add Variant Type
+                <Trash2 className="size-4" />
               </Button>
-            </div>
+            </>
+          )
+        }}
+        // Always allow expand so empty types can show the empty hint
+        renderChildEmpty={() => (
+          <div className="rounded-lg bg-white px-2.5 py-3 text-sm text-slate-400 ring-1 ring-border">
+            No values yet. Use Add Values to create one.
           </div>
-        </SurfaceCard>
-      </MotionReveal>
-
-      <MotionReveal delay={0.04}>
-        <SurfaceCard
-          title="Variant Types"
-          description="Click a type to expand or collapse its values"
-          actions={
-            <span className="text-xs text-slate-400">
-              {rows.length} type{rows.length === 1 ? '' : 's'}
-              {statusFilter !== 'all' ? ` · ${statusFilter}` : ''}
-            </span>
-          }
-        >
-          {loading ? (
-            <TableRowsSkeleton rows={4} />
-          ) : !rows.length ? (
-            <EmptyState
-              icon={Layers}
-              title={
-                debouncedSearch || statusFilter !== 'all'
-                  ? 'No variant types match your filters.'
-                  : 'No variant types yet. Create a type first, then add values.'
-              }
-              compact
-            />
-          ) : (
-            <ul className="space-y-3">
-              {rows.map((type) => {
-                const values = type.values || []
-                const expanded = expandedId === type.id
-                const inactive = type.isActive === false
-
-                return (
-                  <li
-                    key={type.id}
-                    className={cn(
-                      'rounded-xl px-3 py-3 ring-1 transition-colors',
-                      inactive
-                        ? 'bg-slate-50 ring-slate-200 opacity-80'
-                        : 'bg-slate-50/80 ring-border',
-                    )}
-                  >
-                    <div className="flex flex-wrap items-center justify-between gap-2">
-                      <button
-                        type="button"
-                        className="flex min-w-0 flex-1 cursor-pointer items-center gap-3 rounded-lg text-left outline-none focus-visible:ring-2 focus-visible:ring-slate-300"
-                        onClick={() => toggleExpand(type.id)}
-                        aria-expanded={expanded}
-                      >
-                        <div
-                          className="flex size-10 shrink-0 items-center justify-center rounded-lg text-xs font-bold text-white"
-                          style={{
-                            background: `linear-gradient(145deg, ${BRAND.purple}, ${BRAND.deep})`,
-                          }}
-                        >
-                          {(type.name || '?').slice(0, 1).toUpperCase()}
-                        </div>
-                        <div className="min-w-0">
-                          <p className="truncate font-semibold text-slate-900">{type.name}</p>
-                          <p className="text-xs text-slate-400">
-                            {type.valuesCount ?? values.length} value
-                            {(type.valuesCount ?? values.length) === 1 ? '' : 's'}
-                          </p>
-                        </div>
-                        <ChevronDown
-                          className={cn(
-                            'ml-auto size-4 shrink-0 text-slate-400 transition-transform duration-200',
-                            expanded ? 'rotate-180' : '',
-                          )}
-                        />
-                      </button>
-
-                      <div
-                        className="flex flex-wrap items-center gap-1.5"
-                        onClick={(e) => e.stopPropagation()}
-                      >
-                        <EntityStatusToggle
-                          status={inactive ? 'inactive' : 'active'}
-                          loading={statusUpdatingId === type.id}
-                          onChange={(nextActive) => patchStatus('type', type, nextActive)}
-                        />
-                        {!inactive ? (
-                          <Button
-                            type="button"
-                            size="sm"
-                            variant="outline"
-                            className="cursor-pointer"
-                            onClick={() => openCreateValue(type)}
-                          >
-                            <Plus className="size-3.5" />
-                            Add Values
-                          </Button>
-                        ) : null}
-                        <Button
-                          type="button"
-                          size="icon"
-                          variant="ghost"
-                          className="cursor-pointer text-slate-500 hover:bg-slate-100 hover:text-slate-900 hover:scale-110"
-                          title="Edit"
-                          onClick={() => openEditType(type)}
-                        >
-                          <Pencil className="size-4" />
-                        </Button>
-                        <Button
-                          type="button"
-                          size="icon"
-                          variant="ghost"
-                          className="cursor-pointer text-slate-500 hover:bg-rose-50 hover:text-rose-700 hover:scale-110"
-                          title="Delete"
-                          aria-label={`Delete ${type.name || 'variant type'}`}
-                          onClick={() => requestDelete('type', type)}
-                        >
-                          <Trash2 className="size-4" />
-                        </Button>
-                      </div>
-                    </div>
-
-                    {expanded ? (
-                      <ul className="mt-3 space-y-2 border-t border-border/70 pt-3">
-                        {values.length === 0 ? (
-                          <li className="rounded-lg bg-white px-2.5 py-3 text-sm text-slate-400 ring-1 ring-border">
-                            No values yet. Use Add Values to create one.
-                          </li>
-                        ) : (
-                          values.map((value) => (
-                            <li
-                              key={value.id}
-                              className="flex items-center justify-between gap-2 rounded-lg bg-white px-2.5 py-2 ring-1 ring-border"
-                            >
-                              <span className="truncate text-sm font-medium text-slate-800">
-                                {value.name}
-                              </span>
-                              <div className="flex items-center gap-1">
-                                <EntityStatusToggle
-                                  status={value.isActive === false ? 'inactive' : 'active'}
-                                  loading={statusUpdatingId === value.id}
-                                  onChange={(nextActive) =>
-                                    patchStatus('value', value, nextActive)
-                                  }
-                                />
-                                <Button
-                                  type="button"
-                                  size="icon"
-                                  variant="ghost"
-                                  className="cursor-pointer text-slate-500 hover:bg-slate-100 hover:text-slate-900 hover:scale-110"
-                                  title="Edit"
-                                  onClick={() => openEditValue(value)}
-                                >
-                                  <Pencil className="size-3.5" />
-                                </Button>
-                                <Button
-                                  type="button"
-                                  size="icon"
-                                  variant="ghost"
-                                  className="cursor-pointer text-slate-500 hover:bg-rose-50 hover:text-rose-700 hover:scale-110"
-                                  title="Delete"
-                                  aria-label={`Delete ${value.name || 'variant value'}`}
-                                  onClick={() => requestDelete('value', value)}
-                                >
-                                  <Trash2 className="size-3.5" />
-                                </Button>
-                              </div>
-                            </li>
-                          ))
-                        )}
-                      </ul>
-                    ) : null}
-                  </li>
-                )
-              })}
-            </ul>
-          )}
-        </SurfaceCard>
-      </MotionReveal>
+        )}
+        renderChild={(child) => (
+          <>
+            <span className="truncate text-sm font-medium text-slate-800">{child.name}</span>
+            <div className="flex items-center gap-1">
+              <EntityStatusToggle
+                status={child.isActive === false ? 'inactive' : 'active'}
+                loading={statusUpdatingId === child.id}
+                onChange={(nextActive) => patchStatus('value', child, nextActive)}
+              />
+              <Button
+                type="button"
+                size="icon"
+                variant="ghost"
+                className="cursor-pointer text-slate-500 hover:bg-slate-100 hover:text-slate-900 hover:scale-110"
+                title="Edit"
+                onClick={() => openEditValue(child)}
+              >
+                <Pencil className="size-3.5" />
+              </Button>
+              <Button
+                type="button"
+                size="icon"
+                variant="ghost"
+                className="cursor-pointer text-slate-500 hover:bg-rose-50 hover:text-rose-700 hover:scale-110"
+                title="Delete"
+                aria-label={`Delete ${child.name || 'variant value'}`}
+                onClick={() => requestDelete('value', child)}
+              >
+                <Trash2 className="size-3.5" />
+              </Button>
+            </div>
+          </>
+        )}
+        pagination={{
+          page,
+          pageCount,
+          total,
+          pageSize,
+          onPageChange: setPage,
+          onPageSizeChange: setPageSize,
+        }}
+      />
 
       <VariantTypeDialog
         open={typeDialogOpen}

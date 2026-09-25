@@ -4,48 +4,15 @@ import { CategoryDialog } from '@/components/feature/products/CategoryDialog'
 import { ProductStatusToggle } from '@/components/feature/products/ProductStatusToggle'
 import { ConfirmDialog } from '@/components/shared/ConfirmDialog'
 import { DeleteEntityDialog } from '@/components/shared/DeleteEntityDialog'
-import { EmptyState } from '@/components/shared/EmptyState'
-import { MotionHeader, MotionReveal } from '@/components/shared/MotionReveal'
+import { MotionHeader } from '@/components/shared/MotionReveal'
 import { PageHeader } from '@/components/shared/PageHeader'
-import { SurfaceCard } from '@/components/shared/SurfaceCard'
+import { ParentChildTreePanel } from '@/components/shared/ParentChildTreePanel'
 import { Button } from '@/components/ui/button'
-import { NativeSelect } from '@/components/ui/select'
-import { Label } from '@/components/ui/label'
-import { TableRowsSkeleton } from '@/components/ui/skeleton'
+import { useClientPagination } from '@/hooks/useClientPagination'
 import { useProducts } from '@/hooks/useProducts'
-import { BRAND } from '@/lib/constants'
+import { filterParentChildRows } from '@/lib/filterParentChildRows'
+import { TABLE_PAGE_SIZE } from '@/lib/tablePagination'
 import { toastError, toastSuccess } from '@/lib/toast'
-
-function filterCategoryRows(catalog, statusFilter) {
-  const allRows = (catalog.parents || []).map((parent) => ({
-    parent,
-    children: catalog.childrenByParent.get(parent.id) || [],
-  }))
-
-  if (statusFilter === 'all') return allRows
-
-  if (statusFilter === 'active') {
-    return allRows
-      .filter(({ parent }) => parent.isActive !== false)
-      .map(({ parent, children }) => ({
-        parent,
-        children: children.filter((child) => child.isActive !== false),
-      }))
-  }
-
-  return allRows
-    .map(({ parent, children }) => {
-      const inactiveChildren = children.filter((child) => child.isActive === false)
-      if (parent.isActive === false) {
-        return { parent, children: inactiveChildren }
-      }
-      if (inactiveChildren.length > 0) {
-        return { parent, children: inactiveChildren }
-      }
-      return null
-    })
-    .filter(Boolean)
-}
 
 export function CategoriesPage() {
   const {
@@ -58,46 +25,108 @@ export function CategoriesPage() {
     setCategoryActive,
   } = useProducts({}, { skipList: true })
 
-  // Default Active so soft-deleted categories disappear from the main list (like products)
+  // Default Active so soft-deleted categories disappear from the main list
   const [statusFilter, setStatusFilter] = useState('active')
+  const [query, setQuery] = useState('')
+  // Parents the user has expanded via chevron
+  const [openIds, setOpenIds] = useState(() => new Set())
 
   const [dialogOpen, setDialogOpen] = useState(false)
   const [dialogMode, setDialogMode] = useState('create')
   const [dialogKind, setDialogKind] = useState('category')
   const [editing, setEditing] = useState(null)
   const [parentForSub, setParentForSub] = useState(null)
+  // Toolbar "Add Sub Category" asks for a parent inside the dialog
+  const [pickParent, setPickParent] = useState(false)
   const [deactivateTarget, setDeactivateTarget] = useState(null)
   const [deleteTarget, setDeleteTarget] = useState(null)
   const [statusUpdatingId, setStatusUpdatingId] = useState(null)
   const [deleteLoading, setDeleteLoading] = useState(false)
 
-  const rows = useMemo(() => filterCategoryRows(catalog, statusFilter), [catalog, statusFilter])
+  // Normalize catalog → shared tree row shape
+  const treeRows = useMemo(() => {
+    return (catalog.parents || []).map((parent) => {
+      const children = catalog.childrenByParent.get(parent.id) || []
+      return {
+        id: parent.id,
+        name: parent.name,
+        isActive: parent.isActive,
+        imageUrl: parent.imageUrl,
+        parentId: parent.parentId,
+        children: children.map((child) => ({
+          id: child.id,
+          name: child.name,
+          isActive: child.isActive,
+          imageUrl: child.imageUrl,
+          parentId: child.parentId,
+        })),
+        // Keep raw refs for dialogs / status handlers
+        _raw: parent,
+        _rawChildren: children,
+      }
+    })
+  }, [catalog])
+
+  const rows = useMemo(
+    () => filterParentChildRows(treeRows, statusFilter, query),
+    [treeRows, statusFilter, query],
+  )
+
+  const {
+    page,
+    setPage,
+    pageSize,
+    setPageSize,
+    pageCount,
+    total,
+    slice: pageRows,
+  } = useClientPagination(rows, TABLE_PAGE_SIZE)
+
+  function toggleParent(parentId) {
+    setOpenIds((prev) => {
+      const next = new Set(prev)
+      if (next.has(parentId)) next.delete(parentId)
+      else next.add(parentId)
+      return next
+    })
+  }
 
   function openCreateCategory() {
     setDialogKind('category')
     setDialogMode('create')
     setEditing(null)
     setParentForSub(null)
+    setPickParent(false)
     setDialogOpen(true)
   }
 
   function openCreateSub(parent) {
+    // Toolbar add needs at least one active parent
+    if (!parent) {
+      const choices = (catalog.parents || []).filter((row) => row.isActive !== false)
+      if (!choices.length) {
+        toastError('Create a parent category first')
+        return
+      }
+    }
     setDialogKind('subcategory')
     setDialogMode('create')
     setEditing(null)
-    setParentForSub(parent)
+    setParentForSub(parent?._raw || parent || null)
+    setPickParent(!parent)
     setDialogOpen(true)
   }
 
   function openEdit(row, kind) {
     setDialogKind(kind)
     setDialogMode('edit')
-    setEditing(row)
+    setEditing(row._raw || row)
     setParentForSub(null)
+    setPickParent(false)
     setDialogOpen(true)
   }
 
-  async function handleSubmit({ name, image }) {
+  async function handleSubmit({ name, image, parentId }) {
     let result
     if (dialogMode === 'edit' && editing?.id) {
       result = await updateCategory(editing.id, { name, image })
@@ -105,7 +134,7 @@ export function CategoriesPage() {
       result = await createCategory({
         name,
         image,
-        parentId: parentForSub?.id,
+        parentId: parentForSub?.id || parentId,
       })
     } else {
       result = await createCategory({ name, image })
@@ -126,14 +155,15 @@ export function CategoriesPage() {
   }
 
   async function handleStatusChange(row, isActive) {
-    if (!row?.id) return
+    const target = row._raw || row
+    if (!target?.id) return
     if (!isActive) {
-      setDeactivateTarget(row)
+      setDeactivateTarget(target)
       return
     }
-    setStatusUpdatingId(row.id)
+    setStatusUpdatingId(target.id)
     try {
-      const result = await setCategoryActive(row.id, true)
+      const result = await setCategoryActive(target.id, true)
       if (result.success) toastSuccess('Category activated')
       else toastError(result.error || 'Activate failed')
     } finally {
@@ -209,202 +239,154 @@ export function CategoriesPage() {
         <PageHeader
           title="Categories"
           description="Manage parent and sub categories — delete or deactivate when unused"
-          actions={
-            <div className="flex flex-wrap items-end gap-2">
-              <div className="space-y-1.5">
-                <Label htmlFor="category-status-filter" className="sr-only">
-                  Status
-                </Label>
-                <NativeSelect
-                  id="category-status-filter"
-                  value={statusFilter}
-                  className="min-w-[8.5rem]"
-                  onChange={(event) => setStatusFilter(event.target.value)}
-                >
-                  <option value="all">All</option>
-                  <option value="active">Active</option>
-                  <option value="inactive">Inactive</option>
-                </NativeSelect>
-              </div>
-              <Button
-                type="button"
-                variant="brand"
-                onClick={openCreateCategory}
-              >
-                <Plus className="size-4" />
-                Category
-              </Button>
-            </div>
-          }
         />
       </MotionHeader>
 
-      <MotionReveal delay={0.06}>
-        <SurfaceCard
-          title="Category tree"
-          description="Parent categories and sub categories"
-          actions={
-            <span className="text-xs text-slate-400">
-              {rows.length} parent
-              {rows.length === 1 ? '' : 's'}
-              {statusFilter !== 'all' ? ` · ${statusFilter}` : ''}
-            </span>
-          }
-        >
-          {catalogLoading ? (
-            <TableRowsSkeleton rows={4} />
-          ) : !rows.length ? (
-            <EmptyState
-              icon={FolderTree}
-              title={
-                statusFilter === 'all'
-                  ? 'No categories yet. Create a parent category first.'
-                  : statusFilter === 'active'
-                    ? 'No active categories.'
-                    : 'No inactive categories.'
-              }
-              compact
+      <ParentChildTreePanel
+        search={query}
+        onSearchChange={(value) => {
+          setQuery(value)
+          setPage(1)
+        }}
+        searchId="category-search"
+        searchPlaceholder="Search category, sub category or keyword..."
+        status={statusFilter}
+        onStatusChange={(value) => {
+          setStatusFilter(value)
+          setPage(1)
+        }}
+        statusId="category-status-filter"
+        toolbarActions={
+          <>
+            <Button type="button" variant="outline" onClick={openCreateCategory}>
+              <Plus className="size-4" />
+              Add Category
+            </Button>
+            <Button type="button" variant="brand" onClick={() => openCreateSub(null)}>
+              <Plus className="size-4" />
+              Add Sub Category
+            </Button>
+          </>
+        }
+        title="Category tree"
+        description="Parent categories and sub categories"
+        countLabel={`${rows.length} parent${rows.length === 1 ? '' : 's'}${
+          statusFilter !== 'all' ? ` · ${statusFilter}` : ''
+        }`}
+        emptyIcon={FolderTree}
+        emptyTitle={
+          query.trim()
+            ? 'No categories match that search.'
+            : statusFilter === 'all'
+              ? 'No categories yet. Create a parent category first.'
+              : statusFilter === 'active'
+                ? 'No active categories.'
+                : 'No inactive categories.'
+        }
+        loading={catalogLoading}
+        rows={pageRows}
+        openIds={openIds}
+        onToggleParent={toggleParent}
+        renderParentMeta={(_parent, children) => (
+          <p className="text-xs text-slate-400">
+            {children.length} sub categor{children.length === 1 ? 'y' : 'ies'}
+          </p>
+        )}
+        renderParentActions={(parent) => (
+          <>
+            <ProductStatusToggle
+              status={parent.isActive === false ? 'inactive' : 'active'}
+              loading={statusUpdatingId === parent.id}
+              onChange={(status) => handleStatusChange(parent, status === 'active')}
             />
-          ) : (
-            <ul className="space-y-3">
-              {rows.map(({ parent, children }) => (
-                <li
-                  key={parent.id}
-                  className={`rounded-xl px-3 py-3 ring-1 ${
-                    parent.isActive === false
-                      ? 'bg-slate-50 ring-slate-200 opacity-80'
-                      : 'bg-slate-50/80 ring-border'
-                  }`}
-                >
-                  <div className="flex flex-wrap items-center justify-between gap-2">
-                    <div className="flex min-w-0 items-center gap-3">
-                      {parent.imageUrl ? (
-                        <img
-                          src={parent.imageUrl}
-                          alt=""
-                          className="size-10 rounded-lg object-cover"
-                        />
-                      ) : (
-                        <div
-                          className="flex size-10 items-center justify-center rounded-lg text-xs font-bold text-white"
-                          style={{
-                            background: `linear-gradient(145deg, ${BRAND.purple}, ${BRAND.deep})`,
-                          }}
-                        >
-                          {parent.name.slice(0, 1).toUpperCase()}
-                        </div>
-                      )}
-                      <div className="min-w-0">
-                        <p className="truncate font-semibold text-slate-900">{parent.name}</p>
-                        <p className="text-xs text-slate-400">
-                          {children.length} sub categor
-                          {children.length === 1 ? 'y' : 'ies'}
-                        </p>
-                      </div>
-                    </div>
-                    <div className="flex flex-wrap items-center gap-1.5">
-                      <ProductStatusToggle
-                        status={parent.isActive === false ? 'inactive' : 'active'}
-                        loading={statusUpdatingId === parent.id}
-                        onChange={(status) =>
-                          handleStatusChange(parent, status === 'active')
-                        }
-                      />
-                      {parent.isActive !== false ? (
-                        <Button
-                          type="button"
-                          size="sm"
-                          variant="outline"
-                          className="cursor-pointer"
-                          onClick={() => openCreateSub(parent)}
-                        >
-                          <Plus className="size-3.5" />
-                          Sub category
-                        </Button>
-                      ) : null}
-                      <Button
-                        type="button"
-                        size="icon"
-                        variant="ghost"
-                        className="cursor-pointer text-slate-500 hover:bg-slate-100 hover:text-slate-900 hover:scale-110"
-                        title="Edit"
-                        onClick={() => openEdit(parent, 'category')}
-                      >
-                        <Pencil className="size-4" />
-                      </Button>
-                      <Button
-                        type="button"
-                        size="icon"
-                        variant="ghost"
-                        className="cursor-pointer text-slate-500 hover:bg-rose-50 hover:text-rose-700 hover:scale-110"
-                        title="Delete"
-                        aria-label={`Delete ${parent.name || 'category'}`}
-                        onClick={() => setDeleteTarget(parent)}
-                      >
-                        <Trash2 className="size-4" />
-                      </Button>
-                    </div>
-                  </div>
-
-                  {children.length ? (
-                    <ul className="mt-3 space-y-2 border-t border-border/70 pt-3">
-                      {children.map((child) => (
-                        <li
-                          key={child.id}
-                          className="flex items-center justify-between gap-2 rounded-lg bg-white px-2.5 py-2 ring-1 ring-border"
-                        >
-                          <div className="flex min-w-0 items-center gap-2">
-                            {child.imageUrl ? (
-                              <img
-                                src={child.imageUrl}
-                                alt=""
-                                className="size-7 rounded object-cover"
-                              />
-                            ) : null}
-                            <span className="truncate text-sm font-medium text-slate-800">
-                              {child.name}
-                            </span>
-                          </div>
-                          <div className="flex items-center gap-1">
-                            <ProductStatusToggle
-                              status={child.isActive === false ? 'inactive' : 'active'}
-                              loading={statusUpdatingId === child.id}
-                              onChange={(status) =>
-                                handleStatusChange(child, status === 'active')
-                              }
-                            />
-                            <Button
-                              type="button"
-                              size="icon"
-                              variant="ghost"
-                              className="cursor-pointer text-slate-500 hover:bg-slate-100 hover:text-slate-900 hover:scale-110"
-                              title="Edit"
-                              onClick={() => openEdit(child, 'subcategory')}
-                            >
-                              <Pencil className="size-3.5" />
-                            </Button>
-                            <Button
-                              type="button"
-                              size="icon"
-                              variant="ghost"
-                              className="cursor-pointer text-slate-500 hover:bg-rose-50 hover:text-rose-700 hover:scale-110"
-                              title="Delete"
-                              aria-label={`Delete ${child.name || 'sub category'}`}
-                              onClick={() => setDeleteTarget(child)}
-                            >
-                              <Trash2 className="size-3.5" />
-                            </Button>
-                          </div>
-                        </li>
-                      ))}
-                    </ul>
-                  ) : null}
-                </li>
-              ))}
-            </ul>
-          )}
-        </SurfaceCard>
-      </MotionReveal>
+            {parent.isActive !== false ? (
+              <Button
+                type="button"
+                size="sm"
+                variant="outline"
+                className="cursor-pointer"
+                onClick={() => openCreateSub(parent)}
+              >
+                <Plus className="size-3.5" />
+                Sub category
+              </Button>
+            ) : null}
+            <Button
+              type="button"
+              size="icon"
+              variant="ghost"
+              className="cursor-pointer text-slate-500 hover:bg-slate-100 hover:text-slate-900 hover:scale-110"
+              title="Edit"
+              onClick={() => openEdit(parent, 'category')}
+            >
+              <Pencil className="size-4" />
+            </Button>
+            <Button
+              type="button"
+              size="icon"
+              variant="ghost"
+              className="cursor-pointer text-slate-500 hover:bg-rose-50 hover:text-rose-700 hover:scale-110"
+              title="Delete"
+              aria-label={`Delete ${parent.name || 'category'}`}
+              onClick={() => setDeleteTarget(parent._raw || parent)}
+            >
+              <Trash2 className="size-4" />
+            </Button>
+          </>
+        )}
+        renderChild={(child) => (
+          <>
+            <div className="flex min-w-0 items-center gap-2">
+              {child.imageUrl ? (
+                <img
+                  src={child.imageUrl}
+                  alt=""
+                  className="size-7 rounded object-cover"
+                />
+              ) : null}
+              <span className="truncate text-sm font-medium text-slate-800">
+                {child.name}
+              </span>
+            </div>
+            <div className="flex items-center gap-1">
+              <ProductStatusToggle
+                status={child.isActive === false ? 'inactive' : 'active'}
+                loading={statusUpdatingId === child.id}
+                onChange={(status) => handleStatusChange(child, status === 'active')}
+              />
+              <Button
+                type="button"
+                size="icon"
+                variant="ghost"
+                className="cursor-pointer text-slate-500 hover:bg-slate-100 hover:text-slate-900 hover:scale-110"
+                title="Edit"
+                onClick={() => openEdit(child, 'subcategory')}
+              >
+                <Pencil className="size-3.5" />
+              </Button>
+              <Button
+                type="button"
+                size="icon"
+                variant="ghost"
+                className="cursor-pointer text-slate-500 hover:bg-rose-50 hover:text-rose-700 hover:scale-110"
+                title="Delete"
+                aria-label={`Delete ${child.name || 'sub category'}`}
+                onClick={() => setDeleteTarget(child)}
+              >
+                <Trash2 className="size-3.5" />
+              </Button>
+            </div>
+          </>
+        )}
+        pagination={{
+          page,
+          pageCount,
+          total,
+          pageSize,
+          onPageChange: setPage,
+          onPageSizeChange: setPageSize,
+        }}
+      />
 
       <CategoryDialog
         open={dialogOpen}
@@ -413,6 +395,11 @@ export function CategoriesPage() {
         initial={editing}
         title={dialogKind === 'subcategory' ? 'Sub category' : 'Category'}
         loading={mutating}
+        parents={
+          pickParent
+            ? (catalog.parents || []).filter((row) => row.isActive !== false)
+            : null
+        }
         onSubmit={handleSubmit}
       />
 

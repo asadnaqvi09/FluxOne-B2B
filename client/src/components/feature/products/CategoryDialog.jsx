@@ -11,6 +11,7 @@ import {
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import { NativeSelect } from '@/components/ui/select'
 import { ImageUploadField } from '@/components/shared/ImageUploadField'
 import { FieldError } from '@/components/shared/FieldError'
 import { BRAND } from '@/lib/constants'
@@ -26,10 +27,14 @@ export function CategoryDialog({
   title = 'Category',
   loading = false,
   onSubmit,
+  // Parent list — shown when adding a sub category from the toolbar.
+  parents = null,
 }) {
   const isEdit = mode === 'edit'
+  const showParentSelect = !isEdit && Array.isArray(parents)
   const [name, setName] = useState('')
   const [image, setImage] = useState(null)
+  const [parentId, setParentId] = useState('')
   const { fieldErrors, formError, setFormError, resetErrors, clearField, applyErrors } =
     useFieldErrors()
   const { captureBaseline, isDirty } = useFormBaseline(open)
@@ -37,21 +42,40 @@ export function CategoryDialog({
   useEffect(() => {
     if (!open) return
     resetErrors()
-    const snapshot = { name: initial?.name || '', image: null }
+    const snapshot = {
+      name: initial?.name || '',
+      image: null,
+      parentId: initial?.parentId || '',
+    }
     setImage(null)
     setName(snapshot.name)
+    setParentId(snapshot.parentId)
     captureBaseline(snapshot)
   }, [open, initial, captureBaseline, resetErrors])
 
   async function handleSubmit(event) {
     event.preventDefault()
+    const errors = {}
+    const anchors = {}
+    if (showParentSelect && !parentId) {
+      errors.parentId = 'Parent category is required'
+      anchors.parentId = 'category-parent'
+    }
     if (!name.trim()) {
-      applyErrors({ name: 'Name is required' }, { name: 'category-name' }, ['name'])
+      errors.name = 'Name is required'
+      anchors.name = 'category-name'
+    }
+    if (Object.keys(errors).length) {
+      applyErrors(errors, anchors, Object.keys(errors))
       return
     }
     resetErrors()
     try {
-      const result = await onSubmit?.({ name: name.trim(), image })
+      const result = await onSubmit?.({
+        name: name.trim(),
+        image,
+        parentId: parentId || undefined,
+      })
       if (result?.success) onOpenChange?.(false)
       else setFormError(result?.error || 'Save failed. Please try again.')
     } catch (err) {
@@ -60,7 +84,7 @@ export function CategoryDialog({
   }
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange} dirty={isDirty({ name, image })}>
+    <Dialog open={open} onOpenChange={onOpenChange} dirty={isDirty({ name, image, parentId })}>
       <DialogContent className="max-w-md">
         <DialogHeader>
           <DialogTitle>
@@ -74,6 +98,29 @@ export function CategoryDialog({
         ) : null}
 
         <form className="space-y-4" onSubmit={handleSubmit} noValidate>
+          {showParentSelect ? (
+            <div className="space-y-1.5">
+              <Label htmlFor="category-parent">Parent category</Label>
+              <NativeSelect
+                id="category-parent"
+                value={parentId}
+                aria-invalid={Boolean(fieldErrors.parentId)}
+                className={fieldErrorClass(fieldErrors.parentId)}
+                onChange={(event) => {
+                  setParentId(event.target.value)
+                  clearField('parentId')
+                }}
+              >
+                <option value="">Select parent category</option>
+                {parents.map((parent) => (
+                  <option key={parent.id} value={parent.id}>
+                    {parent.name}
+                  </option>
+                ))}
+              </NativeSelect>
+              <FieldError message={fieldErrors.parentId} />
+            </div>
+          ) : null}
           <div className="space-y-1.5">
             <Label htmlFor="category-name">Name</Label>
             <Input

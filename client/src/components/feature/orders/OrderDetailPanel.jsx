@@ -16,18 +16,29 @@ import {
   TableCell,
 } from '@/components/ui/table'
 import { DataCard, ResponsiveDataShell } from '@/components/shared/ResponsiveDataShell'
-import { BRAND } from '@/lib/constants'
 import { displayItemCode } from '@/lib/formatDisplayId'
 import { money } from '@/lib/mapProduct'
+import { cn } from '@/lib/utils'
 
-// View all lines on a purchase order + approve / cancel
+// Status chip for detail header (approved → Accepted)
+function statusLabel(status) {
+  if (status === 'approved') return 'Accepted'
+  return status || '—'
+}
+
+function statusClass(status) {
+  if (status === 'approved') return 'bg-emerald-50 text-emerald-700'
+  if (status === 'received') return 'bg-sky-50 text-sky-700'
+  if (status === 'cancelled') return 'bg-slate-100 text-slate-500'
+  return 'bg-amber-50 text-amber-800'
+}
+
+// View order lines — read-only (no approve / cancel; generate auto-accepts)
 export function OrderDetailPanel({
   open,
   onOpenChange,
   order = null,
   loading = false,
-  onApprove,
-  onCancel,
   onPrint,
 }) {
   if (!order) return null
@@ -38,7 +49,17 @@ export function OrderDetailPanel({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-2xl">
         <DialogHeader>
-          <DialogTitle>Order {order.orderNumber}</DialogTitle>
+          <DialogTitle className="flex flex-wrap items-center gap-2">
+            <span>Order {order.orderNumber}</span>
+            <span
+              className={cn(
+                'rounded-full px-2 py-0.5 text-xs font-medium capitalize',
+                statusClass(order.status),
+              )}
+            >
+              {statusLabel(order.status)}
+            </span>
+          </DialogTitle>
           <DialogDescription>
             {order.companyName}
             {order.representativeName
@@ -132,28 +153,6 @@ export function OrderDetailPanel({
           >
             Download PDF
           </Button>
-          {order.status === 'pending' ? (
-            <>
-              <Button
-                type="button"
-                variant="outline"
-                className="w-full cursor-pointer text-red-600 sm:w-auto"
-                disabled={loading}
-                onClick={() => onCancel?.(order)}
-              >
-                Cancel
-              </Button>
-              <Button
-                type="button"
-                className="w-full cursor-pointer text-white sm:w-auto"
-                style={{ background: BRAND.purple }}
-                disabled={loading}
-                onClick={() => onApprove?.(order)}
-              >
-                Approve
-              </Button>
-            </>
-          ) : null}
         </DialogFooter>
       </DialogContent>
     </Dialog>

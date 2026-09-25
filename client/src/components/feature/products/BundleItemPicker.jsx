@@ -7,16 +7,30 @@ import { WholeNumberInput } from '@/components/shared/WholeNumberInput'
 import { cn } from '@/lib/utils'
 
 // Pick existing single items for a bundle.
-// Items may already belong to other bundles — selection is from the full single-item catalog.
+// Line qty = recipe per 1 finished bundle; consume = bundleQuantity × recipe.
 export function BundleItemPicker({
   catalogItems = [],
   value = [],
   onChange,
   excludeId = null,
   loading = false,
+  bundleQuantity = 1,
+  // Edit: prior finished qty + recipe so preview shows delta vs already-assembled stock
+  baselineBundleQty = 0,
+  baselineItems = [],
   className,
 }) {
   const [query, setQuery] = useState('')
+  const finished = Math.max(0, Number(bundleQuantity) || 0)
+  const priorFinished = Math.max(0, Number(baselineBundleQty) || 0)
+
+  const baselineMap = useMemo(() => {
+    const map = new Map()
+    for (const row of baselineItems || []) {
+      if (row?.itemId) map.set(row.itemId, Number(row.quantity) || 0)
+    }
+    return map
+  }, [baselineItems])
 
   const options = useMemo(
     () =>
@@ -76,7 +90,8 @@ export function BundleItemPicker({
       <div>
         <Label>Select existing items</Label>
         <p className="mt-0.5 text-[11px] text-slate-500">
-          Choose single items from your catalog. Items can belong to different bundles elsewhere.
+          Qty per finished bundle. Saving deducts Bundle Quantity × line qty from each item
+          (Stock Out).
         </p>
       </div>
 
@@ -105,6 +120,7 @@ export function BundleItemPicker({
               <ul className="divide-y divide-border/70">
                 {filteredOptions.map((item) => {
                   const checked = selectedIds.has(item.id)
+                  const onHand = Number(item.quantity ?? 0)
                   return (
                     <li key={item.id}>
                       <label className="flex cursor-pointer items-start gap-3 px-3 py-2.5 transition-colors hover:bg-white">
@@ -119,7 +135,7 @@ export function BundleItemPicker({
                             {item.name}
                           </span>
                           <span className="mt-0.5 block font-mono text-[11px] text-slate-400">
-                            {item.itemCode || '—'} · {item.scale || 'unit'}
+                            {item.itemCode || '—'} · {item.scale || 'unit'} · stock {onHand}
                           </span>
                         </span>
                       </label>
@@ -136,34 +152,54 @@ export function BundleItemPicker({
                 Selected ({selectedRows.length})
               </p>
               <div className="space-y-2">
-                {selectedRows.map((row) => (
-                  <div
-                    key={row.itemId}
-                    className="flex items-center gap-2 rounded-lg border border-border bg-white px-3 py-2"
-                  >
-                    <div className="min-w-0 flex-1">
-                      <p className="truncate text-sm font-medium text-slate-900">{row.item.name}</p>
-                      <p className="font-mono text-[11px] text-slate-400">{row.item.itemCode}</p>
-                    </div>
-                    <div className="w-20 shrink-0 space-y-0.5">
-                      <Label className="text-[10px] text-slate-400">Qty</Label>
-                      <WholeNumberInput
-                        min={1}
-                        value={row.quantity}
-                        onChange={(event) => patchQuantity(row.itemId, event.target.value)}
-                      />
-                    </div>
-                    <Button
-                      type="button"
-                      size="icon"
-                      variant="ghost"
-                      className="shrink-0 cursor-pointer text-red-600"
-                      onClick={() => removeItem(row.itemId)}
+                {selectedRows.map((row) => {
+                  const onHand = Number(row.item.quantity ?? 0)
+                  const recipe = Number(row.quantity) || 0
+                  const oldLocked = priorFinished * (baselineMap.get(row.itemId) || 0)
+                  const newLocked = finished * recipe
+                  const delta = newLocked - oldLocked
+                  const remaining = onHand - delta
+                  const insufficient = remaining < 0
+                  return (
+                    <div
+                      key={row.itemId}
+                      className="flex flex-wrap items-center gap-2 rounded-lg border border-border bg-white px-3 py-2"
                     >
-                      <Trash2 className="size-4" />
-                    </Button>
-                  </div>
-                ))}
+                      <div className="min-w-0 flex-1">
+                        <p className="truncate text-sm font-medium text-slate-900">{row.item.name}</p>
+                        <p className="font-mono text-[11px] text-slate-400">{row.item.itemCode}</p>
+                        <p
+                          className={cn(
+                            'mt-0.5 text-[11px]',
+                            insufficient ? 'font-medium text-rose-600' : 'text-slate-500',
+                          )}
+                        >
+                          Now {onHand} → after save {remaining}
+                          {delta > 0 ? ` (Stock Out ${delta})` : ''}
+                          {delta < 0 ? ` (return ${Math.abs(delta)})` : ''}
+                          {delta === 0 ? ' (no stock change)' : ''}
+                        </p>
+                      </div>
+                      <div className="w-20 shrink-0 space-y-0.5">
+                        <Label className="text-[10px] text-slate-400">Qty / bundle</Label>
+                        <WholeNumberInput
+                          min={1}
+                          value={row.quantity}
+                          onChange={(event) => patchQuantity(row.itemId, event.target.value)}
+                        />
+                      </div>
+                      <Button
+                        type="button"
+                        size="icon"
+                        variant="ghost"
+                        className="shrink-0 cursor-pointer text-red-600"
+                        onClick={() => removeItem(row.itemId)}
+                      >
+                        <Trash2 className="size-4" />
+                      </Button>
+                    </div>
+                  )
+                })}
               </div>
             </div>
           ) : (

@@ -49,21 +49,58 @@ export const setCategoryActiveSchema = z.object({
   params: idParams,
 })
 
+// Combination parts — typeId/valueId may be catalog UUIDs or custom temp ids
+const variantPartSchema = z.object({
+  typeId: z.string().min(1).optional(),
+  typeName: z.string().min(1),
+  valueId: z.string().min(1).optional(),
+  valueName: z.string().min(1),
+  isCustomType: optionalBool,
+  isCustomValue: optionalBool,
+})
+
+const variantSkuSchema = z.object({
+  label: z.string().min(1),
+  itemCode: z.string().min(1).optional(),
+  sku: z.string().min(1).optional(),
+  barcode: z.string().min(1),
+  purchasePrice: z.coerce.number().int().nonnegative(),
+  sellingPrice: z.coerce.number().int().nonnegative(),
+  quantity: z.coerce.number().int().nonnegative().optional().default(0),
+  reorderPoint: z.coerce.number().int().nonnegative().optional(),
+  dailyPriceChange: optionalBool,
+  status: z
+    .enum([PRODUCT_STATUS.ACTIVE, PRODUCT_STATUS.INACTIVE])
+    .optional()
+    .default(PRODUCT_STATUS.ACTIVE),
+  parts: z.array(variantPartSchema).min(1),
+})
+
 export const createProductSchema = z
   .object({
     body: z.object({
       name: z.string().min(1),
       categoryId: optionalLooseUuid,
       subcategoryId: optionalLooseUuid,
-      type: z.enum([PRODUCT_TYPES.SINGLE, PRODUCT_TYPES.BUNDLE]).default(PRODUCT_TYPES.SINGLE),
-      scale: z.string().min(1),
+      type: z
+        .enum([PRODUCT_TYPES.SINGLE, PRODUCT_TYPES.BUNDLE, PRODUCT_TYPES.VARIANT])
+        .default(PRODUCT_TYPES.SINGLE),
+      scale: z.string().min(1).optional().default('unit'),
       description: z.string().optional(),
+      // Optional — system generates when omitted
+      itemCode: z.string().min(1).optional(),
+      sku: z.string().min(1).optional(),
+      barcode: z.string().min(1).optional(),
       purchasePrice: z.coerce.number().int().nonnegative().optional(),
       sellingPrice: z.coerce.number().int().nonnegative().optional(),
       taxIds: z.array(looseUuid).optional(),
       offerId: optionalLooseUuid,
       discountPercent: z.coerce.number().int().min(0).max(100).optional(),
       confirmed: z.coerce.boolean().optional(),
+      // Opening stock (single) or finished bundle count
+      quantity: z.coerce.number().int().nonnegative().optional(),
+      reorderPoint: z.coerce.number().int().nonnegative().optional(),
+      dailyPriceChange: optionalBool,
       bundleItems: z
         .array(
           z.object({
@@ -72,6 +109,7 @@ export const createProductSchema = z
           }),
         )
         .optional(),
+      variants: z.array(variantSkuSchema).optional(),
     }),
     query: empty,
     params: empty,
@@ -84,10 +122,27 @@ export const createProductSchema = z
     },
   )
   .refine(
+    ({ body }) =>
+      body.type !== PRODUCT_TYPES.BUNDLE ||
+      (body.quantity !== undefined && Number(body.quantity) >= 1),
+    {
+      message: 'Bundle Quantity must be at least 1 when creating a bundle',
+      path: ['body', 'quantity'],
+    },
+  )
+  .refine(
     ({ body }) => body.type === PRODUCT_TYPES.BUNDLE || Boolean(body.categoryId),
     {
-      message: 'categoryId is required for single items',
+      message: 'categoryId is required for single and variant items',
       path: ['body', 'categoryId'],
+    },
+  )
+  .refine(
+    ({ body }) =>
+      body.type !== PRODUCT_TYPES.VARIANT || (Array.isArray(body.variants) && body.variants.length > 0),
+    {
+      message: 'Variant products require at least one combination (variants)',
+      path: ['body', 'variants'],
     },
   )
 
@@ -134,13 +189,31 @@ export const deleteProductSchema = z.object({
   params: idParams,
 })
 
+const variantSkuUpdateSchema = z.object({
+  id: optionalLooseUuid,
+  label: z.string().min(1),
+  itemCode: z.string().min(1).optional(),
+  sku: z.string().min(1).optional(),
+  barcode: z.string().min(1),
+  purchasePrice: z.coerce.number().int().nonnegative(),
+  sellingPrice: z.coerce.number().int().nonnegative(),
+  // Opening stock only for NEW child SKUs (existing stock via Control)
+  quantity: z.coerce.number().int().nonnegative().optional(),
+  reorderPoint: z.coerce.number().int().nonnegative().optional(),
+  dailyPriceChange: optionalBool,
+  status: z.enum([PRODUCT_STATUS.ACTIVE, PRODUCT_STATUS.INACTIVE]).optional(),
+  parts: z.array(variantPartSchema).min(1),
+})
+
 export const updateProductSchema = z
   .object({
     body: z.object({
       name: z.string().min(1).optional(),
       categoryId: optionalLooseUuid,
       subcategoryId: nullableLooseUuid,
-      type: z.enum([PRODUCT_TYPES.SINGLE, PRODUCT_TYPES.BUNDLE]).optional(),
+      type: z
+        .enum([PRODUCT_TYPES.SINGLE, PRODUCT_TYPES.BUNDLE, PRODUCT_TYPES.VARIANT])
+        .optional(),
       status: z
         .enum([PRODUCT_STATUS.ACTIVE, PRODUCT_STATUS.INACTIVE, 'open', 'close'])
         .optional()
@@ -152,6 +225,11 @@ export const updateProductSchema = z
         }),
       sellingPrice: z.coerce.number().int().nonnegative().optional(),
       purchasePrice: z.coerce.number().int().nonnegative().optional(),
+      itemCode: z.string().min(1).optional(),
+      sku: z.string().min(1).optional(),
+      barcode: z.string().min(1).optional(),
+      reorderPoint: z.coerce.number().int().nonnegative().optional(),
+      dailyPriceChange: optionalBool,
       discountPercent: z.preprocess(
         (v) => (v === '' || v === undefined ? undefined : v === null ? null : v),
         z.coerce.number().int().min(0).max(100).nullable().optional(),
@@ -160,6 +238,8 @@ export const updateProductSchema = z
       description: z.string().optional(),
       scale: z.string().min(1).optional(),
       taxIds: z.array(looseUuid).optional(),
+      // Finished bundle stock — changing this assembles / disassembles components
+      quantity: z.coerce.number().int().nonnegative().optional(),
       bundleItems: z
         .array(
           z.object({
@@ -168,6 +248,7 @@ export const updateProductSchema = z
           }),
         )
         .optional(),
+      variants: z.array(variantSkuUpdateSchema).optional(),
     }),
     query: empty,
     params: idParams,

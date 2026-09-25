@@ -26,6 +26,7 @@ export const BCRYPT_COST = 12
 export const PRODUCT_TYPES = {
   SINGLE: 'single',
   BUNDLE: 'bundle',
+  VARIANT: 'variant',
 }
 
 export const PRODUCT_STATUS = {
@@ -46,6 +47,7 @@ export const MOVEMENT_TYPES = {
 
 export const PURCHASE_ORDER_STATUS = {
   PENDING: 'pending',
+  // Generate sets APPROVED immediately (UI label: Accepted)
   APPROVED: 'approved',
   RECEIVED: 'received',
   CANCELLED: 'cancelled',

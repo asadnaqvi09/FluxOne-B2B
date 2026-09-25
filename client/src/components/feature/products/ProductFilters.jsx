@@ -108,6 +108,7 @@ export function ProductFilters({
               <option value="">All Types</option>
               <option value="single">Single Item</option>
               <option value="bundle">Bundle</option>
+              <option value="variant">Variant</option>
             </NativeSelect>
           </div>
 

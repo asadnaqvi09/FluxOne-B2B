@@ -9,10 +9,19 @@ import {
   TableHead,
   TableRow,
   TableCell,
+  TableActionsHead,
+  TableActionsCell,
   TablePagination,
 } from '@/components/ui/table'
 import { TableRowsSkeleton } from '@/components/ui/skeleton'
 import { displayOrderRef } from '@/lib/formatDisplayId'
+import { cn } from '@/lib/utils'
+
+// Map API status → UI label (approved = Accepted per IM flow)
+function statusLabel(status) {
+  if (status === 'approved') return 'Accepted'
+  return status || '—'
+}
 
 function statusClass(status) {
   if (status === 'approved') return 'bg-emerald-50 text-emerald-700'
@@ -21,38 +30,42 @@ function statusClass(status) {
   return 'bg-amber-50 text-amber-800'
 }
 
+// Icon-only row actions (Details / History / PDF)
 function OrderActions({ row, onView, onHistory, onPrint }) {
   return (
-    <div className="flex flex-wrap gap-1.5">
+    <div className="flex items-center justify-start gap-0.5">
       <Button
         type="button"
-        size="sm"
-        variant="outline"
-        className="cursor-pointer"
+        size="icon"
+        variant="ghost"
+        className="size-8 cursor-pointer text-purple-700 hover:bg-purple-50 hover:text-purple-900 hover:scale-110 active:scale-95"
+        title="Details"
+        aria-label="Details"
         onClick={() => onView?.(row)}
       >
-        <Eye className="size-3.5" />
-        Details
+        <Eye className="size-4 transition-transform duration-200" />
       </Button>
       <Button
         type="button"
-        size="sm"
-        variant="outline"
-        className="cursor-pointer"
+        size="icon"
+        variant="ghost"
+        className="size-8 cursor-pointer text-slate-500 hover:bg-slate-100 hover:text-slate-900 hover:scale-110 active:scale-95"
+        title="Purchase history"
+        aria-label="Purchase history"
         onClick={() => onHistory?.(row)}
       >
-        <History className="size-3.5" />
-        History
+        <History className="size-4 transition-transform duration-200" />
       </Button>
       <Button
         type="button"
-        size="sm"
-        variant="outline"
-        className="cursor-pointer"
+        size="icon"
+        variant="ghost"
+        className="size-8 cursor-pointer text-slate-500 hover:bg-slate-100 hover:text-slate-900 hover:scale-110 active:scale-95"
+        title="Download PDF"
+        aria-label="Download PDF"
         onClick={() => onPrint?.(row)}
       >
-        <Printer className="size-3.5" />
-        PDF
+        <Printer className="size-4 transition-transform duration-200" />
       </Button>
     </div>
   )
@@ -115,9 +128,12 @@ export function OrderTable({
                     ) : null}
                   </div>
                   <span
-                    className={`shrink-0 rounded-full px-2 py-0.5 text-xs font-medium capitalize ${statusClass(row.status)}`}
+                    className={cn(
+                      'shrink-0 rounded-full px-2 py-0.5 text-xs font-medium capitalize',
+                      statusClass(row.status),
+                    )}
                   >
-                    {row.status}
+                    {statusLabel(row.status)}
                   </span>
                 </div>
                 <p className="mt-2 text-xs text-slate-500">{row.itemsNumber} items</p>
@@ -141,7 +157,7 @@ export function OrderTable({
                   <TableHead className="px-2 py-3 font-semibold">Company</TableHead>
                   <TableHead className="px-2 py-3 font-semibold">Items</TableHead>
                   <TableHead className="px-2 py-3 font-semibold">Status</TableHead>
-                  <TableHead className="px-2 py-3 font-semibold">Actions</TableHead>
+                  <TableActionsHead className="px-2 py-3 font-semibold" />
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -162,19 +178,22 @@ export function OrderTable({
                     <TableCell className="px-2 py-3 text-slate-600">{row.itemsNumber}</TableCell>
                     <TableCell className="px-2 py-3">
                       <span
-                        className={`rounded-full px-2 py-0.5 text-xs font-medium capitalize ${statusClass(row.status)}`}
+                        className={cn(
+                          'rounded-full px-2 py-0.5 text-xs font-medium capitalize',
+                          statusClass(row.status),
+                        )}
                       >
-                        {row.status}
+                        {statusLabel(row.status)}
                       </span>
                     </TableCell>
-                    <TableCell className="px-2 py-3">
+                    <TableActionsCell className="px-2 py-3">
                       <OrderActions
                         row={row}
                         onView={onView}
                         onHistory={onHistory}
                         onPrint={onPrint}
                       />
-                    </TableCell>
+                    </TableActionsCell>
                   </TableRow>
                 ))}
               </TableBody>

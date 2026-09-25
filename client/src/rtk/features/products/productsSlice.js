@@ -140,6 +140,8 @@ export const createProduct = createAsyncThunk(
   'products/create',
   async (fields, { getState, dispatch, rejectWithValue }) => {
     const { json, image } = splitProductWrite(fields, { withConfirmed: true })
+    // Strip client-only keys if present
+    delete json._customVariantMeta
     const path =
       fields.type === 'bundle' ? endpoints.products.bundles : endpoints.products.create
     const result = await apiClient.post(path, json)
@@ -172,6 +174,12 @@ export const updateProduct = createAsyncThunk(
     const { json, image } = splitProductWrite(fields, { withConfirmed: false })
     const patchBody = { ...json }
     delete patchBody.confirmed
+    delete patchBody._customVariantMeta
+    // Variant parent: don't send dummy purchase/selling 0 unless explicitly set
+    if (fields.type === 'variant') {
+      delete patchBody.purchasePrice
+      delete patchBody.sellingPrice
+    }
     const result = await apiClient.patch(endpoints.products.update(id), patchBody)
     if (!result.success) return rejectWithValue(result.error || 'Update failed')
     if (image) {

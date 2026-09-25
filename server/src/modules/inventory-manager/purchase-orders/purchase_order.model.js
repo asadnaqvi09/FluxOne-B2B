@@ -145,15 +145,17 @@ export async function generatePurchaseOrder(tenantId, payload) {
       }
     }
 
+    // IM generate → auto-accepted (approved); no pending / approve / reject step
     const orderNumber = `PO-${Date.now().toString(36).toUpperCase()}`
     const { rows: orders } = await tenantClientQuery(
       client,
       tenantId,
       `
         INSERT INTO purchase_orders (
-          tenant_id, branch_id, supplier_id, order_number, explanation, status, created_by
+          tenant_id, branch_id, supplier_id, order_number, explanation,
+          status, created_by, approved_by, approved_at
         )
-        VALUES ($1, $2, $3, $4, $5, $6, $7)
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, now())
         RETURNING id, order_number AS "orderNumber", status
       `,
       [
@@ -161,7 +163,8 @@ export async function generatePurchaseOrder(tenantId, payload) {
         payload.supplierId,
         orderNumber,
         payload.explanation || null,
-        PURCHASE_ORDER_STATUS.PENDING,
+        PURCHASE_ORDER_STATUS.APPROVED,
+        payload.createdBy,
         payload.createdBy,
       ],
     )

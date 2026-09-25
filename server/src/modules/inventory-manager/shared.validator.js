@@ -25,7 +25,9 @@ export const catalogFilters = z.object({
   q: z.string().optional(),
   categoryId: optionalUuid,
   subcategoryId: optionalUuid,
-  type: z.enum([PRODUCT_TYPES.SINGLE, PRODUCT_TYPES.BUNDLE]).optional(),
+  type: z
+    .enum([PRODUCT_TYPES.SINGLE, PRODUCT_TYPES.BUNDLE, PRODUCT_TYPES.VARIANT])
+    .optional(),
   scale: z.string().optional(),
   status: z
     .enum([PRODUCT_STATUS.ACTIVE, PRODUCT_STATUS.INACTIVE, 'all', 'open', 'close'])

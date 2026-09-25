@@ -1,4 +1,4 @@
-import { Package, Printer } from 'lucide-react'
+import { Package, Printer, PackagePlus } from 'lucide-react'
 import { BarcodeCell } from '@/components/feature/products/BarcodeCell'
 import { PricingColumns } from '@/components/feature/products/PricingColumns'
 import { ProductImageCell, ProductStatusToggle } from '@/components/feature/products/ProductStatusToggle'
@@ -19,11 +19,12 @@ import {
   TablePagination,
 } from '@/components/ui/table'
 import { TableRowsSkeleton } from '@/components/ui/skeleton'
-import { formatInventoryStock, money } from '@/lib/mapProduct'
+import { formatInventoryStock, money, PRODUCT_TYPES } from '@/lib/mapProduct'
 import { displayItemCode } from '@/lib/formatDisplayId'
 
-// Print / Edit / Delete for one catalog row
-function ProductRowActions({ row, onPrintBarcode, onEdit, onDelete }) {
+// Print / Add Stock / Edit / Delete for one catalog row
+function ProductRowActions({ row, onPrintBarcode, onAddStock, onEdit, onDelete }) {
+  const isVariantParent = row.type === PRODUCT_TYPES.VARIANT
   return (
     <>
       <Button
@@ -37,6 +38,19 @@ function ProductRowActions({ row, onPrintBarcode, onEdit, onDelete }) {
       >
         <Printer className="size-4" />
       </Button>
+      {!isVariantParent ? (
+        <Button
+          type="button"
+          size="icon"
+          variant="ghost"
+          className="size-8 cursor-pointer text-emerald-600 hover:bg-emerald-50 hover:text-emerald-800"
+          title="Add stock"
+          aria-label="Add stock"
+          onClick={() => onAddStock?.(row)}
+        >
+          <PackagePlus className="size-4" />
+        </Button>
+      ) : null}
       <ActionIconButton
         action="edit"
         label="Edit product"
@@ -54,6 +68,14 @@ function ProductRowActions({ row, onPrintBarcode, onEdit, onDelete }) {
 }
 
 function InventoryStockCell({ row, className = '' }) {
+  // Variant parent has no combined stock — children are independent SKUs (task 5 breakdown)
+  if (row.type === PRODUCT_TYPES.VARIANT) {
+    return (
+      <span className={`text-xs font-medium whitespace-nowrap text-slate-500 ${className}`.trim()}>
+        Per variant SKU
+      </span>
+    )
+  }
   const stock = formatInventoryStock(row.quantity, row.reorderPoint, row.scale)
   return (
     <span
@@ -73,6 +95,7 @@ export function ProductTable({
   onPageChange,
   onPageSizeChange,
   onEdit,
+  onAddStock,
   onPrintBarcode,
   onStatusChange,
   onDelete,
@@ -97,7 +120,7 @@ export function ProductTable({
         <EmptyState
           icon={Package}
           title="No product available"
-          description="Try another category or type, or add a single item / bundle to get started."
+          description="Try another category or type, or add an item / bundle to get started."
         />
       ) : (
         <>
@@ -158,6 +181,7 @@ export function ProductTable({
                       <ProductRowActions
                         row={row}
                         onPrintBarcode={onPrintBarcode}
+                        onAddStock={onAddStock}
                         onEdit={onEdit}
                         onDelete={onDelete}
                       />
@@ -193,10 +217,7 @@ export function ProductTable({
               </TableHeader>
               <TableBody>
                 {list.map((row) => (
-                  <TableRow
-                    key={row.id}
-                    className="hover:bg-slate-50/80"
-                  >
+                  <TableRow key={row.id} className="hover:bg-slate-50/80">
                     <TableCell className="px-2 py-3">
                       <div className="flex items-center gap-2">
                         <ProductImageCell src={row.imageUrl} name={row.name} />
@@ -271,6 +292,7 @@ export function ProductTable({
                       <ProductRowActions
                         row={row}
                         onPrintBarcode={onPrintBarcode}
+                        onAddStock={onAddStock}
                         onEdit={onEdit}
                         onDelete={onDelete}
                       />

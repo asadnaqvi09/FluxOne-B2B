@@ -1,11 +1,25 @@
+import crypto from 'crypto'
 import { tenantClientQuery, tenantQuery, withTransaction } from '../../../config/db.js'
-import { PRODUCT_TYPES } from '../../../config/constants.js'
+import { MOVEMENT_TYPES, PRODUCT_TYPES } from '../../../config/constants.js'
 import { normalizeImageUrl } from '../../../utils/uploadUrl.util.js'
+import { insertLedgerEventInTx } from '../control/control.model.js'
 
 function httpError(status, message) {
   const error = new Error(message)
   error.status = status
   return error
+}
+
+const LOOSE_UUID_RE =
+  /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/
+
+function isLooseUuid(value) {
+  return typeof value === 'string' && LOOSE_UUID_RE.test(value)
+}
+
+function mapUniqueViolation(err, message = 'Item code or barcode already exists') {
+  if (err?.code === '23505') throw httpError(409, message)
+  throw err
 }
 
 // Branch scope: null = all branches (B2B admin)
@@ -337,6 +351,7 @@ export async function listProducts(tenantId, filters = {}) {
         WHERE pt.tenant_id = p.tenant_id AND pt.product_id = p.id
       ) tax ON true
       WHERE p.tenant_id = $1
+        AND p.parent_id IS NULL
         AND ($2::text IS NULL OR p.name ILIKE '%' || $2 || '%' OR p.item_code ILIKE '%' || $2 || '%' OR p.barcode ILIKE '%' || $2 || '%')
         AND ($3::uuid IS NULL OR p.category_id = $3)
         AND ($4::uuid IS NULL OR p.subcategory_id = $4)
@@ -407,6 +422,10 @@ export async function getProductDetail(tenantId, id, { branchId = null } = {}) {
         p.category_id AS "categoryId",
         p.subcategory_id AS "subcategoryId",
         p.branch_id AS "branchId",
+        p.parent_id AS "parentId",
+        p.creation_batch_id AS "creationBatchId",
+        p.variant_label AS "variantLabel",
+        p.daily_price_change AS "dailyPriceChange",
         p.purchase_price AS "purchasePrice",
         p.selling_price AS "sellingPrice",
         p.discount_percent AS "discountPercent",
@@ -459,7 +478,8 @@ export async function getProductDetail(tenantId, id, { branchId = null } = {}) {
         bi.quantity,
         cp.name AS "itemName",
         cp.item_code AS "itemCode",
-        cp.scale AS "itemScale"
+        cp.scale AS "itemScale",
+        cp.quantity AS "itemStock"
       FROM bundle_items bi
       JOIN products cp ON cp.id = bi.item_id AND cp.tenant_id = bi.tenant_id
       WHERE bi.tenant_id = $1 AND bi.bundle_id = $2
@@ -468,10 +488,75 @@ export async function getProductDetail(tenantId, id, { branchId = null } = {}) {
     [id],
   )
 
+  let variants = []
+  if (product.type === PRODUCT_TYPES.VARIANT) {
+    const { rows: childRows } = await tenantQuery(
+      tenantId,
+      `
+        SELECT
+          c.id,
+          c.name,
+          c.item_code AS "itemCode",
+          c.barcode,
+          c.type,
+          c.scale,
+          c.quantity,
+          c.reorder_point AS "reorderPoint",
+          c.status,
+          c.variant_label AS "variantLabel",
+          c.daily_price_change AS "dailyPriceChange",
+          c.purchase_price AS "purchasePrice",
+          c.selling_price AS "sellingPrice",
+          c.creation_batch_id AS "creationBatchId",
+          c.parent_id AS "parentId",
+          c.created_at AS "createdAt"
+        FROM products c
+        WHERE c.tenant_id = $1 AND c.parent_id = $2
+        ORDER BY c.variant_label ASC NULLS LAST, c.created_at ASC, c.id ASC
+      `,
+      [id],
+    )
+
+    const childIds = childRows.map((r) => r.id)
+    let optionsByProduct = new Map()
+    if (childIds.length) {
+      const { rows: optionRows } = await tenantQuery(
+        tenantId,
+        `
+          SELECT
+            product_id AS "productId",
+            sort_order AS "sortOrder",
+            variant_type_id AS "variantTypeId",
+            variant_value_id AS "variantValueId",
+            type_name AS "typeName",
+            value_name AS "valueName",
+            is_custom_type AS "isCustomType",
+            is_custom_value AS "isCustomValue"
+          FROM product_variant_options
+          WHERE tenant_id = $1 AND product_id = ANY($2::uuid[])
+          ORDER BY product_id, sort_order ASC
+        `,
+        [childIds],
+      )
+      optionsByProduct = new Map()
+      for (const opt of optionRows) {
+        const list = optionsByProduct.get(opt.productId) || []
+        list.push(opt)
+        optionsByProduct.set(opt.productId, list)
+      }
+    }
+
+    variants = childRows.map((child) => ({
+      ...child,
+      parts: optionsByProduct.get(child.id) || [],
+    }))
+  }
+
   return {
     ...product,
     imageUrl: normalizeImageUrl(product.imageUrl),
     bundleItems: bundleRows,
+    variants,
   }
 }
 
@@ -575,6 +660,124 @@ async function attachBundleItems(client, tenantId, bundleId, bundleItems = [], b
   )
 }
 
+// Recipe map: itemId → units required per 1 finished bundle
+function recipeQtyMap(bundleItems = []) {
+  const map = new Map()
+  for (const row of bundleItems) {
+    if (!row?.itemId) continue
+    map.set(String(row.itemId), Number(row.quantity) || 0)
+  }
+  return map
+}
+
+// Apply assemble / disassemble deltas via Control ledger (Stock Out / Stock In).
+// locked units for a component = finishedBundleQty × recipeQty
+async function applyBundleAssembleDelta(
+  client,
+  tenantId,
+  {
+    bundleId,
+    bundleName,
+    bundleScale = 'unit',
+    oldBundleQty = 0,
+    newBundleQty = 0,
+    oldItems = [],
+    newItems = [],
+    createdBy = null,
+    scopeBranchId = null,
+  },
+) {
+  const oldMap = recipeQtyMap(oldItems)
+  const newMap = recipeQtyMap(newItems)
+  const allIds = [...new Set([...oldMap.keys(), ...newMap.keys()])]
+  const oldFinished = Math.max(0, Number(oldBundleQty) || 0)
+  const newFinished = Math.max(0, Number(newBundleQty) || 0)
+
+  if (allIds.length) {
+    const { rows: componentRows } = await tenantClientQuery(
+      client,
+      tenantId,
+      `
+        SELECT id, name, scale, quantity
+        FROM products
+        WHERE tenant_id = $1 AND id = ANY($2::uuid[])
+        FOR UPDATE
+      `,
+      [allIds],
+    )
+    const byId = new Map(componentRows.map((row) => [String(row.id), row]))
+
+    for (const itemId of allIds) {
+      const component = byId.get(itemId)
+      if (!component) throw httpError(404, 'Bundle component product not found')
+
+      const oldLocked = oldFinished * (oldMap.get(itemId) || 0)
+      const newLocked = newFinished * (newMap.get(itemId) || 0)
+      const delta = newLocked - oldLocked
+      if (delta === 0) continue
+
+      if (delta > 0) {
+        await insertLedgerEventInTx(client, tenantId, {
+          productId: itemId,
+          movementType: MOVEMENT_TYPES.OUT,
+          quantity: delta,
+          scale: component.scale || 'unit',
+          reason: `Assembled into bundle: ${bundleName}`,
+          createdBy,
+          scopeBranchId,
+        })
+      } else {
+        await insertLedgerEventInTx(client, tenantId, {
+          productId: itemId,
+          movementType: MOVEMENT_TYPES.IN,
+          quantity: Math.abs(delta),
+          scale: component.scale || 'unit',
+          reason: `Returned from bundle: ${bundleName}`,
+          createdBy,
+          scopeBranchId,
+        })
+      }
+    }
+  }
+
+  const finishedDelta = newFinished - oldFinished
+  if (finishedDelta > 0) {
+    await insertLedgerEventInTx(client, tenantId, {
+      productId: bundleId,
+      movementType: MOVEMENT_TYPES.IN,
+      quantity: finishedDelta,
+      scale: bundleScale || 'unit',
+      reason: `Bundle assembled: ${bundleName}`,
+      createdBy,
+      scopeBranchId,
+    })
+  } else if (finishedDelta < 0) {
+    await insertLedgerEventInTx(client, tenantId, {
+      productId: bundleId,
+      movementType: MOVEMENT_TYPES.OUT,
+      quantity: Math.abs(finishedDelta),
+      scale: bundleScale || 'unit',
+      reason: `Bundle disassembled: ${bundleName}`,
+      createdBy,
+      scopeBranchId,
+    })
+  }
+}
+
+async function loadBundleRecipe(client, tenantId, bundleId) {
+  const { rows } = await tenantClientQuery(
+    client,
+    tenantId,
+    `
+      SELECT item_id AS "itemId", quantity
+      FROM bundle_items
+      WHERE tenant_id = $1 AND bundle_id = $2
+    `,
+    [bundleId],
+  )
+  return rows
+}
+
 async function validateProductCategories(client, tenantId, { categoryId, subcategoryId, branchId }) {
   if (categoryId) {
     const { rows: cats } = await tenantClientQuery(
@@ -645,104 +848,408 @@ async function resolveBundlePrices(client, tenantId, bundleItems = [], branchId 
   }
 }
 
+async function resolveTenantTaxProfitDefaults(client, tenantId) {
+  const { rows: tenantRows } = await tenantClientQuery(
+    client,
+    tenantId,
+    `
+      SELECT
+        COALESCE(default_profit_percent, 0) AS "defaultProfitPercent",
+        COALESCE(default_tax_percent, 0) AS "defaultTaxPercent"
+      FROM tenants
+      WHERE id = $1
+      LIMIT 1
+    `,
+  )
+  return {
+    defaultProfit: Number(tenantRows[0]?.defaultProfitPercent) || 0,
+    defaultTax: Number(tenantRows[0]?.defaultTaxPercent) || 0,
+  }
+}
+
+async function resolveTaxIdsForCreate(client, tenantId, payloadTaxIds, defaultTax) {
+  if (payloadTaxIds !== undefined && payloadTaxIds !== null) return payloadTaxIds
+  if (defaultTax > 0) {
+    const defaultTaxId = await findOrCreateTaxByRate(client, tenantId, defaultTax)
+    return [defaultTaxId]
+  }
+  return []
+}
+
+async function applyOpeningStockInTx(client, tenantId, {
+  productId,
+  quantity,
+  scale,
+  unitCost,
+  branchId,
+  createdBy,
+}) {
+  const qty = Math.max(0, Number(quantity) || 0)
+  if (qty <= 0) return
+  await insertLedgerEventInTx(client, tenantId, {
+    productId,
+    movementType: MOVEMENT_TYPES.IN,
+    quantity: qty,
+    scale: scale || 'unit',
+    reason: 'Opening stock',
+    unitCost: unitCost ?? null,
+    branchId: branchId || null,
+    scopeBranchId: branchId || null,
+    createdBy: createdBy || null,
+  })
+}
+
+async function insertProductRow(client, tenantId, row) {
+  const { rows } = await tenantClientQuery(
+    client,
+    tenantId,
+    `
+      INSERT INTO products (
+        tenant_id, branch_id, category_id, subcategory_id, type, item_code, name, image_url,
+        scale, barcode, description, purchase_price, selling_price, profit_percent, offer_id,
+        discount_percent, quantity, reorder_point, status, parent_id, creation_batch_id,
+        variant_label, daily_price_change, created_at
+      )
+      VALUES (
+        $1, $2, $3, $4, $5, $6, $7, $8,
+        $9, $10, $11, $12, $13, $14, $15,
+        $16, $17, $18, $19, $20, $21,
+        $22, $23, COALESCE($24::timestamptz, now())
+      )
+      RETURNING
+        id, name, item_code AS "itemCode", barcode, type, status, branch_id AS "branchId",
+        parent_id AS "parentId", creation_batch_id AS "creationBatchId",
+        variant_label AS "variantLabel", quantity, reorder_point AS "reorderPoint",
+        daily_price_change AS "dailyPriceChange", created_at AS "createdAt"
+    `,
+    [
+      row.branchId,
+      row.categoryId || null,
+      row.subcategoryId || null,
+      row.type,
+      row.itemCode,
+      row.name,
+      row.imageUrl || null,
+      row.scale || 'unit',
+      row.barcode,
+      row.description || null,
+      row.purchasePrice ?? 0,
+      row.sellingPrice ?? 0,
+      row.profitPercent ?? 0,
+      row.offerId || null,
+      row.discountPercent ?? null,
+      row.quantity ?? 0,
+      row.reorderPoint ?? 10,
+      row.status || 'active',
+      row.parentId || null,
+      row.creationBatchId || null,
+      row.variantLabel || null,
+      Boolean(row.dailyPriceChange),
+      row.createdAt || null,
+    ],
+  )
+  return rows[0]
+}
+
+async function attachVariantOptions(client, tenantId, productId, parts = []) {
+  for (let i = 0; i < parts.length; i += 1) {
+    const part = parts[i]
+    const typeName = String(part.typeName || '').trim()
+    const valueName = String(part.valueName || '').trim()
+    if (!typeName || !valueName) {
+      throw httpError(422, 'Each variant part requires typeName and valueName')
+    }
+
+    const typeId = isLooseUuid(part.typeId) ? part.typeId : null
+    const valueId = isLooseUuid(part.valueId) ? part.valueId : null
+    const isCustomType = Boolean(part.isCustomType) || !typeId
+    const isCustomValue = Boolean(part.isCustomValue) || !valueId
+
+    // Catalog FKs only when UUID-shaped (custom temp ids stay denormalized)
+    let resolvedTypeId = null
+    let resolvedValueId = null
+    if (typeId && !isCustomType) {
+      const { rows } = await tenantClientQuery(
+        client,
+        tenantId,
+        `SELECT id FROM variant_types WHERE tenant_id = $1 AND id = $2 LIMIT 1`,
+        [typeId],
+      )
+      resolvedTypeId = rows[0]?.id || null
+    }
+    if (valueId && !isCustomValue) {
+      const { rows } = await tenantClientQuery(
+        client,
+        tenantId,
+        `
+          SELECT id FROM variant_values
+          WHERE tenant_id = $1 AND id = $2
+            AND ($3::uuid IS NULL OR variant_type_id = $3)
+          LIMIT 1
+        `,
+        [valueId, resolvedTypeId],
+      )
+      resolvedValueId = rows[0]?.id || null
+    }
+
+    await tenantClientQuery(
+      client,
+      tenantId,
+      `
+        INSERT INTO product_variant_options (
+          tenant_id, product_id, sort_order, variant_type_id, variant_value_id,
+          type_name, value_name, is_custom_type, is_custom_value
+        )
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+      `,
+      [
+        productId,
+        i,
+        resolvedTypeId,
+        resolvedValueId,
+        typeName,
+        valueName,
+        isCustomType || !resolvedTypeId,
+        isCustomValue || !resolvedValueId,
+      ],
+    )
+  }
+}
+
+export async function createVariantProduct(tenantId, payload) {
+  if (!payload.branchId) throw httpError(422, 'branchId is required to create a product')
+  const variants = Array.isArray(payload.variants) ? payload.variants : []
+  if (!variants.length) throw httpError(422, 'Variant products require at least one combination')
+
+  try {
+    return await withTransaction(async (client) => {
+      if (payload.categoryId || payload.subcategoryId) {
+        await validateProductCategories(client, tenantId, {
+          categoryId: payload.categoryId,
+          subcategoryId: payload.subcategoryId,
+          branchId: payload.branchId,
+        })
+        if (payload.subcategoryId && !payload.categoryId) {
+          throw httpError(400, 'categoryId is required when subcategoryId is set')
+        }
+      }
+
+      const { defaultProfit, defaultTax } = await resolveTenantTaxProfitDefaults(client, tenantId)
+      const profitPercent =
+        payload.profitPercent !== undefined ? Number(payload.profitPercent) : defaultProfit
+      const resolvedTaxIds = await resolveTaxIdsForCreate(client, tenantId, payload.taxIds, defaultTax)
+
+      const createdAt = payload.createdAt || new Date().toISOString()
+      const creationBatchId = payload.creationBatchId || crypto.randomUUID()
+      const scale = payload.scale || 'unit'
+
+      // Parent holds shared name/category — no sellable stock
+      const parent = await insertProductRow(client, tenantId, {
+        branchId: payload.branchId,
+        categoryId: payload.categoryId,
+        subcategoryId: payload.subcategoryId,
+        type: PRODUCT_TYPES.VARIANT,
+        itemCode: payload.itemCode,
+        name: payload.name,
+        imageUrl: payload.imageUrl,
+        scale,
+        barcode: payload.barcode,
+        description: payload.description,
+        purchasePrice: 0,
+        sellingPrice: 0,
+        profitPercent,
+        offerId: payload.offerId,
+        discountPercent: payload.discountPercent,
+        quantity: 0,
+        reorderPoint: payload.reorderPoint ?? 10,
+        status: 'active',
+        creationBatchId,
+        createdAt,
+        dailyPriceChange: false,
+      })
+      await attachTaxes(client, tenantId, parent.id, resolvedTaxIds)
+
+      const children = []
+      for (const [index, variant] of variants.entries()) {
+        const label = String(variant.label || '').trim()
+        if (!label) throw httpError(422, `Variant #${index + 1}: label is required`)
+        const itemCode = String(variant.itemCode || variant.sku || '').trim()
+        const barcode = String(variant.barcode || '').trim()
+        if (!itemCode || !barcode) {
+          throw httpError(422, `Variant “${label}”: item code and barcode are required`)
+        }
+
+        const purchasePrice = Number(variant.purchasePrice) || 0
+        let sellingPrice = Number(variant.sellingPrice) || 0
+        if ((!sellingPrice || sellingPrice === 0) && purchasePrice > 0 && profitPercent > 0) {
+          sellingPrice = Math.round(purchasePrice * (1 + profitPercent / 100) * 100) / 100
+        }
+
+        const childStatus = variant.status === 'inactive' ? 'inactive' : 'active'
+        const openingQty =
+          childStatus === 'inactive' ? 0 : Math.max(0, Number(variant.quantity) || 0)
+        const child = await insertProductRow(client, tenantId, {
+          branchId: payload.branchId,
+          categoryId: payload.categoryId,
+          subcategoryId: payload.subcategoryId,
+          type: PRODUCT_TYPES.SINGLE,
+          itemCode,
+          name: payload.name,
+          imageUrl: payload.imageUrl,
+          scale,
+          barcode,
+          description: payload.description,
+          purchasePrice,
+          sellingPrice,
+          profitPercent,
+          offerId: payload.offerId,
+          discountPercent: payload.discountPercent,
+          quantity: 0,
+          reorderPoint:
+            variant.reorderPoint === undefined || variant.reorderPoint === null
+              ? 10
+              : Number(variant.reorderPoint),
+          status: childStatus,
+          parentId: parent.id,
+          creationBatchId,
+          variantLabel: label,
+          dailyPriceChange: Boolean(variant.dailyPriceChange),
+          createdAt,
+        })
+
+        await attachTaxes(client, tenantId, child.id, resolvedTaxIds)
+        await attachVariantOptions(client, tenantId, child.id, variant.parts || [])
+        await applyOpeningStockInTx(client, tenantId, {
+          productId: child.id,
+          quantity: openingQty,
+          scale,
+          unitCost: purchasePrice,
+          branchId: payload.branchId,
+          createdBy: payload.createdBy,
+        })
+
+        children.push({
+          ...child,
+          label,
+          parts: variant.parts || [],
+        })
+      }
+
+      return {
+        ...parent,
+        creationBatchId,
+        variants: children,
+      }
+    })
+  } catch (err) {
+    mapUniqueViolation(err, 'A variant SKU or barcode already exists in this branch')
+  }
+}
+
 export async function createProduct(tenantId, payload) {
   if (!payload.branchId) throw httpError(422, 'branchId is required to create a product')
 
-  return withTransaction(async (client) => {
-    if (payload.categoryId || payload.subcategoryId) {
-      await validateProductCategories(client, tenantId, {
+  if (payload.type === PRODUCT_TYPES.VARIANT) {
+    return createVariantProduct(tenantId, payload)
+  }
+
+  try {
+    return await withTransaction(async (client) => {
+      if (payload.categoryId || payload.subcategoryId) {
+        await validateProductCategories(client, tenantId, {
+          categoryId: payload.categoryId,
+          subcategoryId: payload.subcategoryId,
+          branchId: payload.branchId,
+        })
+        if (payload.subcategoryId && !payload.categoryId) {
+          throw httpError(400, 'categoryId is required when subcategoryId is set')
+        }
+      }
+
+      const { defaultProfit, defaultTax } = await resolveTenantTaxProfitDefaults(client, tenantId)
+      const profitPercent =
+        payload.profitPercent !== undefined ? Number(payload.profitPercent) : defaultProfit
+
+      let purchasePrice = payload.purchasePrice ?? 0
+      let sellingPrice = payload.sellingPrice ?? 0
+      if (payload.type === PRODUCT_TYPES.BUNDLE && payload.bundleItems?.length) {
+        const derived = await resolveBundlePrices(
+          client,
+          tenantId,
+          payload.bundleItems,
+          payload.branchId,
+        )
+        purchasePrice = derived.purchasePrice
+        sellingPrice = derived.sellingPrice
+      } else if ((!sellingPrice || sellingPrice === 0) && purchasePrice > 0 && profitPercent > 0) {
+        sellingPrice = Math.round(purchasePrice * (1 + profitPercent / 100) * 100) / 100
+      }
+
+      const isBundle = payload.type === PRODUCT_TYPES.BUNDLE
+      const openingQty = isBundle ? 0 : Math.max(0, Number(payload.quantity) || 0)
+
+      const product = await insertProductRow(client, tenantId, {
+        branchId: payload.branchId,
         categoryId: payload.categoryId,
         subcategoryId: payload.subcategoryId,
-        branchId: payload.branchId,
-      })
-      if (payload.subcategoryId && !payload.categoryId) {
-        throw httpError(400, 'categoryId is required when subcategoryId is set')
-      }
-    }
-
-    // Fetch tenant defaults for profit % and tax %
-    const { rows: tenantRows } = await tenantClientQuery(
-      client,
-      tenantId,
-      `
-        SELECT
-          COALESCE(default_profit_percent, 0) AS "defaultProfitPercent",
-          COALESCE(default_tax_percent, 0) AS "defaultTaxPercent"
-        FROM tenants
-        WHERE id = $1
-        LIMIT 1
-      `,
-    )
-    const defaultProfit = Number(tenantRows[0]?.defaultProfitPercent) || 0
-    const defaultTax = Number(tenantRows[0]?.defaultTaxPercent) || 0
-
-    const profitPercent =
-      payload.profitPercent !== undefined ? Number(payload.profitPercent) : defaultProfit
-
-    let purchasePrice = payload.purchasePrice ?? 0
-    let sellingPrice = payload.sellingPrice ?? 0
-    if (payload.type === PRODUCT_TYPES.BUNDLE && payload.bundleItems?.length) {
-      const derived = await resolveBundlePrices(
-        client,
-        tenantId,
-        payload.bundleItems,
-        payload.branchId,
-      )
-      purchasePrice = derived.purchasePrice
-      sellingPrice = derived.sellingPrice
-    } else if ((!sellingPrice || sellingPrice === 0) && purchasePrice > 0 && profitPercent > 0) {
-      sellingPrice = Math.round(purchasePrice * (1 + profitPercent / 100) * 100) / 100
-    }
-
-    const { rows } = await tenantClientQuery(
-      client,
-      tenantId,
-      `
-        INSERT INTO products (
-          tenant_id, branch_id, category_id, subcategory_id, type, item_code, name, image_url,
-          scale, barcode, description, purchase_price, selling_price, profit_percent, offer_id, discount_percent, quantity, status
-        )
-        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, 'active')
-        RETURNING id, name, item_code AS "itemCode", barcode, type, status, branch_id AS "branchId"
-      `,
-      [
-        payload.branchId,
-        payload.categoryId || null,
-        payload.subcategoryId || null,
-        payload.type,
-        payload.itemCode,
-        payload.name,
-        payload.imageUrl || null,
-        payload.scale,
-        payload.barcode,
-        payload.description || null,
+        type: payload.type,
+        itemCode: payload.itemCode,
+        name: payload.name,
+        imageUrl: payload.imageUrl,
+        scale: payload.scale || 'unit',
+        barcode: payload.barcode,
+        description: payload.description,
         purchasePrice,
         sellingPrice,
         profitPercent,
-        payload.offerId || null,
-        payload.discountPercent || null,
-        payload.quantity ?? 0,
-      ],
-    )
-    const product = rows[0]
+        offerId: payload.offerId,
+        discountPercent: payload.discountPercent,
+        // Opening stock applied via ledger so qty + branch_inventory stay consistent
+        quantity: 0,
+        reorderPoint:
+          payload.reorderPoint === undefined || payload.reorderPoint === null
+            ? 10
+            : Number(payload.reorderPoint),
+        status: 'active',
+        dailyPriceChange: Boolean(payload.dailyPriceChange),
+      })
 
-    // Tax assignment: Use explicit taxIds if provided; otherwise fallback to tenant defaultTaxPercent
-    let resolvedTaxIds = payload.taxIds
-    if (resolvedTaxIds === undefined || resolvedTaxIds === null) {
-      if (defaultTax > 0) {
-        const defaultTaxId = await findOrCreateTaxByRate(client, tenantId, defaultTax)
-        resolvedTaxIds = [defaultTaxId]
+      const resolvedTaxIds = await resolveTaxIdsForCreate(client, tenantId, payload.taxIds, defaultTax)
+      await attachTaxes(client, tenantId, product.id, resolvedTaxIds)
+
+      if (isBundle) {
+        const bundleItems = payload.bundleItems || []
+        await attachBundleItems(client, tenantId, product.id, bundleItems, payload.branchId)
+        const finishedQty = Math.max(0, Number(payload.quantity) || 0)
+        if (finishedQty > 0 || bundleItems.length) {
+          await applyBundleAssembleDelta(client, tenantId, {
+            bundleId: product.id,
+            bundleName: product.name,
+            bundleScale: payload.scale || 'unit',
+            oldBundleQty: 0,
+            newBundleQty: finishedQty,
+            oldItems: [],
+            newItems: bundleItems,
+            createdBy: payload.createdBy || null,
+            scopeBranchId: payload.branchId || null,
+          })
+        }
       } else {
-        resolvedTaxIds = []
+        await applyOpeningStockInTx(client, tenantId, {
+          productId: product.id,
+          quantity: openingQty,
+          scale: payload.scale || 'unit',
+          unitCost: purchasePrice,
+          branchId: payload.branchId,
+          createdBy: payload.createdBy,
+        })
       }
-    }
 
-    await attachTaxes(client, tenantId, product.id, resolvedTaxIds)
-    if (payload.type === PRODUCT_TYPES.BUNDLE) {
-      await attachBundleItems(client, tenantId, product.id, payload.bundleItems || [], payload.branchId)
-    }
-    return product
-  })
+      return product
+    })
+  } catch (err) {
+    mapUniqueViolation(err)
+  }
 }
 
 // Maps camelCase payload keys to SQL column names. Columns whose values can
@@ -760,165 +1267,413 @@ const UPDATABLE_COLUMNS = {
   discountPercent: 'discount_percent',
   offerId: 'offer_id',
   imageUrl: 'image_url',
+  itemCode: 'item_code',
+  barcode: 'barcode',
+  reorderPoint: 'reorder_point',
+  dailyPriceChange: 'daily_price_change',
+}
+
+async function syncVariantChildrenInTx(client, tenantId, parent, payload, { branchId, createdBy }) {
+  const variants = Array.isArray(payload.variants) ? payload.variants : []
+  if (!variants.length) throw httpError(422, 'Variant products require at least one combination')
+
+  const effectiveBranchId = parent.branchId || branchId
+  const parentName = payload.name || parent.name
+  const parentScale = payload.scale || parent.scale || 'unit'
+  const creationBatchId = parent.creationBatchId || crypto.randomUUID()
+  const createdAt = new Date().toISOString()
+
+  // Inherit parent category when not patched on this request
+  const categoryId =
+    'categoryId' in payload ? payload.categoryId ?? null : parent.categoryId
+  const subcategoryId =
+    'subcategoryId' in payload ? payload.subcategoryId ?? null : parent.subcategoryId
+
+  const { defaultTax } = await resolveTenantTaxProfitDefaults(client, tenantId)
+  const resolvedTaxIds = await resolveTaxIdsForCreate(client, tenantId, payload.taxIds, defaultTax)
+
+  const children = []
+  for (const [index, variant] of variants.entries()) {
+    const label = String(variant.label || '').trim()
+    if (!label) throw httpError(422, `Variant #${index + 1}: label is required`)
+    const itemCode = String(variant.itemCode || variant.sku || '').trim()
+    const barcode = String(variant.barcode || '').trim()
+    if (!itemCode || !barcode) {
+      throw httpError(422, `Variant “${label}”: item code and barcode are required`)
+    }
+
+    const purchasePrice = Number(variant.purchasePrice) || 0
+    const sellingPrice = Number(variant.sellingPrice) || 0
+    const childStatus = variant.status === 'inactive' ? 'inactive' : 'active'
+    const reorderPoint =
+      variant.reorderPoint === undefined || variant.reorderPoint === null
+        ? 10
+        : Number(variant.reorderPoint)
+
+    if (variant.id) {
+      // Existing child — update fields; stock stays via Control
+      const { rows: owned } = await tenantClientQuery(
+        client,
+        tenantId,
+        `
+          SELECT id FROM products
+          WHERE tenant_id = $1 AND id = $2 AND parent_id = $3
+          LIMIT 1
+        `,
+        [variant.id, parent.id],
+      )
+      if (!owned[0]) {
+        throw httpError(404, `Variant SKU not found under this product (${label})`)
+      }
+
+      await tenantClientQuery(
+        client,
+        tenantId,
+        `
+          UPDATE products SET
+            name = $3,
+            item_code = $4,
+            barcode = $5,
+            purchase_price = $6,
+            last_selling_price = CASE
+              WHEN selling_price IS DISTINCT FROM $7::numeric THEN selling_price
+              ELSE last_selling_price
+            END,
+            selling_price = $7::numeric,
+            reorder_point = $8,
+            daily_price_change = $9,
+            status = $10,
+            variant_label = $11,
+            category_id = $12,
+            subcategory_id = $13,
+            updated_at = now()
+          WHERE tenant_id = $1 AND id = $2
+        `,
+        [
+          variant.id,
+          parentName,
+          itemCode,
+          barcode,
+          purchasePrice,
+          sellingPrice,
+          reorderPoint,
+          Boolean(variant.dailyPriceChange),
+          childStatus,
+          label,
+          categoryId,
+          subcategoryId,
+        ],
+      )
+
+      // Replace option parts
+      await tenantClientQuery(
+        client,
+        tenantId,
+        `DELETE FROM product_variant_options WHERE tenant_id = $1 AND product_id = $2`,
+        [variant.id],
+      )
+      await attachVariantOptions(client, tenantId, variant.id, variant.parts || [])
+      if (payload.taxIds !== undefined) {
+        await attachTaxes(client, tenantId, variant.id, resolvedTaxIds)
+      }
+
+      children.push({ id: variant.id, label, itemCode, barcode })
+    } else {
+      // New combination under existing parent
+      const child = await insertProductRow(client, tenantId, {
+        branchId: effectiveBranchId,
+        categoryId,
+        subcategoryId,
+        type: PRODUCT_TYPES.SINGLE,
+        itemCode,
+        name: parentName,
+        imageUrl: payload.imageUrl || parent.imageUrl || null,
+        scale: parentScale,
+        barcode,
+        description: payload.description !== undefined ? payload.description : parent.description,
+        purchasePrice,
+        sellingPrice,
+        profitPercent: parent.profitPercent ?? 0,
+        quantity: 0,
+        reorderPoint,
+        status: childStatus,
+        parentId: parent.id,
+        creationBatchId,
+        variantLabel: label,
+        dailyPriceChange: Boolean(variant.dailyPriceChange),
+        createdAt,
+      })
+      await attachTaxes(client, tenantId, child.id, resolvedTaxIds)
+      await attachVariantOptions(client, tenantId, child.id, variant.parts || [])
+
+      const openingQty =
+        childStatus === 'inactive' ? 0 : Math.max(0, Number(variant.quantity) || 0)
+      await applyOpeningStockInTx(client, tenantId, {
+        productId: child.id,
+        quantity: openingQty,
+        scale: parentScale,
+        unitCost: purchasePrice,
+        branchId: effectiveBranchId,
+        createdBy,
+      })
+
+      children.push({ id: child.id, label, itemCode, barcode })
+    }
+  }
+
+  return children
 }
 
 export async function updateProduct(tenantId, id, payload, { branchId = null } = {}) {
-  return withTransaction(async (client) => {
-    const { rows: existingRows } = await tenantClientQuery(
-      client,
-      tenantId,
-      `
-        SELECT id, category_id AS "categoryId", branch_id AS "branchId", quantity
-        FROM products
-        WHERE tenant_id = $1 AND id = $2
-          ${branchClause('', 3)}
-        LIMIT 1
-      `,
-      [id, branchId],
-    )
-    const existing = existingRows[0]
-    if (!existing) return null
+  // Normalize sku → itemCode
+  if (payload.sku && !payload.itemCode) payload.itemCode = payload.sku
 
-    const effectiveBranchId = existing.branchId || branchId
-    const hasCategoryPatch = 'categoryId' in payload || 'subcategoryId' in payload
+  try {
+    return await withTransaction(async (client) => {
+      const { rows: existingRows } = await tenantClientQuery(
+        client,
+        tenantId,
+        `
+          SELECT
+            id,
+            name,
+            type,
+            scale,
+            category_id AS "categoryId",
+            subcategory_id AS "subcategoryId",
+            branch_id AS "branchId",
+            quantity,
+            image_url AS "imageUrl",
+            description,
+            creation_batch_id AS "creationBatchId",
+            profit_percent AS "profitPercent",
+            parent_id AS "parentId"
+          FROM products
+          WHERE tenant_id = $1 AND id = $2
+            ${branchClause('', 3)}
+          LIMIT 1
+        `,
+        [id, branchId],
+      )
+      const existing = existingRows[0]
+      if (!existing) return null
 
-    if (hasCategoryPatch) {
-      const nextCategoryId =
-        'categoryId' in payload ? payload.categoryId ?? null : existing.categoryId
-      const nextSubcategoryId =
-        'subcategoryId' in payload ? payload.subcategoryId ?? null : undefined
-
-      if (nextSubcategoryId && !nextCategoryId) {
-        throw httpError(400, 'categoryId is required when subcategoryId is set')
+      if (existing.parentId) {
+        throw httpError(400, 'Edit the parent variant product to update this SKU')
       }
 
-      if (nextCategoryId || nextSubcategoryId) {
-        await validateProductCategories(client, tenantId, {
-          categoryId: nextCategoryId,
-          subcategoryId: nextSubcategoryId,
-          branchId: effectiveBranchId,
-        })
+      const effectiveBranchId = existing.branchId || branchId
+      const hasCategoryPatch = 'categoryId' in payload || 'subcategoryId' in payload
+
+      if (hasCategoryPatch) {
+        const nextCategoryId =
+          'categoryId' in payload ? payload.categoryId ?? null : existing.categoryId
+        const nextSubcategoryId =
+          'subcategoryId' in payload ? payload.subcategoryId ?? null : undefined
+
+        if (nextSubcategoryId && !nextCategoryId) {
+          throw httpError(400, 'categoryId is required when subcategoryId is set')
+        }
+
+        if (nextCategoryId || nextSubcategoryId) {
+          await validateProductCategories(client, tenantId, {
+            categoryId: nextCategoryId,
+            subcategoryId: nextSubcategoryId,
+            branchId: effectiveBranchId,
+          })
+        }
+
+        if (
+          'categoryId' in payload &&
+          !('subcategoryId' in payload) &&
+          payload.categoryId !== existing.categoryId
+        ) {
+          payload.subcategoryId = null
+        }
       }
 
-      if ('categoryId' in payload && !('subcategoryId' in payload) && payload.categoryId !== existing.categoryId) {
-        payload.subcategoryId = null
+      // Non-bundle: stock is Control-only (ignore quantity on update)
+      if (existing.type !== PRODUCT_TYPES.BUNDLE && 'quantity' in payload) {
+        delete payload.quantity
       }
-    }
 
-    // Collect only the keys the caller explicitly sent so we never COALESCE away
-    // a deliberate NULL (e.g. removing a discount or unlinking an offer).
-    const setClauses = []
-    const params = [id, branchId] // $2 = id; $3 = branchId; $1 is tenantId injected by tenantClientQuery
+      const setClauses = []
+      const params = [id, branchId]
 
-    for (const [payloadKey, column] of Object.entries(UPDATABLE_COLUMNS)) {
-      if (!(payloadKey in payload)) continue // key not sent → leave column alone
+      for (const [payloadKey, column] of Object.entries(UPDATABLE_COLUMNS)) {
+        if (!(payloadKey in payload)) continue
 
-      const paramIndex = params.length + 2 // +2 because tenantId=$1 is prepended
-      const value = payload[payloadKey] ?? null
+        const paramIndex = params.length + 2
+        const value = payload[payloadKey] ?? null
 
-      if (payloadKey === 'sellingPrice') {
-        // Snapshot the old selling_price before overwriting it
-        setClauses.push(`
+        if (payloadKey === 'sellingPrice') {
+          setClauses.push(`
           last_selling_price = CASE
             WHEN $${paramIndex}::numeric IS NOT NULL AND selling_price IS DISTINCT FROM $${paramIndex}::numeric
               THEN selling_price
             ELSE last_selling_price
           END,
           selling_price = $${paramIndex}::numeric`)
-      } else if (payloadKey === 'purchasePrice') {
-        setClauses.push(`purchase_price = $${paramIndex}::numeric`)
-      } else if (payloadKey === 'discountPercent') {
-        setClauses.push(`discount_percent = $${paramIndex}::numeric`)
-      } else if (payloadKey === 'offerId') {
-        setClauses.push(`offer_id = $${paramIndex}::uuid`)
-      } else if (payloadKey === 'categoryId') {
-        setClauses.push(`category_id = $${paramIndex}::uuid`)
-      } else if (payloadKey === 'subcategoryId') {
-        setClauses.push(`subcategory_id = $${paramIndex}::uuid`)
-      } else if (payloadKey === 'imageUrl') {
-        setClauses.push(`image_url = $${paramIndex}`)
-      } else {
-        setClauses.push(`${column} = $${paramIndex}`)
+        } else if (payloadKey === 'purchasePrice') {
+          setClauses.push(`purchase_price = $${paramIndex}::numeric`)
+        } else if (payloadKey === 'discountPercent') {
+          setClauses.push(`discount_percent = $${paramIndex}::numeric`)
+        } else if (payloadKey === 'offerId') {
+          setClauses.push(`offer_id = $${paramIndex}::uuid`)
+        } else if (payloadKey === 'categoryId') {
+          setClauses.push(`category_id = $${paramIndex}::uuid`)
+        } else if (payloadKey === 'subcategoryId') {
+          setClauses.push(`subcategory_id = $${paramIndex}::uuid`)
+        } else if (payloadKey === 'imageUrl') {
+          setClauses.push(`image_url = $${paramIndex}`)
+        } else if (payloadKey === 'reorderPoint') {
+          setClauses.push(`reorder_point = $${paramIndex}::numeric`)
+        } else if (payloadKey === 'dailyPriceChange') {
+          setClauses.push(`daily_price_change = $${paramIndex}::boolean`)
+          params.push(Boolean(value))
+          continue
+        } else {
+          setClauses.push(`${column} = $${paramIndex}`)
+        }
+
+        params.push(value)
       }
 
-      params.push(value)
-    }
+      const hasVariantSync =
+        existing.type === PRODUCT_TYPES.VARIANT && Array.isArray(payload.variants)
 
-    if (!setClauses.length && !payload.taxIds && !payload.bundleItems) {
-      // Nothing to update; fetch current row and return it as-is
-      const { rows: current } = await tenantClientQuery(
-        client,
-        tenantId,
-        `
-          SELECT id, name, status, branch_id AS "branchId",
-            category_id AS "categoryId", subcategory_id AS "subcategoryId"
-          FROM products
-          WHERE tenant_id = $1 AND id = $2
-            ${branchClause('', 3)}
-        `,
-        [id, branchId],
-      )
-      return current[0] || null
-    }
+      if (
+        !setClauses.length &&
+        !payload.taxIds &&
+        !payload.bundleItems &&
+        !('quantity' in payload) &&
+        !hasVariantSync
+      ) {
+        const { rows: current } = await tenantClientQuery(
+          client,
+          tenantId,
+          `
+            SELECT id, name, status, branch_id AS "branchId",
+              category_id AS "categoryId", subcategory_id AS "subcategoryId"
+            FROM products
+            WHERE tenant_id = $1 AND id = $2
+              ${branchClause('', 3)}
+          `,
+          [id, branchId],
+        )
+        return current[0] || null
+      }
 
-    let product = null
+      let product = null
 
-    if (setClauses.length) {
-      setClauses.push('updated_at = now()')
-      const { rows } = await tenantClientQuery(
-        client,
-        tenantId,
-        `
-          UPDATE products SET ${setClauses.join(', ')}
-          WHERE tenant_id = $1 AND id = $2
-            ${branchClause('', 3)}
-          RETURNING id, name, status, branch_id AS "branchId",
-            category_id AS "categoryId", subcategory_id AS "subcategoryId"
-        `,
-        params,
-      )
-      product = rows[0] || null
-      if (!product) return null
-    } else {
-      const { rows } = await tenantClientQuery(
-        client,
-        tenantId,
-        `
-          SELECT id, name, status, branch_id AS "branchId",
-            category_id AS "categoryId", subcategory_id AS "subcategoryId"
-          FROM products
-          WHERE tenant_id = $1 AND id = $2
-            ${branchClause('', 3)}
-        `,
-        [id, branchId],
-      )
-      product = rows[0] || null
-      if (!product) return null
-    }
+      if (setClauses.length) {
+        setClauses.push('updated_at = now()')
+        const { rows } = await tenantClientQuery(
+          client,
+          tenantId,
+          `
+            UPDATE products SET ${setClauses.join(', ')}
+            WHERE tenant_id = $1 AND id = $2
+              ${branchClause('', 3)}
+            RETURNING id, name, status, branch_id AS "branchId",
+              category_id AS "categoryId", subcategory_id AS "subcategoryId"
+          `,
+          params,
+        )
+        product = rows[0] || null
+        if (!product) return null
+      } else {
+        const { rows } = await tenantClientQuery(
+          client,
+          tenantId,
+          `
+            SELECT id, name, status, branch_id AS "branchId",
+              category_id AS "categoryId", subcategory_id AS "subcategoryId"
+            FROM products
+            WHERE tenant_id = $1 AND id = $2
+              ${branchClause('', 3)}
+          `,
+          [id, branchId],
+        )
+        product = rows[0] || null
+        if (!product) return null
+      }
 
-    if (payload.taxIds !== undefined) await attachTaxes(client, tenantId, id, payload.taxIds)
-    if (payload.bundleItems !== undefined) {
-      const effectiveBranchId = product.branchId || branchId
-      await attachBundleItems(client, tenantId, id, payload.bundleItems, effectiveBranchId)
-      const derived = await resolveBundlePrices(
-        client,
-        tenantId,
-        payload.bundleItems,
-        effectiveBranchId,
-      )
-      await tenantClientQuery(
-        client,
-        tenantId,
-        `
-          UPDATE products
-          SET purchase_price = $3, selling_price = $4
-          WHERE tenant_id = $1 AND id = $2
-        `,
-        [id, derived.purchasePrice, derived.sellingPrice],
-      )
-    }
-    return product
-  })
+      if (payload.taxIds !== undefined) await attachTaxes(client, tenantId, id, payload.taxIds)
+
+      const isBundle = existing.type === PRODUCT_TYPES.BUNDLE
+      const recipeChanging = isBundle && payload.bundleItems !== undefined
+      const qtyChanging = isBundle && 'quantity' in payload
+
+      if (recipeChanging || qtyChanging) {
+        const oldItems = await loadBundleRecipe(client, tenantId, id)
+        const newItems = recipeChanging ? payload.bundleItems : oldItems
+        const newBundleQty = qtyChanging
+          ? Math.max(0, Number(payload.quantity) || 0)
+          : Number(existing.quantity) || 0
+        const bundleName = payload.name || existing.name
+        const bundleScale = payload.scale || existing.scale || 'unit'
+
+        if (recipeChanging) {
+          const recipeBranchId = product.branchId || branchId
+          await attachBundleItems(client, tenantId, id, payload.bundleItems, recipeBranchId)
+          const derived = await resolveBundlePrices(
+            client,
+            tenantId,
+            payload.bundleItems,
+            recipeBranchId,
+          )
+          await tenantClientQuery(
+            client,
+            tenantId,
+            `
+              UPDATE products
+              SET purchase_price = $3, selling_price = $4
+              WHERE tenant_id = $1 AND id = $2
+            `,
+            [id, derived.purchasePrice, derived.sellingPrice],
+          )
+        }
+
+        await applyBundleAssembleDelta(client, tenantId, {
+          bundleId: id,
+          bundleName,
+          bundleScale,
+          oldBundleQty: Number(existing.quantity) || 0,
+          newBundleQty,
+          oldItems,
+          newItems,
+          createdBy: payload.createdBy || null,
+          scopeBranchId: product.branchId || branchId || null,
+        })
+      }
+
+      if (hasVariantSync) {
+        await syncVariantChildrenInTx(client, tenantId, existing, payload, {
+          branchId: effectiveBranchId,
+          createdBy: payload.createdBy || null,
+        })
+
+        // Keep child display names in sync when parent name changes
+        if (payload.name) {
+          await tenantClientQuery(
+            client,
+            tenantId,
+            `
+              UPDATE products
+              SET name = $3, updated_at = now()
+              WHERE tenant_id = $1 AND parent_id = $2
+            `,
+            [id, payload.name],
+          )
+        }
+      }
+
+      return product
+    })
+  } catch (err) {
+    mapUniqueViolation(err, 'Item code or barcode already exists in this branch')
+  }
 }
 
 export async function getProductDeleteEligibility(tenantId, id, { branchId = null } = {}) {

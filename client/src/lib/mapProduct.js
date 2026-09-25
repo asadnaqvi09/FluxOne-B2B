@@ -1,6 +1,7 @@
 export const PRODUCT_TYPES = {
   SINGLE: 'single',
   BUNDLE: 'bundle',
+  VARIANT: 'variant',
 }
 
 export const PRODUCT_STATUS = {
@@ -91,6 +92,10 @@ export function mapProduct(row = {}) {
     description: row.description || '',
     categoryId: row.categoryId ?? row.category_id ?? null,
     subcategoryId: row.subcategoryId ?? row.subcategory_id ?? null,
+    parentId: row.parentId ?? row.parent_id ?? null,
+    creationBatchId: row.creationBatchId ?? row.creation_batch_id ?? null,
+    variantLabel: row.variantLabel ?? row.variant_label ?? null,
+    dailyPriceChange: Boolean(row.dailyPriceChange ?? row.daily_price_change),
     purchasePrice: Number(row.purchasePrice ?? row.purchase_price ?? 0),
     sellingPrice: Number(row.sellingPrice ?? row.selling_price ?? 0),
     discountPercent: Number(row.discountPercent ?? row.discount_percent ?? 0),
@@ -111,6 +116,7 @@ export function mapProduct(row = {}) {
       : Array.isArray(row.bundle_items)
         ? row.bundle_items
         : [],
+    variants: Array.isArray(row.variants) ? row.variants : [],
   }
 }
 
@@ -171,6 +177,16 @@ export function buildProductPayload(fields, { withConfirmed = true } = {}) {
       fields.discountPercent === '' || fields.discountPercent == null
         ? undefined
         : Number(fields.discountPercent),
+    ...(fields.itemCode || fields.sku
+      ? { itemCode: String(fields.itemCode || fields.sku).trim() }
+      : {}),
+    ...(fields.barcode ? { barcode: String(fields.barcode).trim() } : {}),
+    ...(fields.reorderPoint !== undefined && fields.reorderPoint !== ''
+      ? { reorderPoint: Number(fields.reorderPoint) }
+      : {}),
+    ...(fields.dailyPriceChange !== undefined
+      ? { dailyPriceChange: Boolean(fields.dailyPriceChange) }
+      : {}),
     bundleItems: Array.isArray(fields.bundleItems)
       ? fields.bundleItems
           .map((row) => ({
@@ -179,6 +195,18 @@ export function buildProductPayload(fields, { withConfirmed = true } = {}) {
           }))
           .filter((row) => row.itemId)
       : undefined,
+    variants: Array.isArray(fields.variants) ? fields.variants : undefined,
+    // Finished bundle count / opening stock
+    ...(fields.type === PRODUCT_TYPES.BUNDLE ||
+    fields.type === PRODUCT_TYPES.VARIANT ||
+    fields.quantity != null
+      ? {
+          quantity:
+            fields.quantity === '' || fields.quantity == null
+              ? undefined
+              : Number(fields.quantity),
+        }
+      : {}),
   }
   if (withConfirmed) base.confirmed = true
 
@@ -224,6 +252,17 @@ export function buildProductUpdatePayload(fields) {
       fields.discountPercent === '' || fields.discountPercent == null
         ? undefined
         : Number(fields.discountPercent),
+    ...(fields.itemCode || fields.sku
+      ? { itemCode: String(fields.itemCode || fields.sku).trim() }
+      : {}),
+    ...(fields.barcode ? { barcode: String(fields.barcode).trim() } : {}),
+    ...(fields.reorderPoint !== undefined && fields.reorderPoint !== ''
+      ? { reorderPoint: Number(fields.reorderPoint) }
+      : {}),
+    ...(fields.dailyPriceChange !== undefined
+      ? { dailyPriceChange: Boolean(fields.dailyPriceChange) }
+      : {}),
+    ...(fields.status ? { status: fields.status } : {}),
     bundleItems: Array.isArray(fields.bundleItems)
       ? fields.bundleItems
           .map((row) => ({
@@ -232,6 +271,16 @@ export function buildProductUpdatePayload(fields) {
           }))
           .filter((row) => row.itemId)
       : undefined,
+    variants: Array.isArray(fields.variants) ? fields.variants : undefined,
+    // Bundle finished qty only — singles/variants ignore quantity on update
+    ...(fields.type === PRODUCT_TYPES.BUNDLE && fields.quantity != null
+      ? {
+          quantity:
+            fields.quantity === '' || fields.quantity == null
+              ? undefined
+              : Number(fields.quantity),
+        }
+      : {}),
   }
 
   return base

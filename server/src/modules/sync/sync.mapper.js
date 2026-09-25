@@ -3,26 +3,40 @@
 // FluxOne-POS invoice slip policies:
 // See ./posSlipPolicies.contract.js — after sync, print company.slipPolicies
 // (or returnInstructions fallback) on the sale receipt footer.
+//
+// FluxOne-POS offline login:
+// See ./posOfflineAuth.contract.js + POS_OFFLINE_AUTH_REPORT.md
 
 import {
   POS_SLIP_POLICY_FIELDS,
   resolveSlipPoliciesForPrint,
   formatSlipPolicyPrintLines,
 } from './posSlipPolicies.contract.js'
+import { POS_OFFLINE_AUTH_FIELDS } from './posOfflineAuth.contract.js'
 
 export {
   POS_SLIP_POLICY_FIELDS,
   resolveSlipPoliciesForPrint,
   formatSlipPolicyPrintLines,
+  POS_OFFLINE_AUTH_FIELDS,
 }
 
 function mapUser(user) {
-  // Never ship password hashes to POS — offline auth must use a separate mechanism
-  const { passwordHash: _passwordHash, password_hash: _password_hash, ...safe } = user
+  // bcrypt hash for offline POS login — never plaintext. See posOfflineAuth.contract.js
+  const passwordHash = user.passwordHash || user.password_hash || null
   return {
-    ...safe,
-    name: user.fullName,
+    id: user.id,
+    loginId: user.loginId,
     email: user.loginId,
+    role: user.role,
+    fullName: user.fullName,
+    name: user.fullName,
+    branchId: user.branchId,
+    tenantId: user.tenantId,
+    isActive: user.isActive,
+    passwordHash,
+    // Alias some POS builds expect
+    password: passwordHash,
   }
 }
 

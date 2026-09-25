@@ -1022,7 +1022,9 @@ export async function listSalesForPosPull(tenantId, { branchId, page = 1, limit 
 // Bootstrap / Delta snapshots
 // ---------------------------------------------------------------------------
 
-async function fetchBootstrapUsers(tenantId, branchId, since = null) {
+// Branch BM + cashier for POS offline login (bcrypt hash included).
+// Always full active set on bootstrap and delta so password resets stay in sync.
+async function fetchBootstrapUsers(tenantId, branchId, _since = null) {
   const { rows } = await tenantQuery(
     tenantId,
     `
@@ -1033,17 +1035,17 @@ async function fetchBootstrapUsers(tenantId, branchId, since = null) {
         u.full_name AS "fullName",
         u.branch_id AS "branchId",
         u.tenant_id AS "tenantId",
-        u.is_active AS "isActive"
+        u.is_active AS "isActive",
+        u.password_hash AS "passwordHash"
       FROM users u
       JOIN roles r ON r.id = u.role_id
       WHERE u.tenant_id = $1
         AND u.branch_id = $2
         AND r.slug IN ($3, $4)
-        AND ($5::timestamptz IS NULL OR u.created_at > $5::timestamptz)
-        AND ($5::timestamptz IS NOT NULL OR u.is_active = true)
+        AND u.is_active = true
       ORDER BY u.full_name
     `,
-    [branchId, ROLES.BRANCH_MANAGER, ROLES.CASHIER, since],
+    [branchId, ROLES.BRANCH_MANAGER, ROLES.CASHIER],
   )
   return rows
 }

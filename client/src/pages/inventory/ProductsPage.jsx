@@ -55,7 +55,6 @@ export function ProductsPage() {
   } = useProducts()
 
   const { localQ, onSearchChange } = useDebouncedSearch(updateFilters)
-  const navigate = useNavigate()
 
   // Bundle modal only (create + edit) — items use dedicated pages
   const [bundleOpen, setBundleOpen] = useState(false)

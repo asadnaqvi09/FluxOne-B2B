@@ -1,14 +1,13 @@
 import { SearchStatusFilters } from '@/components/shared/SearchStatusFilters'
 
+// Pending / cancelled removed — generate auto-accepts (approved)
 const ORDER_STATUS_OPTIONS = [
   { value: '', label: 'All' },
-  { value: 'pending', label: 'Pending' },
-  { value: 'approved', label: 'Approved' },
+  { value: 'approved', label: 'Accepted' },
   { value: 'received', label: 'Received' },
-  { value: 'cancelled', label: 'Cancelled' },
 ]
 
-// use reusable SearchStatusFilters — same layout as Supplier / Products
+// Reusable SearchStatusFilters — same layout as Supplier / Products
 export function OrderFilters({
   q = '',
   status = '',

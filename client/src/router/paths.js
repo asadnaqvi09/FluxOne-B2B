@@ -7,6 +7,10 @@ export const PATHS = {
     dashboard: '/inventory',
     products: '/inventory/products',
     bundles: '/inventory/bundles',
+    // Add Item page (Normal / Variant) — replaces Single Item dialog
+    productsNew: '/inventory/products/new',
+    // Edit non-bundle item — same layout as Add Item
+    productsEdit: (id) => `/inventory/products/${id}/edit`,
     control: '/inventory/control',
     suppliers: '/inventory/suppliers',
     orders: '/inventory/orders',

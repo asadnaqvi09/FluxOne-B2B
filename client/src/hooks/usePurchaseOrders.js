@@ -11,8 +11,6 @@ import {
   fetchOrderDetail,
   fetchOrderHistory,
   generateOrder as generateOrderThunk,
-  approveOrder as approveOrderThunk,
-  cancelOrder as cancelOrderThunk,
   printOrder as printOrderThunk,
 } from '@/rtk/features/orders/ordersSlice'
 
@@ -76,8 +74,6 @@ export function usePurchaseOrders(initialFilters = EMPTY_FILTERS) {
     fetchHistory: (id) => asResult(dispatch(fetchOrderHistory(id)).unwrap()),
     clearDetail: () => dispatch(clearOrderDetail()),
     generateOrder: (payload) => asResult(dispatch(generateOrderThunk(payload)).unwrap()),
-    approveOrder: (id) => asResult(dispatch(approveOrderThunk(id)).unwrap()),
-    cancelOrder: (id) => asResult(dispatch(cancelOrderThunk(id)).unwrap()),
     printOrder: (idOrOrder) => asResult(dispatch(printOrderThunk(idOrOrder)).unwrap()),
     reload: () => dispatch(fetchOrders(filtersRef.current)),
   }

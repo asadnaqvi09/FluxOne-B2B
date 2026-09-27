@@ -103,12 +103,16 @@ export async function addProduct(req, res) {
 
   try {
     const { tenantId, branchId } = resolveInventoryCreateScope(req)
+    const itemCode = body.itemCode || body.sku || generateItemCode()
+    const barcode = body.barcode || generateBarcodeValue()
     const row = await createProduct(tenantId, {
       ...body,
       branchId,
       imageUrl: resolveUploadUrl(req.file, req),
-      itemCode: generateItemCode(),
-      barcode: generateBarcodeValue(),
+      itemCode,
+      barcode,
+      // Variant children carry their own codes; parent still needs unique placeholders
+      createdBy: req.user?.id || null,
     })
     return success(res, row, 201)
   } catch (err) {
@@ -218,6 +222,7 @@ export async function update(req, res) {
       {
         ...req.validated.body,
         ...(req.file ? { imageUrl: resolveUploadUrl(req.file, req) } : {}),
+        createdBy: req.user?.id || null,
       },
       { branchId },
     )

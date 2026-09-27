@@ -30,8 +30,6 @@ export function PurchaseOrdersPage() {
     fetchHistory,
     clearDetail,
     generateOrder,
-    approveOrder,
-    cancelOrder,
     printOrder,
   } = usePurchaseOrders()
 
@@ -76,23 +74,6 @@ export function PurchaseOrdersPage() {
     const result = await printOrder(row)
     if (!result.success) toastError(result.error || 'PDF download failed')
     else toastSuccess('Order PDF downloaded')
-  }
-
-  async function handleApprove(order) {
-    const result = await approveOrder(order.id)
-    if (result.success) {
-      toastSuccess('Order approved')
-      await fetchDetail(order.id)
-    } else toastError(result.error || 'Approve failed')
-  }
-
-  async function handleCancel(order) {
-    const result = await cancelOrder(order.id)
-    if (result.success) {
-      toastSuccess('Order cancelled')
-      setDetailOpen(false)
-      clearDetail()
-    } else toastError(result.error || 'Cancel failed')
   }
 
   return (
@@ -159,8 +140,6 @@ export function PurchaseOrdersPage() {
         }}
         order={selected}
         loading={mutating}
-        onApprove={handleApprove}
-        onCancel={handleCancel}
         onPrint={handlePrint}
       />
 

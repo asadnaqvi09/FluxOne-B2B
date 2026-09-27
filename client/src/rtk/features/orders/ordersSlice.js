@@ -134,26 +134,6 @@ export const generateOrder = createAsyncThunk(
   },
 )
 
-export const approveOrder = createAsyncThunk(
-  'orders/approve',
-  async (id, { getState, dispatch, rejectWithValue }) => {
-    const result = await apiClient.post(endpoints.orders.approve(id))
-    if (!result.success) return rejectWithValue(result.error || 'Approve failed')
-    void dispatch(fetchOrders(getState().orders.filters))
-    return result
-  },
-)
-
-export const cancelOrder = createAsyncThunk(
-  'orders/cancel',
-  async (id, { getState, dispatch, rejectWithValue }) => {
-    const result = await apiClient.post(endpoints.orders.cancel(id))
-    if (!result.success) return rejectWithValue(result.error || 'Cancel failed')
-    void dispatch(fetchOrders(getState().orders.filters))
-    return { ...result, clearedId: id }
-  },
-)
-
 export const printOrder = createAsyncThunk(
   'orders/print',
   async (idOrOrder, { rejectWithValue }) => {
@@ -232,27 +212,6 @@ const ordersSlice = createSlice({
         state.mutating = false
       })
       .addCase(generateOrder.rejected, (state) => {
-        state.mutating = false
-      })
-      .addCase(approveOrder.pending, (state) => {
-        state.mutating = true
-      })
-      .addCase(approveOrder.fulfilled, (state) => {
-        state.mutating = false
-      })
-      .addCase(approveOrder.rejected, (state) => {
-        state.mutating = false
-      })
-      .addCase(cancelOrder.pending, (state) => {
-        state.mutating = true
-      })
-      .addCase(cancelOrder.fulfilled, (state, action) => {
-        state.mutating = false
-        if (state.selected?.id === action.payload.clearedId) {
-          state.selected = null
-        }
-      })
-      .addCase(cancelOrder.rejected, (state) => {
         state.mutating = false
       })
   },

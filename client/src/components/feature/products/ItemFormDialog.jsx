@@ -17,10 +17,14 @@ import { BundleItemPicker } from '@/components/feature/products/BundleItemPicker
 import { TaxMultiSelect } from '@/components/feature/products/TaxMultiSelect'
 import { ImageUploadField } from '@/components/shared/ImageUploadField'
 import { WholeNumberInput } from '@/components/shared/WholeNumberInput'
+import { FieldError } from '@/components/shared/FieldError'
 import { BRAND } from '@/lib/constants'
 import { PRODUCT_TYPES, SCALE_OPTIONS } from '@/lib/mapProduct'
+import { fieldErrorClass } from '@/lib/validation/fieldErrors'
 import { useFormBaseline } from '@/hooks/useFormBaseline'
+import { useFieldErrors } from '@/hooks/useFieldErrors'
 import { useItemScales } from '@/hooks/useItemScales'
+import { cn } from '@/lib/utils'
 
 const EMPTY = {
   name: '',
@@ -35,6 +39,8 @@ const EMPTY = {
   offerId: '',
   discountPercent: '',
   bundleItems: [],
+  // Finished bundles after assemble (create/edit)
+  bundleQuantity: '1',
   image: null,
 }
 
@@ -77,9 +83,12 @@ export function ItemFormDialog({
   const [imageWarning, setImageWarning] = useState(null)
   const { captureBaseline, isDirty } = useFormBaseline(open)
   const { scales: scaleOptions } = useItemScales({ enabled: open })
+  const { fieldErrors, formError, setFormError, resetErrors, clearField, applyErrors } =
+    useFieldErrors()
 
   const type = isEdit ? form.type : productType
   const isBundle = type === PRODUCT_TYPES.BUNDLE
+  const finishedBundles = Math.max(0, Number(form.bundleQuantity) || 0)
 
   const scaleChoices = useMemo(() => {
     const current = String(form.scale || '').trim()
@@ -118,6 +127,11 @@ export function ItemFormDialog({
           itemId: row.itemId,
           quantity: Number(row.quantity || 1),
         })),
+        bundleQuantity: String(
+          initialProduct.quantity != null && initialProduct.quantity !== ''
+            ? Number(initialProduct.quantity)
+            : 1,
+        ),
         image: null,
       }
       setForm(nextForm)
@@ -204,6 +218,28 @@ export function ItemFormDialog({
           }
         }
       }
+      if (!form.bundleQuantity || Number(form.bundleQuantity) < 1) {
+        errors.bundleQuantity = 'Bundle Quantity must be at least 1'
+      } else {
+        // Create or edit: remaining after assemble delta must stay ≥ 0
+        const prior = isEdit ? Number(initialProduct?.quantity ?? 0) : 0
+        for (const row of form.bundleItems) {
+          const item = catalogItems.find((entry) => entry.id === row.itemId)
+          if (!item) continue
+          const oldRecipe = isEdit
+            ? Number(
+                (initialProduct?.bundleItems || []).find((b) => b.itemId === row.itemId)
+                  ?.quantity || 0,
+              )
+            : 0
+          const delta = finishedBundles * (Number(row.quantity) || 0) - prior * oldRecipe
+          const remaining = Number(item.quantity ?? 0) - delta
+          if (delta > 0 && remaining < 0) {
+            errors.bundleItems = `Not enough stock for ${item.name} (need ${delta} more, have ${item.quantity})`
+            break
+          }
+        }
+      }
     } else {
       if (!form.categoryId) {
         errors.categoryId = categories.length
@@ -219,7 +255,7 @@ export function ItemFormDialog({
     }
 
     const order = isBundle
-      ? ['bundleItems', 'name', 'scale']
+      ? ['bundleItems', 'bundleQuantity', 'name', 'scale']
       : ['name', 'scale', 'categoryId', 'purchasePrice', 'sellingPrice']
     return { errors, order }
   }
@@ -231,6 +267,7 @@ export function ItemFormDialog({
     purchasePrice: 'product-purchase',
     sellingPrice: 'product-selling',
     bundleItems: 'product-bundle-items',
+    bundleQuantity: 'product-bundle-quantity',
   }
 
   function goReview(event) {
@@ -273,6 +310,7 @@ export function ItemFormDialog({
               quantity: Number(row.quantity),
             }))
           : undefined,
+      quantity: isBundle ? Number(form.bundleQuantity) || 0 : undefined,
     }
 
     if (!isBundle) {
@@ -338,8 +376,10 @@ export function ItemFormDialog({
           </DialogDescription>
         </DialogHeader>
 
-        {error ? (
-          <p className="mb-3 rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">{error}</p>
+        {error || formError ? (
+          <p className="mb-3 rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">
+            {error || formError}
+          </p>
         ) : null}
 
         {step === 'form' ? (
@@ -373,13 +413,95 @@ export function ItemFormDialog({
                     </div>
                   )}
 
-                  <BundleItemPicker
-                    catalogItems={catalogItems}
-                    value={form.bundleItems}
-                    excludeId={initialProduct?.id}
-                    loading={catalogItemsLoading}
-                    onChange={(bundleItems) => patch('bundleItems', bundleItems)}
-                  />
+                  <div id="product-bundle-items" tabIndex={-1} className="outline-none">
+                    <BundleItemPicker
+                      catalogItems={catalogItems}
+                      value={form.bundleItems}
+                      excludeId={initialProduct?.id}
+                      loading={catalogItemsLoading}
+                      bundleQuantity={finishedBundles}
+                      baselineBundleQty={isEdit ? Number(initialProduct?.quantity ?? 0) : 0}
+                      baselineItems={
+                        isEdit
+                          ? (initialProduct?.bundleItems || []).map((row) => ({
+                              itemId: row.itemId,
+                              quantity: Number(row.quantity || 1),
+                            }))
+                          : []
+                      }
+                      onChange={(bundleItems) => patch('bundleItems', bundleItems)}
+                    />
+                  </div>
+                  <FieldError message={fieldErrors.bundleItems} />
+
+                  <div className="space-y-1.5">
+                    <Label htmlFor="product-bundle-quantity">Bundle Quantity</Label>
+                    <WholeNumberInput
+                      id="product-bundle-quantity"
+                      min={1}
+                      value={form.bundleQuantity}
+                      onChange={(event) => patch('bundleQuantity', event.target.value)}
+                      aria-invalid={Boolean(fieldErrors.bundleQuantity)}
+                      className={fieldErrorClass(fieldErrors.bundleQuantity)}
+                    />
+                    <p className="text-[11px] text-slate-400">
+                      How many finished bundles to assemble. Each uses the line qtys above.
+                    </p>
+                    <FieldError message={fieldErrors.bundleQuantity} />
+                  </div>
+
+                  {form.bundleItems.length > 0 && finishedBundles > 0 ? (
+                    <div className="rounded-xl border border-emerald-100 bg-emerald-50/60 px-3 py-2.5 text-xs text-slate-700">
+                      <p className="font-semibold text-emerald-900">Stock after save</p>
+                      <ul className="mt-1.5 space-y-1">
+                        {form.bundleItems.map((row) => {
+                          const item = catalogItems.find((entry) => entry.id === row.itemId)
+                          if (!item) return null
+                          const prior = isEdit ? Number(initialProduct?.quantity ?? 0) : 0
+                          const oldRecipe = isEdit
+                            ? Number(
+                                (initialProduct?.bundleItems || []).find(
+                                  (b) => b.itemId === row.itemId,
+                                )?.quantity || 0,
+                              )
+                            : 0
+                          const delta =
+                            finishedBundles * (Number(row.quantity) || 0) - prior * oldRecipe
+                          const remaining = Number(item.quantity ?? 0) - delta
+                          return (
+                            <li key={row.itemId} className={cn(remaining < 0 && 'text-rose-700')}>
+                              <span className="font-medium">{item.name}</span>: {item.quantity} →{' '}
+                              {remaining}
+                              {delta > 0 ? ` (−${delta} Stock Out)` : ''}
+                              {delta < 0 ? ` (+${Math.abs(delta)} return)` : ''}
+                            </li>
+                          )
+                        })}
+                        {isEdit
+                          ? (initialProduct?.bundleItems || [])
+                              .filter(
+                                (old) =>
+                                  !form.bundleItems.some((row) => row.itemId === old.itemId),
+                              )
+                              .map((old) => {
+                                const item = catalogItems.find((entry) => entry.id === old.itemId)
+                                if (!item) return null
+                                const prior = Number(initialProduct?.quantity ?? 0)
+                                const returned = prior * (Number(old.quantity) || 0)
+                                return (
+                                  <li key={`rm-${old.itemId}`}>
+                                    <span className="font-medium">{item.name}</span>: {item.quantity}{' '}
+                                    → {Number(item.quantity) + returned} (+{returned} return)
+                                  </li>
+                                )
+                              })
+                          : null}
+                        <li className="pt-1 font-medium text-emerald-900">
+                          Bundle stock → {finishedBundles}
+                        </li>
+                      </ul>
+                    </div>
+                  ) : null}
 
                   <div className="space-y-1.5">
                     <Label htmlFor="product-name">Name</Label>
@@ -711,7 +833,10 @@ export function ItemFormDialog({
               ) : null}
               {isBundle ? (
                 <div className="mt-2">
-                  <p className="text-slate-500">Bundle items:</p>
+                  <p className="text-slate-500">
+                    Bundle Quantity: <span className="font-semibold text-slate-800">{form.bundleQuantity}</span>
+                  </p>
+                  <p className="mt-1 text-slate-500">Bundle items (per finished unit):</p>
                   {bundleReviewLines.length ? (
                     <ul className="mt-1 list-inside list-disc text-slate-800">
                       {bundleReviewLines.map((line) => (

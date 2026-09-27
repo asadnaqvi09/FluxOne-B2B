@@ -74,12 +74,14 @@ function emptyDraft() {
 }
 
 // Multi-item stock-in: one supplier, many product lines → single POST /stock-in.
+// initialProduct — optional catalog row from Product table “Add Stock” (pre-selects item).
 export function AddStockInDialog({
   open,
   onOpenChange,
   catalog,
   loading = false,
   onSubmit,
+  initialProduct = null,
 }) {
   const parents = catalog?.parents || []
   const childrenByParent = catalog?.childrenByParent
@@ -116,17 +118,36 @@ export function AddStockInDialog({
     if (!open) return
     setStep(1)
     resetErrors()
-    setDraft(emptyDraft())
     setLines([])
     setSupplierId('')
-    setProducts([])
     setLoadingOptions(true)
+
+    // Seed from catalog row when opened via Products → Add Stock
+    if (initialProduct?.id) {
+      setDraft({
+        ...emptyDraft(),
+        categoryId: initialProduct.categoryId || '',
+        subcategoryId: initialProduct.subcategoryId || '',
+        productId: initialProduct.id,
+        scale: initialProduct.scale || 'unit',
+        unitCost:
+          initialProduct.purchasePrice != null && initialProduct.purchasePrice !== ''
+            ? String(initialProduct.purchasePrice)
+            : '',
+      })
+      setProducts([initialProduct])
+    } else {
+      setDraft(emptyDraft())
+      setProducts([])
+    }
+
     void (async () => {
       const supRes = await fetchControlSuppliers()
       if (supRes.success) setSuppliers(supRes.items)
       setLoadingOptions(false)
     })()
-  }, [open])
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- reset only when dialog opens / seed changes
+  }, [open, initialProduct?.id])
 
   useEffect(() => {
     if (!open) return
@@ -137,17 +158,24 @@ export function AddStockInDialog({
       limit: 50,
     }).then((res) => {
       if (cancelled || !res.success) return
-      setProducts(res.items)
-      setDraft((prev) =>
-        res.items.some((p) => p.id === prev.productId)
-          ? prev
-          : { ...prev, productId: '' },
-      )
+      const seedId = initialProduct?.id
+      const merged =
+        seedId && !res.items.some((p) => p.id === seedId) && initialProduct
+          ? [initialProduct, ...res.items]
+          : res.items
+      setProducts(merged)
+      setDraft((prev) => {
+        if (merged.some((p) => p.id === prev.productId)) return prev
+        if (seedId && merged.some((p) => p.id === seedId)) {
+          return { ...prev, productId: seedId }
+        }
+        return { ...prev, productId: '' }
+      })
     })
     return () => {
       cancelled = true
     }
-  }, [open, draft.categoryId, draft.subcategoryId])
+  }, [open, draft.categoryId, draft.subcategoryId, initialProduct])
 
   function patchDraft(field, value) {
     setDraft((prev) => {

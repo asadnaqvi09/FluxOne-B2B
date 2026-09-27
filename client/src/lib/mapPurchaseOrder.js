@@ -8,7 +8,8 @@ export function mapPurchaseOrder(row = {}) {
     representativeName: row.representativeName || row.representative_name || '',
     representativePhone: row.representativePhone || row.representative_phone || '',
     companyPhone: row.companyPhone || row.company_phone || '',
-    status: row.status || 'pending',
+    // Generate auto-accepts → default approved when API omits status
+    status: row.status || 'approved',
     explanation: row.explanation || '',
     createdAt: row.createdAt || row.created_at || null,
     itemsNumber: Number(row.itemsNumber ?? row.items_number ?? row.lines?.length ?? 0),

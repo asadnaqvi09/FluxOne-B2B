@@ -4,6 +4,7 @@ import {
   normalizeCurrency,
   SUPPORTED_CURRENCIES,
 } from '../../../utils/currency.util.js'
+import { conversionFactor } from '../../../utils/fx.util.js'
 
 function mapDeviceRow(row) {
   if (!row) return null
@@ -181,46 +182,155 @@ export async function updateDeviceStatus(tenantId, id, status) {
 }
 
 // Tenant default currency (display default across the company)
-export async function getCurrencySettings(tenantId) {
+export async function getRatesToPkr(tenantId) {
   const { rows } = await tenantQuery(
     tenantId,
     `
-      SELECT COALESCE(default_currency, $2) AS "defaultCurrency"
-      FROM tenants
-      WHERE id = $1
-      LIMIT 1
+      SELECT currency_code AS code, rate_to_pkr::float8 AS rate
+      FROM exchange_rates
+      WHERE tenant_id = $1
     `,
-    [DEFAULT_CURRENCY],
   )
+  const rates = { [DEFAULT_CURRENCY]: 1 }
+  for (const row of rows) {
+    rates[normalizeCurrency(row.code)] = Number(row.rate) || 1
+  }
+  return rates
+}
+
+export async function upsertRateToPkr(tenantId, currencyCode, rateToPkr) {
+  const code = normalizeCurrency(currencyCode)
+  const rate = code === DEFAULT_CURRENCY ? 1 : Number(rateToPkr)
+  if (!Number.isFinite(rate) || rate <= 0) {
+    const error = new Error('Exchange rate must be a positive number (PKR per 1 unit)')
+    error.status = 422
+    throw error
+  }
+
+  await tenantQuery(
+    tenantId,
+    `
+      INSERT INTO exchange_rates (tenant_id, currency_code, rate_to_pkr)
+      VALUES ($1, $2, $3)
+      ON CONFLICT (tenant_id, currency_code)
+      DO UPDATE SET
+        rate_to_pkr = EXCLUDED.rate_to_pkr,
+        created_at = now()
+    `,
+    [code, rate],
+  )
+  return rate
+}
+
+async function convertProductPrices(tenantId, fromCurrency, toCurrency, ratesToPkr) {
+  const factor = conversionFactor(fromCurrency, toCurrency, ratesToPkr)
+  if (factor === 1) return 0
+
+  const { rowCount } = await tenantQuery(
+    tenantId,
+    `
+      UPDATE products
+      SET
+        selling_price = ROUND(selling_price * $2::numeric, 2),
+        purchase_price = ROUND(purchase_price * $2::numeric, 2),
+        last_selling_price = CASE
+          WHEN last_selling_price IS NULL THEN NULL
+          ELSE ROUND(last_selling_price * $2::numeric, 2)
+        END,
+        price_currency = $3,
+        updated_at = now()
+      WHERE tenant_id = $1
+    `,
+    [factor, normalizeCurrency(toCurrency)],
+  )
+  return rowCount || 0
+}
+
+export async function getCurrencySettings(tenantId) {
+  const [{ rows }, ratesToPkr] = await Promise.all([
+    tenantQuery(
+      tenantId,
+      `
+        SELECT COALESCE(default_currency, $2) AS "defaultCurrency"
+        FROM tenants
+        WHERE id = $1
+        LIMIT 1
+      `,
+      [DEFAULT_CURRENCY],
+    ),
+    getRatesToPkr(tenantId),
+  ])
 
   return {
     defaultCurrency: normalizeCurrency(rows[0]?.defaultCurrency || DEFAULT_CURRENCY),
     options: SUPPORTED_CURRENCIES,
+    ratesToPkr,
   }
 }
 
-export async function updateCurrencySettings(tenantId, currencyCode) {
-  const code = normalizeCurrency(currencyCode)
+export async function updateCurrencySettings(tenantId, { defaultCurrency, rateToPkr }, userId = null) {
+  const next = normalizeCurrency(defaultCurrency)
+  const current = await getCurrencySettings(tenantId)
+  const from = current.defaultCurrency
 
-  const { rows } = await tenantQuery(
-    tenantId,
-    `
-      UPDATE tenants
-      SET default_currency = $2
-      WHERE id = $1
-      RETURNING COALESCE(default_currency, $3) AS "defaultCurrency"
-    `,
-    [code, DEFAULT_CURRENCY],
-  )
+  // Persist latest rate for the selected currency (1 USD = rateToPkr PKR)
+  const resolvedRate =
+    next === DEFAULT_CURRENCY
+      ? 1
+      : rateToPkr != null && rateToPkr !== ''
+        ? Number(rateToPkr)
+        : current.ratesToPkr[next]
 
-  if (!rows[0]) {
-    const error = new Error('Company not found')
-    error.status = 404
+  if (next !== DEFAULT_CURRENCY && (!Number.isFinite(Number(resolvedRate)) || Number(resolvedRate) <= 0)) {
+    const error = new Error(`Enter how many PKR equal 1 ${next} (e.g. 1 ${next} = 230 PKR)`)
+    error.status = 422
     throw error
   }
 
+  await upsertRateToPkr(tenantId, next, resolvedRate)
+  // Keep PKR anchor
+  await upsertRateToPkr(tenantId, DEFAULT_CURRENCY, 1)
+
+  const ratesToPkr = await getRatesToPkr(tenantId)
+  let productsConverted = 0
+
+  if (from !== next) {
+    productsConverted = await convertProductPrices(tenantId, from, next, ratesToPkr)
+
+    const { rows } = await tenantQuery(
+      tenantId,
+      `
+        UPDATE tenants
+        SET default_currency = $2
+        WHERE id = $1
+        RETURNING COALESCE(default_currency, $3) AS "defaultCurrency"
+      `,
+      [next, DEFAULT_CURRENCY],
+    )
+
+    if (!rows[0]) {
+      const error = new Error('Company not found')
+      error.status = 404
+      throw error
+    }
+
+    await tenantQuery(
+      tenantId,
+      `
+        INSERT INTO currency_change_events (
+          tenant_id, from_currency, to_currency, rate_to_pkr, products_converted, created_by
+        )
+        VALUES ($1, $2, $3, $4, $5, $6)
+      `,
+      [from, next, ratesToPkr[next] ?? resolvedRate, productsConverted, userId],
+    )
+  }
+
+  const refreshed = await getCurrencySettings(tenantId)
   return {
-    defaultCurrency: normalizeCurrency(rows[0].defaultCurrency),
-    options: SUPPORTED_CURRENCIES,
+    ...refreshed,
+    productsConverted,
+    currencyChanged: from !== next,
+    fromCurrency: from,
   }
 }

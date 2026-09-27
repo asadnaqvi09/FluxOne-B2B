@@ -26,7 +26,7 @@ export function getCurrencyMeta(code) {
   return SUPPORTED_CURRENCIES.find((c) => c.code === normalized) || SUPPORTED_CURRENCIES[0]
 }
 
-// Display-only formatting — does not convert amounts between currencies
+// Display-only formatting helper — FX conversion lives in fx.util.js / settings currency change
 export function formatMoney(amount, currencyCode = DEFAULT_CURRENCY) {
   const n = Number(amount) || 0
   const code = normalizeCurrency(currencyCode)

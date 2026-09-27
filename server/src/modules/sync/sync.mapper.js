@@ -46,6 +46,7 @@ function mapProduct(product) {
     ...product,
     sku: product.itemCode,
     price: product.sellingPrice,
+    currency: product.priceCurrency || product.currency || null,
     isActive,
   }
 }

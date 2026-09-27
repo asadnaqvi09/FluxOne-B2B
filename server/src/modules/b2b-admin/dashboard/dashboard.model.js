@@ -1,4 +1,7 @@
 import { tenantQuery } from '../../../config/db.js'
+import { DEFAULT_CURRENCY, formatMoney, normalizeCurrency } from '../../../utils/currency.util.js'
+import { convertAmount } from '../../../utils/fx.util.js'
+import { getRatesToPkr } from '../settings/settings.model.js'
 
 const MONTH_LABELS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
 
@@ -17,15 +20,8 @@ function round1(value) {
   return Math.round(num(value) * 10) / 10
 }
 
-function formatRs(value) {
-  const n = num(value)
-  if (Math.abs(n) >= 1_000_000) {
-    return `Rs. ${(n / 1_000_000).toFixed(2)} M`
-  }
-  if (Math.abs(n) >= 1_000) {
-    return `Rs. ${Math.round(n).toLocaleString('en-PK')}`
-  }
-  return `Rs. ${n.toFixed(0)}`
+function formatRs(value, currency = DEFAULT_CURRENCY) {
+  return formatMoney(value, currency)
 }
 
 function shiftDays(isoDate, days) {
@@ -48,7 +44,7 @@ function yearStart(year) {
   return `${year}-01-01`
 }
 
-function buildKpiBlock({ value, previous, comparisonText, sublabel, target }) {
+function buildKpiBlock({ value, previous, comparisonText, sublabel, target, currency }) {
   const current = num(value)
   const prev = num(previous)
   let changePct = 0
@@ -57,10 +53,11 @@ function buildKpiBlock({ value, previous, comparisonText, sublabel, target }) {
 
   const targetProgressPct =
     target && target > 0 ? round1(Math.min(200, (current / target) * 100)) : null
+  const code = normalizeCurrency(currency || DEFAULT_CURRENCY)
 
   return {
     value: current,
-    formatted: formatRs(current),
+    formatted: formatRs(current, code),
     changePct,
     isPositive: changePct >= 0,
     comparisonText,
@@ -84,11 +81,15 @@ async function listTenantBranches(tenantId, branchId = null) {
   return rows
 }
 
-async function salesNet(tenantId, { from, to, branchId }) {
+async function salesNet(tenantId, { from, to, branchId, ratesToPkr, targetCurrency }) {
+  const target = normalizeCurrency(targetCurrency || DEFAULT_CURRENCY)
+  const rates = ratesToPkr || { [DEFAULT_CURRENCY]: 1 }
+
   const { rows } = await tenantQuery(
     tenantId,
     `
       SELECT
+        COALESCE(currency, 'PKR') AS currency,
         count(*)::int AS "saleCount",
         COALESCE(sum(final_amount), 0)::float8 AS revenue,
         COALESCE(sum(final_amount - return_amount), 0)::float8 AS earning,
@@ -99,15 +100,22 @@ async function salesNet(tenantId, { from, to, branchId }) {
         AND ($2::date IS NULL OR sold_at::date >= $2::date)
         AND ($3::date IS NULL OR sold_at::date <= $3::date)
         AND ($4::uuid IS NULL OR branch_id = $4)
+      GROUP BY COALESCE(currency, 'PKR')
     `,
     [from, to, branchId],
   )
-  return {
-    saleCount: rows[0]?.saleCount || 0,
-    revenue: num(rows[0]?.revenue),
-    earning: num(rows[0]?.earning),
-    returnAmount: num(rows[0]?.returnAmount),
+
+  let saleCount = 0
+  let revenue = 0
+  let earning = 0
+  let returnAmount = 0
+  for (const row of rows) {
+    saleCount += num(row.saleCount)
+    revenue += convertAmount(row.revenue, row.currency, target, rates)
+    earning += convertAmount(row.earning, row.currency, target, rates)
+    returnAmount += convertAmount(row.returnAmount, row.currency, target, rates)
   }
+  return { saleCount, revenue, earning, returnAmount }
 }
 
 async function salesProfit(tenantId, { from, to, branchId }) {
@@ -153,6 +161,17 @@ async function buildKpis(tenantId, { date, branchId }) {
   const prevYtdFrom = yearStart(year - 1)
   const prevYtdTo = `${year - 1}-${asOf.slice(5)}`
 
+  const [{ rows: curRows }, ratesToPkr] = await Promise.all([
+    tenantQuery(
+      tenantId,
+      `SELECT COALESCE(default_currency, $2) AS c FROM tenants WHERE id = $1 LIMIT 1`,
+      [DEFAULT_CURRENCY],
+    ),
+    getRatesToPkr(tenantId),
+  ])
+  const currency = normalizeCurrency(curRows[0]?.c || DEFAULT_CURRENCY)
+  const netOpts = { branchId, ratesToPkr, targetCurrency: currency }
+
   const [
     today,
     yesterdaySales,
@@ -162,17 +181,17 @@ async function buildKpis(tenantId, { date, branchId }) {
     prevYearYtd,
     allTime,
   ] = await Promise.all([
-    salesNet(tenantId, { from: asOf, to: asOf, branchId }),
-    salesNet(tenantId, { from: yesterday, to: yesterday, branchId }),
-    salesNet(tenantId, { from: prevMonthFrom, to: lastMonthTo, branchId }),
+    salesNet(tenantId, { from: asOf, to: asOf, ...netOpts }),
+    salesNet(tenantId, { from: yesterday, to: yesterday, ...netOpts }),
+    salesNet(tenantId, { from: prevMonthFrom, to: lastMonthTo, ...netOpts }),
     salesNet(tenantId, {
       from: monthStart(addMonths(prevMonthFrom, -1)),
       to: shiftDays(prevMonthFrom, -1),
-      branchId,
+      ...netOpts,
     }),
-    salesNet(tenantId, { from: ytdFrom, to: asOf, branchId }),
-    salesNet(tenantId, { from: prevYtdFrom, to: prevYtdTo, branchId }),
-    salesNet(tenantId, { from: null, to: asOf, branchId }),
+    salesNet(tenantId, { from: ytdFrom, to: asOf, ...netOpts }),
+    salesNet(tenantId, { from: prevYtdFrom, to: prevYtdTo, ...netOpts }),
+    salesNet(tenantId, { from: null, to: asOf, ...netOpts }),
   ])
 
   const avgTicket =
@@ -182,16 +201,18 @@ async function buildKpis(tenantId, { date, branchId }) {
     todayEarning: buildKpiBlock({
       value: today.earning,
       previous: yesterdaySales.earning,
-      comparisonText: `vs. previous day (${formatRs(yesterdaySales.earning)})`,
+      comparisonText: `vs. previous day (${formatRs(yesterdaySales.earning, currency)})`,
       sublabel: `As of ${asOf}`,
       target: null,
+      currency,
     }),
     lastMonthEarning: buildKpiBlock({
       value: lastMonth.earning,
       previous: priorMonth.earning,
-      comparisonText: `vs. prior month (${formatRs(priorMonth.earning)})`,
+      comparisonText: `vs. prior month (${formatRs(priorMonth.earning, currency)})`,
       sublabel: `${prevMonthFrom} → ${lastMonthTo}`,
       target: null,
+      currency,
     }),
     thisYearEarning: buildKpiBlock({
       value: thisYear.earning,
@@ -199,6 +220,7 @@ async function buildKpis(tenantId, { date, branchId }) {
       comparisonText: `YTD vs ${year - 1} same period`,
       sublabel: `${ytdFrom} → ${asOf}`,
       target: null,
+      currency,
     }),
     totalSale: {
       ...buildKpiBlock({
@@ -207,8 +229,9 @@ async function buildKpis(tenantId, { date, branchId }) {
         comparisonText: branchId
           ? 'Selected branch · all-time through date'
           : 'All branches · all-time through date',
-        sublabel: `Avg ticket: ${formatRs(avgTicket)}`,
+        sublabel: `Avg ticket: ${formatRs(avgTicket, currency)}`,
         target: null,
+        currency,
       }),
       transactions: allTime.saleCount,
       formattedTransactions: `${allTime.saleCount.toLocaleString('en-PK')} orders`,
@@ -283,7 +306,8 @@ async function monthlyBranchSeries(tenantId, { year, branchId }) {
   }))
 }
 
-async function buildBranchProfitOverview(tenantId, { year, branchId, branches }) {
+async function buildBranchProfitOverview(tenantId, { year, branchId, branches, currency }) {
+  const code = normalizeCurrency(currency || DEFAULT_CURRENCY)
   const series = await monthlyBranchSeries(tenantId, { year, branchId })
   const branchList = branches.length
     ? branches
@@ -354,16 +378,16 @@ async function buildBranchProfitOverview(tenantId, { year, branchId, branches })
     branches: filterBranches,
     summary: {
       totalRevenue,
-      totalRevenueFormatted: formatRs(totalRevenue),
+      totalRevenueFormatted: formatRs(totalRevenue, code),
       totalProfit,
-      totalProfitFormatted: formatRs(totalProfit),
+      totalProfitFormatted: formatRs(totalProfit, code),
       avgMarginPct: totalRevenue > 0 ? round1((totalProfit / totalRevenue) * 100) : 0,
       topBranch: topBranch
         ? {
             id: topBranch.id,
             name: topBranch.name,
             profit: topBranch.profit,
-            profitFormatted: formatRs(topBranch.profit),
+            profitFormatted: formatRs(topBranch.profit, code),
           }
         : null,
     },
@@ -371,7 +395,8 @@ async function buildBranchProfitOverview(tenantId, { year, branchId, branches })
   }
 }
 
-async function buildInventoryStatus(tenantId, { branchId, asOfDate }) {
+async function buildInventoryStatus(tenantId, { branchId, asOfDate, currency }) {
+  const code = normalizeCurrency(currency || DEFAULT_CURRENCY)
   const { rows } = await tenantQuery(
     tenantId,
     `
@@ -436,7 +461,7 @@ async function buildInventoryStatus(tenantId, { branchId, asOfDate }) {
       totalSkus,
       totalUnits: num(r.totalUnits),
       valuation: num(r.valuation),
-      valuationFormatted: formatRs(r.valuation),
+      valuationFormatted: formatRs(r.valuation, code),
       healthScore,
     }
   })
@@ -456,7 +481,7 @@ async function buildInventoryStatus(tenantId, { branchId, asOfDate }) {
     summary: {
       totalStockUnits: totalUnits,
       totalValuation: valuation,
-      totalValuationFormatted: formatRs(valuation),
+      totalValuationFormatted: formatRs(valuation, code),
       optimalRate: totalSkus > 0 ? round1((healthy / totalSkus) * 100) : 100,
       criticalAlerts,
     },
@@ -470,6 +495,15 @@ export async function getAdminDashboard(tenantId, filters = {}) {
   const date = toDateParam(filters.date) || new Date().toISOString().slice(0, 10)
   const year = Number(filters.year) || Number(date.slice(0, 4))
   const branchId = filters.branchId || null
+
+  const [{ rows: curRows }] = await Promise.all([
+    tenantQuery(
+      tenantId,
+      `SELECT COALESCE(default_currency, $2) AS c FROM tenants WHERE id = $1 LIMIT 1`,
+      [DEFAULT_CURRENCY],
+    ),
+  ])
+  const currency = normalizeCurrency(curRows[0]?.c || DEFAULT_CURRENCY)
 
   // When filtering one branch, list only that branch for charts; KPIs still scoped.
   const branches = await listTenantBranches(tenantId, null)
@@ -489,8 +523,9 @@ export async function getAdminDashboard(tenantId, filters = {}) {
       year,
       branchId,
       branches: scopedBranches,
+      currency,
     }),
-    buildInventoryStatus(tenantId, { branchId, asOfDate: date }),
+    buildInventoryStatus(tenantId, { branchId, asOfDate: date, currency }),
   ])
 
   return {
@@ -498,6 +533,7 @@ export async function getAdminDashboard(tenantId, filters = {}) {
       date,
       branchId: branchId || 'all',
       year,
+      currency,
     },
     branches: [
       { id: 'all', name: 'All Branches (Consolidated)' },

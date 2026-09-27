@@ -98,6 +98,7 @@ export async function changeAdminPassword({ currentPassword, newPassword }) {
 export function useAdminCurrency() {
   const [defaultCurrency, setDefaultCurrency] = useState('PKR')
   const [options, setOptions] = useState([])
+  const [ratesToPkr, setRatesToPkr] = useState({ PKR: 1 })
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState(null)
@@ -113,6 +114,7 @@ export function useAdminCurrency() {
     }
     setDefaultCurrency(result.data?.defaultCurrency || 'PKR')
     setOptions(result.data?.options || [])
+    setRatesToPkr(result.data?.ratesToPkr || { PKR: 1 })
     setLoading(false)
     return result
   }, [])
@@ -121,15 +123,18 @@ export function useAdminCurrency() {
     void load()
   }, [load])
 
-  const saveCurrency = useCallback(async (nextCurrency) => {
+  const saveCurrency = useCallback(async (nextCurrency, rateToPkr) => {
     setSaving(true)
-    const result = await apiClient.patch(endpoints.admin.settings.currency, {
-      defaultCurrency: nextCurrency,
-    })
+    const body = { defaultCurrency: nextCurrency }
+    if (nextCurrency !== 'PKR' && rateToPkr != null && rateToPkr !== '') {
+      body.rateToPkr = Number(rateToPkr)
+    }
+    const result = await apiClient.patch(endpoints.admin.settings.currency, body)
     setSaving(false)
     if (result.success) {
       setDefaultCurrency(result.data?.defaultCurrency || nextCurrency)
       if (result.data?.options?.length) setOptions(result.data.options)
+      if (result.data?.ratesToPkr) setRatesToPkr(result.data.ratesToPkr)
     }
     return result
   }, [])
@@ -137,6 +142,7 @@ export function useAdminCurrency() {
   return {
     defaultCurrency,
     options,
+    ratesToPkr,
     loading,
     saving,
     error,

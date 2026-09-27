@@ -6,6 +6,7 @@ export const PATHS = {
     root: '/inventory',
     dashboard: '/inventory',
     products: '/inventory/products',
+    bundles: '/inventory/bundles',
     control: '/inventory/control',
     suppliers: '/inventory/suppliers',
     orders: '/inventory/orders',

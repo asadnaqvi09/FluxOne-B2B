@@ -645,6 +645,142 @@ async function resolveBundlePrices(client, tenantId, bundleItems = [], branchId 
   }
 }
 
+async function reserveBundleComponentStock(
+  client,
+  tenantId,
+  { bundleId, bundleName, branchId, bundleItems, bundleQty },
+) {
+  const bundlesToCreate = Number(bundleQty) || 0
+  if (bundlesToCreate <= 0) return
+
+  const ids = bundleItems.map((item) => item.itemId)
+  const { rows } = await tenantClientQuery(
+    client,
+    tenantId,
+    `
+      SELECT id, name, quantity, scale, status
+      FROM products
+      WHERE tenant_id = $1 AND id = ANY($2::uuid[])
+      FOR UPDATE
+    `,
+    [ids],
+  )
+  const byId = new Map(rows.map((row) => [row.id, row]))
+
+  let maxBundles = Infinity
+  for (const item of bundleItems) {
+    const row = byId.get(item.itemId)
+    if (!row) throw httpError(422, 'One or more bundle items were not found')
+    if (row.status === 'inactive') {
+      throw httpError(409, `${row.name} is inactive and cannot be added to a bundle`)
+    }
+    const perBundle = Number(item.quantity) || 1
+    const companyQty = Number(row.quantity) || 0
+    let available = companyQty
+
+    if (branchId) {
+      const { rows: branchRows } = await tenantClientQuery(
+        client,
+        tenantId,
+        `
+          SELECT quantity
+          FROM branch_inventory
+          WHERE tenant_id = $1 AND branch_id = $2 AND product_id = $3
+          FOR UPDATE
+        `,
+        [branchId, item.itemId],
+      )
+      if (branchRows[0]) {
+        available = Math.min(available, Number(branchRows[0].quantity) || 0)
+      }
+    }
+
+    const possible = Math.floor(available / perBundle)
+    if (possible < maxBundles) maxBundles = possible
+  }
+
+  if (!Number.isFinite(maxBundles)) maxBundles = 0
+  if (bundlesToCreate > maxBundles) {
+    throw httpError(
+      422,
+      `Bundle stock cannot exceed ${maxBundles} based on current component stock`,
+    )
+  }
+
+  for (const item of bundleItems) {
+    const row = byId.get(item.itemId)
+    const deduct = bundlesToCreate * (Number(item.quantity) || 1)
+    const { rowCount } = await tenantClientQuery(
+      client,
+      tenantId,
+      `
+        UPDATE products
+        SET quantity = quantity - $3
+        WHERE tenant_id = $1 AND id = $2 AND quantity >= $3
+      `,
+      [item.itemId, deduct],
+    )
+    if (!rowCount) {
+      throw httpError(422, `Insufficient stock for ${row.name}`)
+    }
+
+    if (branchId) {
+      const { rows: branchRows } = await tenantClientQuery(
+        client,
+        tenantId,
+        `
+          SELECT quantity
+          FROM branch_inventory
+          WHERE tenant_id = $1 AND branch_id = $2 AND product_id = $3
+          FOR UPDATE
+        `,
+        [branchId, item.itemId],
+      )
+      if (branchRows[0]) {
+        const { rowCount: branchUpdated } = await tenantClientQuery(
+          client,
+          tenantId,
+          `
+            UPDATE branch_inventory
+            SET quantity = quantity - $4, updated_at = now()
+            WHERE tenant_id = $1 AND branch_id = $2 AND product_id = $3 AND quantity >= $4
+          `,
+          [branchId, item.itemId, deduct],
+        )
+        if (!branchUpdated) {
+          throw httpError(422, `Insufficient branch stock for ${row.name}`)
+        }
+      }
+    }
+
+    await tenantClientQuery(
+      client,
+      tenantId,
+      `
+        INSERT INTO inventory_ledger (
+          tenant_id, product_id, movement_type, quantity, scale, reason
+        )
+        VALUES ($1, $2, 'out', $3, $4, $5)
+      `,
+      [item.itemId, deduct, row.scale || 'unit', `Reserved for bundle ${bundleName}`],
+    )
+  }
+
+  if (branchId && bundleId) {
+    await tenantClientQuery(
+      client,
+      tenantId,
+      `
+        INSERT INTO branch_inventory (tenant_id, branch_id, product_id, quantity)
+        VALUES ($1, $2, $3, $4)
+        ON CONFLICT (tenant_id, branch_id, product_id)
+        DO UPDATE SET quantity = branch_inventory.quantity + EXCLUDED.quantity, updated_at = now()
+      `,
+      [branchId, bundleId, bundlesToCreate],
+    )
+  }
+}
+
 export async function createProduct(tenantId, payload) {
   if (!payload.branchId) throw httpError(422, 'branchId is required to create a product')
 
@@ -689,7 +825,8 @@ export async function createProduct(tenantId, payload) {
         payload.branchId,
       )
       purchasePrice = derived.purchasePrice
-      sellingPrice = derived.sellingPrice
+      const requestedSelling = Number(payload.sellingPrice)
+      sellingPrice = requestedSelling > 0 ? requestedSelling : derived.sellingPrice
     } else if ((!sellingPrice || sellingPrice === 0) && purchasePrice > 0 && profitPercent > 0) {
       sellingPrice = Math.round(purchasePrice * (1 + profitPercent / 100) * 100) / 100
     }
@@ -702,7 +839,7 @@ export async function createProduct(tenantId, payload) {
           tenant_id, branch_id, category_id, subcategory_id, type, item_code, name, image_url,
           scale, barcode, description, purchase_price, selling_price, profit_percent, offer_id, discount_percent, quantity, status
         )
-        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, 'active')
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18)
         RETURNING id, name, item_code AS "itemCode", barcode, type, status, branch_id AS "branchId"
       `,
       [
@@ -722,6 +859,7 @@ export async function createProduct(tenantId, payload) {
         payload.offerId || null,
         payload.discountPercent || null,
         payload.quantity ?? 0,
+        payload.status === 'inactive' ? 'inactive' : 'active',
       ],
     )
     const product = rows[0]
@@ -740,6 +878,13 @@ export async function createProduct(tenantId, payload) {
     await attachTaxes(client, tenantId, product.id, resolvedTaxIds)
     if (payload.type === PRODUCT_TYPES.BUNDLE) {
       await attachBundleItems(client, tenantId, product.id, payload.bundleItems || [], payload.branchId)
+      await reserveBundleComponentStock(client, tenantId, {
+        bundleId: product.id,
+        bundleName: payload.name,
+        branchId: payload.branchId,
+        bundleItems: payload.bundleItems || [],
+        bundleQty: Number(payload.quantity) || 0,
+      })
     }
     return product
   })
@@ -872,7 +1017,7 @@ export async function updateProduct(tenantId, id, payload, { branchId = null } =
           UPDATE products SET ${setClauses.join(', ')}
           WHERE tenant_id = $1 AND id = $2
             ${branchClause('', 3)}
-          RETURNING id, name, status, branch_id AS "branchId",
+          RETURNING id, name, type, status, branch_id AS "branchId",
             category_id AS "categoryId", subcategory_id AS "subcategoryId"
         `,
         params,
@@ -884,7 +1029,7 @@ export async function updateProduct(tenantId, id, payload, { branchId = null } =
         client,
         tenantId,
         `
-          SELECT id, name, status, branch_id AS "branchId",
+          SELECT id, name, type, status, branch_id AS "branchId",
             category_id AS "categoryId", subcategory_id AS "subcategoryId"
           FROM products
           WHERE tenant_id = $1 AND id = $2
@@ -897,7 +1042,7 @@ export async function updateProduct(tenantId, id, payload, { branchId = null } =
     }
 
     if (payload.taxIds !== undefined) await attachTaxes(client, tenantId, id, payload.taxIds)
-    if (payload.bundleItems !== undefined) {
+    if (payload.bundleItems !== undefined && product.type !== PRODUCT_TYPES.BUNDLE) {
       const effectiveBranchId = product.branchId || branchId
       await attachBundleItems(client, tenantId, id, payload.bundleItems, effectiveBranchId)
       const derived = await resolveBundlePrices(

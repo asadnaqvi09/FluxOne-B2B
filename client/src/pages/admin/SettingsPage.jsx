@@ -77,16 +77,27 @@ export function SettingsPage() {
   const {
     defaultCurrency,
     options: currencyOptions,
+    ratesToPkr,
     loading: currencyLoading,
     saving: currencySaving,
     error: currencyError,
     saveCurrency,
   } = useAdminCurrency()
   const [selectedCurrency, setSelectedCurrency] = useState('PKR')
+  const [rateToPkr, setRateToPkr] = useState('')
 
   useEffect(() => {
     if (defaultCurrency) setSelectedCurrency(defaultCurrency)
   }, [defaultCurrency])
+
+  useEffect(() => {
+    if (selectedCurrency === 'PKR') {
+      setRateToPkr('1')
+      return
+    }
+    const existing = ratesToPkr?.[selectedCurrency]
+    setRateToPkr(existing != null ? String(existing) : '')
+  }, [selectedCurrency, ratesToPkr])
 
   const [searchQuery, setSearchQuery] = useState('')
   const debouncedQ = useDebouncedValue(searchQuery.trim(), 300)
@@ -118,7 +129,13 @@ export function SettingsPage() {
 
   const slowHint = useSlowLoadingHint(loading && activeTab === 'systems')
   const hasDeviceFilters = Boolean(debouncedQ) || statusFilter !== 'all'
-  const currencyDirty = selectedCurrency !== defaultCurrency
+  const savedRate = ratesToPkr?.[selectedCurrency]
+  const rateDirty =
+    selectedCurrency !== 'PKR' &&
+    rateToPkr !== '' &&
+    Number(rateToPkr) > 0 &&
+    Number(rateToPkr) !== Number(savedRate)
+  const currencyDirty = selectedCurrency !== defaultCurrency || rateDirty
 
   async function handleChangePassword(e) {
     e.preventDefault()
@@ -159,12 +176,22 @@ export function SettingsPage() {
       toastError('Please select a default currency')
       return
     }
+    if (selectedCurrency !== 'PKR') {
+      const rate = Number(rateToPkr)
+      if (!Number.isFinite(rate) || rate <= 0) {
+        toastError(`Enter how many PKR equal 1 ${selectedCurrency} (e.g. 230)`)
+        return
+      }
+    }
     if (!currencyDirty) {
       toastSuccess('Currency is already up to date')
       return
     }
 
-    const result = await saveCurrency(selectedCurrency)
+    const result = await saveCurrency(
+      selectedCurrency,
+      selectedCurrency === 'PKR' ? 1 : Number(rateToPkr),
+    )
     if (!result.success) {
       toastError(result.error || 'Failed to save currency')
       return
@@ -172,7 +199,13 @@ export function SettingsPage() {
 
     // Sync session so products / invoices / reports pick up the new default
     dispatch(setDefaultCurrency(result.data?.defaultCurrency || selectedCurrency))
-    toastSuccess('Default currency saved')
+    const converted = result.data?.productsConverted || 0
+    const changed = result.data?.currencyChanged
+    toastSuccess(
+      changed
+        ? `Default currency saved. ${converted} product price(s) converted.`
+        : 'Exchange rate updated. Totals will use the latest rate.',
+    )
   }
 
   function handlePromptBlockSystem(sys) {
@@ -437,6 +470,33 @@ export function SettingsPage() {
                       </p>
                     </div>
 
+                    {selectedCurrency !== 'PKR' ? (
+                      <div className="space-y-1.5">
+                        <Label className="text-xs font-bold text-slate-700">
+                          Exchange rate <span className="text-rose-600">*</span>
+                        </Label>
+                        <div className="flex items-center gap-2">
+                          <span className="shrink-0 text-xs font-semibold text-slate-600">
+                            1 {selectedCurrency} =
+                          </span>
+                          <Input
+                            type="number"
+                            min="0.000001"
+                            step="any"
+                            value={rateToPkr}
+                            onChange={(e) => setRateToPkr(e.target.value)}
+                            placeholder="e.g. 230"
+                            className="h-10"
+                            required
+                          />
+                          <span className="shrink-0 text-xs font-semibold text-slate-600">PKR</span>
+                        </div>
+                        <p className="text-[11px] text-slate-500">
+                          Latest rate is used for totals. Update anytime (e.g. 230 today, 240 tomorrow).
+                        </p>
+                      </div>
+                    ) : null}
+
                     <div className="pt-2">
                       <Button
                         type="submit"
@@ -456,9 +516,10 @@ export function SettingsPage() {
               <SurfaceCard className="p-5">
                 <h4 className="font-bold text-sm text-slate-900 mb-2">How it applies</h4>
                 <p className="text-xs text-slate-500 leading-relaxed">
-                  Changing the default currency updates labels and formatting only. Stored amounts
-                  are not converted. New product prices, orders, invoices, payments, and financial
-                  reports will display using this currency.
+                  Saving a new default currency converts live product prices using your rate and
+                  stamps new sales/invoices in that currency. Past invoices keep their original
+                  currency (e.g. old PKR bills stay PKR). Dashboard income totals convert past sales
+                  with the <strong>latest</strong> rate you enter.
                 </p>
               </SurfaceCard>
             </div>

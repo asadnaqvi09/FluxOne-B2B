@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { ArrowDownToLine, ArrowUpFromLine, Camera, Plus } from 'lucide-react'
 import { ImportItemsDialog } from '@/components/feature/products/ImportItemsDialog'
 import { ItemFormDialog } from '@/components/feature/products/ItemFormDialog'
@@ -15,6 +16,7 @@ import { useDebouncedSearch } from '@/hooks/useDebouncedSearch'
 import { useProducts } from '@/hooks/useProducts'
 import { BRAND } from '@/lib/constants'
 import { PRODUCT_STATUS, PRODUCT_TYPES } from '@/lib/mapProduct'
+import { PATHS } from '@/router/paths'
 import { toastError, toastSuccess } from '@/lib/toast'
 
 export function ProductsPage() {
@@ -45,6 +47,7 @@ export function ProductsPage() {
   } = useProducts()
 
   const { localQ, onSearchChange } = useDebouncedSearch(updateFilters)
+  const navigate = useNavigate()
 
   const [formOpen, setFormOpen] = useState(false)
   const [formMode, setFormMode] = useState('create')
@@ -228,7 +231,7 @@ export function ProductsPage() {
               <Button
                 type="button"
                 variant="brand"
-                onClick={() => openCreate(PRODUCT_TYPES.BUNDLE)}
+                onClick={() => navigate(PATHS.inventory.bundles)}
               >
                 <Plus className="size-4" />
                 Bundle

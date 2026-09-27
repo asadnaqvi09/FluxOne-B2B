@@ -109,6 +109,7 @@ export async function listInvoices(tenantId, filters = {}) {
         tracking_id AS "trackingId",
         billed_at AS "billedAt",
         price,
+        COALESCE(currency, 'PKR') AS currency,
         source,
         status,
         billing_cycle AS "billingCycle",
@@ -132,7 +133,7 @@ export async function listInvoices(tenantId, filters = {}) {
   )
 
   return {
-    items: rows.map((row) => mapInvoiceRow(row, currency)),
+    items: rows.map((row) => mapInvoiceRow(row, row.currency || currency)),
     total: countRows[0]?.total || 0,
     page,
     limit,
@@ -149,6 +150,7 @@ export async function getInvoiceById(tenantId, id) {
         tracking_id AS "trackingId",
         billed_at AS "billedAt",
         price,
+        COALESCE(currency, 'PKR') AS currency,
         source,
         status,
         billing_cycle AS "billingCycle",
@@ -160,7 +162,7 @@ export async function getInvoiceById(tenantId, id) {
     `,
     [id],
   )
-  return mapInvoiceRow(rows[0] || null, currency)
+  return mapInvoiceRow(rows[0] || null, rows[0]?.currency || currency)
 }
 
 export async function getInvoicesSummary(tenantId) {

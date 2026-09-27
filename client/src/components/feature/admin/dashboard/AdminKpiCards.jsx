@@ -47,7 +47,7 @@ export function AdminKpiCards({ kpis = {}, className }) {
     <div className={cn('grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4', className)}>
       {KPI_CONFIG.map((config, index) => {
         const item = kpis[config.key] || {}
-        const displayValue = item.formatted || 'Rs. 0'
+        const displayValue = item.formatted || '—'
 
         return (
           <StatCard

@@ -13,6 +13,7 @@ export async function listSales(tenantId, filters = {}) {
       s.paid_amount AS "paidAmount",
       s.return_amount AS "returnAmount",
       s.status,
+      COALESCE(s.currency, 'PKR') AS currency,
       COALESCE(
         json_agg(
           json_build_object(

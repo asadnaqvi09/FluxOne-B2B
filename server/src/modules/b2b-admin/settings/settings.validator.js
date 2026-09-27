@@ -56,6 +56,11 @@ export const updateCurrencySchema = z.object({
       .refine((v) => currencyCodes.includes(v), {
         message: `Currency must be one of: ${currencyCodes.join(', ')}`,
       }),
+    // PKR per 1 unit of defaultCurrency (e.g. 1 USD = 230 PKR → 230). Required when not PKR.
+    rateToPkr: z.preprocess(
+      (v) => (v === '' || v === null || v === undefined ? undefined : v),
+      z.coerce.number().positive().optional(),
+    ),
   }),
   params: empty,
   query: empty,

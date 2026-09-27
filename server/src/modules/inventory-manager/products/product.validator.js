@@ -64,6 +64,8 @@ export const createProductSchema = z
       offerId: optionalLooseUuid,
       discountPercent: z.coerce.number().int().min(0).max(100).optional(),
       confirmed: z.coerce.boolean().optional(),
+      quantity: z.coerce.number().int().nonnegative().optional(),
+      status: z.enum([PRODUCT_STATUS.ACTIVE, PRODUCT_STATUS.INACTIVE]).optional(),
       bundleItems: z
         .array(
           z.object({
@@ -77,10 +79,35 @@ export const createProductSchema = z
     params: empty,
   })
   .refine(
-    ({ body }) => body.type !== PRODUCT_TYPES.BUNDLE || (body.bundleItems && body.bundleItems.length > 0),
+    ({ body }) => body.type !== PRODUCT_TYPES.BUNDLE || (body.bundleItems && body.bundleItems.length >= 2),
     {
-      message: 'Bundle products require at least one bundle item',
+      message: 'A bundle must contain at least 2 items',
       path: ['body', 'bundleItems'],
+    },
+  )
+  .refine(
+    ({ body }) => {
+      if (body.type !== PRODUCT_TYPES.BUNDLE || !body.bundleItems) return true
+      const ids = body.bundleItems.map((row) => row.itemId)
+      return new Set(ids).size === ids.length
+    },
+    {
+      message: 'The same item cannot be added twice. Increase quantity on the existing row.',
+      path: ['body', 'bundleItems'],
+    },
+  )
+  .refine(
+    ({ body }) => body.type !== PRODUCT_TYPES.BUNDLE || Number(body.sellingPrice) > 0,
+    {
+      message: 'Bundle price is required and cannot be zero',
+      path: ['body', 'sellingPrice'],
+    },
+  )
+  .refine(
+    ({ body }) => body.type !== PRODUCT_TYPES.BUNDLE || Number(body.quantity) > 0,
+    {
+      message: 'Bundle stock quantity is required',
+      path: ['body', 'quantity'],
     },
   )
   .refine(

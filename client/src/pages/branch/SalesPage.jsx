@@ -36,8 +36,10 @@ import { useDebouncedValue } from '@/hooks/useDebouncedValue'
 import { useClientPagination } from '@/hooks/useClientPagination'
 import { BRAND } from '@/lib/constants'
 import { toastError, toastSuccess } from '@/lib/toast'
+import { useCurrency } from '@/hooks/useCurrency'
 
 export function SalesPage() {
+  const { format, currency: tenantCurrency } = useCurrency()
   const [sales, setSales] = useState([])
   const [kpis, setKpis] = useState({ totalSales: 0, totalRefunds: 0, transactionCount: 0, totalPaid: 0, totalReturns: 0 })
   const [loading, setLoading] = useState(false)
@@ -139,10 +141,7 @@ export function SalesPage() {
     }, 500)
   }
 
-  const formatPrice = (val) => {
-    const num = parseFloat(val || 0)
-    return num.toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 2 })
-  }
+  const money = (val, cur) => format(val, cur || tenantCurrency)
 
   return (
     <div className="space-y-6 pb-8">
@@ -168,7 +167,7 @@ export function SalesPage() {
           <StatCard
             index={1}
             label="Net Sales"
-            value={`Rs. ${formatPrice(kpis.totalSales)}`}
+            value={`${money(kpis.totalSales)}`}
             subtitle="Gross transaction revenue"
             badge="Gross"
             icon={CircleDollarSign}
@@ -176,7 +175,7 @@ export function SalesPage() {
           <StatCard
             index={2}
             label="Paid Amount"
-            value={`Rs. ${formatPrice(kpis.totalPaid)}`}
+            value={`${money(kpis.totalPaid)}`}
             subtitle="Settled cash & POS cards"
             badge="Settled"
             icon={CreditCard}
@@ -184,7 +183,7 @@ export function SalesPage() {
           <StatCard
             index={3}
             label="Returns & Refunds"
-            value={`Rs. ${formatPrice(kpis.totalReturns)}`}
+            value={`${money(kpis.totalReturns)}`}
             subtitle={`${kpis.totalRefunds || 0} refunds recorded`}
             badge="Returns"
             icon={ArrowDownRight}
@@ -298,20 +297,20 @@ export function SalesPage() {
                       <div className="mt-3 grid grid-cols-2 gap-2 text-xs">
                         <div>
                           <span className="text-slate-400">Final</span>
-                          <p className="font-bold text-slate-900">Rs. {formatPrice(sale.finalAmount)}</p>
+                          <p className="font-bold text-slate-900">{money(sale.finalAmount, sale.currency)}</p>
                         </div>
                         <div>
                           <span className="text-slate-400">Paid</span>
-                          <p className="font-semibold text-slate-700">Rs. {formatPrice(sale.paidAmount)}</p>
+                          <p className="font-semibold text-slate-700">{money(sale.paidAmount, sale.currency)}</p>
                         </div>
                         <div>
                           <span className="text-slate-400">Tax</span>
-                          <p className="text-slate-600">Rs. {formatPrice(sale.tax_amount || sale.taxAmount)}</p>
+                          <p className="text-slate-600">{money(sale.tax_amount || sale.taxAmount, sale.currency)}</p>
                         </div>
                         <div>
                           <span className="text-slate-400">Discount</span>
                           <p className="text-slate-600">
-                            Rs. {formatPrice(sale.discount_amount || sale.discountAmount)}
+                            {money(sale.discount_amount || sale.discountAmount, sale.currency)}
                           </p>
                         </div>
                       </div>
@@ -395,20 +394,20 @@ export function SalesPage() {
                             {exchangeItems.map((i) => i.name).join(', ') || '—'}
                           </TableCell>
                           <TableCell className="hidden text-slate-600 xl:table-cell">
-                            Rs. {formatPrice(sale.tax_amount || sale.taxAmount)}
+                            {money(sale.tax_amount || sale.taxAmount, sale.currency)}
                           </TableCell>
                           <TableCell className="hidden text-slate-600 xl:table-cell">
-                            Rs. {formatPrice(sale.discount_amount || sale.discountAmount)}
+                            {money(sale.discount_amount || sale.discountAmount, sale.currency)}
                           </TableCell>
                           <TableCell className="font-bold text-slate-900">
-                            Rs. {formatPrice(sale.finalAmount)}
+                            {money(sale.finalAmount, sale.currency)}
                           </TableCell>
                           <TableCell className="text-slate-600">
-                            Rs. {formatPrice(sale.paidAmount)}
+                            {money(sale.paidAmount, sale.currency)}
                           </TableCell>
                           <TableCell className="hidden text-slate-600 lg:table-cell">
                             {parseFloat(sale.returnAmount) > 0
-                              ? `Rs. ${formatPrice(sale.returnAmount)}`
+                              ? `${money(sale.returnAmount, sale.currency)}`
                               : '—'}
                           </TableCell>
                           <TableActionsCell sticky>
@@ -474,7 +473,7 @@ export function SalesPage() {
           {refundTarget && (
             <div className="bg-slate-50 border border-slate-200 rounded-lg p-3 text-sm space-y-1">
               <div><strong>Invoice:</strong> {refundTarget.saleNumber}</div>
-              <div><strong>Amount to Refund:</strong> Rs. {formatPrice(refundTarget.finalAmount)}</div>
+              <div><strong>Amount to Refund:</strong> {money(refundTarget.finalAmount, refundTarget.currency)}</div>
             </div>
           )}
 
@@ -511,34 +510,34 @@ export function SalesPage() {
                 {(invoiceTarget.items || []).map((i) => (
                   <div key={i.id} className="flex justify-between text-slate-600">
                     <span>{i.name} (x{parseInt(i.quantity)})</span>
-                    <span>Rs. {formatPrice(i.lineTotal)}</span>
+                    <span>{money(i.lineTotal, invoiceTarget.currency)}</span>
                   </div>
                 ))}
               </div>
               <div className="space-y-1">
                 <div className="flex justify-between">
                   <span>Subtotal</span>
-                  <span>Rs. {formatPrice(invoiceTarget.subtotal)}</span>
+                  <span>{money(invoiceTarget.subtotal, invoiceTarget.currency)}</span>
                 </div>
                 <div className="flex justify-between">
                   <span>Tax Amount</span>
-                  <span>Rs. {formatPrice(invoiceTarget.tax_amount || invoiceTarget.taxAmount)}</span>
+                  <span>{money(invoiceTarget.tax_amount || invoiceTarget.taxAmount, invoiceTarget.currency)}</span>
                 </div>
                 <div className="flex justify-between">
                   <span>Discount</span>
-                  <span>- Rs. {formatPrice(invoiceTarget.discount_amount || invoiceTarget.discountAmount)}</span>
+                  <span>- {money(invoiceTarget.discount_amount || invoiceTarget.discountAmount, invoiceTarget.currency)}</span>
                 </div>
                 <div className="flex justify-between font-bold text-sm border-t border-dashed border-slate-400 pt-2">
                   <span>FINAL TOTAL</span>
-                  <span>Rs. {formatPrice(invoiceTarget.finalAmount)}</span>
+                  <span>{money(invoiceTarget.finalAmount, invoiceTarget.currency)}</span>
                 </div>
                 <div className="flex justify-between text-slate-500">
                   <span>Paid amount</span>
-                  <span>Rs. {formatPrice(invoiceTarget.paidAmount)}</span>
+                  <span>{money(invoiceTarget.paidAmount, invoiceTarget.currency)}</span>
                 </div>
                 <div className="flex justify-between text-slate-500">
                   <span>Return Amount</span>
-                  <span>Rs. {formatPrice(invoiceTarget.returnAmount)}</span>
+                  <span>{money(invoiceTarget.returnAmount, invoiceTarget.currency)}</span>
                 </div>
               </div>
               <div className="text-center text-[10px] border-t border-dashed border-slate-400 pt-3">

@@ -146,6 +146,17 @@ async function insertSaleInTx(client, tenantId, { branchId, counterId, payload, 
     payload.invoiceType ||
     (payload.exchange ? INVOICE_TYPES.EXCHANGE : INVOICE_TYPES.SALE)
 
+  // Freeze invoice currency at write time — later tenant currency changes do not rewrite this row
+  let currency = payload.currency || null
+  if (!currency) {
+    const { rows: curRows } = await tenantClientQuery(
+      client,
+      tenantId,
+      `SELECT COALESCE(default_currency, 'PKR') AS currency FROM tenants WHERE id = $1 LIMIT 1`,
+    )
+    currency = curRows[0]?.currency || 'PKR'
+  }
+
   const { rows } = await tenantClientQuery(
     client,
     tenantId,
@@ -154,9 +165,9 @@ async function insertSaleInTx(client, tenantId, { branchId, counterId, payload, 
         tenant_id, branch_id, counter_id, sale_number, sold_at,
         subtotal, tax_amount, discount_amount, final_amount,
         paid_amount, return_amount, status, invoice_type,
-        original_sale_number, staff_id, pos_event_id, updated_at
+        original_sale_number, staff_id, pos_event_id, currency, updated_at
       )
-      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, now())
+      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, now())
       RETURNING id
     `,
     [
@@ -175,6 +186,7 @@ async function insertSaleInTx(client, tenantId, { branchId, counterId, payload, 
       payload.originalInvoiceId || null,
       staffId,
       posEventId,
+      String(currency).toUpperCase().slice(0, 3),
     ],
   )
   return rows[0].id
@@ -1088,6 +1100,7 @@ async function fetchBootstrapProducts(tenantId, branchId, since = null) {
         p.type,
         p.scale,
         p.selling_price AS "sellingPrice",
+        COALESCE(p.price_currency, 'PKR') AS "priceCurrency",
         p.discount_percent AS "discountPercent",
         p.status,
         p.image_url AS "imageUrl",
@@ -1231,6 +1244,7 @@ async function fetchTenantBranchMeta(tenantId, branchId) {
         t.slug AS "tenantSlug",
         t.contact_numbers AS "contactNumbers",
         t.business_address AS "businessAddress",
+        COALESCE(t.default_currency, 'PKR') AS "defaultCurrency",
         b.id AS "branchId",
         b.name AS "branchName"
       FROM tenants t
@@ -1292,6 +1306,7 @@ function buildCompanyPayload(meta, slipPolicies = []) {
     contactPhone: meta.contactNumbers || null,
     phone: meta.contactNumbers || null,
     address: meta.businessAddress || null,
+    currency: meta.defaultCurrency || 'PKR',
     warningMessage,
     returnInstructions,
     // Structured list — preferred source for FluxOne-POS receipt footer

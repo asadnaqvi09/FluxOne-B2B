@@ -13,7 +13,10 @@ export function useCurrency() {
   const code = normalizeCurrency(user?.defaultCurrency || DEFAULT_CURRENCY)
   const meta = useMemo(() => getCurrencyMeta(code), [code])
 
-  const format = useCallback((amount) => formatMoney(amount, code), [code])
+  const format = useCallback(
+    (amount, currencyCode) => formatMoney(amount, currencyCode || code),
+    [code],
+  )
 
   return {
     currency: code,

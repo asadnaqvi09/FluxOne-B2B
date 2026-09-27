@@ -17,6 +17,7 @@ import { ProfilePage } from '@/pages/shared/ProfilePage'
 import { ComingSoonPage } from '@/pages/workspace/ComingSoonPage'
 import { DashboardPage as InventoryDashboardPage } from '@/pages/inventory/DashboardPage'
 import { ProductsPage } from '@/pages/inventory/ProductsPage'
+import { AddBundlePage } from '@/pages/inventory/AddBundlePage'
 import { InventoryControlPage } from '@/pages/inventory/InventoryControlPage'
 import { SuppliersPage } from '@/pages/inventory/SuppliersPage'
 import { PurchaseOrdersPage } from '@/pages/inventory/PurchaseOrdersPage'
@@ -96,6 +97,7 @@ const router = createBrowserRouter([
             children: [
               { index: true, element: <InventoryDashboardPage /> },
               { path: 'products', element: <ProductsPage /> },
+              { path: 'bundles', element: <AddBundlePage /> },
               { path: 'control', element: <InventoryControlPage /> },
               { path: 'suppliers', element: <SuppliersPage /> },
               { path: 'orders', element: <PurchaseOrdersPage /> },

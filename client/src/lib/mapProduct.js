@@ -171,6 +171,10 @@ export function buildProductPayload(fields, { withConfirmed = true } = {}) {
       fields.discountPercent === '' || fields.discountPercent == null
         ? undefined
         : Number(fields.discountPercent),
+    ...(fields.quantity === '' || fields.quantity == null
+      ? {}
+      : { quantity: Number(fields.quantity) }),
+    ...(fields.status ? { status: fields.status } : {}),
     bundleItems: Array.isArray(fields.bundleItems)
       ? fields.bundleItems
           .map((row) => ({

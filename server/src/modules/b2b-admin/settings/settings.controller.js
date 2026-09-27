@@ -42,7 +42,11 @@ export async function currencyPatch(req, res) {
   try {
     const data = await updateCurrencySettings(
       req.tenantId,
-      req.validated.body.defaultCurrency,
+      {
+        defaultCurrency: req.validated.body.defaultCurrency,
+        rateToPkr: req.validated.body.rateToPkr,
+      },
+      req.user?.id || null,
     )
     return success(res, data)
   } catch (err) {

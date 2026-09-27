@@ -134,9 +134,9 @@ export function ItemFormDialog({
     // eslint-disable-next-line react-hooks/exhaustive-deps -- categories seeded in separate effect
   }, [open, isEdit, initialProduct, productType])
 
-  // Bundle purchase/selling prices = sum of selected single-item prices × qty
+  // New bundles start from the sum of item prices. Saved bundles keep the price that was locked at creation.
   useEffect(() => {
-    if (!open || !isBundle) return
+    if (!open || !isBundle || isEdit) return
     let purchase = 0
     let selling = 0
     for (const row of form.bundleItems) {
@@ -152,7 +152,7 @@ export function ItemFormDialog({
       if (prev.purchasePrice === nextPurchase && prev.sellingPrice === nextSelling) return prev
       return { ...prev, purchasePrice: nextPurchase, sellingPrice: nextSelling }
     })
-  }, [open, isBundle, form.bundleItems, catalogItems])
+  }, [open, isBundle, isEdit, form.bundleItems, catalogItems])
 
   // Re-seed categoryId only when create form still has none and parents load async
   // useEffect(() => {

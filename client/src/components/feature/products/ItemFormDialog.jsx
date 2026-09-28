@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import {
   Dialog,
   DialogContent,
@@ -19,7 +19,7 @@ import { ImageUploadField } from '@/components/shared/ImageUploadField'
 import { WholeNumberInput } from '@/components/shared/WholeNumberInput'
 import { FieldError } from '@/components/shared/FieldError'
 import { BRAND } from '@/lib/constants'
-import { PRODUCT_TYPES, SCALE_OPTIONS } from '@/lib/mapProduct'
+import { PRODUCT_TYPES, SCALE_OPTIONS, taxIdsForDefaultRate } from '@/lib/mapProduct'
 import { fieldErrorClass } from '@/lib/validation/fieldErrors'
 import { useFormBaseline } from '@/hooks/useFormBaseline'
 import { useFieldErrors } from '@/hooks/useFieldErrors'
@@ -68,6 +68,8 @@ export function ItemFormDialog({
   childrenByParent,
   taxes = [],
   offers = [],
+  // Tenant defaults — pre-fill tax on create (override still allowed)
+  taxProfitDefaults = null,
   catalogItems = [],
   catalogItemsLoading = false,
   loading = false,
@@ -85,6 +87,8 @@ export function ItemFormDialog({
   const { scales: scaleOptions } = useItemScales({ enabled: open })
   const { fieldErrors, formError, setFormError, resetErrors, clearField, applyErrors } =
     useFieldErrors()
+  // Skip re-applying default tax after the user changes TaxMultiSelect
+  const taxTouchedRef = useRef(false)
 
   const type = isEdit ? form.type : productType
   const isBundle = type === PRODUCT_TYPES.BUNDLE
@@ -105,6 +109,7 @@ export function ItemFormDialog({
   // Reset dialog when opened / mode changes (do not depend on categories — avoids wiping typed fields)
   useEffect(() => {
     if (!open) return
+    taxTouchedRef.current = false
     setError(null)
     setImageWarning(null)
     setCreated(null)
@@ -147,6 +152,17 @@ export function ItemFormDialog({
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps -- categories seeded in separate effect
   }, [open, isEdit, initialProduct, productType])
+
+  // Create only: pre-fill default tax once catalog/defaults arrive (do not overwrite user picks)
+  useEffect(() => {
+    if (!open || isEdit || taxTouchedRef.current) return
+    const defaultIds = taxIdsForDefaultRate(taxes, taxProfitDefaults?.defaultTaxPercent)
+    if (!defaultIds.length) return
+    setForm((prev) => {
+      if (prev.taxIds?.length) return prev
+      return { ...prev, taxIds: defaultIds }
+    })
+  }, [open, isEdit, taxes, taxProfitDefaults])
 
   // New bundles start from the sum of item prices. Saved bundles keep the price that was locked at creation.
   useEffect(() => {
@@ -294,7 +310,10 @@ export function ItemFormDialog({
       type,
       scale: form.scale,
       description: form.description,
-      taxIds: form.taxIds,
+      // Touched or pre-filled → send ([] = exempt). Untouched empty → omit → server default.
+      ...(taxTouchedRef.current || form.taxIds?.length
+        ? { taxIds: form.taxIds }
+        : {}),
       offerId: form.offerId ? form.offerId : null,
       discountPercent:
         form.offerId && selectedOffer?.percent != null
@@ -556,7 +575,10 @@ export function ItemFormDialog({
                     <TaxMultiSelect
                       taxes={taxes}
                       value={form.taxIds}
-                      onChange={(taxIds) => patch('taxIds', taxIds)}
+                      onChange={(taxIds) => {
+                        taxTouchedRef.current = true
+                        patch('taxIds', taxIds)
+                      }}
                     />
                   </div>
 
@@ -772,7 +794,10 @@ export function ItemFormDialog({
                   <TaxMultiSelect
                     taxes={taxes}
                     value={form.taxIds}
-                    onChange={(taxIds) => patch('taxIds', taxIds)}
+                    onChange={(taxIds) => {
+                      taxTouchedRef.current = true
+                      patch('taxIds', taxIds)
+                    }}
                   />
                 </div>
 

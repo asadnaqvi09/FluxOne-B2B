@@ -10,6 +10,11 @@ const emptyCatalog = () => ({
   all: [],
   taxes: [],
   offers: [],
+  // Tenant defaults for new product tax/profit pre-fill
+  defaults: {
+    defaultProfitPercent: 0,
+    defaultTaxPercent: 0,
+  },
 })
 
 // Module-level cache shared across Products + Categories pages (same session).
@@ -36,12 +41,16 @@ function applyCategories(rows) {
   return cache.data
 }
 
-function applyFull({ categories, taxes, offers }) {
+function applyFull({ categories, taxes, offers, defaults }) {
   const split = splitCategories(Array.isArray(categories) ? categories : [])
   cache.data = {
     ...split,
     taxes: Array.isArray(taxes) ? taxes : [],
     offers: Array.isArray(offers) ? offers : [],
+    defaults: {
+      defaultProfitPercent: Number(defaults?.defaultProfitPercent) || 0,
+      defaultTaxPercent: Number(defaults?.defaultTaxPercent) || 0,
+    },
   }
   cache.fetchedAt = Date.now()
   return cache.data
@@ -57,10 +66,11 @@ export async function getProductCatalog(options = {}) {
   const generation = cacheGeneration
   cache.inFlight = (async () => {
     try {
-      const [catsRes, taxesRes, offersRes] = await Promise.all([
+      const [catsRes, taxesRes, offersRes, defaultsRes] = await Promise.all([
         apiClient.get(endpoints.products.categories),
         apiClient.get(endpoints.products.taxes),
         apiClient.get(endpoints.products.offers),
+        apiClient.get(endpoints.products.taxProfitDefaults),
       ])
       // A category CRUD refresh landed first — keep that catalog, drop this stale apply
       if (generation !== cacheGeneration) return cache.data
@@ -68,6 +78,7 @@ export async function getProductCatalog(options = {}) {
         categories: catsRes.success && Array.isArray(catsRes.data) ? catsRes.data : [],
         taxes: taxesRes.success && Array.isArray(taxesRes.data) ? taxesRes.data : [],
         offers: offersRes.success && Array.isArray(offersRes.data) ? offersRes.data : [],
+        defaults: defaultsRes.success ? defaultsRes.data : null,
       })
     } finally {
       if (generation === cacheGeneration) cache.inFlight = null

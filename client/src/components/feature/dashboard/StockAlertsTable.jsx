@@ -15,8 +15,12 @@ import {
 } from '@/components/ui/table'
 import { TableRowsSkeleton } from '@/components/ui/skeleton'
 import { sourceLabel, STOCK_STATUS_META } from '@/lib/mapInventoryDashboard'
-import { displayItemCode } from '@/lib/formatDisplayId'
+import { referenceFromUuid } from '@/lib/formatDisplayId'
 import { cn } from '@/lib/utils'
+
+function displayAlertId(row = {}) {
+  return row.id ? referenceFromUuid(row.id, 'ALT') : '—'
+}
 
 function StatusBadge({ status }) {
   const meta = STOCK_STATUS_META[status] || STOCK_STATUS_META.green
@@ -57,7 +61,7 @@ function StockAlertsTableComponent({
         className,
       )}
       title="Stock Alerts & Requests"
-      description="Low stock, branch alerts, and replenishment requests"
+      description="Alert or Request from branch manager"
     >
       {loading ? (
         <TableRowsSkeleton rows={5} />
@@ -65,11 +69,12 @@ function StockAlertsTableComponent({
         <EmptyState
           icon={Bell}
           title="No alerts right now"
-          description="Stock levels look healthy. Branch requests will appear here when managers raise them."
+          description="Branch manager alerts and requests will appear here when raised."
           compact
         />
       ) : (
         <>
+          {/* Mobile cards */}
           <div className="space-y-3 overflow-hidden md:hidden">
             {list.map((row) => (
               <article
@@ -79,15 +84,13 @@ function StockAlertsTableComponent({
                 <div className="flex items-start justify-between gap-2">
                   <div className="min-w-0">
                     <p className="truncate text-sm font-semibold text-slate-900">{row.name}</p>
-                    <p className="mt-0.5 font-mono text-[11px] text-slate-400">{displayItemCode(row)}</p>
+                    <p className="mt-0.5 font-mono text-[11px] text-slate-400">{displayAlertId(row)}</p>
                   </div>
                   <StatusBadge status={row.status} />
                 </div>
                 <div className="mt-3 flex flex-wrap items-center justify-between gap-2 text-xs">
                   <span className="text-slate-600">
-                    {row.source === 'branch_request' || row.source === 'branch_alert'
-                      ? 'Required'
-                      : 'Remaining'}{' '}
+                    Remaining Number{' '}
                     <span className="font-bold text-slate-900">{row.remainingNumber}</span>
                   </span>
                   <span className="truncate text-slate-500">{sourceLabel(row.source)}</span>
@@ -96,37 +99,42 @@ function StockAlertsTableComponent({
             ))}
           </div>
 
+          {/* Desktop table — TL columns */}
           <div className="hidden overflow-hidden md:block">
             <Table className="w-full table-fixed text-left text-sm">
               <TableHeader>
                 <TableRow className="text-xs tracking-wide text-slate-500 uppercase">
-                  <TableHead className="w-[18%] px-2 py-3 font-semibold">Item code</TableHead>
-                  <TableHead className="w-[28%] px-2 py-3 font-semibold">Name</TableHead>
-                  <TableHead className="w-[14%] px-2 py-3 font-semibold">Qty</TableHead>
-                  <TableHead className="w-[18%] px-2 py-3 font-semibold">Status</TableHead>
-                  <TableHead className="w-[22%] px-2 py-3 font-semibold">Source</TableHead>
+                  <TableHead className="w-[16%] px-2 py-3 font-semibold">Id</TableHead>
+                  <TableHead className="w-[26%] px-2 py-3 font-semibold">Name</TableHead>
+                  <TableHead className="w-[16%] px-2 py-3 font-semibold">Remaining Number</TableHead>
+                  <TableHead className="w-[14%] px-2 py-3 font-semibold">Status</TableHead>
+                  <TableHead className="w-[28%] px-2 py-3 font-semibold">
+                    Alert or Request from branch manager
+                  </TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {list.map((row) => (
-                  <TableRow
-                    key={row.id}
-                    className="cursor-pointer hover:bg-slate-50/80"
-                  >
+                  <TableRow key={row.id} className="cursor-pointer hover:bg-slate-50/80">
                     <TableCell
                       className="truncate px-2 py-3 font-mono text-xs text-slate-500"
-                      title={displayItemCode(row)}
+                      title={displayAlertId(row)}
                     >
-                      {displayItemCode(row)}
+                      {displayAlertId(row)}
                     </TableCell>
                     <TableCell className="truncate px-2 py-3 font-medium text-slate-900" title={row.name}>
                       {row.name}
                     </TableCell>
-                    <TableCell className="px-2 py-3 tabular-nums text-slate-800">{row.remainingNumber}</TableCell>
+                    <TableCell className="px-2 py-3 tabular-nums text-slate-800">
+                      {row.remainingNumber}
+                    </TableCell>
                     <TableCell className="px-2 py-3">
                       <StatusBadge status={row.status} />
                     </TableCell>
-                    <TableCell className="truncate px-2 py-3 text-slate-600" title={sourceLabel(row.source)}>
+                    <TableCell
+                      className="truncate px-2 py-3 text-slate-600"
+                      title={sourceLabel(row.source)}
+                    >
                       {sourceLabel(row.source)}
                     </TableCell>
                   </TableRow>
@@ -145,6 +153,7 @@ function StockAlertsTableComponent({
             onPageSizeChange={onPageSizeChange}
           />
 
+          {/* Bottom hint — color meaning */}
           <div className="mt-4 border-t border-border pt-3">
             <StockLegend />
           </div>

@@ -1,12 +1,31 @@
-import { memo, useMemo, useState } from 'react'
+import { memo, useEffect, useMemo, useState } from 'react'
 import { Cell, Pie, PieChart, ResponsiveContainer, Tooltip } from 'recharts'
 import { EmptyState } from '@/components/shared/EmptyState'
 import { SurfaceCard } from '@/components/shared/SurfaceCard'
+import { NativeSelect } from '@/components/ui/select'
 import { ChartSkeleton } from '@/components/ui/skeleton'
-import { PIE_COLORS } from '@/lib/mapInventoryDashboard'
+import {
+  aggregateStockOutPie,
+  listStockGraphDates,
+  PIE_COLORS,
+} from '@/lib/mapInventoryDashboard'
 import { cn } from '@/lib/utils'
 
 const CHART_H = 280
+const TOP_N = 10
+
+function formatDayLabel(day) {
+  if (!day) return 'All dates'
+  try {
+    return new Date(`${day}T00:00:00`).toLocaleDateString(undefined, {
+      year: 'numeric',
+      month: 'short',
+      day: 'numeric',
+    })
+  } catch {
+    return day
+  }
+}
 
 function PieTooltip({ active, payload }) {
   if (!active || !payload?.length) return null
@@ -38,13 +57,26 @@ function buildChartData(items = []) {
   })
 }
 
-function StockOutChartComponent({
-  items = [],
-  loading = false,
-  className,
-}) {
+function StockOutChartComponent({ rows = [], loading = false, className }) {
   const [activeIndex, setActiveIndex] = useState(null)
-  const chartData = useMemo(() => buildChartData(items), [items])
+  const [selectedDay, setSelectedDay] = useState('')
+
+  const dates = useMemo(() => listStockGraphDates(rows), [rows])
+
+  // Default to newest day when data loads / changes
+  useEffect(() => {
+    if (!dates.length) {
+      setSelectedDay('')
+      return
+    }
+    setSelectedDay((prev) => (prev && dates.includes(prev) ? prev : dates[0]))
+  }, [dates])
+
+  const pieItems = useMemo(
+    () => aggregateStockOutPie(rows, { day: selectedDay, limit: TOP_N }),
+    [rows, selectedDay],
+  )
+  const chartData = useMemo(() => buildChartData(pieItems), [pieItems])
   const isEmpty = !loading && chartData.length === 0
 
   return (
@@ -54,11 +86,30 @@ function StockOutChartComponent({
         className,
       )}
       title="Stock Graph"
-      description="Top 10 items leaving stock (sales, damaged, expired)"
+      description="Most out-of-stock items — top 10 by selected date"
       actions={
-        <span className="text-xs font-medium text-slate-400">
-          {chartData.length} item{chartData.length === 1 ? '' : 's'}
-        </span>
+        <div className="flex min-w-0 items-center gap-2">
+          <label htmlFor="stock-graph-day" className="shrink-0 text-xs font-medium text-slate-500">
+            Items by date
+          </label>
+          <NativeSelect
+            id="stock-graph-day"
+            value={selectedDay}
+            disabled={loading || dates.length === 0}
+            onChange={(e) => setSelectedDay(e.target.value)}
+            className="h-8 max-w-[10.5rem] text-xs"
+          >
+            {dates.length === 0 ? (
+              <option value="">No dates</option>
+            ) : (
+              dates.map((day) => (
+                <option key={day} value={day}>
+                  {formatDayLabel(day)}
+                </option>
+              ))
+            )}
+          </NativeSelect>
+        </div>
       }
     >
       {loading ? (

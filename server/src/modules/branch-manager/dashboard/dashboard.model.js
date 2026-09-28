@@ -200,18 +200,25 @@ async function peakHours(tenantId, { from, to, branchId }) {
 }
 
 async function counterBreakdown(tenantId, { from, to, branchId }) {
+  // Prefer POS till name/code; never expose raw hardware UUID in the UI label
   const { rows } = await tenantQuery(
     tenantId,
     `
       SELECT
         COALESCE(
           c.id::text,
-          'hw:' || COALESCE(NULLIF(TRIM(st.hardware_device_id), ''), 'unassigned')
+          'hw:' || COALESCE(NULLIF(TRIM(hw.code), ''), NULLIF(hw.id::text, ''), 'unassigned')
         ) AS "counterId",
-        COALESCE(c.code, NULLIF(TRIM(st.hardware_device_id), ''), 'UNASSIGNED') AS "counterCode",
         COALESCE(
-          NULLIF(c.name, ''),
-          NULLIF(TRIM(st.hardware_device_id), ''),
+          NULLIF(TRIM(c.code), ''),
+          NULLIF(TRIM(hw.code), ''),
+          'UNASSIGNED'
+        ) AS "counterCode",
+        COALESCE(
+          NULLIF(TRIM(c.name), ''),
+          NULLIF(TRIM(c.code), ''),
+          NULLIF(TRIM(hw.name), ''),
+          NULLIF(TRIM(hw.code), ''),
           'Unassigned till'
         ) AS "counterName",
         count(s.id)::int AS "saleCount",
@@ -219,12 +226,15 @@ async function counterBreakdown(tenantId, { from, to, branchId }) {
       FROM sales s
       LEFT JOIN pos_counters c ON c.id = s.counter_id AND c.tenant_id = s.tenant_id
       LEFT JOIN staff st ON st.id = s.staff_id AND st.tenant_id = s.tenant_id
+      LEFT JOIN branch_hardware hw
+        ON hw.tenant_id = s.tenant_id
+       AND hw.id::text = NULLIF(TRIM(st.hardware_device_id), '')
       WHERE s.tenant_id = $1
         AND s.status IN ('completed', 'partial_refund')
         AND ($2::date IS NULL OR s.sold_at::date >= $2::date)
         AND ($3::date IS NULL OR s.sold_at::date <= $3::date)
         AND ($4::uuid IS NULL OR s.branch_id = $4)
-      GROUP BY c.id, c.code, c.name, st.hardware_device_id
+      GROUP BY c.id, c.code, c.name, hw.id, hw.code, hw.name
       ORDER BY revenue DESC
     `,
     [from, to, branchId],
@@ -711,15 +721,23 @@ export async function getFullBranchDashboard(tenantId, filters = {}) {
       ORDER BY sales DESC
     `
 
+    // Prefer POS till name/code; fall back to hardware name/code (never raw UUID)
     const countersSql = `
       SELECT
         COALESCE(
           c.id::text,
-          'hw:' || COALESCE(NULLIF(TRIM(st.hardware_device_id), ''), 'unassigned')
+          'hw:' || COALESCE(NULLIF(TRIM(hw.code), ''), NULLIF(hw.id::text, ''), 'unassigned')
         ) AS "counterId",
         COALESCE(
-          NULLIF(c.name, ''),
-          NULLIF(TRIM(st.hardware_device_id), ''),
+          NULLIF(TRIM(c.code), ''),
+          NULLIF(TRIM(hw.code), ''),
+          'UNASSIGNED'
+        ) AS "counterCode",
+        COALESCE(
+          NULLIF(TRIM(c.name), ''),
+          NULLIF(TRIM(c.code), ''),
+          NULLIF(TRIM(hw.name), ''),
+          NULLIF(TRIM(hw.code), ''),
           'Unassigned till'
         ) AS "counterName",
         count(s.id)::int AS "saleCount",
@@ -727,12 +745,15 @@ export async function getFullBranchDashboard(tenantId, filters = {}) {
       FROM sales s
       LEFT JOIN pos_counters c ON c.id = s.counter_id AND c.tenant_id = s.tenant_id
       LEFT JOIN staff st ON st.id = s.staff_id AND st.tenant_id = s.tenant_id
+      LEFT JOIN branch_hardware hw
+        ON hw.tenant_id = s.tenant_id
+       AND hw.id::text = NULLIF(TRIM(st.hardware_device_id), '')
       WHERE s.tenant_id = $1
         AND s.status IN ('completed', 'partial_refund')
         AND ($2::date IS NULL OR s.sold_at::date >= $2::date)
         AND ($3::date IS NULL OR s.sold_at::date <= $3::date)
         AND ($4::uuid IS NULL OR s.branch_id = $4)
-      GROUP BY c.id, c.name, st.hardware_device_id
+      GROUP BY c.id, c.code, c.name, hw.id, hw.code, hw.name
       ORDER BY revenue DESC
     `
 
@@ -909,6 +930,7 @@ export async function getFullBranchDashboard(tenantId, filters = {}) {
       lowProducts,
       counters: (countersRes.rows || []).map((c) => ({
         id: c.counterId,
+        code: c.counterCode,
         name: c.counterName,
         sales: Number(c.revenue) || 0,
         orders: Number(c.saleCount) || 0,

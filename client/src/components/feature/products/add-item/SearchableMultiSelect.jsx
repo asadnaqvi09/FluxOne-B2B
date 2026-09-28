@@ -13,7 +13,7 @@ export function SearchableMultiSelect({
   options = [],
   value = [],
   onChange,
-  customLabel = '+ Custom',
+  customLabel = 'Custom',
   onAddCustom,
   placeholder = 'Search or select…',
   emptyText = 'No options match',

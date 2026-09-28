@@ -125,6 +125,7 @@ export const endpoints = {
     create: '/inventory/products',
     bundles: '/inventory/products/bundles',
     import: '/inventory/products/import',
+    export: '/inventory/products/export',
     scan: '/inventory/products/scan',
     detail: (id) => `/inventory/products/${id}`,
     deleteInfo: (id) => `/inventory/products/${id}/delete-info`,
@@ -135,6 +136,7 @@ export const endpoints = {
     subcategories: '/inventory/products/subcategories',
     category: (id) => `/inventory/products/categories/${id}`,
     taxes: '/inventory/products/taxes',
+    taxProfitDefaults: '/inventory/products/tax-profit-defaults',
     offers: '/inventory/products/offers',
   },
   // @deprecated prefer products.* — kept for older slices

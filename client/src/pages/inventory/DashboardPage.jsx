@@ -17,7 +17,7 @@ export function DashboardPage() {
     kpis,
     alerts,
     alertsPagination,
-    stockOutPie,
+    stockGraphRows,
     setAlertsPage,
     setAlertsPageSize,
     loading,
@@ -43,7 +43,7 @@ export function DashboardPage() {
         <PageHeader
           eyebrow="Inventory"
           title="Inventory Overview"
-          description={`Hi ${name} — categories, stock alerts, and top stock-out movers.`}
+          description={`Hi ${name} — Inventory Overview KPIs, stock alerts, and stock graph.`}
           actions={
             <Button
               type="button"
@@ -65,7 +65,7 @@ export function DashboardPage() {
         <MotionReveal delay={0.04}>
           <div>
             <p className="mb-3 text-xs font-semibold tracking-[0.12em] text-slate-400 uppercase">
-              Inventory overview KPIs
+              Inventory Overview KPI&apos;s
             </p>
             <InventoryKpiCards kpis={kpis} loading={loading} />
           </div>
@@ -82,7 +82,7 @@ export function DashboardPage() {
             />
           </MotionReveal>
           <MotionReveal delay={0.1}>
-            <StockOutChart items={stockOutPie} loading={loading} />
+            <StockOutChart rows={stockGraphRows} loading={loading} />
           </MotionReveal>
         </div>
       </div>

@@ -2,11 +2,11 @@ import {
   createCategory,
   createProduct,
   deleteProduct,
-  findOrCreateImportedCategory,
   findProductByBarcode,
   getProductById,
   getProductDeleteEligibility,
   getProductDetail,
+  getTaxProfitDefaults,
   listCategories,
   listOffers,
   listProducts,
@@ -15,6 +15,7 @@ import {
   updateCategory,
   updateProduct,
 } from './product.model.js'
+import { buildProductExportRows, importCatalogRows } from './product.import-export.js'
 import { resolveInventoryCreateScope, resolveInventoryScope } from '../shared.access.js'
 import { PRODUCT_TYPES } from '../../../config/constants.js'
 import { generateBarcodeValue, generateItemCode, renderBarcodePng } from '../../../utils/barcode.util.js'
@@ -39,6 +40,11 @@ export async function categories(req, res) {
 
 export async function taxes(req, res) {
   return success(res, await listTaxes(req.tenantId))
+}
+
+// Tenant default tax/profit % for new-product pre-fill (IM read).
+export async function taxProfitDefaults(req, res) {
+  return success(res, await getTaxProfitDefaults(req.tenantId))
 }
 
 export async function offers(req, res) {
@@ -131,48 +137,27 @@ export async function addBundle(req, res) {
 export async function importItems(req, res) {
   try {
     const { tenantId, branchId } = resolveInventoryCreateScope(req)
-    const category = await findOrCreateImportedCategory(tenantId, branchId)
-    const created = []
-    const errors = []
+    const result = await importCatalogRows(tenantId, req.validated.body.rows, {
+      branchId,
+      createdBy: req.user?.id || null,
+    })
 
-    for (const [index, row] of req.validated.body.rows.entries()) {
-      try {
-        const product = await createProduct(tenantId, {
-          name: row.name,
-          categoryId: category.id,
-          branchId,
-          type: PRODUCT_TYPES.SINGLE,
-          scale: row.scale || 'unit',
-          itemCode: row.sku,
-          barcode: row.barcode || generateBarcodeValue(),
-          purchasePrice: row.purchasePrice ?? 0,
-          sellingPrice: row.sellingPrice ?? 0,
-          quantity: row.quantity ?? 0,
-        })
-        created.push(product)
-      } catch (err) {
-        const message =
-          err?.code === '23505'
-            ? `Row ${index + 1}: item code or barcode already exists (${row.sku})`
-            : err?.message || `Row ${index + 1}: import failed`
-        errors.push(message)
-      }
+    if (!result.imported) {
+      return fail(res, result.errors?.[0] || 'No products imported', 409)
     }
 
-    if (!created.length) {
-      return fail(res, errors[0] || 'No products imported', 409)
-    }
+    return success(res, result, 201)
+  } catch (err) {
+    return scopeError(res, err)
+  }
+}
 
-    return success(
-      res,
-      {
-        imported: created.length,
-        failed: errors.length,
-        errors: errors.length ? errors : undefined,
-        items: created,
-      },
-      201,
-    )
+// Flat rows matching Import CSV (1:1) — singles, variant children, bundle components
+export async function exportItems(req, res) {
+  try {
+    const { tenantId, branchId } = resolveInventoryScope(req)
+    const rows = await buildProductExportRows(tenantId, { branchId })
+    return success(res, { rows, exported: rows.filter((r) => r.rowKind === 'product').length })
   } catch (err) {
     return scopeError(res, err)
   }

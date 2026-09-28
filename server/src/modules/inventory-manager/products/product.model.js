@@ -911,6 +911,41 @@ async function resolveTenantTaxProfitDefaults(client, tenantId) {
   }
 }
 
+// Public read for IM create forms (pre-fill only; never mutates existing products).
+export async function getTaxProfitDefaults(tenantId) {
+  const { rows } = await tenantQuery(
+    tenantId,
+    `
+      SELECT
+        COALESCE(default_profit_percent, 0) AS "defaultProfitPercent",
+        COALESCE(default_tax_percent, 0) AS "defaultTaxPercent"
+      FROM tenants
+      WHERE id = $1
+      LIMIT 1
+    `,
+  )
+  return {
+    defaultProfitPercent: Number(rows[0]?.defaultProfitPercent) || 0,
+    defaultTaxPercent: Number(rows[0]?.defaultTaxPercent) || 0,
+  }
+}
+
+async function loadProductTaxIds(client, tenantId, productId) {
+  const { rows } = await tenantClientQuery(
+    client,
+    tenantId,
+    `
+      SELECT tax_id AS id
+      FROM product_taxes
+      WHERE tenant_id = $1 AND product_id = $2
+      ORDER BY tax_id
+    `,
+    [productId],
+  )
+  return rows.map((row) => row.id)
+}
+
+// Create only: undefined/null taxIds → tenant default; [] / [ids] → explicit override.
 async function resolveTaxIdsForCreate(client, tenantId, payloadTaxIds, defaultTax) {
   if (payloadTaxIds !== undefined && payloadTaxIds !== null) return payloadTaxIds
   if (defaultTax > 0) {
@@ -1334,8 +1369,11 @@ async function syncVariantChildrenInTx(client, tenantId, parent, payload, { bran
   const subcategoryId =
     'subcategoryId' in payload ? payload.subcategoryId ?? null : parent.subcategoryId
 
-  const { defaultTax } = await resolveTenantTaxProfitDefaults(client, tenantId)
-  const resolvedTaxIds = await resolveTaxIdsForCreate(client, tenantId, payload.taxIds, defaultTax)
+  // Edit path: inherit parent taxes for new SKUs (do not re-apply tenant defaults).
+  const resolvedTaxIds =
+    payload.taxIds !== undefined
+      ? payload.taxIds
+      : await loadProductTaxIds(client, tenantId, parent.id)
 
   const children = []
   for (const [index, variant] of variants.entries()) {

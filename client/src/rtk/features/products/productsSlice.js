@@ -25,6 +25,10 @@ const emptyCatalog = () => ({
   all: [],
   taxes: [],
   offers: [],
+  defaults: {
+    defaultProfitPercent: 0,
+    defaultTaxPercent: 0,
+  },
 })
 
 function catalogToState(catalog) {
@@ -37,6 +41,10 @@ function catalogToState(catalog) {
     all: catalog.all || [],
     taxes: catalog.taxes || [],
     offers: catalog.offers || [],
+    defaults: {
+      defaultProfitPercent: Number(catalog.defaults?.defaultProfitPercent) || 0,
+      defaultTaxPercent: Number(catalog.defaults?.defaultTaxPercent) || 0,
+    },
   }
 }
 
@@ -211,7 +219,7 @@ export const updateProduct = createAsyncThunk(
       if (!imageResult.success) {
         return rejectWithValue(
           imageResult.error ||
-            'Details saved but image upload failed. Try again from Edit.',
+          'Details saved but image upload failed. Try again from Edit.',
         )
       }
     }
@@ -254,36 +262,30 @@ export const deleteProduct = createAsyncThunk(
 export const exportProductsCsv = createAsyncThunk(
   'products/exportCsv',
   async (_, { rejectWithValue }) => {
-    const collected = []
-    let page = 1
-    let pageCount = 1
-    do {
-      const result = await apiClient.get(endpoints.products.list, {
-        page,
-        limit: 50,
-        status: 'all',
-      })
-      if (!result.success) return rejectWithValue(result.error || 'Export failed')
-      const data = result.data || {}
-      const rows = Array.isArray(data.items) ? data.items.map(mapProduct) : []
-      collected.push(...rows)
-      pageCount = data.pagination?.pageCount || 1
-      page += 1
-    } while (page <= pageCount)
-
-    if (!collected.length) return rejectWithValue('No products to export')
+    // Server builds the same flat rows Import accepts (1:1)
+    const result = await apiClient.get(endpoints.products.export)
+    if (!result.success) return rejectWithValue(result.error || 'Export failed')
+    const rows = Array.isArray(result.data?.rows) ? result.data.rows : []
+    if (!rows.length) return rejectWithValue('No products to export')
     downloadTextFile(
       `fluxone-products-${new Date().toISOString().slice(0, 10)}.csv`,
-      productsToCsv(collected),
+      productsToCsv(rows),
     )
-    return { success: true, data: { exported: collected.length } }
+    const exported = result.data?.exported ?? rows.filter((r) => r.rowKind === 'product').length
+    return { success: true, data: { exported } }
   },
 )
 
 export const importProducts = createAsyncThunk(
   'products/import',
   async (rows, { getState, dispatch, rejectWithValue }) => {
-    const result = await apiClient.post(endpoints.products.import, { rows })
+    // Normalize legacy sku → itemCode for API
+    const payloadRows = (rows || []).map((row) => ({
+      ...row,
+      itemCode: row.itemCode || row.sku || undefined,
+      sku: row.sku || row.itemCode || undefined,
+    }))
+    const result = await apiClient.post(endpoints.products.import, { rows: payloadRows }, { timeoutMs: 300_000 })
     if (!result.success) return rejectWithValue(result.error || 'Import failed')
     const filters = { ...getState().products.filters, page: 1, status: 'all' }
     dispatch(setProductFilters(filters))

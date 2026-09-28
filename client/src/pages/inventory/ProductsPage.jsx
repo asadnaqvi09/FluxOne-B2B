@@ -1,4 +1,4 @@
-import { useCallback, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { ArrowDownToLine, ArrowUpFromLine, Camera, Plus } from 'lucide-react'
 import { ImportItemsDialog } from '@/components/feature/products/ImportItemsDialog'
@@ -13,6 +13,8 @@ import { ConfirmDialog } from '@/components/shared/ConfirmDialog'
 import { DeleteEntityDialog } from '@/components/shared/DeleteEntityDialog'
 import { PageHeader } from '@/components/shared/PageHeader'
 import { Button } from '@/components/ui/button'
+import { apiClient } from '@/api/api'
+import { endpoints } from '@/api/endpoints'
 import { useAppDispatch } from '@/rtk/hooks'
 import { asResult } from '@/rtk/asResult'
 import { createMovement as createMovementThunk } from '@/rtk/features/control/controlSlice'
@@ -69,6 +71,9 @@ export function ProductsPage() {
   const [deleteTarget, setDeleteTarget] = useState(null)
   const [deleteInfo, setDeleteInfo] = useState(null)
   const [deleteLoading, setDeleteLoading] = useState(false)
+  const [selectedIds, setSelectedIds] = useState([])
+  const [bulkDeleteOpen, setBulkDeleteOpen] = useState(false)
+  const [bulkDeleting, setBulkDeleting] = useState(false)
 
   // Add Stock → Stock In dialog, pre-seeded with the catalog row
   const [stockOpen, setStockOpen] = useState(false)
@@ -77,6 +82,19 @@ export function ProductsPage() {
 
   const activeParents = (catalog.parents || []).filter((row) => row.isActive !== false)
   const activeSubs = (selectedCategorySubs || []).filter((row) => row.isActive !== false)
+
+  // Drop selection when list filters / page change
+  useEffect(() => {
+    setSelectedIds([])
+  }, [
+    filters.page,
+    filters.limit,
+    filters.q,
+    filters.type,
+    filters.status,
+    filters.categoryId,
+    filters.subcategoryId,
+  ])
 
   const openBundleEdit = useCallback(
     async (row) => {
@@ -194,6 +212,7 @@ export function ProductsPage() {
       const result = await deleteProduct({ id: deleteTarget.id, permanent: false })
       if (result.success) {
         toastSuccess('Product deactivated')
+        setSelectedIds((prev) => prev.filter((id) => id !== deleteTarget.id))
         setDeleteTarget(null)
         setDeleteInfo(null)
       } else {
@@ -213,11 +232,34 @@ export function ProductsPage() {
         toastSuccess('Product permanently deleted')
         setDeleteTarget(null)
         setDeleteInfo(null)
+        setSelectedIds((prev) => prev.filter((id) => id !== deleteTarget.id))
       } else {
         toastError(result.error || 'Permanent delete failed')
       }
     } finally {
       setDeleteLoading(false)
+    }
+  }
+
+  async function handleBulkDeactivate() {
+    if (!selectedIds.length) return
+    setBulkDeleting(true)
+    try {
+      let ok = 0
+      let failed = 0
+      for (const id of selectedIds) {
+        const result = await apiClient.delete(endpoints.products.remove(id))
+        if (result.success) ok += 1
+        else failed += 1
+      }
+      setSelectedIds([])
+      setBulkDeleteOpen(false)
+      void reload()
+      if (ok && !failed) toastSuccess(`Deactivated ${ok} product${ok === 1 ? '' : 's'}`)
+      else if (ok && failed) toastSuccess(`Deactivated ${ok}; ${failed} failed`)
+      else toastError('Could not deactivate selected products')
+    } finally {
+      setBulkDeleting(false)
     }
   }
 
@@ -241,6 +283,9 @@ export function ProductsPage() {
           ? `Imported ${imported}; ${failed} row(s) skipped`
           : `Imported ${imported} products`,
       )
+      if (failed && result.data?.errors?.[0]) {
+        toastError(result.data.errors[0])
+      }
     } else {
       toastError(result.error || 'Import failed')
     }
@@ -339,6 +384,10 @@ export function ProductsPage() {
           loading={loading}
           pagination={pagination}
           statusUpdatingId={statusUpdatingId}
+          selectedIds={selectedIds}
+          onSelectedIdsChange={setSelectedIds}
+          bulkDeleting={bulkDeleting}
+          onBulkDelete={() => setBulkDeleteOpen(true)}
           onPageChange={setPage}
           onPageSizeChange={(limit) => updateFilters({ limit })}
           onEdit={handleEdit}
@@ -359,6 +408,7 @@ export function ProductsPage() {
         childrenByParent={catalog.childrenByParent}
         taxes={catalog.taxes}
         offers={catalog.offers}
+        taxProfitDefaults={catalog.defaults}
         catalogItems={bundleOptions}
         catalogItemsLoading={bundleOptionsLoading}
         loading={mutating}
@@ -416,6 +466,22 @@ export function ProductsPage() {
         confirmLabel="Deactivate"
         loading={mutating}
         onConfirm={handleConfirmDeactivate}
+      />
+
+      <ConfirmDialog
+        open={bulkDeleteOpen}
+        onOpenChange={(open) => {
+          if (!open && !bulkDeleting) setBulkDeleteOpen(false)
+        }}
+        title="Delete selected products?"
+        description={
+          selectedIds.length
+            ? `${selectedIds.length} selected product${selectedIds.length === 1 ? '' : 's'} will be deactivated (hidden from open lists and POS sync). You can open them again later. Permanent delete stays per-product.`
+            : undefined
+        }
+        confirmLabel="Deactivate selected"
+        loading={bulkDeleting}
+        onConfirm={handleBulkDeactivate}
       />
 
       <DeleteEntityDialog

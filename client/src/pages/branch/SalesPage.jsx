@@ -12,10 +12,10 @@ import {
 import { PageHeader } from '@/components/shared/PageHeader'
 import { MotionHeader, MotionReveal } from '@/components/shared/MotionReveal'
 import { SurfaceCard } from '@/components/shared/SurfaceCard'
-import { StatCard } from '@/components/shared/StatsCards'
+// import { StatCard } from '@/components/shared/StatsCards'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
-import { Label } from '@/components/ui/label'
+// import { Label } from '@/components/ui/label'
 import { NativeSelect } from '@/components/ui/select'
 import { Badge } from '@/components/ui/badge'
 import {
@@ -41,7 +41,7 @@ import { useCurrency } from '@/hooks/useCurrency'
 export function SalesPage() {
   const { format, currency: tenantCurrency } = useCurrency()
   const [sales, setSales] = useState([])
-  const [kpis, setKpis] = useState({ totalSales: 0, totalRefunds: 0, transactionCount: 0, totalPaid: 0, totalReturns: 0 })
+  // const [kpis, setKpis] = useState({ totalSales: 0, totalRefunds: 0, transactionCount: 0, totalPaid: 0, totalReturns: 0 })
   const [loading, setLoading] = useState(false)
   const [categories, setCategories] = useState([])
   const {
@@ -154,7 +154,7 @@ export function SalesPage() {
       </MotionHeader>
 
       {/* Reusable KPI Stat Cards (4 Columns) */}
-      <MotionReveal delay={0.02}>
+      {/* <MotionReveal delay={0.02}>
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
           <StatCard
             index={0}
@@ -189,7 +189,7 @@ export function SalesPage() {
             icon={ArrowDownRight}
           />
         </div>
-      </MotionReveal>
+      </MotionReveal> */}
 
       {/* Search & Filters */}
       <MotionReveal delay={0.04}>

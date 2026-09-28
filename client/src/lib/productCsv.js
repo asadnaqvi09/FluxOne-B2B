@@ -1,16 +1,30 @@
-// Shared product CSV helpers for Import / Export.
-// Format matches productsToCsv / parseProductsCsv.
+// Shared product CSV helpers — Import / Export use the same columns (1:1).
+// rowKind: product | variant | bundle_item
 
 export const PRODUCT_CSV_HEADERS = [
+  'rowKind',
   'itemCode',
   'name',
   'barcode',
   'type',
   'scale',
   'status',
+  'category',
+  'subcategory',
   'purchasePrice',
   'sellingPrice',
   'quantity',
+  'reorderPoint',
+  'description',
+  'discountPercent',
+  'offerName',
+  'taxPercent',
+  'dailyPriceChange',
+  'parentItemCode',
+  'variantLabel',
+  'variantOptions',
+  'componentItemCode',
+  'componentQty',
 ]
 
 // Escape one CSV cell.
@@ -51,21 +65,47 @@ export function parseCsvLine(line) {
   return cells
 }
 
+function numOrUndef(value) {
+  if (value == null || value === '') return undefined
+  const n = Number(value)
+  return Number.isNaN(n) ? undefined : n
+}
+
+function boolOrUndef(value) {
+  if (value == null || value === '') return undefined
+  const v = String(value).trim().toLowerCase()
+  if (['1', 'true', 'yes', 'y'].includes(v)) return true
+  if (['0', 'false', 'no', 'n'].includes(v)) return false
+  return undefined
+}
+
+function normalizeHeader(h) {
+  return String(h || '')
+    .trim()
+    .toLowerCase()
+    .replace(/[\s_]+/g, '')
+}
+
+// Serialize catalog rows → CSV text (same shape Import expects).
 export function productsToCsv(rows = []) {
   const lines = [PRODUCT_CSV_HEADERS.join(',')]
   for (const row of rows) {
     lines.push(
       PRODUCT_CSV_HEADERS.map((key) => {
         if (key === 'itemCode') return escapeCsvCell(row.itemCode || row.sku || '')
-        return escapeCsvCell(row[key])
+        if (key === 'dailyPriceChange') {
+          if (row.dailyPriceChange == null || row.dailyPriceChange === '') return ''
+          return escapeCsvCell(row.dailyPriceChange ? 'true' : 'false')
+        }
+        return escapeCsvCell(row[key] ?? '')
       }).join(','),
     )
   }
   return `${lines.join('\n')}\n`
 }
 
-// Parse CSV text into import rows for POST /inventory/products/import.
-// Accepts export headers or legacy sku,name,barcode,quantity,scale.
+// Parse CSV text → import rows for POST /inventory/products/import.
+// Supports full headers, legacy short headers, and positional sku,name,...
 export function parseProductsCsv(raw) {
   const text = String(raw || '').replace(/^\uFEFF/, '')
   const lines = text
@@ -75,12 +115,12 @@ export function parseProductsCsv(raw) {
 
   if (!lines.length) return []
 
-  const first = parseCsvLine(lines[0]).map((h) => h.toLowerCase())
+  const first = parseCsvLine(lines[0]).map(normalizeHeader)
   const looksLikeHeader =
     first.includes('itemcode') ||
     first.includes('sku') ||
     first.includes('name') ||
-    (first[0] === 'itemcode' && first[1] === 'name')
+    first.includes('rowkind')
 
   let headers = null
   let startIndex = 0
@@ -98,40 +138,70 @@ export function parseProductsCsv(raw) {
     if (headers) {
       const get = (...names) => {
         for (const name of names) {
-          const idx = headers.indexOf(name)
+          const idx = headers.indexOf(normalizeHeader(name))
           if (idx >= 0 && cells[idx] != null && cells[idx] !== '') return cells[idx]
         }
         return undefined
       }
+
+      const itemCode = get('itemCode', 'sku', 'item_code') || ''
+      const rowKindRaw = (get('rowKind', 'row_kind') || 'product').toLowerCase()
+      const rowKind =
+        rowKindRaw === 'variant' || rowKindRaw === 'bundle_item' || rowKindRaw === 'bundleitem'
+          ? rowKindRaw === 'bundleitem'
+            ? 'bundle_item'
+            : rowKindRaw
+          : 'product'
+
       row = {
-        sku: get('itemcode', 'sku', 'item_code') || '',
+        rowKind,
+        itemCode,
+        sku: itemCode,
         name: get('name') || '',
         barcode: get('barcode') || undefined,
         type: get('type') || undefined,
         scale: get('scale') || undefined,
-        quantity: get('quantity') != null ? Number(get('quantity')) : undefined,
-        purchasePrice: get('purchaseprice', 'purchase_price') != null
-          ? Number(get('purchaseprice', 'purchase_price'))
-          : undefined,
-        sellingPrice: get('sellingprice', 'selling_price') != null
-          ? Number(get('sellingprice', 'selling_price'))
-          : undefined,
+        status: get('status') || undefined,
+        category: get('category', 'categoryName', 'category_name') || undefined,
+        subcategory: get('subcategory', 'subcategoryName', 'subcategory_name') || undefined,
+        quantity: numOrUndef(get('quantity')),
+        purchasePrice: numOrUndef(get('purchasePrice', 'purchase_price')),
+        sellingPrice: numOrUndef(get('sellingPrice', 'selling_price')),
+        reorderPoint: numOrUndef(get('reorderPoint', 'reorder_point')),
+        description: get('description') || undefined,
+        discountPercent: numOrUndef(get('discountPercent', 'discount_percent')),
+        offerName: get('offerName', 'offer_name') || undefined,
+        taxPercent: numOrUndef(get('taxPercent', 'tax_percent')),
+        dailyPriceChange: boolOrUndef(get('dailyPriceChange', 'daily_price_change')),
+        parentItemCode: get('parentItemCode', 'parent_item_code', 'parentSku') || undefined,
+        variantLabel: get('variantLabel', 'variant_label') || undefined,
+        variantOptions: get('variantOptions', 'variant_options') || undefined,
+        componentItemCode: get('componentItemCode', 'component_item_code') || undefined,
+        componentQty: numOrUndef(get('componentQty', 'component_qty')),
       }
     } else {
       // Legacy positional: sku,name,barcode?,quantity?,scale?
       row = {
+        rowKind: 'product',
+        itemCode: cells[0] || '',
         sku: cells[0] || '',
         name: cells[1] || '',
         barcode: cells[2] || undefined,
-        quantity: cells[3] ? Number(cells[3]) : undefined,
+        quantity: numOrUndef(cells[3]),
         scale: cells[4] || undefined,
+        type: 'single',
       }
     }
 
-    if (!row.sku || !row.name) continue
-    if (Number.isNaN(row.quantity)) row.quantity = undefined
-    if (Number.isNaN(row.purchasePrice)) row.purchasePrice = undefined
-    if (Number.isNaN(row.sellingPrice)) row.sellingPrice = undefined
+    // product rows need sku+name; child rows need parent link
+    if (row.rowKind === 'product') {
+      if (!row.itemCode || !row.name) continue
+    } else if (row.rowKind === 'variant') {
+      if (!row.parentItemCode || !row.itemCode) continue
+    } else if (row.rowKind === 'bundle_item') {
+      if (!row.parentItemCode || !row.componentItemCode) continue
+    }
+
     rows.push(row)
   }
 
@@ -148,18 +218,85 @@ export function downloadTextFile(filename, content, mime = 'text/csv;charset=utf
   URL.revokeObjectURL(url)
 }
 
+// Template covers single + variant children + bundle components
 export function productCsvTemplate() {
   return productsToCsv([
     {
+      rowKind: 'product',
       itemCode: 'BEV-001',
       name: 'Cola 1.5L',
       barcode: '8901234567890',
       type: 'single',
       scale: 'unit',
       status: 'active',
+      category: 'Beverages',
+      subcategory: 'Soft Drinks',
       purchasePrice: 80,
       sellingPrice: 120,
       quantity: 48,
+      reorderPoint: 10,
+      description: 'Sample single item',
+      discountPercent: 0,
+      offerName: '',
+      taxPercent: 10,
+      dailyPriceChange: false,
+    },
+    {
+      rowKind: 'product',
+      itemCode: 'TEE-PARENT',
+      name: 'T-Shirt',
+      barcode: '8901000000001',
+      type: 'variant',
+      scale: 'unit',
+      status: 'active',
+      category: 'Apparel',
+      subcategory: 'Tops',
+      purchasePrice: 0,
+      sellingPrice: 0,
+      quantity: 0,
+      reorderPoint: 10,
+      description: 'Variant parent',
+      taxPercent: 10,
+    },
+    {
+      rowKind: 'variant',
+      itemCode: 'TEE-RED-M',
+      name: 'T-Shirt',
+      barcode: '8901000000002',
+      type: 'single',
+      scale: 'unit',
+      status: 'active',
+      parentItemCode: 'TEE-PARENT',
+      variantLabel: 'Red–M',
+      variantOptions: 'Color:Red|Size:M',
+      purchasePrice: 200,
+      sellingPrice: 350,
+      quantity: 12,
+      reorderPoint: 5,
+      dailyPriceChange: false,
+    },
+    {
+      rowKind: 'product',
+      itemCode: 'BND-001',
+      name: 'Snack Bundle',
+      barcode: '8902000000001',
+      type: 'bundle',
+      scale: 'unit',
+      status: 'active',
+      category: 'Bundles',
+      subcategory: '',
+      purchasePrice: 0,
+      sellingPrice: 500,
+      quantity: 5,
+      reorderPoint: 2,
+      description: 'Sample bundle',
+      taxPercent: 10,
+    },
+    {
+      rowKind: 'bundle_item',
+      parentItemCode: 'BND-001',
+      componentItemCode: 'BEV-001',
+      componentQty: 2,
     },
   ])
 }

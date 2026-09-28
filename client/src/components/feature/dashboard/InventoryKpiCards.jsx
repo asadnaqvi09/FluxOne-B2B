@@ -3,27 +3,22 @@ import { Boxes, FolderTree, Layers } from 'lucide-react'
 import { StatCard } from '@/components/shared/StatsCards'
 import { cn } from '@/lib/utils'
 
+// TL Inventory Overview KPIs
 const KPI_META = [
   {
     key: 'totalCategories',
     label: 'Total Categories',
     icon: FolderTree,
-    subtitle: 'Active parent categories only',
-    badge: 'Catalog',
   },
   {
     key: 'totalSubCategories',
-    label: 'Total Sub Categories',
+    label: 'Total subcategories',
     icon: Layers,
-    subtitle: 'Active sub categories under active parents',
-    badge: 'Segments',
   },
   {
     key: 'totalItems',
-    label: 'Total Products',
+    label: 'Total items',
     icon: Boxes,
-    subtitle: 'Active products — each bundle counts as 1',
-    badge: 'Inventory',
   },
 ]
 
@@ -42,8 +37,6 @@ function InventoryKpiCardsComponent({ kpis = {}, loading = false, className }) {
             index={index}
             label={meta.label}
             value={loading ? '...' : formatCount(kpis[meta.key])}
-            subtitle={meta.subtitle}
-            badge={meta.badge}
             icon={Icon}
           />
         )

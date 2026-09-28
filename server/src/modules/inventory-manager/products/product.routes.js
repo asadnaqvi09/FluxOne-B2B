@@ -6,6 +6,7 @@ import {
   categories,
   detail,
   deleteInfo,
+  exportItems,
   importItems,
   offers,
   patchCategory,
@@ -15,6 +16,7 @@ import {
   removeCategory,
   scan,
   taxes,
+  taxProfitDefaults,
   update,
 } from './product.controller.js'
 import { asyncHandler } from '../../../middlewares/error.middleware.js'
@@ -26,6 +28,7 @@ import {
   createCategorySchema,
   createProductSchema,
   deleteProductSchema,
+  exportItemsSchema,
   importItemsSchema,
   listCatalogSchema,
   productIdParamsSchema,
@@ -38,6 +41,7 @@ const router = Router()
 
 router.get('/categories', requirePermission('items:read'), asyncHandler(categories))
 router.get('/taxes', requirePermission('items:read'), asyncHandler(taxes))
+router.get('/tax-profit-defaults', requirePermission('items:read'), asyncHandler(taxProfitDefaults))
 router.get('/offers', requirePermission('items:read'), asyncHandler(offers))
 router.post(
   '/categories',
@@ -68,6 +72,12 @@ router.delete(
 )
 
 router.get('/', requirePermission('items:read'), validate(listCatalogSchema), asyncHandler(products))
+router.get(
+  '/export',
+  requirePermission('items:read'),
+  validate(exportItemsSchema),
+  asyncHandler(exportItems),
+)
 router.post(
   '/',
   requirePermission('items:write'),

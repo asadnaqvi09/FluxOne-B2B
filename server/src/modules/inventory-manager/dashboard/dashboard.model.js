@@ -41,6 +41,7 @@ export async function getOverviewKpis(tenantId, { branchId = null } = {}) {
   return rows[0]
 }
 
+// Open branch alerts & requests only — never dump the full product catalog
 export async function listStockAlerts(tenantId, { page = 1, limit = 8, branchId = null } = {}) {
   const safePage = Math.max(1, Number(page) || 1)
   const safeLimit = Math.min(50, Math.max(1, Number(limit) || 8))
@@ -50,48 +51,22 @@ export async function listStockAlerts(tenantId, { page = 1, limit = 8, branchId 
     tenantId,
     `
       SELECT
-        id,
-        name,
-        "itemCode",
-        "remainingNumber",
-        status,
-        source,
+        sr.id,
+        p.name,
+        sr.remaining_quantity AS "remainingNumber",
+        CASE
+          WHEN sr.remaining_quantity <= 0 THEN 'red'
+          WHEN sr.remaining_quantity <= p.reorder_point THEN 'yellow'
+          ELSE 'green'
+        END AS status,
+        CASE WHEN sr.kind = 'request' THEN 'branch_request' ELSE 'branch_alert' END AS source,
         count(*) OVER()::int AS "_total"
-      FROM (
-        SELECT
-          p.id,
-          p.name,
-          p.item_code AS "itemCode",
-          p.quantity AS "remainingNumber",
-          CASE
-            WHEN p.quantity <= 0 THEN 'red'
-            WHEN p.quantity <= p.reorder_point THEN 'yellow'
-            ELSE 'green'
-          END AS status,
-          'system'::text AS source
-        FROM products p
-        WHERE p.tenant_id = $1
-          AND ($2::uuid IS NULL OR p.branch_id = $2)
-
-        UNION ALL
-
-        SELECT
-          sr.id,
-          p.name,
-          p.item_code AS "itemCode",
-          sr.remaining_quantity AS "remainingNumber",
-          CASE
-            WHEN sr.remaining_quantity <= 0 THEN 'red'
-            WHEN sr.remaining_quantity <= p.reorder_point THEN 'yellow'
-            ELSE 'green'
-          END AS status,
-          CASE WHEN sr.kind = 'request' THEN 'branch_request' ELSE 'branch_alert' END AS source
-        FROM stock_requests sr
-        JOIN products p ON p.id = sr.product_id AND p.tenant_id = sr.tenant_id
-        WHERE sr.tenant_id = $1 AND sr.status = 'open'
-          AND ($2::uuid IS NULL OR p.branch_id = $2)
-          AND ($2::uuid IS NULL OR sr.branch_id IS NULL OR sr.branch_id = $2)
-      ) alerts
+      FROM stock_requests sr
+      JOIN products p ON p.id = sr.product_id AND p.tenant_id = sr.tenant_id
+      WHERE sr.tenant_id = $1
+        AND sr.status = 'open'
+        AND ($2::uuid IS NULL OR p.branch_id = $2)
+        AND ($2::uuid IS NULL OR sr.branch_id IS NULL OR sr.branch_id = $2)
       ORDER BY "remainingNumber" ASC
       LIMIT $3 OFFSET $4
     `,

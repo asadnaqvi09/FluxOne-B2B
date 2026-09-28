@@ -21,7 +21,7 @@ import {
   TableRow,
 } from '@/components/ui/table'
 import { useProducts } from '@/hooks/useProducts'
-import { PRODUCT_TYPES, money } from '@/lib/mapProduct'
+import { PRODUCT_TYPES, money, taxIdsForDefaultRate } from '@/lib/mapProduct'
 import { PATHS } from '@/router/paths'
 import { toastError, toastSuccess } from '@/lib/toast'
 
@@ -58,10 +58,19 @@ export function AddBundlePage() {
   const [created, setCreated] = useState(null)
   const priceTouched = useRef(false)
   const stockTouched = useRef(false)
+  // After user changes tax, do not re-apply tenant default
+  const taxTouched = useRef(false)
 
   useEffect(() => {
     void loadBundleOptions()
   }, [loadBundleOptions])
+
+  // Pre-fill tax from tenant default when catalog loads (user can still clear/override)
+  useEffect(() => {
+    if (taxTouched.current || taxId) return
+    const ids = taxIdsForDefaultRate(catalog.taxes, catalog.defaults?.defaultTaxPercent)
+    if (ids[0]) setTaxId(ids[0])
+  }, [catalog.taxes, catalog.defaults, taxId])
 
   const parents = (catalog.parents || []).filter((row) => row.isActive !== false)
   const subcategories = useMemo(() => {
@@ -218,6 +227,11 @@ export function AddBundlePage() {
       sellingPrice: price,
       purchasePrice: 0,
       quantity: stock,
+      // Explicit pick or clear → send. Never touched + empty → omit → server default.
+      ...(taxTouched.current || taxId
+        ? { taxIds: taxId ? [taxId] : [] }
+        : {}),
+      offerId: offerId || undefined,
       bundleItems: lineDetails.map((row) => ({
         itemId: row.itemId,
         quantity: row.qty,
@@ -345,7 +359,14 @@ export function AddBundlePage() {
 
           <div className="space-y-1.5">
             <Label htmlFor="bundle-tax">Tax</Label>
-            <NativeSelect id="bundle-tax" value={taxId} onChange={(event) => setTaxId(event.target.value)}>
+            <NativeSelect
+              id="bundle-tax"
+              value={taxId}
+              onChange={(event) => {
+                taxTouched.current = true
+                setTaxId(event.target.value)
+              }}
+            >
               <option value="">No tax</option>
               {(catalog.taxes || []).map((tax) => (
                 <option key={tax.id} value={tax.id}>
@@ -355,7 +376,7 @@ export function AddBundlePage() {
               ))}
             </NativeSelect>
             <p className="text-[11px] text-slate-400">
-              Dropdown is visible for review. Tax is not saved until confirmation.
+              Pre-filled from company default tax when set. Clear for tax-exempt, or pick another rate.
               {selectedTax ? ` Selected: ${selectedTax.name}.` : ''}
             </p>
           </div>

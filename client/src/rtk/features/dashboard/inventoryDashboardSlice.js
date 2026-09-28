@@ -1,4 +1,4 @@
-// Inventory Dashboard Slice — Express /api/inventory/dashboard → RTK → useInventoryDashboard
+// Inventory Dashboard Slice — Express /api/inventory/dashboard → RTK
 import { createAsyncThunk, createSlice } from '@reduxjs/toolkit'
 import { apiClient } from '@/api/api'
 import { endpoints } from '@/api/endpoints'
@@ -6,7 +6,7 @@ import {
   EMPTY_KPIS,
   normalizeAlertsPayload,
   normalizeKpis,
-  normalizeStockGraph,
+  normalizeStockGraphRows,
 } from '@/lib/mapInventoryDashboard'
 
 export const ALERTS_PAGE_SIZE = 8
@@ -20,7 +20,8 @@ const initialState = {
     total: 0,
     pageCount: 1,
   },
-  stockOutPie: [],
+  // Day-level ledger rows — pie filters via "Items by date"
+  stockGraphRows: [],
   alertsPage: 1,
   alertsLimit: ALERTS_PAGE_SIZE,
   loading: false,
@@ -35,10 +36,7 @@ export const fetchInventoryDashboard = createAsyncThunk(
     const limit = getState().inventoryDashboard.alertsLimit || ALERTS_PAGE_SIZE
     const [overviewRes, alertsRes, graphRes] = await Promise.all([
       apiClient.get(endpoints.dashboard.overview),
-      apiClient.get(endpoints.dashboard.alerts, {
-        page,
-        limit,
-      }),
+      apiClient.get(endpoints.dashboard.alerts, { page, limit }),
       apiClient.get(endpoints.dashboard.stockGraph),
     ])
 
@@ -51,26 +49,20 @@ export const fetchInventoryDashboard = createAsyncThunk(
     }
 
     let alerts = []
-    let alertsPagination = {
-      page,
-      limit,
-      total: 0,
-      pageCount: 1,
-    }
+    let alertsPagination = { page, limit, total: 0, pageCount: 1 }
     if (alertsRes.success) {
-      const normalized = normalizeAlertsPayload(alertsRes.data, {
-        page,
-        limit,
-      })
+      const normalized = normalizeAlertsPayload(alertsRes.data, { page, limit })
       alerts = normalized.items
       alertsPagination = normalized.pagination
     } else if (alertsRes.error) {
       errors.push(alertsRes.error)
     }
 
-    let stockOutPie = []
+    let stockGraphRows = []
     if (graphRes.success) {
-      stockOutPie = normalizeStockGraph(graphRes.data).items
+      stockGraphRows = normalizeStockGraphRows(
+        Array.isArray(graphRes.data) ? graphRes.data : graphRes.data?.items || [],
+      )
     } else if (graphRes.error) {
       errors.push(graphRes.error)
     }
@@ -83,7 +75,7 @@ export const fetchInventoryDashboard = createAsyncThunk(
       kpis,
       alerts,
       alertsPagination,
-      stockOutPie,
+      stockGraphRows,
       alertsPage: page,
       error: errors[0] || null,
     }
@@ -100,17 +92,11 @@ export const fetchInventoryAlertsPage = createAsyncThunk(
       1,
       Number(isObj && arg.limit != null ? arg.limit : state.alertsLimit) || ALERTS_PAGE_SIZE,
     )
-    const alertsRes = await apiClient.get(endpoints.dashboard.alerts, {
-      page,
-      limit,
-    })
+    const alertsRes = await apiClient.get(endpoints.dashboard.alerts, { page, limit })
     if (!alertsRes.success) {
       return rejectWithValue(alertsRes.error || 'Failed to load alerts')
     }
-    const normalized = normalizeAlertsPayload(alertsRes.data, {
-      page,
-      limit,
-    })
+    const normalized = normalizeAlertsPayload(alertsRes.data, { page, limit })
     return {
       alerts: normalized.items,
       alertsPagination: normalized.pagination,
@@ -143,7 +129,7 @@ const inventoryDashboardSlice = createSlice({
         state.kpis = action.payload.kpis
         state.alerts = action.payload.alerts
         state.alertsPagination = action.payload.alertsPagination
-        state.stockOutPie = action.payload.stockOutPie
+        state.stockGraphRows = action.payload.stockGraphRows
         state.alertsPage = action.payload.alertsPage
         state.error = action.payload.error
       })
@@ -151,7 +137,7 @@ const inventoryDashboardSlice = createSlice({
         state.loading = false
         state.kpis = { ...EMPTY_KPIS }
         state.alerts = []
-        state.stockOutPie = []
+        state.stockGraphRows = []
         state.error = action.payload || action.error.message
       })
       .addCase(fetchInventoryAlertsPage.pending, (state, action) => {

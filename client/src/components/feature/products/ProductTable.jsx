@@ -1,4 +1,5 @@
-import { Package, Printer, PackagePlus } from 'lucide-react'
+import { useMemo } from 'react'
+import { Package, Printer, PackagePlus, Trash2 } from 'lucide-react'
 import { BarcodeCell } from '@/components/feature/products/BarcodeCell'
 import { PricingColumns } from '@/components/feature/products/PricingColumns'
 import { ProductImageCell, ProductStatusToggle } from '@/components/feature/products/ProductStatusToggle'
@@ -7,6 +8,7 @@ import { ActionIconButton } from '@/components/shared/ActionIconButton'
 import { EmptyState } from '@/components/shared/EmptyState'
 import { SurfaceCard } from '@/components/shared/SurfaceCard'
 import { Button } from '@/components/ui/button'
+import { Checkbox } from '@/components/ui/checkbox'
 import {
   Table,
   TableHeader,
@@ -92,6 +94,10 @@ export function ProductTable({
   loading = false,
   pagination,
   statusUpdatingId = null,
+  selectedIds = [],
+  onSelectedIdsChange,
+  bulkDeleting = false,
+  onBulkDelete,
   onPageChange,
   onPageSizeChange,
   onEdit,
@@ -108,11 +114,69 @@ export function ProductTable({
   const total = pagination?.total ?? list.length
   const pageSize = pagination?.limit || 8
 
+  const pageIds = useMemo(() => list.map((row) => row.id).filter(Boolean), [list])
+  const selectedSet = useMemo(() => new Set(selectedIds), [selectedIds])
+  const selectedOnPage = pageIds.filter((id) => selectedSet.has(id))
+  const allPageSelected = pageIds.length > 0 && selectedOnPage.length === pageIds.length
+  const somePageSelected = selectedOnPage.length > 0 && !allPageSelected
+  const selectionCount = selectedIds.length
+
+  function toggleOne(id) {
+    if (!id || !onSelectedIdsChange) return
+    if (selectedSet.has(id)) {
+      onSelectedIdsChange(selectedIds.filter((entry) => entry !== id))
+    } else {
+      onSelectedIdsChange([...selectedIds, id])
+    }
+  }
+
+  function toggleAllPage() {
+    if (!onSelectedIdsChange) return
+    if (allPageSelected) {
+      onSelectedIdsChange(selectedIds.filter((id) => !pageIds.includes(id)))
+      return
+    }
+    const merged = new Set(selectedIds)
+    for (const id of pageIds) merged.add(id)
+    onSelectedIdsChange([...merged])
+  }
+
+  const catalogActions =
+    selectionCount > 0 ? (
+      <div className="flex flex-wrap items-center gap-2">
+        <span className="text-xs font-medium text-slate-600 sm:text-sm">
+          {selectionCount} selected
+        </span>
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          className="cursor-pointer"
+          disabled={bulkDeleting}
+          onClick={() => onSelectedIdsChange?.([])}
+        >
+          Clear
+        </Button>
+        <Button
+          type="button"
+          variant="destructive"
+          size="sm"
+          className="cursor-pointer"
+          disabled={bulkDeleting || !onBulkDelete}
+          onClick={() => onBulkDelete?.()}
+        >
+          <Trash2 className="size-4" />
+          {bulkDeleting ? 'Deleting…' : 'Delete selected'}
+        </Button>
+      </div>
+    ) : null
+
   return (
     <SurfaceCard
       className={className}
       title="Product catalog"
       description="Single items & bundles for this company"
+      actions={catalogActions}
     >
       {loading ? (
         <TableRowsSkeleton rows={6} />
@@ -126,12 +190,29 @@ export function ProductTable({
         <>
           {/* Mobile cards */}
           <div className="space-y-3 md:hidden">
+            <div className="flex items-center gap-2 rounded-xl border border-border bg-white px-3 py-2">
+              <Checkbox
+                checked={allPageSelected}
+                ref={(el) => {
+                  if (el) el.indeterminate = somePageSelected
+                }}
+                onChange={toggleAllPage}
+                aria-label="Select all products on this page"
+              />
+              <span className="text-xs text-slate-500">Select all on page</span>
+            </div>
             {list.map((row) => (
               <article
                 key={row.id}
                 className="rounded-xl border border-border bg-slate-50/60 px-3 py-3"
               >
                 <div className="flex items-start gap-3">
+                  <Checkbox
+                    className="mt-1"
+                    checked={selectedSet.has(row.id)}
+                    onChange={() => toggleOne(row.id)}
+                    aria-label={`Select ${row.name || 'product'}`}
+                  />
                   <ProductImageCell src={row.imageUrl} name={row.name} />
                   <div className="min-w-0 flex-1">
                     <div className="flex items-start justify-between gap-2">
@@ -191,11 +272,20 @@ export function ProductTable({
               </article>
             ))}
           </div>
-          {/* Desktop table — Action uses nowrap cell so Delete is not clipped */}
           <div className="hidden overflow-x-auto md:block">
             <Table className="min-w-[1280px] text-left text-sm">
               <TableHeader>
                 <TableRow className="text-[11px] tracking-wide text-slate-500 uppercase">
+                  <TableHead className="w-10 px-2 py-3">
+                    <Checkbox
+                      checked={allPageSelected}
+                      ref={(el) => {
+                        if (el) el.indeterminate = somePageSelected
+                      }}
+                      onChange={toggleAllPage}
+                      aria-label="Select all products on this page"
+                    />
+                  </TableHead>
                   <TableHead className="px-2 py-3 font-semibold">Name</TableHead>
                   <TableHead className="px-2 py-3 font-semibold">Scale</TableHead>
                   <TableHead className="px-2 py-3 font-semibold">Item code</TableHead>
@@ -218,6 +308,13 @@ export function ProductTable({
               <TableBody>
                 {list.map((row) => (
                   <TableRow key={row.id} className="hover:bg-slate-50/80">
+                    <TableCell className="px-2 py-3">
+                      <Checkbox
+                        checked={selectedSet.has(row.id)}
+                        onChange={() => toggleOne(row.id)}
+                        aria-label={`Select ${row.name || 'product'}`}
+                      />
+                    </TableCell>
                     <TableCell className="px-2 py-3">
                       <div className="flex items-center gap-2">
                         <ProductImageCell src={row.imageUrl} name={row.name} />

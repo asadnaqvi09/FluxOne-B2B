@@ -1,6 +1,8 @@
+// Inventory dashboard mappers — KPIs, alerts, stock-graph pie by date
+
 export const STOCK_STATUS_META = {
   red: {
-    label: 'Critical',
+    label: 'Red',
     hint: 'Out of stock or critically low — replenish immediately',
     color: '#ef4444',
     bg: 'bg-red-50',
@@ -8,7 +10,7 @@ export const STOCK_STATUS_META = {
     ring: 'ring-red-100',
   },
   yellow: {
-    label: 'Low stock',
+    label: 'Yellow',
     hint: 'Below reorder point — plan a purchase soon',
     color: '#f59e0b',
     bg: 'bg-amber-50',
@@ -16,7 +18,7 @@ export const STOCK_STATUS_META = {
     ring: 'ring-amber-100',
   },
   green: {
-    label: 'Healthy',
+    label: 'Green',
     hint: 'Stock level is healthy',
     color: '#22c55e',
     bg: 'bg-emerald-50',
@@ -25,7 +27,7 @@ export const STOCK_STATUS_META = {
   },
 }
 
-// Pie slice palette (FluxOne-adjacent, not flat purple-only).
+// Pie slice palette (FluxOne-adjacent)
 export const PIE_COLORS = [
   '#8E238F',
   '#412283',
@@ -45,11 +47,22 @@ export const EMPTY_KPIS = {
   totalItems: 0,
 }
 
+// TL source wording
 export function sourceLabel(source) {
   if (source === 'branch_request') return 'Request from branch manager'
   if (source === 'branch_alert') return 'Alert from branch manager'
-  if (source === 'system') return 'System alert'
-  return source ? String(source).replace(/_/g, ' ') : 'System alert'
+  return 'Alert from branch manager'
+}
+
+// Normalize API day → YYYY-MM-DD
+function toDayKey(value) {
+  if (!value) return ''
+  if (typeof value === 'string') return value.slice(0, 10)
+  try {
+    return new Date(value).toISOString().slice(0, 10)
+  } catch {
+    return ''
+  }
 }
 
 export function normalizeAlert(row = {}) {
@@ -58,10 +71,9 @@ export function normalizeAlert(row = {}) {
   return {
     id: row.id,
     name: row.name || '—',
-    itemCode: row.itemCode || row.item_code || '',
     remainingNumber: Number(row.remainingNumber ?? row.remaining_number ?? 0),
     status: safeStatus,
-    source: row.source || 'system',
+    source: row.source === 'branch_request' ? 'branch_request' : 'branch_alert',
   }
 }
 
@@ -74,16 +86,36 @@ export function normalizeKpis(raw) {
   }
 }
 
-// Graph API returns rows: { name, day, quantity }.
-// Aggregate by product name → top 10 for pie chart.
-export function aggregateStockOutPie(rows = [], limit = 10) {
+// Keep day-level rows so the pie can filter by date dropdown
+export function normalizeStockGraphRows(rows = []) {
+  if (!Array.isArray(rows) || rows.length === 0) return []
+  return rows
+    .map((row) => ({
+      name: row.name || 'Unknown',
+      day: toDayKey(row.day),
+      quantity: Number(row.quantity ?? 0),
+    }))
+    .filter((row) => row.day && row.quantity > 0)
+}
+
+// Unique days, newest first — for "Items by date" dropdown
+export function listStockGraphDates(rows = []) {
+  const set = new Set()
+  for (const row of rows) {
+    if (row.day) set.add(row.day)
+  }
+  return [...set].sort((a, b) => (a < b ? 1 : a > b ? -1 : 0))
+}
+
+// Top N items for one day (or all days when day is empty)
+export function aggregateStockOutPie(rows = [], { day = '', limit = 10 } = {}) {
   if (!Array.isArray(rows) || rows.length === 0) return []
 
+  const filtered = day ? rows.filter((row) => row.day === day) : rows
   const totals = new Map()
-  for (const row of rows) {
+  for (const row of filtered) {
     const name = row.name || 'Unknown'
-    const qty = Number(row.quantity ?? 0)
-    totals.set(name, (totals.get(name) || 0) + qty)
+    totals.set(name, (totals.get(name) || 0) + Number(row.quantity || 0))
   }
 
   return [...totals.entries()]
@@ -113,6 +145,7 @@ export function normalizeAlertsPayload(data, { page = 1, limit = 8 } = {}) {
   return { items, pagination }
 }
 
+// Back-compat alias used by older imports
 export function normalizeStockGraph(rows) {
-  return { items: aggregateStockOutPie(rows) }
+  return { items: aggregateStockOutPie(normalizeStockGraphRows(rows)) }
 }

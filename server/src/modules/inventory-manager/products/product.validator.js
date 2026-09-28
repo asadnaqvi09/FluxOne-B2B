@@ -94,6 +94,8 @@ export const createProductSchema = z
       purchasePrice: z.coerce.number().int().nonnegative().optional(),
       sellingPrice: z.coerce.number().int().nonnegative().optional(),
       taxIds: z.array(looseUuid).optional(),
+      // Optional; omit → server uses tenants.default_profit_percent
+      profitPercent: z.coerce.number().int().min(0).max(100).optional(),
       offerId: optionalLooseUuid,
       discountPercent: z.coerce.number().int().min(0).max(100).optional(),
       confirmed: z.coerce.boolean().optional(),
@@ -170,18 +172,55 @@ export const importItemsSchema = z.object({
     rows: z
       .array(
         z.object({
-          sku: z.string().min(1),
-          name: z.string().min(1),
+          rowKind: z.enum(['product', 'variant', 'bundle_item']).optional().default('product'),
+          // sku kept for legacy clients; prefer itemCode
+          sku: z.string().optional(),
+          itemCode: z.string().optional(),
+          name: z.string().optional(),
           barcode: z.string().optional(),
-          type: z.enum([PRODUCT_TYPES.SINGLE, PRODUCT_TYPES.BUNDLE]).optional(),
-          quantity: z.coerce.number().int().nonnegative().optional(),
+          type: z
+            .enum([PRODUCT_TYPES.SINGLE, PRODUCT_TYPES.BUNDLE, PRODUCT_TYPES.VARIANT])
+            .optional(),
           scale: z.string().optional(),
-          purchasePrice: z.coerce.number().int().nonnegative().optional(),
-          sellingPrice: z.coerce.number().int().nonnegative().optional(),
+          status: z.enum(['active', 'inactive', 'open', 'close']).optional(),
+          category: z.string().optional(),
+          subcategory: z.string().optional(),
+          quantity: z.coerce.number().nonnegative().optional(),
+          purchasePrice: z.coerce.number().nonnegative().optional(),
+          sellingPrice: z.coerce.number().nonnegative().optional(),
+          reorderPoint: z.coerce.number().nonnegative().optional(),
+          description: z.string().optional(),
+          discountPercent: z.coerce.number().nonnegative().optional(),
+          offerName: z.string().optional(),
+          taxPercent: z.coerce.number().nonnegative().optional(),
+          dailyPriceChange: z
+            .union([z.boolean(), z.string(), z.number()])
+            .optional()
+            .transform((v) => {
+              if (v === true || v === 1 || v === '1') return true
+              if (v === false || v === 0 || v === '0') return false
+              if (typeof v === 'string') {
+                const s = v.trim().toLowerCase()
+                if (['true', 'yes', 'y'].includes(s)) return true
+                if (['false', 'no', 'n'].includes(s)) return false
+              }
+              return undefined
+            }),
+          parentItemCode: z.string().optional(),
+          variantLabel: z.string().optional(),
+          variantOptions: z.string().optional(),
+          componentItemCode: z.string().optional(),
+          componentQty: z.coerce.number().positive().optional(),
         }),
       )
       .min(1),
   }),
+  query: empty,
+  params: empty,
+})
+
+export const exportItemsSchema = z.object({
+  body: empty,
   query: empty,
   params: empty,
 })

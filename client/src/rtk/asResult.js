@@ -20,6 +20,10 @@ export function catalogForUi(catalog) {
       all: [],
       taxes: [],
       offers: [],
+      defaults: {
+        defaultProfitPercent: 0,
+        defaultTaxPercent: 0,
+      },
     }
   }
   const raw = catalog.childrenByParent
@@ -31,6 +35,10 @@ export function catalogForUi(catalog) {
     all: catalog.all || [],
     taxes: catalog.taxes || [],
     offers: catalog.offers || [],
+    defaults: {
+      defaultProfitPercent: Number(catalog.defaults?.defaultProfitPercent) || 0,
+      defaultTaxPercent: Number(catalog.defaults?.defaultTaxPercent) || 0,
+    },
   }
 }
 

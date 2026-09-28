@@ -58,7 +58,7 @@ export function ImportItemsDialog({ open, onOpenChange, loading = false, onSubmi
     const rows = parseProductsCsv(text)
     if (!rows.length) {
       setError(
-        'No valid rows. Use headers: itemCode,name,barcode,type,scale,status,purchasePrice,sellingPrice,quantity',
+        'No valid rows. Download the template — use rowKind product / variant / bundle_item with category & subcategory names.',
       )
       return
     }
@@ -84,7 +84,8 @@ export function ImportItemsDialog({ open, onOpenChange, loading = false, onSubmi
         <DialogHeader>
           <DialogTitle>Import products (CSV)</DialogTitle>
           <DialogDescription>
-            Upload a CSV or paste rows. Same format as Export — download the template to get started.
+            Upload a CSV or paste rows. Same format as Export (singles, variants, bundles). Category /
+            subcategory are resolved by name — existing names are reused, missing ones are created.
           </DialogDescription>
         </DialogHeader>
 
@@ -127,7 +128,7 @@ export function ImportItemsDialog({ open, onOpenChange, loading = false, onSubmi
               id="import-rows"
               className="min-h-40 font-mono text-xs"
               placeholder={
-                'itemCode,name,barcode,type,scale,status,purchasePrice,sellingPrice,quantity\nBEV-001,Cola 1.5L,890123,single,unit,active,80,120,48'
+                'rowKind,itemCode,name,...,category,subcategory,...\nproduct,BEV-001,Cola,...,Beverages,Soft Drinks,...'
               }
               value={text}
               onChange={(event) => {

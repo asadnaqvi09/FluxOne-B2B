@@ -1,21 +1,25 @@
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
 import { ProfileCard } from '@/components/feature/profile/ProfileCard'
 import { ProfileEditDialog } from '@/components/feature/profile/ProfileEditDialog'
 import { MotionHeader, MotionReveal } from '@/components/shared/MotionReveal'
 import { useAuthSession } from '@/hooks/useAuthSession'
+import { formatLoginExpires, getTokenExpiryDate } from '@/lib/authToken'
 import { updateProfile } from '@/rtk/features/auth/authSlice'
 import { useAppDispatch } from '@/rtk/hooks'
 import { toastSuccess, toastError } from '@/lib/toast'
 
 export function AdminProfilePage() {
   const dispatch = useAppDispatch()
-  const { user } = useAuthSession()
+  const { user, token } = useAuthSession()
   const [name, setName] = useState(user?.name || 'Admin')
   const [loginId, setLoginId] = useState(user?.email || user?.id || '')
   const [editOpen, setEditOpen] = useState(false)
   const [saving, setSaving] = useState(false)
   // Prefer live session (updates after save via authSlice)
   const imageUrl = user?.imageUrl || null
+  const loginExpires = useMemo(() => {
+    return formatLoginExpires(getTokenExpiryDate(token))
+  }, [token])
 
   async function handleSave(fields) {
     setSaving(true)
@@ -61,7 +65,7 @@ export function AdminProfilePage() {
           name={name}
           loginId={loginId}
           role="b2b_admin"
-          loginExpires="Session (JWT)"
+          loginExpires={loginExpires}
           onEdit={() => setEditOpen(true)}
           imageUrl={imageUrl}
         />

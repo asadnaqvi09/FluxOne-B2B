@@ -353,9 +353,18 @@ export function downloadBranchDashboardPdf({
     y = drawBwSectionTitle(doc, 'POS counters', y, margin)
     y = drawBwRow(doc, ['Counter', 'Sales', 'Orders'], y, margin, { bold: true })
     for (const c of counterList) {
+      // Prefer configured code/name — never print raw UUID
+      const code = String(c.code || '').trim()
+      const name = String(c.name || '').trim()
+      const uuidRe =
+        /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
+      const label =
+        (code && !uuidRe.test(code) && code) ||
+        (name && !uuidRe.test(name) && name) ||
+        'Unassigned till'
       y = drawBwRow(
         doc,
-        [c.name || '—', money(c.sales), `${Number(c.orders || 0)} orders`],
+        [label, money(c.sales), `${Number(c.orders || 0)} orders`],
         y,
         margin,
       )

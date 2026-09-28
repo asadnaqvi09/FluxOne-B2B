@@ -7,6 +7,22 @@ import { cn } from '@/lib/utils'
 
 const COUNTER_COLORS = [BRAND.purple, BRAND.deep, '#2563eb', '#16a34a']
 
+// Hide internal UUIDs — only show configured POS name/code
+const UUID_RE =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
+
+function isUuidLike(value) {
+  return UUID_RE.test(String(value || '').trim())
+}
+
+function displayCounterLabel(counter = {}) {
+  const code = String(counter.code || '').trim()
+  const name = String(counter.name || '').trim()
+  if (code && !isUuidLike(code)) return code
+  if (name && !isUuidLike(name)) return name
+  return 'Unassigned till'
+}
+
 export function CounterSalesCard({ counters = [], className }) {
   const { format } = useCurrency()
   const list = Array.isArray(counters) ? counters : []
@@ -23,7 +39,7 @@ export function CounterSalesCard({ counters = [], className }) {
     <SurfaceCard
       className={cn('w-full', className)}
       title="POS Counter Sales"
-      description="Sales per POS till — uses counter code, or cashier hardware ID when till was not synced"
+      description="Sales per configured POS counter name/code"
       actions={
         list.length > 0 ? (
           <span className="rounded-full bg-purple-50 px-3 py-1 text-xs font-semibold text-purple-900 border border-purple-100">
@@ -45,10 +61,11 @@ export function CounterSalesCard({ counters = [], className }) {
             const salesNum = Number(counter.sales) || 0
             const share = total > 0 ? ((salesNum / total) * 100).toFixed(1) : '0.0'
             const barColor = COUNTER_COLORS[index % COUNTER_COLORS.length]
+            const label = displayCounterLabel(counter)
 
             return (
               <div
-                key={counter.id || counter.name}
+                key={counter.id || label}
                 className="rounded-xl border border-slate-200/80 bg-slate-50/70 p-4 transition-all hover:bg-slate-50 hover:border-purple-200"
               >
                 <div className="flex items-center justify-between">
@@ -59,8 +76,10 @@ export function CounterSalesCard({ counters = [], className }) {
                     >
                       <Monitor className="size-4.5" />
                     </div>
-                    <div>
-                      <p className="text-sm font-bold text-slate-900">{counter.name}</p>
+                    <div className="min-w-0">
+                      <p className="truncate text-sm font-bold text-slate-900" title={label}>
+                        {label}
+                      </p>
                       <p className="text-xs text-slate-500">{counter.orders} orders processed</p>
                     </div>
                   </div>

@@ -158,10 +158,22 @@ export function asNullableUuid(value) {
   return String(value)
 }
 
+// Match a catalog tax row to the tenant default tax %.
+export function taxIdsForDefaultRate(taxes = [], defaultTaxPercent = 0) {
+  const rate = Number(defaultTaxPercent) || 0
+  if (rate <= 0) return []
+  const match = (taxes || []).find((tax) => Number(tax.ratePercent ?? tax.rate_percent) === rate)
+  return match?.id ? [match.id] : []
+}
+
 // Build JSON body or FormData when an image file is present.
 export function buildProductPayload(fields, { withConfirmed = true } = {}) {
   // Never send categoryId: "" — Zod uuid() → 422 Invalid uuid
   const categoryId = asOptionalUuid(fields.categoryId)
+  const taxIds = cleanUuidList(fields.taxIds)
+  // Include taxIds only when the caller set the key (incl. [] = explicit tax-exempt).
+  // Omit entirely on create so the server applies tenants.default_tax_percent.
+  const hasTaxIdsKey = Object.prototype.hasOwnProperty.call(fields, 'taxIds')
   const base = {
     name: String(fields.name || '').trim(),
     ...(categoryId ? { categoryId } : {}),
@@ -171,7 +183,13 @@ export function buildProductPayload(fields, { withConfirmed = true } = {}) {
     description: fields.description?.trim() || undefined,
     purchasePrice: Number(fields.purchasePrice ?? 0),
     sellingPrice: Number(fields.sellingPrice ?? 0),
-    taxIds: cleanUuidList(fields.taxIds),
+    ...(hasTaxIdsKey ? { taxIds } : {}),
+    // Optional override; omit → server uses tenant default profit %
+    ...(fields.profitPercent !== undefined &&
+    fields.profitPercent !== null &&
+    fields.profitPercent !== ''
+      ? { profitPercent: Number(fields.profitPercent) }
+      : {}),
     offerId: asOptionalUuid(fields.offerId),
     discountPercent:
       fields.discountPercent === '' || fields.discountPercent == null

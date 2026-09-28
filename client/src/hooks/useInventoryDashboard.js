@@ -1,4 +1,4 @@
-// useInventoryDashboard — RTK dashboard slice wrapper (Express → RTK → useInventoryDashboard)
+// useInventoryDashboard — RTK wrapper for inventory overview
 import { useCallback, useEffect } from 'react'
 import { useAppDispatch, useAppSelector } from '@/rtk/hooks'
 import {
@@ -15,7 +15,7 @@ export function useInventoryDashboard() {
     kpis,
     alerts,
     alertsPagination,
-    stockOutPie,
+    stockGraphRows,
     alertsPage,
     alertsLimit,
     loading,
@@ -49,7 +49,7 @@ export function useInventoryDashboard() {
     kpis,
     alerts,
     alertsPagination,
-    stockOutPie,
+    stockGraphRows,
     alertsPage,
     alertsLimit,
     setAlertsPage,

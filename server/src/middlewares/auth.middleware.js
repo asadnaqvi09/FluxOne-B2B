@@ -41,7 +41,12 @@ export async function authMiddleware(req, res, next) {
     }
     req.tenantId = decoded.tenantId
     next()
-  } catch {
-    return error(res, 'Invalid or expired token', 401)
+  } catch (err) {
+    // Expired or forged JWT only. A database blip must not look like a logout.
+    const name = err?.name
+    if (name === 'TokenExpiredError' || name === 'JsonWebTokenError' || name === 'NotBeforeError') {
+      return error(res, 'Invalid or expired token', 401)
+    }
+    return next(err)
   }
 }

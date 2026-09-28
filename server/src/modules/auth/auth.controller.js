@@ -220,9 +220,15 @@ export async function refresh(req, res) {
       return fail(res, 'Invalid refresh token', 401)
     }
 
-    // Reuse of a rotated/revoked token → kill all sessions for this user
+    // Reuse of a rotated token usually means theft. Two open tabs can present the
+    // same token in the same moment, so a just-rotated token must not kill the new session.
     if (stored.revokedAt) {
-      await revokeAllRefreshTokensForUser(stored.userId, stored.tenantId)
+      const revokedMs = new Date(stored.revokedAt).getTime()
+      const ageMs = Date.now() - revokedMs
+      const rotatedJustNow = Boolean(stored.replacedByJti) && ageMs >= 0 && ageMs < 30_000
+      if (!rotatedJustNow) {
+        await revokeAllRefreshTokensForUser(stored.userId, stored.tenantId)
+      }
       return fail(res, 'Invalid refresh token', 401)
     }
 
@@ -243,8 +249,13 @@ export async function refresh(req, res) {
     const payload = authPayload(user, tokens)
     payload.branches = await branchesForUser(user)
     return success(res, payload)
-  } catch {
-    return fail(res, 'Invalid refresh token', 401)
+  } catch (err) {
+    const name = err?.name
+    if (name === 'TokenExpiredError' || name === 'JsonWebTokenError' || name === 'NotBeforeError') {
+      return fail(res, 'Invalid refresh token', 401)
+    }
+    // Database and other failures stay 5xx so the client keeps the session.
+    throw err
   }
 }
 

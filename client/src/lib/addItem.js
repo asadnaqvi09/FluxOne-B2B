@@ -43,18 +43,15 @@ export function buildCombinations(selectedTypes) {
     combos = next
   }
 
-  return combos.map((parts, index) => {
+  return combos.map((parts) => {
     const label = parts.map((p) => p.valueName).join('–')
-    const slug = parts
-      .map((p) => p.valueName.replace(/\s+/g, '').slice(0, 6).toUpperCase())
-      .join('-')
-    const stamp = Date.now().toString(36).toUpperCase()
     return {
       key: parts.map((p) => p.valueId).join('|'),
       label,
       parts,
-      sku: `SKU-${slug}-${stamp}-${index + 1}`,
-      barcode: `890${String(Date.now()).slice(-8)}${String(index + 1).padStart(2, '0')}`.slice(0, 13),
+      // Assigned by the server on create (same as modal ItemFormDialog)
+      sku: '',
+      barcode: '',
       purchasePrice: '',
       sellingPrice: '',
       openingStock: '0',
@@ -79,6 +76,8 @@ export function buildAddItemApiPayload({
   const subcategoryId = form.subcategoryId || undefined
 
   if (productKind === PRODUCT_KIND.NORMAL) {
+    const itemCode = String(form.sku || '').trim()
+    const barcode = String(form.barcode || '').trim()
     return {
       name,
       description,
@@ -86,8 +85,8 @@ export function buildAddItemApiPayload({
       subcategoryId,
       type: 'single',
       scale: 'unit',
-      itemCode: String(form.sku || '').trim(),
-      barcode: String(form.barcode || '').trim(),
+      ...(itemCode ? { itemCode } : {}),
+      ...(barcode ? { barcode } : {}),
       purchasePrice: Number(form.purchasePrice) || 0,
       sellingPrice: Number(form.sellingPrice) || 0,
       quantity: Number(form.openingStock) || 0,
@@ -101,28 +100,32 @@ export function buildAddItemApiPayload({
   }
 
   const activeRows = combinations.filter((row) => row.status === 'active')
-  const variants = activeRows.map((row) => ({
-    label: row.label,
-    itemCode: String(row.sku || '').trim(),
-    barcode: String(row.barcode || '').trim(),
-    purchasePrice: Number(row.purchasePrice) || 0,
-    sellingPrice: Number(row.sellingPrice) || 0,
-    quantity: Number(row.openingStock) || 0,
-    reorderPoint:
-      row.lowStockThreshold === '' || row.lowStockThreshold == null
-        ? undefined
-        : Number(row.lowStockThreshold),
-    dailyPriceChange: Boolean(row.dailyPriceChange),
-    status: 'active',
-    parts: (row.parts || []).map((p) => ({
-      typeId: p.typeId,
-      typeName: p.typeName,
-      valueId: p.valueId,
-      valueName: p.valueName,
-      isCustomType: Boolean(p.isCustomType),
-      isCustomValue: Boolean(p.isCustomValue),
-    })),
-  }))
+  const variants = activeRows.map((row) => {
+    const itemCode = String(row.sku || '').trim()
+    const barcode = String(row.barcode || '').trim()
+    return {
+      label: row.label,
+      ...(itemCode ? { itemCode } : {}),
+      ...(barcode ? { barcode } : {}),
+      purchasePrice: Number(row.purchasePrice) || 0,
+      sellingPrice: Number(row.sellingPrice) || 0,
+      quantity: Number(row.openingStock) || 0,
+      reorderPoint:
+        row.lowStockThreshold === '' || row.lowStockThreshold == null
+          ? undefined
+          : Number(row.lowStockThreshold),
+      dailyPriceChange: Boolean(row.dailyPriceChange),
+      status: 'active',
+      parts: (row.parts || []).map((p) => ({
+        typeId: p.typeId,
+        typeName: p.typeName,
+        valueId: p.valueId,
+        valueName: p.valueName,
+        isCustomType: Boolean(p.isCustomType),
+        isCustomValue: Boolean(p.isCustomValue),
+      })),
+    }
+  })
 
   // TEMP: custom type/value metadata kept for BM notify (task 4)
   const customMeta = selectedTypes.map((t) => ({
@@ -148,6 +151,73 @@ export function buildAddItemApiPayload({
   }
 }
 
+// Order-independent identity for a combination (Flavour×Size === Size×Flavour)
+export function combinationMatchKey(parts = []) {
+  return (parts || [])
+    .map((p) => {
+      const type = String(p?.typeName || '')
+        .trim()
+        .toLowerCase()
+      const value = String(p?.valueName || p?.valueId || '')
+        .trim()
+        .toLowerCase()
+      if (!value) return null
+      return type ? `${type}:${value}` : value
+    })
+    .filter(Boolean)
+    .sort()
+    .join('|')
+}
+
+// Coalesce previous (loaded) SKUs onto a freshly built matrix by match key
+export function mergeCombinationMatrix(generated = [], previous = []) {
+  const byMatch = new Map()
+  for (const row of previous) {
+    const mk = combinationMatchKey(row.parts)
+    if (!mk) continue
+    // Prefer rows that already have a persisted productId
+    const prior = byMatch.get(mk)
+    if (!prior || (!prior.productId && row.productId)) {
+      byMatch.set(mk, row)
+    }
+  }
+
+  const byProductId = new Map(
+    previous.filter((r) => r.productId).map((r) => [r.productId, r]),
+  )
+
+  const usedIds = new Set()
+  const next = generated.map((row) => {
+    const mk = combinationMatchKey(row.parts)
+    const existing = mk ? byMatch.get(mk) : null
+    if (!existing) return row
+    if (existing.productId) usedIds.add(existing.productId)
+    return {
+      ...row,
+      ...existing,
+      // Matrix owns current type order / label / react key
+      label: row.label,
+      parts: row.parts,
+      key: row.key,
+      productId: existing.productId || null,
+      openingStock: existing.productId
+        ? existing.openingStock
+        : (existing.openingStock ?? row.openingStock),
+    }
+  })
+
+  // Keep existing SKUs whose values were deselected from the matrix
+  for (const [productId, row] of byProductId) {
+    if (usedIds.has(productId)) continue
+    next.push({
+      ...row,
+      key: row.key || combinationMatchKey(row.parts) || productId,
+    })
+  }
+
+  return next
+}
+
 // Map product detail → combination rows (edit)
 export function variantsToCombinationRows(variants = []) {
   return (variants || []).map((v) => {
@@ -160,6 +230,7 @@ export function variantsToCombinationRows(variants = []) {
       isCustomValue: Boolean(p.isCustomValue),
     }))
     const key =
+      combinationMatchKey(parts) ||
       parts.map((p) => p.valueId || p.valueName).join('|') ||
       v.id ||
       `row-${v.variantLabel || v.label}`
@@ -265,6 +336,8 @@ export function buildEditItemApiPayload({
   const subcategoryId = form.subcategoryId || undefined
 
   if (productKind === PRODUCT_KIND.NORMAL) {
+    const itemCode = String(form.sku || '').trim()
+    const barcode = String(form.barcode || '').trim()
     return {
       name,
       description,
@@ -272,8 +345,8 @@ export function buildEditItemApiPayload({
       subcategoryId,
       type: 'single',
       scale: 'unit',
-      itemCode: String(form.sku || '').trim(),
-      barcode: String(form.barcode || '').trim(),
+      ...(itemCode ? { itemCode } : {}),
+      ...(barcode ? { barcode } : {}),
       purchasePrice: Number(form.purchasePrice) || 0,
       sellingPrice: Number(form.sellingPrice) || 0,
       reorderPoint:
@@ -286,10 +359,12 @@ export function buildEditItemApiPayload({
   }
 
   const variants = combinations.map((row) => {
+    const itemCode = String(row.sku || '').trim()
+    const barcode = String(row.barcode || '').trim()
     const base = {
       label: row.label,
-      itemCode: String(row.sku || '').trim(),
-      barcode: String(row.barcode || '').trim(),
+      ...(itemCode ? { itemCode } : {}),
+      ...(barcode ? { barcode } : {}),
       purchasePrice: Number(row.purchasePrice) || 0,
       sellingPrice: Number(row.sellingPrice) || 0,
       reorderPoint:
@@ -310,7 +385,7 @@ export function buildEditItemApiPayload({
     if (row.productId) {
       return { ...base, id: row.productId }
     }
-    // New SKU — opening stock allowed
+    // New SKU — opening stock allowed; codes generated on server if omitted
     return {
       ...base,
       quantity: Number(row.openingStock) || 0,

@@ -20,7 +20,9 @@ import {
   PRODUCT_KIND,
   buildCombinations,
   buildEditItemApiPayload,
+  combinationMatchKey,
   hydrateVariantSelectionFromRows,
+  mergeCombinationMatrix,
   variantsToCombinationRows,
 } from '@/lib/addItem'
 import { PRODUCT_TYPES } from '@/lib/mapProduct'
@@ -102,7 +104,10 @@ export function EditItemPage() {
   )
 
   const selectedTypes = useMemo(
-    () => variantTypes.filter((t) => selectedTypeIds.includes(t.id)),
+    () =>
+      selectedTypeIds
+        .map((id) => variantTypes.find((t) => t.id === id))
+        .filter(Boolean),
     [variantTypes, selectedTypeIds],
   )
 
@@ -236,11 +241,11 @@ export function EditItemPage() {
     setVariantTypes(merged)
     setSelectedTypeIds(typeIds)
     setSelectedValuesByType(valuesMap)
-    // Re-key rows so rebuild matches catalog ids
+    // Re-key with order-independent match so rebuild can coalesce old SKUs
     setCombinations((prev) =>
       prev.map((row) => ({
         ...row,
-        key: (row.parts || []).map((p) => p.valueId || p.valueName).join('|') || row.key,
+        key: combinationMatchKey(row.parts) || row.key,
       })),
     )
     setHydrated(true)
@@ -256,7 +261,7 @@ export function EditItemPage() {
     })
   }, [selectedTypeIds])
 
-  // Rebuild matrix when values change — keep existing edits / productIds
+  // Rebuild matrix when values change — coalesce existing SKUs (order-independent)
   useEffect(() => {
     if (!isVariant || !hydrated) return
     const forBuild = selectedTypes.map((t) => ({
@@ -267,31 +272,9 @@ export function EditItemPage() {
     }))
     const generated = buildCombinations(forBuild)
     setCombinations((prev) => {
-      const byKey = new Map(prev.map((r) => [r.key, r]))
-      const byProductId = new Map(
-        prev.filter((r) => r.productId).map((r) => [r.productId, r]),
-      )
-      const next = generated.map((row) => {
-        const existing = byKey.get(row.key)
-        if (!existing) return row
-        return {
-          ...row,
-          ...existing,
-          label: row.label,
-          parts: row.parts,
-          key: row.key,
-          productId: existing.productId || null,
-          openingStock: existing.productId ? existing.openingStock : row.openingStock,
-        }
-      })
-      const usedIds = new Set(next.map((r) => r.productId).filter(Boolean))
-      // Keep existing SKUs even if their values were deselected from the matrix
-      for (const [productId, row] of byProductId) {
-        if (usedIds.has(productId)) continue
-        next.push(row)
-      }
+      const next = mergeCombinationMatrix(generated, prev)
       const nextKeys = new Set(next.map((r) => r.key))
-      setSelectedComboKeys((prev) => prev.filter((k) => nextKeys.has(k)))
+      setSelectedComboKeys((keys) => keys.filter((k) => nextKeys.has(k)))
       return next
     })
   }, [isVariant, hydrated, selectedTypes, selectedValuesByType])
@@ -350,9 +333,6 @@ export function EditItemPage() {
         if (row.purchasePrice === '' || row.sellingPrice === '') {
           return `Fill purchase & selling price for active row “${row.label}”`
         }
-        if (!row.sku?.trim() || !row.barcode?.trim()) {
-          return `SKU and barcode required for “${row.label}”`
-        }
       }
       if (!combinations.some((r) => r.status === 'active')) {
         return 'At least one active combination is required'
@@ -361,9 +341,6 @@ export function EditItemPage() {
     if (tabId === 'save' && isNormal) {
       if (form.purchasePrice === '' || form.sellingPrice === '') {
         return 'Purchase and selling price are required'
-      }
-      if (!form.sku?.trim() || !form.barcode?.trim()) {
-        return 'SKU and barcode are required'
       }
     }
     return null

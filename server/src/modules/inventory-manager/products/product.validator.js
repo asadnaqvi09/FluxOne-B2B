@@ -63,7 +63,8 @@ const variantSkuSchema = z.object({
   label: z.string().min(1),
   itemCode: z.string().min(1).optional(),
   sku: z.string().min(1).optional(),
-  barcode: z.string().min(1),
+  // Optional — server generates when omitted (same as single-item create)
+  barcode: z.string().min(1).optional(),
   purchasePrice: z.coerce.number().int().nonnegative(),
   sellingPrice: z.coerce.number().int().nonnegative(),
   quantity: z.coerce.number().int().nonnegative().optional().default(0),
@@ -252,7 +253,8 @@ const variantSkuUpdateSchema = z.object({
   label: z.string().min(1),
   itemCode: z.string().min(1).optional(),
   sku: z.string().min(1).optional(),
-  barcode: z.string().min(1),
+  // Optional for new child SKUs — server generates when omitted
+  barcode: z.string().min(1).optional(),
   purchasePrice: z.coerce.number().int().nonnegative(),
   sellingPrice: z.coerce.number().int().nonnegative(),
   // Opening stock only for NEW child SKUs (existing stock via Control)

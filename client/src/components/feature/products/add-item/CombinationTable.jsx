@@ -190,18 +190,38 @@ export function CombinationTable({
                     ) : null}
                   </td>
                   <td className="px-3 py-2">
-                    <Input
-                      value={row.sku}
-                      onChange={(e) => onChangeRow?.(row.key, { sku: e.target.value })}
-                      className="h-8 min-w-[120px] font-mono text-xs"
-                    />
+                    {isEdit && row.productId && row.sku ? (
+                      <Input
+                        value={row.sku}
+                        disabled
+                        className="h-8 min-w-[120px] bg-slate-50 font-mono text-xs text-slate-600"
+                        title="System-owned item code"
+                      />
+                    ) : (
+                      <Input
+                        value=""
+                        disabled
+                        placeholder="System auto-generated"
+                        className="h-8 min-w-[120px] bg-slate-50 font-mono text-xs text-slate-500"
+                      />
+                    )}
                   </td>
                   <td className="px-3 py-2">
-                    <Input
-                      value={row.barcode}
-                      onChange={(e) => onChangeRow?.(row.key, { barcode: e.target.value })}
-                      className="h-8 min-w-[110px] font-mono text-xs"
-                    />
+                    {isEdit && row.productId && row.barcode ? (
+                      <Input
+                        value={row.barcode}
+                        disabled
+                        className="h-8 min-w-[110px] bg-slate-50 font-mono text-xs text-slate-600"
+                        title="System-owned barcode"
+                      />
+                    ) : (
+                      <Input
+                        value=""
+                        disabled
+                        placeholder="System auto-generated"
+                        className="h-8 min-w-[110px] bg-slate-50 font-mono text-xs text-slate-500"
+                      />
+                    )}
                   </td>
                   <td className="px-3 py-2">
                     <WholeNumberInput
@@ -290,8 +310,8 @@ export function CombinationTable({
         </table>
         <p className="border-t border-border bg-slate-50 px-3 py-2 text-[11px] text-slate-500">
           {isEdit
-            ? 'Existing stock is read-only (use Control). New combinations can set opening stock. Active rows need purchase & selling.'
-            : 'Tick rows for “Apply to selected”, or leave none selected to apply to all. Active rows need purchase & selling before Save.'}
+            ? 'SKU & barcode are system-owned. Existing stock is read-only (use Control). New combinations get codes on save. Active rows need purchase & selling.'
+            : 'SKU & barcode are system auto-generated on save. Tick rows for “Apply to selected”, or leave none selected to apply to all. Active rows need purchase & selling.'}
         </p>
       </div>
     </div>
@@ -300,26 +320,32 @@ export function CombinationTable({
 
 export function NormalProductFields({ form, patch, stockMode = 'create' }) {
   const stockLocked = stockMode === 'edit'
+  const isEdit = stockMode === 'edit'
   return (
     <div className="grid gap-4 sm:grid-cols-2">
       <div className="space-y-1.5">
         <Label htmlFor="normal-sku">SKU / Item code</Label>
         <Input
           id="normal-sku"
-          value={form.sku}
-          onChange={(e) => patch('sku', e.target.value)}
-          placeholder="Auto or manual"
-          className="font-mono"
+          value={isEdit ? form.sku || '—' : ''}
+          disabled
+          placeholder="System auto-generated on create"
+          className="bg-slate-50 font-mono text-slate-500"
         />
+        {!isEdit ? (
+          <p className="text-[11px] text-slate-400">
+            System-owned — assigned automatically when you create the product.
+          </p>
+        ) : null}
       </div>
       <div className="space-y-1.5">
         <Label htmlFor="normal-barcode">Barcode</Label>
         <Input
           id="normal-barcode"
-          value={form.barcode}
-          onChange={(e) => patch('barcode', e.target.value)}
-          placeholder="Scan or type"
-          className="font-mono"
+          value={isEdit ? form.barcode || '—' : ''}
+          disabled
+          placeholder="System auto-generated on create"
+          className="bg-slate-50 font-mono text-slate-500"
         />
       </div>
       <div className="space-y-1.5">

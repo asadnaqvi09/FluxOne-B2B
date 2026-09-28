@@ -220,17 +220,11 @@ export function AddItemPage() {
         if (row.purchasePrice === '' || row.sellingPrice === '') {
           return `Fill purchase & selling price for active row “${row.label}”`
         }
-        if (!row.sku?.trim() || !row.barcode?.trim()) {
-          return `SKU and barcode required for “${row.label}”`
-        }
       }
     }
     if (tabId === 'save' && isNormal) {
       if (form.purchasePrice === '' || form.sellingPrice === '') {
         return 'Purchase and selling price are required'
-      }
-      if (!form.sku?.trim() || !form.barcode?.trim()) {
-        return 'SKU and barcode are required'
       }
     }
     return null
@@ -461,7 +455,7 @@ export function AddItemPage() {
                 {
                   id: PRODUCT_KIND.NORMAL,
                   title: 'Normal Product',
-                  body: 'Single SKU — price, stock, barcode on the Save tab.',
+                  body: 'Single SKU — price & stock on Save; item code & barcode auto-generated.',
                 },
                 {
                   id: PRODUCT_KIND.VARIANT,

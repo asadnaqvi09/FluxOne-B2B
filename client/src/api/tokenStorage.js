@@ -2,6 +2,13 @@ const TOKEN_KEY = 'fluxone.auth.token'
 const REFRESH_TOKEN_KEY = 'fluxone.auth.refresh'
 const USER_KEY = 'fluxone.auth.user'
 
+// Keys another tab must observe so login, refresh, and logout stay in sync.
+export const AUTH_STORAGE_KEYS = [TOKEN_KEY, REFRESH_TOKEN_KEY, USER_KEY]
+
+export function isAuthStorageKey(key) {
+  return AUTH_STORAGE_KEYS.includes(key)
+}
+
 export const tokenStorage = {
   getToken() {
     return localStorage.getItem(TOKEN_KEY)

@@ -1,6 +1,7 @@
 import crypto from 'crypto'
 import { tenantClientQuery, tenantQuery, withTransaction } from '../../../config/db.js'
 import { MOVEMENT_TYPES, PRODUCT_TYPES } from '../../../config/constants.js'
+import { generateBarcodeValue, generateItemCode } from '../../../utils/barcode.util.js'
 import { normalizeImageUrl } from '../../../utils/uploadUrl.util.js'
 import { insertLedgerEventInTx } from '../control/control.model.js'
 
@@ -1152,11 +1153,12 @@ export async function createVariantProduct(tenantId, payload) {
       for (const [index, variant] of variants.entries()) {
         const label = String(variant.label || '').trim()
         if (!label) throw httpError(422, `Variant #${index + 1}: label is required`)
-        const itemCode = String(variant.itemCode || variant.sku || '').trim()
-        const barcode = String(variant.barcode || '').trim()
-        if (!itemCode || !barcode) {
-          throw httpError(422, `Variant “${label}”: item code and barcode are required`)
-        }
+        const itemCode =
+          String(variant.itemCode || variant.sku || '').trim() ||
+          `${generateItemCode()}-${index + 1}`
+        const barcode =
+          String(variant.barcode || '').trim() ||
+          `${generateBarcodeValue().slice(0, 11)}${String(index + 1).padStart(2, '0')}`
 
         const purchasePrice = Number(variant.purchasePrice) || 0
         let sellingPrice = Number(variant.sellingPrice) || 0
@@ -1379,11 +1381,8 @@ async function syncVariantChildrenInTx(client, tenantId, parent, payload, { bran
   for (const [index, variant] of variants.entries()) {
     const label = String(variant.label || '').trim()
     if (!label) throw httpError(422, `Variant #${index + 1}: label is required`)
-    const itemCode = String(variant.itemCode || variant.sku || '').trim()
-    const barcode = String(variant.barcode || '').trim()
-    if (!itemCode || !barcode) {
-      throw httpError(422, `Variant “${label}”: item code and barcode are required`)
-    }
+    let itemCode = String(variant.itemCode || variant.sku || '').trim()
+    let barcode = String(variant.barcode || '').trim()
 
     const purchasePrice = Number(variant.purchasePrice) || 0
     const sellingPrice = Number(variant.sellingPrice) || 0
@@ -1399,7 +1398,8 @@ async function syncVariantChildrenInTx(client, tenantId, parent, payload, { bran
         client,
         tenantId,
         `
-          SELECT id FROM products
+          SELECT id, item_code AS "itemCode", barcode
+          FROM products
           WHERE tenant_id = $1 AND id = $2 AND parent_id = $3
           LIMIT 1
         `,
@@ -1408,6 +1408,8 @@ async function syncVariantChildrenInTx(client, tenantId, parent, payload, { bran
       if (!owned[0]) {
         throw httpError(404, `Variant SKU not found under this product (${label})`)
       }
+      itemCode = itemCode || owned[0].itemCode
+      barcode = barcode || owned[0].barcode
 
       await tenantClientQuery(
         client,
@@ -1462,7 +1464,12 @@ async function syncVariantChildrenInTx(client, tenantId, parent, payload, { bran
 
       children.push({ id: variant.id, label, itemCode, barcode })
     } else {
-      // New combination under existing parent
+      // New combination — system generates codes when omitted
+      itemCode = itemCode || `${generateItemCode()}-${index + 1}`
+      barcode =
+        barcode ||
+        `${generateBarcodeValue().slice(0, 11)}${String(index + 1).padStart(2, '0')}`
+
       const child = await insertProductRow(client, tenantId, {
         branchId: effectiveBranchId,
         categoryId,

@@ -172,7 +172,8 @@ const authSlice = createSlice({
         tokenStorage.setUser(user)
       })
       .addCase(fetchCurrentUser.fulfilled, (state, action) => {
-        if (!action.payload) return
+        // A late /me must not restore a user after this tab already signed out.
+        if (!state.isAuthenticated || !action.payload) return
         state.user = action.payload
         state.role = action.payload?.role || state.role
         tokenStorage.setUser(action.payload)

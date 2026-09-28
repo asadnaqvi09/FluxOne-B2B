@@ -78,6 +78,13 @@ export function EditItemPage() {
   const isVariant = form.productKind === PRODUCT_KIND.VARIANT
   const isNormal = form.productKind === PRODUCT_KIND.NORMAL
 
+  // One gate for the whole page — avoid section-by-section flashes
+  const pageReady =
+    !loading &&
+    !catalogLoading &&
+    Boolean(form.productKind) &&
+    (form.productKind !== PRODUCT_KIND.VARIANT || hydrated)
+
   const categories = catalog.parents || []
   const subcategories = useMemo(() => {
     if (!form.categoryId) return []
@@ -134,13 +141,15 @@ export function EditItemPage() {
     }
   }, [])
 
-  // Load product detail
+  // Load product detail once per id (stable deps — avoid re-fetch flicker)
   useEffect(() => {
     if (!id) return
     let cancelled = false
     async function load() {
       setLoading(true)
       setHydrated(false)
+      setTab('basic')
+      setError(null)
       const result = await fetchProductDetail(id)
       if (cancelled) return
       if (!result.success) {
@@ -208,7 +217,8 @@ export function EditItemPage() {
     return () => {
       cancelled = true
     }
-  }, [id, fetchProductDetail, navigate])
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- only re-load when route id changes
+  }, [id])
 
   // Merge existing combination parts into variant type catalog after both loaded
   useEffect(() => {
@@ -430,11 +440,22 @@ export function EditItemPage() {
   const tabIndex = visibleTabs.findIndex((t) => t.id === tab)
   const newComboCount = combinations.filter((r) => !r.productId).length
 
-  if (loading) {
+  // Single loading shell until product + catalog (+ variant hydrate) are ready
+  if (!pageReady) {
     return (
       <div className="space-y-5 pb-8">
         <PageHeader title="Edit Item" description="Loading product…" />
-        <p className="text-sm text-slate-500">Loading…</p>
+        <SurfaceCard title="Loading" description="Preparing the edit form.">
+          <div className="space-y-3 animate-pulse">
+            <div className="h-10 rounded-lg bg-slate-100" />
+            <div className="h-24 rounded-lg bg-slate-100" />
+            <div className="grid gap-3 sm:grid-cols-2">
+              <div className="h-10 rounded-lg bg-slate-100" />
+              <div className="h-10 rounded-lg bg-slate-100" />
+            </div>
+            <div className="h-28 rounded-lg bg-slate-100" />
+          </div>
+        </SurfaceCard>
       </div>
     )
   }
@@ -557,6 +578,17 @@ export function EditItemPage() {
                     </option>
                   ))}
                 </NativeSelect>
+              </div>
+              {/* Optional product image — Basic Info (parent-level) */}
+              <div className="sm:col-span-2">
+                <ImageUploadField
+                  id="edit-item-image"
+                  label="Image"
+                  optionalLabel="(optional)"
+                  value={form.image}
+                  existingImageUrl={form.imageUrl}
+                  onChange={(file) => patch('image', file)}
+                />
               </div>
             </div>
           ) : null}
@@ -706,15 +738,6 @@ export function EditItemPage() {
                   </div>
                 </div>
               )}
-
-              <ImageUploadField
-                id="edit-item-image"
-                label="Product image"
-                optionalLabel="optional"
-                value={form.image}
-                existingImageUrl={form.imageUrl}
-                onChange={(file) => patch('image', file)}
-              />
             </div>
           ) : null}
 

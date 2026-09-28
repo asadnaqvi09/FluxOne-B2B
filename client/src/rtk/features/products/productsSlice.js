@@ -11,6 +11,7 @@ import {
 import { productsToCsv } from '@/lib/productCsv'
 import {
   getProductCatalog,
+  patchCatalogCategoryActive,
   peekProductCatalog,
   refreshProductCategories,
 } from '@/lib/productCatalogCache'
@@ -37,6 +38,27 @@ function catalogToState(catalog) {
     taxes: catalog.taxes || [],
     offers: catalog.offers || [],
   }
+}
+
+// Optimistic isActive patch on Redux catalog (mirrors patchCatalogCategoryActive)
+function patchStateCatalogActive(state, id, isActive) {
+  if (!id || !state.catalog) return
+  const parents = state.catalog.parents || []
+  const isParent = parents.some((row) => row.id === id)
+  const shouldPatch = (row) => {
+    if (row.id === id) return true
+    if (!isActive && isParent && row.parentId === id) return true
+    return false
+  }
+  const patchRow = (row) => (shouldPatch(row) ? { ...row, isActive } : row)
+
+  state.catalog.parents = parents.map(patchRow)
+  const children = state.catalog.childrenByParent || {}
+  for (const key of Object.keys(children)) {
+    children[key] = (children[key] || []).map(patchRow)
+  }
+  state.catalog.childrenByParent = children
+  state.catalog.all = (state.catalog.all || []).map(patchRow)
 }
 
 function defaultFilters(overrides = {}) {
@@ -340,7 +362,8 @@ export const deleteCategory = createAsyncThunk(
   async (id, { dispatch, rejectWithValue }) => {
     const result = await apiClient.delete(endpoints.products.category(id))
     if (!result.success) return rejectWithValue(result.error || 'Delete category failed')
-    // Soft-delete on server → force catalog reload (no-store + cache-bust)
+    // Soft-delete — patch module cache immediately, then reload from server
+    patchCatalogCategoryActive(id, false)
     await dispatch(reloadProductCategories())
     return { ...(result.data || {}), id, isActive: false }
   },
@@ -351,7 +374,8 @@ export const setCategoryActive = createAsyncThunk(
   async ({ id, isActive }, { dispatch, rejectWithValue }) => {
     const result = await apiClient.patch(endpoints.products.category(id), { isActive })
     if (!result.success) return rejectWithValue(result.error || 'Status update failed')
-    // Reload so parent deactivate cascade (children) stays in sync with server
+    // Patch cache first so UI drops inactive rows before reload settles
+    patchCatalogCategoryActive(id, isActive)
     await dispatch(reloadProductCategories())
     return { id, isActive }
   },
@@ -508,8 +532,11 @@ const productsSlice = createSlice({
       .addCase(deleteCategory.pending, (state) => {
         state.mutating = true
       })
-      .addCase(deleteCategory.fulfilled, (state) => {
+      .addCase(deleteCategory.fulfilled, (state, action) => {
         state.mutating = false
+        // Immediate UI remove from Active filter (soft-delete → isActive false)
+        const id = action.payload?.id
+        if (id) patchStateCatalogActive(state, id, false)
       })
       .addCase(deleteCategory.rejected, (state) => {
         state.mutating = false
@@ -517,8 +544,10 @@ const productsSlice = createSlice({
       .addCase(setCategoryActive.pending, (state) => {
         state.mutating = true
       })
-      .addCase(setCategoryActive.fulfilled, (state) => {
+      .addCase(setCategoryActive.fulfilled, (state, action) => {
         state.mutating = false
+        const { id, isActive } = action.payload || {}
+        if (id != null) patchStateCatalogActive(state, id, Boolean(isActive))
       })
       .addCase(setCategoryActive.rejected, (state) => {
         state.mutating = false

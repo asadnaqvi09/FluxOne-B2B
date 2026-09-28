@@ -1,8 +1,8 @@
 import { useMemo, useState } from 'react'
 import { FolderTree, Pencil, Plus, Trash2 } from 'lucide-react'
 import { CategoryDialog } from '@/components/feature/products/CategoryDialog'
-import { ProductStatusToggle } from '@/components/feature/products/ProductStatusToggle'
 import { ConfirmDialog } from '@/components/shared/ConfirmDialog'
+import { EntityStatusToggle } from '@/components/shared/EntityStatusToggle'
 import { DeleteEntityDialog } from '@/components/shared/DeleteEntityDialog'
 import { MotionHeader } from '@/components/shared/MotionReveal'
 import { PageHeader } from '@/components/shared/PageHeader'
@@ -294,10 +294,11 @@ export function CategoriesPage() {
         )}
         renderParentActions={(parent) => (
           <>
-            <ProductStatusToggle
+            {/* Active / Inactive — not Open/Close (product availability wording) */}
+            <EntityStatusToggle
               status={parent.isActive === false ? 'inactive' : 'active'}
               loading={statusUpdatingId === parent.id}
-              onChange={(status) => handleStatusChange(parent, status === 'active')}
+              onChange={(nextActive) => handleStatusChange(parent, nextActive)}
             />
             {parent.isActive !== false ? (
               <Button
@@ -349,10 +350,10 @@ export function CategoriesPage() {
               </span>
             </div>
             <div className="flex items-center gap-1">
-              <ProductStatusToggle
+              <EntityStatusToggle
                 status={child.isActive === false ? 'inactive' : 'active'}
                 loading={statusUpdatingId === child.id}
-                onChange={(status) => handleStatusChange(child, status === 'active')}
+                onChange={(nextActive) => handleStatusChange(child, nextActive)}
               />
               <Button
                 type="button"

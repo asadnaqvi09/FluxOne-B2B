@@ -6,7 +6,7 @@ const INVENTORY_NAV = [
   { to: PATHS.inventory.dashboard, label: 'Dashboard', end: true },
   { to: PATHS.inventory.categories, label: 'Categories', end: false },
   { to: PATHS.inventory.products, label: 'Products', end: false },
-  { to: PATHS.inventory.bundles, label: 'Bundles', end: false },
+  // { to: PATHS.inventory.bundles, label: 'Bundles', end: false },
   { to: PATHS.inventory.control, label: 'Control', end: false },
   { to: PATHS.inventory.suppliers, label: 'Suppliers', end: false },
   { to: PATHS.inventory.orders, label: 'Orders', end: false },

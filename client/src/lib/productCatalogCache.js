@@ -18,6 +18,8 @@ let cache = {
   fetchedAt: 0,
   inFlight: null,
 }
+// Bumped on category refresh so a stale full-catalog fetch cannot overwrite delete/status
+let cacheGeneration = 0
 
 function isFresh() {
   return Boolean(cache.data) && Date.now() - cache.fetchedAt < TTL_MS
@@ -52,6 +54,7 @@ export async function getProductCatalog(options = {}) {
   if (!force && isFresh()) return cache.data
   if (!force && cache.inFlight) return cache.inFlight
 
+  const generation = cacheGeneration
   cache.inFlight = (async () => {
     try {
       const [catsRes, taxesRes, offersRes] = await Promise.all([
@@ -59,13 +62,15 @@ export async function getProductCatalog(options = {}) {
         apiClient.get(endpoints.products.taxes),
         apiClient.get(endpoints.products.offers),
       ])
+      // A category CRUD refresh landed first — keep that catalog, drop this stale apply
+      if (generation !== cacheGeneration) return cache.data
       return applyFull({
         categories: catsRes.success && Array.isArray(catsRes.data) ? catsRes.data : [],
         taxes: taxesRes.success && Array.isArray(taxesRes.data) ? taxesRes.data : [],
         offers: offersRes.success && Array.isArray(offersRes.data) ? offersRes.data : [],
       })
     } finally {
-      cache.inFlight = null
+      if (generation === cacheGeneration) cache.inFlight = null
     }
   })()
 
@@ -74,6 +79,9 @@ export async function getProductCatalog(options = {}) {
 
 // After category/subcategory CRUD — refresh categories only; keep taxes/offers.
 export async function refreshProductCategories() {
+  // Invalidate in-flight full catalog so it cannot overwrite this refresh
+  cacheGeneration += 1
+  cache.inFlight = null
   // Cache-bust query so intermediaries cannot serve a pre-delete list
   const catsRes = await apiClient.get(endpoints.products.categories, {
     _ts: Date.now(),
@@ -114,5 +122,6 @@ export function patchCatalogCategoryActive(id, isActive) {
 }
 
 export function invalidateProductCatalog() {
+  cacheGeneration += 1
   cache = { data: null, fetchedAt: 0, inFlight: null }
 }

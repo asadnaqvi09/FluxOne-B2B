@@ -82,17 +82,61 @@ export async function createCategory(tenantId, { name, parentId, imageUrl, branc
     if (!parents[0].isActive) throw httpError(409, 'Cannot add subcategory under an inactive category')
   }
 
-  const { rows } = await tenantQuery(
+  // Soft-deleted row with same name — reactivate instead of INSERT (unique index includes inactive)
+  const { rows: existing } = await tenantQuery(
     tenantId,
     `
-      INSERT INTO categories (tenant_id, branch_id, parent_id, name, image_url, is_active)
-      VALUES ($1, $2, $3, $4, $5, true)
-      RETURNING id, parent_id AS "parentId", name, image_url AS "imageUrl", is_active AS "isActive",
+      SELECT id, parent_id AS "parentId", name, image_url AS "imageUrl", is_active AS "isActive",
         branch_id AS "branchId"
+      FROM categories
+      WHERE tenant_id = $1
+        AND branch_id = $2
+        AND name = $3
+        AND (
+          ($4::uuid IS NULL AND parent_id IS NULL)
+          OR parent_id = $4
+        )
+      LIMIT 1
     `,
-    [branchId, parentId || null, name, imageUrl || null],
+    [branchId, name, parentId || null],
   )
-  return mapCategoryRow(rows[0])
+
+  if (existing[0]) {
+    if (existing[0].isActive) {
+      throw httpError(409, 'A category with this name already exists')
+    }
+    const params = [existing[0].id]
+    const imageSet = imageUrl ? `, image_url = $3` : ''
+    if (imageUrl) params.push(imageUrl)
+    const { rows } = await tenantQuery(
+      tenantId,
+      `
+        UPDATE categories
+        SET is_active = true${imageSet}
+        WHERE tenant_id = $1 AND id = $2
+        RETURNING id, parent_id AS "parentId", name, image_url AS "imageUrl", is_active AS "isActive",
+          branch_id AS "branchId"
+      `,
+      params,
+    )
+    return mapCategoryRow(rows[0])
+  }
+
+  try {
+    const { rows } = await tenantQuery(
+      tenantId,
+      `
+        INSERT INTO categories (tenant_id, branch_id, parent_id, name, image_url, is_active)
+        VALUES ($1, $2, $3, $4, $5, true)
+        RETURNING id, parent_id AS "parentId", name, image_url AS "imageUrl", is_active AS "isActive",
+          branch_id AS "branchId"
+      `,
+      [branchId, parentId || null, name, imageUrl || null],
+    )
+    return mapCategoryRow(rows[0])
+  } catch (err) {
+    mapUniqueViolation(err, 'A category with this name already exists')
+  }
 }
 
 export async function updateCategory(tenantId, id, { name, imageUrl, isActive, branchId = null }) {

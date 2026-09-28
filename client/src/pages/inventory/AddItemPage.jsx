@@ -3,6 +3,7 @@ import { Link, useNavigate } from 'react-router-dom'
 import { ArrowLeft, ArrowRight, Check } from 'lucide-react'
 import { CombinationTable, NormalProductFields } from '@/components/feature/products/add-item/CombinationTable'
 import { SearchableMultiSelect } from '@/components/feature/products/add-item/SearchableMultiSelect'
+import { ImageUploadField } from '@/components/shared/ImageUploadField'
 import { MotionHeader, MotionReveal } from '@/components/shared/MotionReveal'
 import { PageHeader } from '@/components/shared/PageHeader'
 import { SurfaceCard } from '@/components/shared/SurfaceCard'
@@ -43,6 +44,8 @@ function emptyForm() {
     openingStock: '0',
     lowStockThreshold: '',
     dailyPriceChange: false,
+    // Optional product image (File) — uploaded after create via PATCH
+    image: null,
   }
 }
 
@@ -288,6 +291,8 @@ export function AddItemPage() {
         selectedTypes,
         selectedValuesByType,
       })
+      // Attach optional image for create → then image PATCH
+      if (form.image) payload.image = form.image
       // TEMP: inspect custom meta until BM notify (task 4)
       if (payload._customVariantMeta) {
         console.info('[AddItem custom variant meta]', payload._customVariantMeta)
@@ -436,6 +441,16 @@ export function AddItemPage() {
                     </option>
                   ))}
                 </NativeSelect>
+              </div>
+              {/* Optional product image — Basic Info (parent-level) */}
+              <div className="sm:col-span-2">
+                <ImageUploadField
+                  id="add-item-image"
+                  label="Image"
+                  optionalLabel="(optional)"
+                  value={form.image}
+                  onChange={(file) => patch('image', file)}
+                />
               </div>
             </div>
           ) : null}

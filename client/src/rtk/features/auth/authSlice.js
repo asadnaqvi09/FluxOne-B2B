@@ -53,14 +53,20 @@ function buildProfileUpdateBody(payload) {
       name: payload.name,
       id: payload.id,
     }
-    if (payload.password) body.password = payload.password
+    if (payload.password) {
+      body.password = payload.password
+      if (payload.currentPassword) body.currentPassword = payload.currentPassword
+    }
     return body
   }
 
   const form = new FormData()
   if (payload.name) form.append('name', payload.name)
   if (payload.id) form.append('id', payload.id)
-  if (payload.password) form.append('password', payload.password)
+  if (payload.password) {
+    form.append('password', payload.password)
+    if (payload.currentPassword) form.append('currentPassword', payload.currentPassword)
+  }
   form.append('image', payload.image)
   return form
 }

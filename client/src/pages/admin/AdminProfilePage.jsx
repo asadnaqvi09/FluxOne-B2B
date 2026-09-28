@@ -29,6 +29,7 @@ export function AdminProfilePage() {
           name: fields.name?.trim(),
           id: (fields.id || fields.loginId || '').trim(),
           password: fields.password || undefined,
+          currentPassword: fields.currentPassword || undefined,
           image: fields.image,
         }),
       )

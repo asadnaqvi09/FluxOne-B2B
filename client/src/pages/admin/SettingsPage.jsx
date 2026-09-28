@@ -4,6 +4,7 @@ import { PageHeader } from '@/components/shared/PageHeader'
 import { MotionHeader, MotionReveal } from '@/components/shared/MotionReveal'
 import { EmptyState } from '@/components/shared/EmptyState'
 import { SlowLoadingBanner, useSlowLoadingHint } from '@/components/shared/SlowLoadingBanner'
+import { FieldError } from '@/components/shared/FieldError'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -22,6 +23,8 @@ import { ConfirmDialog } from '@/components/shared/ConfirmDialog'
 import { DataCard, ResponsiveDataShell } from '@/components/shared/ResponsiveDataShell'
 import { BRAND } from '@/lib/constants'
 import { toastSuccess, toastError } from '@/lib/toast'
+import { fieldErrorClass } from '@/lib/validation/fieldErrors'
+import { useFieldErrors } from '@/hooks/useFieldErrors'
 import {
   ADMIN_DEVICES_PAGE_SIZE,
   changeAdminPassword,
@@ -63,6 +66,13 @@ function formatLastActive(value) {
   return d.toLocaleString()
 }
 
+const PASSWORD_FIELD_IDS = {
+  currentPassword: 'admin-current-password',
+  newPassword: 'admin-new-password',
+  confirmPassword: 'admin-confirm-password',
+}
+const PASSWORD_FIELD_ORDER = ['currentPassword', 'newPassword', 'confirmPassword']
+
 export function SettingsPage() {
   const dispatch = useAppDispatch()
   const [activeTab, setActiveTab] = useState('security')
@@ -72,6 +82,14 @@ export function SettingsPage() {
   const [confirmPassword, setConfirmPassword] = useState('')
   const [showPassword, setShowPassword] = useState(false)
   const [passwordSaving, setPasswordSaving] = useState(false)
+  const {
+    fieldErrors: passwordFieldErrors,
+    formError: passwordFormError,
+    setFormError: setPasswordFormError,
+    resetErrors: resetPasswordErrors,
+    clearField: clearPasswordField,
+    applyErrors: applyPasswordErrors,
+  } = useFieldErrors()
 
   // Currency Settings (local draft until Save)
   const {
@@ -139,18 +157,28 @@ export function SettingsPage() {
 
   async function handleChangePassword(e) {
     e.preventDefault()
+    const errors = {}
     if (!currentPassword) {
-      toastError('Please enter your current password')
-      return
+      errors.currentPassword = 'Please enter your current password'
+    } else if (currentPassword.length < 8) {
+      errors.currentPassword = 'Current password must be at least 8 characters'
     }
     if (newPassword.length < 8) {
-      toastError('New password must be at least 8 characters')
-      return
+      errors.newPassword = 'New password must be at least 8 characters'
+    } else if (newPassword.length > 72) {
+      errors.newPassword = 'New password must be at most 72 characters'
+    } else if (currentPassword && newPassword === currentPassword) {
+      errors.newPassword = 'New password must be different from current password'
     }
     if (newPassword !== confirmPassword) {
-      toastError('New password and confirmation do not match')
+      errors.confirmPassword = 'New password and confirmation do not match'
+    }
+
+    if (Object.keys(errors).length) {
+      applyPasswordErrors(errors, PASSWORD_FIELD_IDS, PASSWORD_FIELD_ORDER)
       return
     }
+    resetPasswordErrors()
 
     setPasswordSaving(true)
     const result = await changeAdminPassword({
@@ -160,6 +188,7 @@ export function SettingsPage() {
     setPasswordSaving(false)
 
     if (!result.success) {
+      setPasswordFormError(result.error || 'Failed to update password')
       toastError(result.error || 'Failed to update password')
       return
     }
@@ -168,6 +197,7 @@ export function SettingsPage() {
     setCurrentPassword('')
     setNewPassword('')
     setConfirmPassword('')
+    resetPasswordErrors()
   }
 
   async function handleSaveCurrency(e) {
@@ -306,29 +336,54 @@ export function SettingsPage() {
                   </div>
                 </div>
 
-                <form onSubmit={handleChangePassword} className="space-y-4">
+                <form onSubmit={handleChangePassword} className="space-y-4" noValidate>
+                  {passwordFormError ? (
+                    <p className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700 ring-1 ring-red-100">
+                      {passwordFormError}
+                    </p>
+                  ) : null}
+
                   <div className="space-y-1.5">
-                    <Label className="text-xs font-bold text-slate-700">Current Password</Label>
+                    <Label
+                      htmlFor="admin-current-password"
+                      className="text-xs font-bold text-slate-700"
+                    >
+                      Current Password
+                    </Label>
                     <Input
+                      id="admin-current-password"
                       type="password"
                       placeholder="Enter current password"
                       value={currentPassword}
-                      onChange={(e) => setCurrentPassword(e.target.value)}
-                      className="h-10 text-sm"
+                      onChange={(e) => {
+                        setCurrentPassword(e.target.value)
+                        clearPasswordField('currentPassword')
+                      }}
+                      className={`h-10 text-sm ${fieldErrorClass(passwordFieldErrors.currentPassword)}`}
                       autoComplete="current-password"
+                      aria-invalid={Boolean(passwordFieldErrors.currentPassword)}
                     />
+                    <FieldError message={passwordFieldErrors.currentPassword} />
                   </div>
 
                   <div className="space-y-1.5">
-                    <Label className="text-xs font-bold text-slate-700">New Password</Label>
+                    <Label htmlFor="admin-new-password" className="text-xs font-bold text-slate-700">
+                      New Password
+                    </Label>
                     <div className="relative">
                       <Input
+                        id="admin-new-password"
                         type={showPassword ? 'text' : 'password'}
                         placeholder="Enter new password (min 8 characters)"
                         value={newPassword}
-                        onChange={(e) => setNewPassword(e.target.value)}
-                        className="h-10 text-sm pr-10"
+                        onChange={(e) => {
+                          setNewPassword(e.target.value)
+                          clearPasswordField('newPassword')
+                          clearPasswordField('confirmPassword')
+                        }}
+                        className={`h-10 text-sm pr-10 ${fieldErrorClass(passwordFieldErrors.newPassword)}`}
                         autoComplete="new-password"
+                        aria-invalid={Boolean(passwordFieldErrors.newPassword)}
                       />
                       <button
                         type="button"
@@ -338,18 +393,30 @@ export function SettingsPage() {
                         {showPassword ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
                       </button>
                     </div>
+                    <FieldError message={passwordFieldErrors.newPassword} />
                   </div>
 
                   <div className="space-y-1.5">
-                    <Label className="text-xs font-bold text-slate-700">Confirm New Password</Label>
+                    <Label
+                      htmlFor="admin-confirm-password"
+                      className="text-xs font-bold text-slate-700"
+                    >
+                      Confirm New Password
+                    </Label>
                     <Input
+                      id="admin-confirm-password"
                       type={showPassword ? 'text' : 'password'}
                       placeholder="Re-enter new password"
                       value={confirmPassword}
-                      onChange={(e) => setConfirmPassword(e.target.value)}
-                      className="h-10 text-sm"
+                      onChange={(e) => {
+                        setConfirmPassword(e.target.value)
+                        clearPasswordField('confirmPassword')
+                      }}
+                      className={`h-10 text-sm ${fieldErrorClass(passwordFieldErrors.confirmPassword)}`}
                       autoComplete="new-password"
+                      aria-invalid={Boolean(passwordFieldErrors.confirmPassword)}
                     />
+                    <FieldError message={passwordFieldErrors.confirmPassword} />
                   </div>
 
                   <div className="pt-2">

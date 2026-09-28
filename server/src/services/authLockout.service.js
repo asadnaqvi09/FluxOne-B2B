@@ -13,9 +13,9 @@ function failKey(loginId, ip) {
   return `auth:fail:${id}:${ip || 'unknown'}`
 }
 
-// 10 failed attempts → lock; correct password also blocked until lock expires
+// 5 failed attempts → lock; correct password also blocked until lock expires
 function maxAttempts() {
-  return Number(process.env.AUTH_LOCKOUT_MAX_ATTEMPTS || 10)
+  return Number(process.env.AUTH_LOCKOUT_MAX_ATTEMPTS || 5)
 }
 
 // Rolling window that counts failures toward the lock threshold
@@ -23,9 +23,9 @@ function windowSec() {
   return Math.ceil(Number(process.env.AUTH_LOCKOUT_WINDOW_MS || 15 * 60 * 1000) / 1000)
 }
 
-// Lock duration after max attempts (default 2 minutes)
+// Lock duration after max attempts (default 6 minutes)
 function lockSec() {
-  return Math.ceil(Number(process.env.AUTH_LOCKOUT_DURATION_MS || 2 * 60 * 1000) / 1000)
+  return Math.ceil(Number(process.env.AUTH_LOCKOUT_DURATION_MS || 6 * 60 * 1000) / 1000)
 }
 
 function memGet(key) {

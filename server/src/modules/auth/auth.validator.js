@@ -39,23 +39,52 @@ export const logoutSchema = z.object({
   params: z.object({}).optional(),
 })
 
-export const changePasswordSchema = z.object({
-  body: z.object({
-    currentPassword: z.string().min(8).max(72),
-    newPassword: z.string().min(8).max(72),
-  }),
-  query: z.object({}).optional(),
-  params: z.object({}).optional(),
-})
+export const changePasswordSchema = z
+  .object({
+    body: z.object({
+      currentPassword: z.string().min(8).max(72),
+      newPassword: z.string().min(8).max(72),
+    }),
+    query: z.object({}).optional(),
+    params: z.object({}).optional(),
+  })
+  .superRefine((data, ctx) => {
+    if (data.body.currentPassword === data.body.newPassword) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: 'New password must be different from current password',
+        path: ['body', 'newPassword'],
+      })
+    }
+  })
 
-// Self-service profile: name + login ID; optional password.
+// Self-service profile: name + login ID; optional password (requires currentPassword).
 // Image-only updates are allowed (multer file checked in controller).
-export const updateProfileSchema = z.object({
-  body: z.object({
-    name: z.string().min(1).max(120).optional(),
-    id: z.string().min(3).max(190).optional(),
-    password: z.string().min(8).max(72).optional(),
-  }),
-  query: z.object({}).optional(),
-  params: z.object({}).optional(),
-})
+export const updateProfileSchema = z
+  .object({
+    body: z.object({
+      name: z.string().min(1).max(120).optional(),
+      id: z.string().min(3).max(190).optional(),
+      password: z.string().min(8).max(72).optional(),
+      currentPassword: z.string().min(8).max(72).optional(),
+    }),
+    query: z.object({}).optional(),
+    params: z.object({}).optional(),
+  })
+  .superRefine((data, ctx) => {
+    const { password, currentPassword } = data.body
+    if (password && !currentPassword) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: 'Current password is required to set a new password',
+        path: ['body', 'currentPassword'],
+      })
+    }
+    if (password && currentPassword && password === currentPassword) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: 'New password must be different from current password',
+        path: ['body', 'password'],
+      })
+    }
+  })

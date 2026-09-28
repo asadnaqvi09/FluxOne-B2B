@@ -29,6 +29,7 @@ import { BRAND } from '@/lib/constants'
 import { referenceFromUuid } from '@/lib/formatDisplayId'
 import { toastSuccess, toastError } from '@/lib/toast'
 import {
+  validateEmail,
   validatePhone,
   validateUrl,
 } from '@/lib/validation/formValidators'
@@ -42,9 +43,17 @@ const COMPANY_FIELD_IDS = {
   whatsappNumber: 'whatsapp',
   facebookUrl: 'facebook',
   instagramUrl: 'instagram',
+  supportEmail: 'supportEmail',
 }
 
-const COMPANY_FIELD_ORDER = ['name', 'contactNumbers', 'whatsappNumber', 'facebookUrl', 'instagramUrl']
+const COMPANY_FIELD_ORDER = [
+  'name',
+  'contactNumbers',
+  'whatsappNumber',
+  'supportEmail',
+  'facebookUrl',
+  'instagramUrl',
+]
 
 const POLICY_FIELD_IDS = { name: 'polName', detail: 'polDetail' }
 const POLICY_FIELD_ORDER = ['name', 'detail']
@@ -203,6 +212,21 @@ export function CompanyPage() {
     }
     if (!form.contactNumbers.trim()) {
       errors.contactNumbers = 'Please provide company contact numbers'
+    } else {
+      const parts = form.contactNumbers
+        .split(/[,;/|]+/)
+        .map((p) => p.trim())
+        .filter(Boolean)
+      for (const part of parts) {
+        const phoneErr = validatePhone(part, {
+          required: true,
+          fieldName: 'Contact number',
+        })
+        if (phoneErr) {
+          errors.contactNumbers = phoneErr
+          break
+        }
+      }
     }
 
     if (form.whatsappNumber?.trim()) {
@@ -211,6 +235,14 @@ export function CompanyPage() {
         fieldName: 'WhatsApp number',
       })
       if (waErr) errors.whatsappNumber = waErr
+    }
+
+    if (form.supportEmail?.trim()) {
+      const emailErr = validateEmail(form.supportEmail, {
+        required: false,
+        fieldName: 'Support Email',
+      })
+      if (emailErr) errors.supportEmail = emailErr
     }
 
     if (form.facebookUrl?.trim()) {
@@ -563,9 +595,15 @@ export function CompanyPage() {
                       id="supportEmail"
                       type="email"
                       value={form.supportEmail}
-                      onChange={(e) => setForm({ ...form, supportEmail: e.target.value })}
+                      onChange={(e) => {
+                        setForm({ ...form, supportEmail: e.target.value })
+                        clearCompanyField('supportEmail')
+                      }}
                       placeholder="support@company.com"
+                      aria-invalid={Boolean(companyFieldErrors.supportEmail)}
+                      className={fieldErrorClass(companyFieldErrors.supportEmail)}
                     />
+                    <FieldError message={companyFieldErrors.supportEmail} />
                   </div>
 
                   <div className="space-y-1.5">

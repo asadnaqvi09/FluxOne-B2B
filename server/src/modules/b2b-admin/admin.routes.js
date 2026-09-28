@@ -12,8 +12,8 @@ import leavesRoutes from './leaves/leaves.routes.js'
 
 const router = Router()
 
-// All /api/admin/* require b2b_admin or branch_admin JWT
-router.use(requireRoles(ROLES.B2B_ADMIN, ROLES.BRANCH_ADMIN))
+// All /api/admin/* require b2b_admin JWT (UI + PERMISSIONS are B2B-admin-only)
+router.use(requireRoles(ROLES.B2B_ADMIN))
 router.use('/dashboard', dashboardRoutes)
 router.use('/branches', branchesRoutes)
 router.use('/leaves', leavesRoutes)

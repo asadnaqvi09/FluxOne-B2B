@@ -15,6 +15,32 @@ const optionalString = z.preprocess(
   z.string().optional(),
 )
 
+// Align with client validatePhone (admin Add Branch form).
+function isValidPhone(value) {
+  const cleaned = String(value || '')
+    .trim()
+    .replace(/[\s()-]/g, '')
+  if (!cleaned) return false
+  if (/[a-zA-Z]/.test(cleaned)) return false
+  if (cleaned.startsWith('+92')) return cleaned.slice(3).length === 10
+  if (cleaned.startsWith('03')) return cleaned.length === 11
+  if (cleaned.startsWith('+')) return cleaned.length >= 9 && cleaned.length <= 16
+  const digits = cleaned.replace(/\D/g, '')
+  return digits.length >= 8 && digits.length <= 15
+}
+
+const phoneString = z
+  .string()
+  .trim()
+  .min(1)
+  .max(32)
+  .refine(isValidPhone, { message: 'Invalid phone number' })
+
+const optionalPhone = z.preprocess(
+  (value) => (value === '' || value === null || value === undefined ? undefined : value),
+  phoneString.optional(),
+)
+
 // Empty string / null clears hours; omit (undefined) leaves existing value on patch.
 const branchHourTime = z.preprocess((value) => {
   if (value === undefined) return undefined
@@ -30,8 +56,8 @@ const genderSchema = z.preprocess(
 const managerCreateSchema = z.object({
   name: z.string().trim().min(1).max(120),
   email: z.string().trim().email().max(190),
-  contact: optionalString,
-  otherContact: optionalString,
+  contact: phoneString,
+  otherContact: optionalPhone,
   gender: genderSchema,
   address: optionalString,
   profileImage: optionalString,
@@ -41,8 +67,8 @@ const managerCreateSchema = z.object({
 const managerUpdateSchema = z.object({
   name: z.string().trim().min(1).max(120).optional(),
   email: z.string().trim().email().max(190).optional(),
-  contact: optionalString,
-  otherContact: optionalString,
+  contact: optionalPhone,
+  otherContact: optionalPhone,
   gender: genderSchema,
   address: optionalString,
   profileImage: optionalString,
@@ -92,6 +118,51 @@ function refineBranchHours(body, ctx) {
   }
 }
 
+function refineCreateManager(body, ctx) {
+  if (body.manager) return
+
+  if (!hasValue(body.managerName)) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      message: 'Branch manager name is required',
+      path: ['body', 'managerName'],
+    })
+  }
+  if (!hasValue(body.managerEmail)) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      message: 'Branch manager email is required',
+      path: ['body', 'managerEmail'],
+    })
+  } else if (!z.string().email().safeParse(String(body.managerEmail).trim()).success) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      message: 'Invalid manager email',
+      path: ['body', 'managerEmail'],
+    })
+  }
+  if (!hasValue(body.managerContact)) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      message: 'Branch manager contact phone is required',
+      path: ['body', 'managerContact'],
+    })
+  } else if (!isValidPhone(body.managerContact)) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      message: 'Invalid phone number',
+      path: ['body', 'managerContact'],
+    })
+  }
+  if (hasValue(body.managerOtherContact) && !isValidPhone(body.managerOtherContact)) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      message: 'Invalid phone number',
+      path: ['body', 'managerOtherContact'],
+    })
+  }
+}
+
 export const listBranchesQuerySchema = z.object({
   body: empty,
   params: empty,
@@ -115,7 +186,7 @@ export const createBranchSchema = z
   .object({
     body: z.object({
       name: z.string().trim().min(1).max(160),
-      location: optionalString,
+      location: z.string().trim().min(1).max(255),
       image: optionalString,
       imageUrl: optionalString,
       status: z.enum([BRANCH_STATUS.OPEN, BRANCH_STATUS.BLOCKED]).optional(),
@@ -125,8 +196,8 @@ export const createBranchSchema = z
       manager: managerCreateSchema.optional(),
       managerName: optionalString,
       managerEmail: optionalString,
-      managerContact: optionalString,
-      managerOtherContact: optionalString,
+      managerContact: optionalPhone,
+      managerOtherContact: optionalPhone,
       managerGender: genderSchema,
       managerAddress: optionalString,
       profileImage: optionalString,
@@ -137,22 +208,26 @@ export const createBranchSchema = z
   })
   .superRefine(({ body }, ctx) => {
     refineBranchHours(body, ctx)
+    refineCreateManager(body, ctx)
   })
 
 export const updateBranchSchema = z
   .object({
     body: z.object({
       name: z.string().trim().min(1).max(160).optional(),
-      location: optionalString,
+      location: z.string().trim().min(1).max(255).optional(),
       image: optionalString,
       imageUrl: optionalString,
       openingTime: branchHourTime,
       closingTime: branchHourTime,
       manager: managerUpdateSchema.optional(),
       managerName: optionalString,
-      managerEmail: optionalString,
-      managerContact: optionalString,
-      managerOtherContact: optionalString,
+      managerEmail: z.preprocess(
+        (value) => (value === '' || value === null || value === undefined ? undefined : value),
+        z.string().trim().email().max(190).optional(),
+      ),
+      managerContact: optionalPhone,
+      managerOtherContact: optionalPhone,
       managerGender: genderSchema,
       managerAddress: optionalString,
       profileImage: optionalString,

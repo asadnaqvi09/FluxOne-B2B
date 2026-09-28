@@ -167,6 +167,7 @@ export async function updateMe(req, res) {
   const fullName = body.name?.trim() || undefined
   const loginId = body.id?.trim() || undefined
   const newPassword = body.password || undefined
+  const currentPassword = body.currentPassword || undefined
   // New upload or replace — multer field name `image`
   const imageUrl = resolveUploadUrl(req.file, req) || undefined
 
@@ -175,6 +176,21 @@ export async function updateMe(req, res) {
   }
 
   try {
+    if (newPassword) {
+      const existing = await findAuthUserById(req.user.id, req.tenantId)
+      if (!existing) return fail(res, 'User not found', 404)
+      if (!currentPassword) {
+        return fail(res, 'Current password is required to set a new password', 422)
+      }
+      const match = await bcrypt.compare(currentPassword, existing.passwordHash)
+      if (!match) {
+        return fail(res, 'Current password is incorrect', 401)
+      }
+      if (currentPassword === newPassword) {
+        return fail(res, 'New password must be different from current password', 422)
+      }
+    }
+
     if (fullName || loginId || imageUrl) {
       const updated = await updateAuthProfile(req.user.id, req.tenantId, {
         fullName,
@@ -268,6 +284,9 @@ export async function changePassword(req, res) {
   const match = await bcrypt.compare(currentPassword, user.passwordHash)
   if (!match) {
     return fail(res, 'Current password is incorrect', 401)
+  }
+  if (currentPassword === newPassword) {
+    return fail(res, 'New password must be different from current password', 422)
   }
   const nextHash = await bcrypt.hash(newPassword, BCRYPT_COST)
   await updatePasswordHash(user.id, req.tenantId, nextHash)

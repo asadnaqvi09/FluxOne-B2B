@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { Plus, Trash2 } from 'lucide-react'
+import { FieldError } from '@/components/shared/FieldError'
 import { ImageUploadField } from '@/components/shared/ImageUploadField'
 import { MotionHeader } from '@/components/shared/MotionReveal'
 import { PageHeader } from '@/components/shared/PageHeader'
@@ -24,11 +25,32 @@ import { useProducts } from '@/hooks/useProducts'
 import { PRODUCT_TYPES, money, taxIdsForDefaultRate } from '@/lib/mapProduct'
 import { PATHS } from '@/router/paths'
 import { toastError, toastSuccess } from '@/lib/toast'
+import { fieldErrorClass } from '@/lib/validation/fieldErrors'
+import { cn } from '@/lib/utils'
 
 function catalogName(catalog, id) {
   if (!id) return '—'
   const row = (catalog.all || []).find((entry) => entry.id === id)
   return row?.name || '—'
+}
+
+/** First component whose on-hand stock cannot cover bundleQty × recipe qty. */
+function findInsufficientComponent(lineDetails, bundleQty) {
+  if (!lineDetails.length || !Number.isFinite(bundleQty) || bundleQty <= 0) return null
+  for (const row of lineDetails) {
+    const onHand = Number(row.item.quantity) || 0
+    const deduct = bundleQty * (row.qty || 0)
+    if (onHand - deduct < 0) {
+      return { name: row.item.name || 'item', onHand, deduct }
+    }
+  }
+  return null
+}
+
+function stockInsufficientMessage(lineDetails, bundleQty) {
+  const bad = findInsufficientComponent(lineDetails, bundleQty)
+  if (!bad) return ''
+  return `Insufficient stock for ${bad.name}. Available stock: ${bad.onHand}.`
 }
 
 export function AddBundlePage() {
@@ -120,6 +142,28 @@ export function AddBundlePage() {
     }, Infinity)
   }, [lineDetails])
 
+  const stockQty = Number(bundleStock)
+  const stockFieldError = useMemo(() => {
+    if (!bundleStock || Number.isNaN(stockQty) || stockQty <= 0) return ''
+    return stockInsufficientMessage(lineDetails, stockQty)
+  }, [bundleStock, lineDetails, stockQty])
+
+  const stockImpactRows = useMemo(() => {
+    if (!lineDetails.length || Number.isNaN(stockQty) || stockQty <= 0) return []
+    return lineDetails.map((row) => {
+      const onHand = Number(row.item.quantity) || 0
+      const deduct = stockQty * (row.qty || 0)
+      const remaining = onHand - deduct
+      return {
+        itemId: row.itemId,
+        name: row.item.name,
+        deduct,
+        remaining,
+        insufficient: remaining < 0,
+      }
+    })
+  }, [lineDetails, stockQty])
+
   useEffect(() => {
     if (priceTouched.current) return
     setBundlePrice(autoTotal > 0 ? String(autoTotal) : '')
@@ -208,12 +252,9 @@ export function AddBundlePage() {
       setError('Bundle stock quantity is required.')
       return
     }
-    if (!Number.isFinite(maxBundles) || stock > maxBundles) {
-      setError(
-        maxBundles > 0
-          ? `You can create up to ${maxBundles} bundles from current stock.`
-          : 'Component items do not have enough stock to create this bundle.',
-      )
+    const stockMsg = stockInsufficientMessage(lineDetails, stock)
+    if (stockMsg) {
+      setError(stockMsg)
       return
     }
 
@@ -559,35 +600,39 @@ export function AddBundlePage() {
           <WholeNumberInput
             id="bundle-stock"
             min={1}
-            max={Number.isFinite(maxBundles) ? maxBundles : undefined}
             value={bundleStock}
             onChange={(event) => {
               stockTouched.current = true
+              setError('')
               setBundleStock(event.target.value)
             }}
+            aria-invalid={Boolean(stockFieldError)}
+            className={fieldErrorClass(stockFieldError)}
             required
           />
+          <FieldError message={stockFieldError} />
           <p className="text-[11px] text-slate-400">
             Saving deducts this quantity from each component item. The bundle keeps its own stock.
           </p>
         </div>
-        {lineDetails.length > 0 && Number(bundleStock) > 0 ? (
+        {stockImpactRows.length > 0 ? (
           <ul className="mt-4 space-y-1 text-sm text-slate-600">
-            {lineDetails.map((row) => {
-              const deduct = Number(bundleStock) * row.qty
-              const left = (Number(row.item.quantity) || 0) - deduct
-              return (
-                <li key={row.itemId}>
-                  {row.item.name}: deduct {deduct}, remaining {left < 0 ? 0 : left}
-                </li>
-              )
-            })}
+            {stockImpactRows.map((row) => (
+              <li
+                key={row.itemId}
+                className={cn(
+                  row.insufficient && 'rounded-md bg-rose-50 px-2 py-1 font-medium text-rose-700',
+                )}
+              >
+                {row.name}: deduct {row.deduct}, remaining {row.remaining}
+              </li>
+            ))}
           </ul>
         ) : null}
       </SurfaceCard>
 
       <div className="flex justify-end">
-        <Button type="submit" variant="brand" disabled={mutating}>
+        <Button type="submit" variant="brand" disabled={mutating || Boolean(stockFieldError)}>
           {mutating ? 'Saving…' : 'Save bundle'}
         </Button>
       </div>

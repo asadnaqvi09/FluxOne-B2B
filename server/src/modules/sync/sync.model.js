@@ -1035,7 +1035,8 @@ export async function listSalesForPosPull(tenantId, { branchId, page = 1, limit 
 // ---------------------------------------------------------------------------
 
 // Branch BM + cashier for POS offline login (bcrypt hash included).
-// Always full active set on bootstrap and delta so password resets stay in sync.
+// Always send the full BM/cashier set (active + inactive) so POS can upsert isActive=false
+// after a branch block / staff deactivate on the next successful sync.
 async function fetchBootstrapUsers(tenantId, branchId, _since = null) {
   const { rows } = await tenantQuery(
     tenantId,
@@ -1054,7 +1055,6 @@ async function fetchBootstrapUsers(tenantId, branchId, _since = null) {
       WHERE u.tenant_id = $1
         AND u.branch_id = $2
         AND r.slug IN ($3, $4)
-        AND u.is_active = true
       ORDER BY u.full_name
     `,
     [branchId, ROLES.BRANCH_MANAGER, ROLES.CASHIER],
@@ -1252,7 +1252,8 @@ async function fetchTenantBranchMeta(tenantId, branchId) {
         t.business_address AS "businessAddress",
         COALESCE(t.default_currency, 'PKR') AS "defaultCurrency",
         b.id AS "branchId",
-        b.name AS "branchName"
+        b.name AS "branchName",
+        b.status AS "branchStatus"
       FROM tenants t
       JOIN branches b ON b.tenant_id = t.id AND b.id = $2
       WHERE t.id = $1
@@ -1359,7 +1360,11 @@ export async function buildBootstrapSnapshot(tenantId, branchId) {
   return {
     syncVersion: new Date().toISOString(),
     tenant: { id: meta.tenantId, name: meta.tenantName, slug: meta.tenantSlug },
-    branch: { id: meta.branchId, name: meta.branchName },
+    branch: {
+      id: meta.branchId,
+      name: meta.branchName,
+      status: meta.branchStatus || 'open',
+    },
     ...sections,
     company: buildCompanyPayload(meta, sections.policies || []),
   }
@@ -1376,7 +1381,11 @@ export async function buildDeltaSnapshot(tenantId, branchId, since) {
   return {
     syncVersion: new Date().toISOString(),
     tenant: { id: meta.tenantId, name: meta.tenantName, slug: meta.tenantSlug },
-    branch: { id: meta.branchId, name: meta.branchName },
+    branch: {
+      id: meta.branchId,
+      name: meta.branchName,
+      status: meta.branchStatus || 'open',
+    },
     ...sections,
     company: buildCompanyPayload(meta, sections.policies || []),
   }

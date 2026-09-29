@@ -22,8 +22,10 @@
  *   4. Never log or display the hash. Treat it as a secret at rest.
  *   5. Cloud online login (POST /api/auth/login) still works for cashiers; this hash
  *      is only for local/offline verification after sync.
- *   6. When isActive becomes false, cloud stops sending that user — deactivate or
- *      delete the local row on the next sync.
+ *   6. When isActive becomes false, cloud still sends that user with isActive=false
+ *      on bootstrap/delta. Deactivate or delete the local row on the next sync.
+ *   6b. Sync payload also includes branch.status ('open' | 'blocked'). When status is
+ *      'blocked', POS must refuse offline login for every local user of that branch.
  *   7. Password resets on cloud: next bootstrap/delta replaces local passwordHash.
  *
  * Roles included: branch_manager, cashier (same branch as the sync token).

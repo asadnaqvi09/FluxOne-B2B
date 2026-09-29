@@ -18,9 +18,14 @@ export async function authMiddleware(req, res, next) {
 
     const { rows } = await pool.query(
       `
-        SELECT is_active AS "isActive"
-        FROM users
-        WHERE id = $1 AND tenant_id = $2
+        SELECT
+          u.is_active AS "isActive",
+          b.status AS "branchStatus"
+        FROM users u
+        LEFT JOIN branches b
+          ON b.id = u.branch_id
+         AND b.tenant_id = u.tenant_id
+        WHERE u.id = $1 AND u.tenant_id = $2
         LIMIT 1
       `,
       [decoded.sub, decoded.tenantId],
@@ -31,6 +36,13 @@ export async function authMiddleware(req, res, next) {
     }
     if (!userRow.isActive) {
       return error(res, 'Account deactivated. Contact your Branch Manager.', 401)
+    }
+    if (userRow.branchStatus === 'blocked') {
+      return error(
+        res,
+        'This branch is blocked. Contact your administrator.',
+        401,
+      )
     }
 
     req.user = {

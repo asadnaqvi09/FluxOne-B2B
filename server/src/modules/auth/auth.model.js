@@ -18,6 +18,7 @@ const AUTH_USER_SELECT = `
     t.name AS "tenantName",
     COALESCE(t.default_currency, 'PKR') AS "defaultCurrency",
     b.name AS "branchName",
+    b.status AS "branchStatus",
     to_char(b.opening_time, 'HH24:MI') AS "openingTime",
     to_char(b.closing_time, 'HH24:MI') AS "closingTime",
     COALESCE(u.image_url, s.image_url) AS "imageUrl"
@@ -57,6 +58,23 @@ export async function findAuthUsersByLoginId(loginId) {
       ${AUTH_USER_SELECT}
       WHERE lower(u.email) = lower($1)
         AND u.is_active = true
+        AND (
+          u.branch_id IS NULL
+          OR (b.id IS NOT NULL AND b.status IS DISTINCT FROM 'blocked')
+        )
+      ORDER BY u.created_at ASC
+    `,
+    [loginId],
+  )
+  return rows.map(mapAuthUser)
+}
+
+// Same lookup without active/branch filters — used to return a clear blocked-branch error.
+export async function findAuthUsersByLoginIdIncludingInactive(loginId) {
+  const { rows } = await query(
+    `
+      ${AUTH_USER_SELECT}
+      WHERE lower(u.email) = lower($1)
       ORDER BY u.created_at ASC
     `,
     [loginId],

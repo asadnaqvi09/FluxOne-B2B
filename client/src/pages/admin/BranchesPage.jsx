@@ -1183,13 +1183,14 @@ export function BranchesPage() {
             <>
               Are you sure you want to block <strong>&quot;{targetBranch?.name}&quot;</strong>?
               <br />
-              The branch manager login for this branch will be deactivated.
+              All users of this branch (manager, inventory, cashier, and other roles) will be
+              unable to log in on web and desktop until the branch is opened again. Data is kept.
             </>
           ) : (
             <>
               Are you sure you want to open and activate <strong>&quot;{targetBranch?.name}&quot;</strong>?
               <br />
-              The branch manager login will be re-enabled.
+              Branch users who were active before the block will be able to log in again.
             </>
           )
         }

@@ -2,6 +2,7 @@ import bcrypt from 'bcryptjs'
 import {
   findAuthUserById,
   findAuthUsersByLoginId,
+  findAuthUsersByLoginIdIncludingInactive,
   updateAuthProfile,
   updatePasswordHash,
 } from './auth.model.js'
@@ -113,6 +114,24 @@ export async function login(req, res) {
 
   const candidates = await findAuthUsersByLoginId(loginId)
   if (!candidates.length) {
+    // Clearer error when credentials are valid but the branch is blocked / account off.
+    const inactiveCandidates = await findAuthUsersByLoginIdIncludingInactive(loginId)
+    for (const candidate of inactiveCandidates) {
+      const ok = await bcrypt.compare(password, candidate.passwordHash)
+      if (!ok) continue
+      if (candidate.branchId && candidate.branchStatus === 'blocked') {
+        await recordLoginFailure(loginId, ip)
+        return fail(
+          res,
+          'This branch is blocked. You cannot log in until an administrator opens it again.',
+          403,
+        )
+      }
+      if (!candidate.isActive) {
+        await recordLoginFailure(loginId, ip)
+        return fail(res, 'Account deactivated. Contact your administrator.', 403)
+      }
+    }
     await recordLoginFailure(loginId, ip)
     return fail(res, 'Invalid id or password', 401)
   }
@@ -144,10 +163,18 @@ export async function login(req, res) {
     )
   }
 
+  const user = matched[0]
+  if (user.branchId && user.branchStatus === 'blocked') {
+    return fail(
+      res,
+      'This branch is blocked. You cannot log in until an administrator opens it again.',
+      403,
+    )
+  }
+
   // Successful auth — clear failure counters for this id+IP
   await clearLoginFailures(loginId, ip)
 
-  const user = matched[0]
   const tokens = await issueSession(user, req)
   const payload = authPayload(user, tokens)
   payload.branches = await branchesForUser(user)
@@ -254,7 +281,7 @@ export async function refresh(req, res) {
     }
 
     const user = await findAuthUserById(decoded.sub, decoded.tenantId)
-    if (!user || !user.isActive) {
+    if (!user || !user.isActive || (user.branchId && user.branchStatus === 'blocked')) {
       await revokeAllRefreshTokensForUser(decoded.sub, decoded.tenantId)
       return fail(res, 'Invalid refresh token', 401)
     }

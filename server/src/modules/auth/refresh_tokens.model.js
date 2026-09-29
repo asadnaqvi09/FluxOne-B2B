@@ -79,6 +79,24 @@ export async function revokeAllRefreshTokensForUser(userId, tenantId) {
   return rowCount
 }
 
+// Kill every open session for users belonging to a branch (used on branch block).
+export async function revokeRefreshTokensForBranch(tenantId, branchId) {
+  const { rowCount } = await query(
+    `
+      UPDATE refresh_tokens rt
+      SET revoked_at = now()
+      FROM users u
+      WHERE rt.user_id = u.id
+        AND rt.tenant_id = $1
+        AND u.tenant_id = $1
+        AND u.branch_id = $2
+        AND rt.revoked_at IS NULL
+    `,
+    [tenantId, branchId],
+  )
+  return rowCount
+}
+
 export async function revokeRefreshTokenByHash(tokenHash) {
   const { rowCount } = await query(
     `

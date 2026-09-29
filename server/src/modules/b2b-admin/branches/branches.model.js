@@ -6,6 +6,7 @@ import {
   displayRefSearchHex,
   normalizeSearchQuery,
 } from '../../../utils/displayRef.util.js'
+import { revokeRefreshTokensForBranch } from '../../auth/refresh_tokens.model.js'
 
 function httpError(status, message) {
   const error = new Error(message)
@@ -391,8 +392,12 @@ export async function updateBranch(tenantId, id, payload) {
   }
 }
 
+// Soft-block / reopen a branch. Never deletes rows — only flips access flags.
+// Block: all branch users lose login (web + POS); active staff marked status='blocked'.
+// Open: restore staff that were branch-blocked; re-enable BM + users linked to active staff.
+// Manually inactive staff stay inactive on reopen.
 export async function setBranchStatus(tenantId, id, status) {
-  return withTransaction(async (client) => {
+  const row = await withTransaction(async (client) => {
     const existing = await getBranchByIdInTx(client, tenantId, id)
     if (!existing) throw httpError(404, 'Branch not found')
 
@@ -407,22 +412,81 @@ export async function setBranchStatus(tenantId, id, status) {
       [id, status],
     )
 
-    const managerActive = status === BRANCH_STATUS.OPEN
-    await tenantClientQuery(
-      client,
-      tenantId,
-      `
-        UPDATE users
-        SET is_active = $3
-        WHERE tenant_id = $1
-          AND branch_id = $2
-          AND role_id = ${ROLE_IDS[ROLES.BRANCH_MANAGER]}
-      `,
-      [id, managerActive],
-    )
+    if (status === BRANCH_STATUS.BLOCKED) {
+      // Mark currently-active staff as branch-blocked (keep manual 'inactive' distinct).
+      await tenantClientQuery(
+        client,
+        tenantId,
+        `
+          UPDATE staff
+          SET status = 'blocked'
+          WHERE tenant_id = $1
+            AND branch_id = $2
+            AND status = 'active'
+        `,
+        [id],
+      )
+
+      // Deactivate every login under this branch (BM, IM, cashier, other roles).
+      await tenantClientQuery(
+        client,
+        tenantId,
+        `
+          UPDATE users
+          SET is_active = false
+          WHERE tenant_id = $1
+            AND branch_id = $2
+        `,
+        [id],
+      )
+    } else {
+      // Restore only staff that were soft-blocked by this branch action.
+      await tenantClientQuery(
+        client,
+        tenantId,
+        `
+          UPDATE staff
+          SET status = 'active'
+          WHERE tenant_id = $1
+            AND branch_id = $2
+            AND status = 'blocked'
+        `,
+        [id],
+      )
+
+      // Re-enable BM always; re-enable other roles only when their staff row is active again.
+      await tenantClientQuery(
+        client,
+        tenantId,
+        `
+          UPDATE users u
+          SET is_active = true
+          WHERE u.tenant_id = $1
+            AND u.branch_id = $2
+            AND (
+              u.role_id = ${ROLE_IDS[ROLES.BRANCH_MANAGER]}
+              OR EXISTS (
+                SELECT 1
+                FROM staff s
+                WHERE s.tenant_id = u.tenant_id
+                  AND s.user_id = u.id
+                  AND s.status = 'active'
+              )
+            )
+        `,
+        [id],
+      )
+    }
 
     return getBranchByIdInTx(client, tenantId, id)
   })
+
+  // Drop open web/desktop sessions so blocked users cannot keep calling APIs.
+  if (status === BRANCH_STATUS.BLOCKED) {
+    await revokeRefreshTokensForBranch(tenantId, id)
+  }
+
+  return row
 }
 
 export async function resetBranchManagerPassword(tenantId, id, passwordHash) {

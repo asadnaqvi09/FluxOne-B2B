@@ -36,6 +36,7 @@ import { useCurrency } from '@/hooks/useCurrency'
 import { BRAND } from '@/lib/constants'
 import { toastSuccess, toastError } from '@/lib/toast'
 import { validatePercentage } from '@/lib/validation/formValidators'
+import { ExportCsvButton } from '@/components/shared/ExportCsvButton'
 import { exportTaxProfitCsv, exportTaxProfitPdf } from '@/lib/taxProfitExport'
 import {
   Percent,
@@ -47,9 +48,7 @@ import {
   Loader2,
   PackageOpen,
   Settings,
-  FileSpreadsheet,
   FileText,
-  Edit2,
 } from 'lucide-react'
 
 const COLUMN_LABELS = {
@@ -87,12 +86,6 @@ export function TaxProfitPage() {
   const [defaultTaxProfitDialogOpen, setDefaultTaxProfitDialogOpen] = useState(false)
   const [defaultTaxValue, setDefaultTaxValue] = useState('0')
   const [defaultProfitValue, setDefaultProfitValue] = useState('0')
-
-  // Individual product override dialog state
-  const [singleItemModalOpen, setSingleItemModalOpen] = useState(false)
-  const [singleItemTarget, setSingleItemTarget] = useState(null)
-  const [singleProfitValue, setSingleProfitValue] = useState('0')
-  const [singleTaxValue, setSingleTaxValue] = useState('0')
 
   const [visibleColumns, setVisibleColumns] = useState({
     id: true,
@@ -211,57 +204,6 @@ export function TaxProfitPage() {
     setSelectedIds((prev) =>
       prev.includes(id) ? prev.filter((item) => item !== id) : [...prev, id],
     )
-  }
-
-  function handleOpenSingleItemEdit(product) {
-    setSingleItemTarget(product)
-    setSingleProfitValue(String(product.profitPct ?? 0))
-    setSingleTaxValue(String(product.taxPct ?? 0))
-    setSingleItemModalOpen(true)
-  }
-
-  async function handleSaveSingleItemOverrides(e) {
-    e.preventDefault()
-    if (!singleItemTarget) return
-
-    const profitErr = validatePercentage(singleProfitValue, {
-      min: 0,
-      max: 100,
-      fieldName: 'Profit percentage',
-    })
-    if (profitErr) {
-      toastError(profitErr)
-      return
-    }
-
-    const taxErr = validatePercentage(singleTaxValue, {
-      min: 0,
-      max: 100,
-      fieldName: 'Tax percentage',
-    })
-    if (taxErr) {
-      toastError(taxErr)
-      return
-    }
-
-    const profitNum = Number(singleProfitValue)
-    const taxNum = Number(singleTaxValue)
-
-    const profitRes = await bulkSetProfit([singleItemTarget.id], profitNum)
-    if (!profitRes.success) {
-      toastError(profitRes.error || 'Failed to update profit %')
-      return
-    }
-
-    const taxRes = await bulkSetTax([singleItemTarget.id], taxNum)
-    if (!taxRes.success) {
-      toastError(taxRes.error || 'Failed to update tax %')
-      return
-    }
-
-    toastSuccess(`Updated "${singleItemTarget.name}" margin & tax settings`)
-    setSingleItemModalOpen(false)
-    setSingleItemTarget(null)
   }
 
   // --- Default Profit & Tax Handlers ---
@@ -418,15 +360,24 @@ export function TaxProfitPage() {
           description="Global wholesale margin rules, sales tax compliance, and automated multi-branch price calculations"
           className="sm:items-center"
           actions={
-            <Button
-              type="button"
-              onClick={handleOpenDefaultTaxProfit}
-              className="h-10 px-3.5 text-xs font-bold cursor-pointer text-white rounded-xl shadow-xs transition-opacity hover:opacity-90 flex items-center gap-1.5"
-              style={{ background: BRAND.purple }}
-            >
-              <Settings className="size-3.5" />
-              Set Default Tax & Profit
-            </Button>
+            <div className="flex flex-wrap items-center gap-2">
+              <ExportCsvButton
+                onClick={() => handleExport('csv')}
+                disabled={exporting || loading}
+                label="Export"
+                title="Export pricing catalog to CSV"
+                className="h-10 px-3"
+              />
+              <Button
+                type="button"
+                onClick={handleOpenDefaultTaxProfit}
+                className="h-10 px-3.5 text-xs font-bold cursor-pointer text-white rounded-xl shadow-xs transition-opacity hover:opacity-90 flex items-center gap-1.5"
+                style={{ background: BRAND.purple }}
+              >
+                <Settings className="size-3.5" />
+                Set Default Tax & Profit
+              </Button>
+            </div>
           }
         />
       </MotionHeader>
@@ -621,19 +572,7 @@ export function TaxProfitPage() {
                   {selectedIds.length} Selected
                 </Badge>
               )}
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                disabled={exporting || loading}
-                onClick={() => handleExport('csv')}
-                className="h-9 px-3 text-xs font-semibold cursor-pointer rounded-xl"
-                title="Export table to CSV"
-              >
-                <FileSpreadsheet className="mr-1.5 size-3.5 text-emerald-600" />
-                CSV
-              </Button>
-              <Button
+              {/* <Button
                 type="button"
                 variant="outline"
                 size="sm"
@@ -644,7 +583,7 @@ export function TaxProfitPage() {
               >
                 <FileText className="mr-1.5 size-3.5 text-rose-600" />
                 PDF
-              </Button>
+              </Button> */}
               <Button
                 type="button"
                 disabled={selectedIds.length === 0 || mutating}
@@ -702,8 +641,8 @@ export function TaxProfitPage() {
                     <article
                       key={p.id}
                       className={`rounded-xl border px-3 py-3 ${isChecked
-                          ? 'border-purple-200 bg-purple-50/40'
-                          : 'border-border bg-slate-50/60'
+                        ? 'border-purple-200 bg-purple-50/40'
+                        : 'border-border bg-slate-50/60'
                         }`}
                     >
                       <div className="flex items-start gap-3">
@@ -735,20 +674,18 @@ export function TaxProfitPage() {
                             {p.subcategory ? ` / ${p.subcategory}` : ''}
                           </p>
                           <div className="mt-2 flex flex-wrap gap-1.5">
-                            <button
-                              type="button"
-                              onClick={() => handleOpenSingleItemEdit(p)}
-                              className="inline-flex items-center rounded border border-emerald-200 bg-emerald-50 px-2 py-0.5 text-xs font-bold text-emerald-700 hover:bg-emerald-100 cursor-pointer"
+                            <span
+                              className="inline-flex items-center rounded border border-emerald-200 bg-emerald-50 px-2 py-0.5 text-xs font-bold text-emerald-700"
+                              aria-label={`Profit margin ${p.profitPct} percent`}
                             >
                               +{p.profitPct}%
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() => handleOpenSingleItemEdit(p)}
-                              className="inline-flex items-center rounded border border-blue-200 bg-blue-50 px-2 py-0.5 text-xs font-bold text-blue-700 hover:bg-blue-100 cursor-pointer"
+                            </span>
+                            <span
+                              className="inline-flex items-center rounded border border-blue-200 bg-blue-50 px-2 py-0.5 text-xs font-bold text-blue-700"
+                              aria-label={`Tax ${p.taxPct > 0 ? `${p.taxPct} percent` : 'exempt'}`}
                             >
                               {p.taxPct > 0 ? `${p.taxPct}%` : '0% (Exempt)'}
-                            </button>
+                            </span>
                           </div>
                           <div className="mt-2 flex items-end justify-between gap-2">
                             <div>
@@ -886,27 +823,17 @@ export function TaxProfitPage() {
 
                           {visibleColumns.profitPct && (
                             <TableCell className="px-3 py-3">
-                              <button
-                                type="button"
-                                onClick={() => handleOpenSingleItemEdit(p)}
-                                title="Click to override Profit % for this product"
-                                className="inline-flex items-center font-bold text-xs text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200 hover:bg-emerald-100 hover:border-emerald-300 transition-colors cursor-pointer"
-                              >
+                              <span className="inline-flex items-center rounded border border-emerald-200 bg-emerald-50 px-2 py-0.5 text-xs font-bold text-emerald-700">
                                 +{p.profitPct}%
-                              </button>
+                              </span>
                             </TableCell>
                           )}
 
                           {visibleColumns.taxPct && (
                             <TableCell className="px-3 py-3">
-                              <button
-                                type="button"
-                                onClick={() => handleOpenSingleItemEdit(p)}
-                                title="Click to override Tax % for this product"
-                                className="inline-flex items-center font-bold text-xs text-blue-700 bg-blue-50 px-2 py-0.5 rounded border border-blue-200 hover:bg-blue-100 hover:border-blue-300 transition-colors cursor-pointer"
-                              >
+                              <span className="inline-flex items-center rounded border border-blue-200 bg-blue-50 px-2 py-0.5 text-xs font-bold text-blue-700">
                                 {p.taxPct > 0 ? `${p.taxPct}%` : '0% (Exempt)'}
-                              </button>
+                              </span>
                             </TableCell>
                           )}
 
@@ -1006,104 +933,6 @@ export function TaxProfitPage() {
                 style={{ background: BRAND.purple }}
               >
                 {mutating ? 'Saving…' : 'Set Default'}
-              </Button>
-            </DialogFooter>
-          </form>
-        </DialogContent>
-      </Dialog>
-
-      {/* Individual Product Override Dialog */}
-      <Dialog open={singleItemModalOpen} onOpenChange={setSingleItemModalOpen}>
-        <DialogContent className="max-w-md">
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
-              <Edit2 className="size-4 text-purple-600" />
-              Edit Product Margin & Tax
-            </DialogTitle>
-            <DialogDescription>
-              Override profit % and tax % for &quot;{singleItemTarget?.name}&quot;
-            </DialogDescription>
-          </DialogHeader>
-
-          <form onSubmit={handleSaveSingleItemOverrides} className="space-y-4 pt-2">
-            <div className="rounded-xl border border-slate-200 bg-slate-50/70 p-3 text-xs space-y-1">
-              <div className="flex justify-between">
-                <span className="text-slate-500">Product SKU:</span>
-                <span className="font-mono font-bold text-slate-800">{singleItemTarget?.itemCode || '—'}</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-slate-500">Purchase Cost:</span>
-                <span className="font-bold text-slate-800">
-                  {formatPlain(singleItemTarget?.baseCost)} ({currency})
-                </span>
-              </div>
-            </div>
-
-            <div className="grid grid-cols-2 gap-3">
-              <div className="space-y-1.5">
-                <Label htmlFor="singleProfitInput" className="text-xs font-semibold">
-                  Profit Margin (%)
-                </Label>
-                <WholeNumberInput
-                  id="singleProfitInput"
-                  min={0}
-                  max={100}
-                  value={singleProfitValue}
-                  onChange={(e) => setSingleProfitValue(e.target.value)}
-                  placeholder="e.g. 20"
-                  required
-                />
-              </div>
-
-              <div className="space-y-1.5">
-                <Label htmlFor="singleTaxInput" className="text-xs font-semibold">
-                  Sales Tax (%)
-                </Label>
-                <WholeNumberInput
-                  id="singleTaxInput"
-                  min={0}
-                  max={100}
-                  value={singleTaxValue}
-                  onChange={(e) => setSingleTaxValue(e.target.value)}
-                  placeholder="e.g. 5"
-                  required
-                />
-              </div>
-            </div>
-
-            <div className="rounded-xl border border-purple-100 bg-purple-50/60 p-3 text-xs text-purple-950 flex items-center justify-between">
-              <span>Calculated Final Price:</span>
-              <span className="font-extrabold text-sm text-purple-950">
-                {formatPlain(
-                  calculateFinalPrice(
-                    singleItemTarget?.baseCost || 0,
-                    Number(singleProfitValue) || 0,
-                    Number(singleTaxValue) || 0,
-                  ),
-                )}{' '}
-                ({currency})
-              </span>
-            </div>
-
-            <DialogFooter className="pt-2">
-              <Button
-                type="button"
-                variant="outline"
-                onClick={() => {
-                  setSingleItemModalOpen(false)
-                  setSingleItemTarget(null)
-                }}
-                disabled={mutating}
-              >
-                Cancel
-              </Button>
-              <Button
-                type="submit"
-                disabled={mutating}
-                className="text-white font-semibold"
-                style={{ background: BRAND.purple }}
-              >
-                {mutating ? 'Saving…' : 'Save Changes'}
               </Button>
             </DialogFooter>
           </form>

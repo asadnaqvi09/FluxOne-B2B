@@ -2,7 +2,7 @@ import {
   MovementHistoryTable,
   movementImageNameColumns,
 } from '@/components/feature/control/MovementHistoryTable'
-import { formatMovementDateTime } from '@/lib/mapStockMovement'
+import { formatDateLine } from '@/lib/formatDateTime'
 
 export function ExpiredTable({
   items,
@@ -29,9 +29,10 @@ export function ExpiredTable({
     {
       key: 'expires',
       label: 'Expires',
+      // Expiry is date-only (no time)
       render: (row) => (
         <span className="text-slate-600">
-          {row.expiresAt ? formatMovementDateTime(row.expiresAt).split(',')[0] : '—'}
+          {row.expiresAt ? formatDateLine(row.expiresAt) : '—'}
         </span>
       ),
     },

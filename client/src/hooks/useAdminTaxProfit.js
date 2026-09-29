@@ -6,6 +6,7 @@ export const ADMIN_TAX_PROFIT_PAGE_SIZE = 8
 
 const EMPTY_META = {
   categories: [],
+  products: [],
   scales: [],
   taxes: [],
   defaults: {
@@ -19,7 +20,8 @@ export function useAdminTaxProfit({
   q = '',
   categoryId = '',
   subcategoryId = '',
-  scale = '',
+  productId = '',
+  variantId = '',
   sort = 'all',
   page = 1,
   limit = ADMIN_TAX_PROFIT_PAGE_SIZE,
@@ -47,6 +49,7 @@ export function useAdminTaxProfit({
     }
     setMeta({
       categories: result.data?.categories || [],
+      products: result.data?.products || [],
       scales: result.data?.scales || [],
       taxes: result.data?.taxes || [],
       defaults: {
@@ -65,7 +68,8 @@ export function useAdminTaxProfit({
       q: q?.trim() || undefined,
       categoryId: categoryId || undefined,
       subcategoryId: subcategoryId || undefined,
-      scale: scale || undefined,
+      productId: productId || undefined,
+      variantId: variantId || undefined,
       sort: sort && sort !== 'all' ? sort : undefined,
       page,
       limit,
@@ -88,7 +92,7 @@ export function useAdminTaxProfit({
     )
     setLoading(false)
     return result
-  }, [q, categoryId, subcategoryId, scale, sort, page, limit])
+  }, [q, categoryId, subcategoryId, productId, variantId, sort, page, limit])
 
   useEffect(() => {
     void loadMeta()
@@ -148,6 +152,25 @@ export function useAdminTaxProfit({
     [load, loadMeta],
   )
 
+  // Fetch rows for CSV/PDF export (same filters, higher limit)
+  const fetchExportRows = useCallback(
+    async ({ limit: exportLimit = 200 } = {}) => {
+      const result = await apiClient.get(endpoints.admin.taxProfit.products, {
+        q: q?.trim() || undefined,
+        categoryId: categoryId || undefined,
+        subcategoryId: subcategoryId || undefined,
+        productId: productId || undefined,
+        variantId: variantId || undefined,
+        sort: sort && sort !== 'all' ? sort : undefined,
+        page: 1,
+        limit: exportLimit,
+      })
+      if (!result.success) return result
+      return { success: true, data: result.data?.items || [] }
+    },
+    [q, categoryId, subcategoryId, productId, variantId, sort],
+  )
+
   return {
     items,
     meta,
@@ -161,5 +184,6 @@ export function useAdminTaxProfit({
     updateDefaults,
     bulkSetProfit,
     bulkSetTax,
+    fetchExportRows,
   }
 }

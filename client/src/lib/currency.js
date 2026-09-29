@@ -42,6 +42,15 @@ export function formatMoney(amount, currencyCode = DEFAULT_CURRENCY) {
   }
 }
 
+// Amount only (no currency code) — use when "Currency: PKR" is shown once in the header
+export function formatAmount(amount) {
+  const n = Number(amount) || 0
+  return new Intl.NumberFormat('en', {
+    maximumFractionDigits: 2,
+    minimumFractionDigits: 0,
+  }).format(n)
+}
+
 // Compact label for table headers / exports e.g. "Price (PKR)"
 export function currencyAmountLabel(prefix, currencyCode = DEFAULT_CURRENCY) {
   return `${prefix} (${normalizeCurrency(currencyCode)})`

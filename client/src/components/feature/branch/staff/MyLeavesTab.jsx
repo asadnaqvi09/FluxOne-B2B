@@ -27,30 +27,12 @@ import {
 } from '@/components/ui/dialog'
 import { apiClient } from '@/api/api'
 import { toastError, toastSuccess } from '@/lib/toast'
+import { formatDateLine, formatDateTime } from '@/lib/formatDateTime'
+import { DateTimeLines } from '@/components/shared/DateTimeLines'
 import { useClientPagination } from '@/hooks/useClientPagination'
 
-function formatDate(value) {
-  if (!value) return '—'
-  return new Date(value).toLocaleDateString('en-GB', {
-    day: '2-digit',
-    month: 'short',
-    year: 'numeric',
-  })
-}
-
 function formatRange(start, end) {
-  return `${formatDate(start)} — ${formatDate(end)}`
-}
-
-function formatDateTime(value) {
-  if (!value) return '—'
-  return new Date(value).toLocaleString('en-GB', {
-    day: 'numeric',
-    month: 'short',
-    year: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit',
-  })
+  return `${formatDateLine(start)} — ${formatDateLine(end)}`
 }
 
 function toInputDate(value) {
@@ -234,7 +216,7 @@ export function MyLeavesTab({ createOpen = false, onCreateOpenChange }) {
                         {formatRange(l.startDate, l.endDate)}
                       </TableCell>
                       <TableCell className="px-3 py-3 whitespace-nowrap text-slate-600">
-                        {formatDateTime(l.createdAt)}
+                        <DateTimeLines value={l.createdAt} />
                       </TableCell>
                       <TableCell className="max-w-xs px-3 py-3">
                         <p className="truncate font-medium text-slate-900" title={l.reason || 'Leave'}>

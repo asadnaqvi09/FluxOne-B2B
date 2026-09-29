@@ -2,7 +2,7 @@ import { Check, Eye, Pencil, Trash2, X } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
 
-// Reusable row action CTAs with hover scale / color feedback.
+// Standard table row actions — direct icons + hover tooltip (title/aria-label). No ⋮ menus.
 const ACTION_STYLES = {
   view: 'text-purple-700 hover:bg-purple-50 hover:text-purple-900 hover:scale-110 active:scale-95',
   edit: 'text-slate-500 hover:bg-slate-100 hover:text-slate-900 hover:scale-110 active:scale-95',
@@ -50,7 +50,7 @@ export function ActionIconButton({
       aria-label={resolvedLabel}
       title={resolvedLabel}
       onClick={onClick}
-      className={cn('cursor-pointer', tone, className)}
+      className={cn('size-8 cursor-pointer', tone, className)}
       {...props}
     >
       <Icon className={cn(iconClassName, 'transition-transform duration-200')} />
@@ -58,23 +58,36 @@ export function ActionIconButton({
   )
 }
 
-// Edit + Delete pair used in most data tables.
+// View / Edit / Delete (pass only the handlers you need)
 export function RowActionButtons({
+  onView,
   onEdit,
   onDelete,
+  viewLabel = 'View',
   editLabel = 'Edit',
   deleteLabel = 'Delete',
   className,
   iconClassName,
+  disabled = false,
 }) {
   return (
-    <div className={cn('flex items-center justify-start gap-1', className)}>
+    <div className={cn('inline-flex items-center justify-start gap-1', className)}>
+      {onView ? (
+        <ActionIconButton
+          action="view"
+          label={viewLabel}
+          onClick={onView}
+          iconClassName={iconClassName}
+          disabled={disabled}
+        />
+      ) : null}
       {onEdit ? (
         <ActionIconButton
           action="edit"
           label={editLabel}
           onClick={onEdit}
           iconClassName={iconClassName}
+          disabled={disabled}
         />
       ) : null}
       {onDelete ? (
@@ -83,6 +96,7 @@ export function RowActionButtons({
           label={deleteLabel}
           onClick={onDelete}
           iconClassName={iconClassName}
+          disabled={disabled}
         />
       ) : null}
     </div>

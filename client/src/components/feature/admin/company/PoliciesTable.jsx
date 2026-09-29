@@ -1,24 +1,11 @@
 import { useMemo, useState } from 'react'
-import {
-  Eye,
-  MoreVertical,
-  Pencil,
-  Trash2,
-  FileText,
-  ArrowDownUp,
-  Printer,
-} from 'lucide-react'
+import { FileText, Printer } from 'lucide-react'
 import { DataCard, ResponsiveDataShell } from '@/components/shared/ResponsiveDataShell'
 import { EmptyState } from '@/components/shared/EmptyState'
 import { EntityStatusToggle } from '@/components/shared/EntityStatusToggle'
+import { RowActionButtons } from '@/components/shared/ActionIconButton'
 import { SurfaceCard } from '@/components/shared/SurfaceCard'
 import { Badge } from '@/components/ui/badge'
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu'
 import {
   Table,
   TableBody,
@@ -30,20 +17,8 @@ import {
 } from '@/components/ui/table'
 import { useClientPagination } from '@/hooks/useClientPagination'
 import { referenceFromUuid } from '@/lib/formatDisplayId'
+import { DateTimeLines } from '@/components/shared/DateTimeLines'
 import { cn } from '@/lib/utils'
-
-function formatPolicyUpdatedAt(value) {
-  if (!value) return '—'
-  const date = new Date(value)
-  if (Number.isNaN(date.getTime())) return String(value)
-  return date.toLocaleString(undefined, {
-    year: 'numeric',
-    month: 'short',
-    day: '2-digit',
-    hour: '2-digit',
-    minute: '2-digit',
-  })
-}
 
 function StatusBadge({ active }) {
   const isActive = active !== false
@@ -65,7 +40,7 @@ function StatusBadge({ active }) {
   )
 }
 
-function CategoryBadge({ category, config }) {
+function PolicyTypeBadge({ category, config }) {
   const cfg = config || {}
   const Icon = cfg.icon || FileText
   return (
@@ -82,61 +57,22 @@ function CategoryBadge({ category, config }) {
   )
 }
 
-function PolicyActionsMenu({ policy, onView, onEdit, onDelete }) {
+// Direct View / Edit / Delete icons (no ⋮ menu) — TC-admin action view-002g
+function PolicyRowActions({ policy, onView, onEdit, onDelete }) {
+  const name = policy?.name || 'policy'
   return (
-    <div className="relative inline-flex justify-start">
-      <DropdownMenu>
-        <DropdownMenuTrigger
-          className="inline-flex size-8 cursor-pointer items-center justify-center rounded-lg text-slate-500 hover:bg-slate-100 hover:text-slate-800"
-          aria-label="Policy actions"
-        >
-          <MoreVertical className="size-4" />
-        </DropdownMenuTrigger>
-        <DropdownMenuContent className="min-w-[9rem]" align="start">
-          <DropdownMenuItem
-            className="cursor-pointer gap-2 text-slate-700"
-            onClick={() => onView?.(policy)}
-          >
-            <Eye className="size-3.5" />
-            View
-          </DropdownMenuItem>
-          <DropdownMenuItem
-            className="cursor-pointer gap-2 text-slate-700"
-            onClick={() => onEdit?.(policy)}
-          >
-            <Pencil className="size-3.5" />
-            Edit
-          </DropdownMenuItem>
-          <DropdownMenuItem
-            className="cursor-pointer gap-2 text-red-600 hover:bg-red-50"
-            onClick={() => onDelete?.(policy)}
-          >
-            <Trash2 className="size-3.5" />
-            Delete
-          </DropdownMenuItem>
-        </DropdownMenuContent>
-      </DropdownMenu>
-    </div>
+    <RowActionButtons
+      onView={onView ? () => onView(policy) : undefined}
+      onEdit={onEdit ? () => onEdit(policy) : undefined}
+      onDelete={onDelete ? () => onDelete(policy) : undefined}
+      viewLabel={`View ${name}`}
+      editLabel={`Edit ${name}`}
+      deleteLabel={`Delete ${name}`}
+    />
   )
 }
 
-function SortableHead({ label, active, direction, onClick, className }) {
-  return (
-    <TableHead className={cn('px-3 py-3 font-semibold', className)}>
-      <button
-        type="button"
-        onClick={onClick}
-        className="inline-flex cursor-pointer items-center gap-1 text-left text-xs tracking-wide text-slate-500 uppercase hover:text-slate-800"
-      >
-        {label}
-        <ArrowDownUp
-          className={cn('size-3 text-slate-400 opacity-40', active && 'opacity-100 text-slate-600')}
-          data-dir={direction}
-        />
-      </button>
-    </TableHead>
-  )
-}
+const DEFAULT_POLICY_TYPE = 'Return'
 
 export function PoliciesTable({
   items = [],
@@ -148,54 +84,21 @@ export function PoliciesTable({
   onDelete,
   onTogglePrintOnSlip,
 }) {
-  const [sortKey, setSortKey] = useState('updatedAt')
-  const [sortDir, setSortDir] = useState('desc')
   const [togglingId, setTogglingId] = useState(null)
 
+  // Newest first — headers are display-only (no sort UI)
   const sorted = useMemo(() => {
     const list = [...(items || [])]
-    const dir = sortDir === 'asc' ? 1 : -1
     list.sort((a, b) => {
-      if (sortKey === 'name') {
-        return String(a.name || '').localeCompare(String(b.name || '')) * dir
-      }
-      if (sortKey === 'category') {
-        return String(a.category || '').localeCompare(String(b.category || '')) * dir
-      }
-      if (sortKey === 'id') {
-        return (
-          referenceFromUuid(a.id, 'POL').localeCompare(referenceFromUuid(b.id, 'POL')) * dir
-        )
-      }
-      if (sortKey === 'status') {
-        const av = a.isActive === false ? 0 : 1
-        const bv = b.isActive === false ? 0 : 1
-        return (av - bv) * dir
-      }
-      if (sortKey === 'printOnSlip') {
-        const av = a.printOnSlip ? 1 : 0
-        const bv = b.printOnSlip ? 1 : 0
-        return (av - bv) * dir
-      }
       const at = new Date(a.updatedAt || a.createdAt || 0).getTime()
       const bt = new Date(b.updatedAt || b.createdAt || 0).getTime()
-      return (at - bt) * dir
+      return bt - at
     })
     return list
-  }, [items, sortKey, sortDir])
+  }, [items])
 
   const { page, setPage, pageSize, setPageSize, pageCount, total, slice } =
     useClientPagination(sorted)
-
-  function toggleSort(key) {
-    if (sortKey === key) {
-      setSortDir((d) => (d === 'asc' ? 'desc' : 'asc'))
-    } else {
-      setSortKey(key)
-      setSortDir(key === 'name' || key === 'category' || key === 'id' ? 'asc' : 'desc')
-    }
-    setPage(1)
-  }
 
   async function handleTogglePrint(policy, next) {
     if (!onTogglePrintOnSlip) return
@@ -224,7 +127,7 @@ export function PoliciesTable({
         <>
           <ResponsiveDataShell
             mobile={slice.map((p) => {
-              const cfg = categoryConfig[p.category] || categoryConfig['Retail Operations']
+              const cfg = categoryConfig[p.category] || categoryConfig[DEFAULT_POLICY_TYPE]
               const displayId = referenceFromUuid(p.id, 'POL')
               return (
                 <DataCard key={p.id}>
@@ -232,9 +135,9 @@ export function PoliciesTable({
                     <div className="min-w-0 space-y-1">
                       <p className="font-mono text-xs font-bold text-purple-700">{displayId}</p>
                       <p className="truncate text-sm font-semibold text-slate-900">{p.name}</p>
-                      <CategoryBadge category={p.category} config={cfg} />
+                      <PolicyTypeBadge category={p.category} config={cfg} />
                     </div>
-                    <PolicyActionsMenu
+                    <PolicyRowActions
                       policy={p}
                       onView={onView}
                       onEdit={onEdit}
@@ -252,7 +155,7 @@ export function PoliciesTable({
                       activeTitle="Click to disable — hide this policy on POS invoices"
                       inactiveTitle="Click to enable — show this policy on POS invoices"
                     />
-                    <span>{formatPolicyUpdatedAt(p.updatedAt || p.createdAt)}</span>
+                    <span><DateTimeLines value={p.updatedAt || p.createdAt} /></span>
                   </div>
                 </DataCard>
               )
@@ -261,49 +164,18 @@ export function PoliciesTable({
               <Table className="min-w-[58rem] text-left text-sm">
                 <TableHeader>
                   <TableRow className="text-xs tracking-wide text-slate-500 uppercase">
-                    <SortableHead
-                      label="Policy ID"
-                      active={sortKey === 'id'}
-                      direction={sortDir}
-                      onClick={() => toggleSort('id')}
-                    />
-                    <SortableHead
-                      label="Policy Name"
-                      active={sortKey === 'name'}
-                      direction={sortDir}
-                      onClick={() => toggleSort('name')}
-                    />
-                    <SortableHead
-                      label="Category"
-                      active={sortKey === 'category'}
-                      direction={sortDir}
-                      onClick={() => toggleSort('category')}
-                    />
-                    {/* <SortableHead
-                      label="Status"
-                      active={sortKey === 'status'}
-                      direction={sortDir}
-                      onClick={() => toggleSort('status')}
-                    /> */}
-                    <SortableHead
-                      label="Printability status"
-                      active={sortKey === 'printOnSlip'}
-                      direction={sortDir}
-                      onClick={() => toggleSort('printOnSlip')}
-                    />
-                    <SortableHead
-                      label="Last Updated"
-                      active={sortKey === 'updatedAt'}
-                      direction={sortDir}
-                      onClick={() => toggleSort('updatedAt')}
-                    />
+                    <TableHead className="px-3 py-3 font-semibold">Policy ID</TableHead>
+                    <TableHead className="px-3 py-3 font-semibold">Policy Name</TableHead>
+                    <TableHead className="px-3 py-3 font-semibold">Policy Type</TableHead>
+                    <TableHead className="px-3 py-3 font-semibold">Printability status</TableHead>
+                    <TableHead className="px-3 py-3 font-semibold">Last Updated</TableHead>
                     <TableHead className="px-3 py-3 font-semibold">Actions</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {slice.map((p) => {
                     const cfg =
-                      categoryConfig[p.category] || categoryConfig['Retail Operations']
+                      categoryConfig[p.category] || categoryConfig[DEFAULT_POLICY_TYPE]
                     const displayId = referenceFromUuid(p.id, 'POL')
                     return (
                       <TableRow key={p.id} className="hover:bg-slate-50/80">
@@ -314,11 +186,8 @@ export function PoliciesTable({
                           {p.name}
                         </TableCell>
                         <TableCell className="px-3 py-3">
-                          <CategoryBadge category={p.category} config={cfg} />
+                          <PolicyTypeBadge category={p.category} config={cfg} />
                         </TableCell>
-                        {/* <TableCell className="px-3 py-3">
-                          <StatusBadge active={p.isActive} />
-                        </TableCell> */}
                         <TableCell className="px-3 py-3">
                           <div className="inline-flex items-center gap-1.5">
                             <Printer
@@ -339,10 +208,10 @@ export function PoliciesTable({
                           </div>
                         </TableCell>
                         <TableCell className="px-3 py-3 whitespace-nowrap text-slate-600">
-                          {formatPolicyUpdatedAt(p.updatedAt || p.createdAt)}
+                          <DateTimeLines value={p.updatedAt || p.createdAt} />
                         </TableCell>
                         <TableCell className="px-3 py-3">
-                          <PolicyActionsMenu
+                          <PolicyRowActions
                             policy={p}
                             onView={onView}
                             onEdit={onEdit}

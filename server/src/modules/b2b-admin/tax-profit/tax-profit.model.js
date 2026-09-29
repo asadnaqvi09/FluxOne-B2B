@@ -21,8 +21,12 @@ function mapProductRow(row) {
     category: row.categoryName || '',
     subcategoryId: row.subcategoryId || null,
     subcategory: row.subcategoryName || '',
+    // Keep scale on payload for legacy clients; UI no longer displays it (TC-054)
     scale: row.scale || '',
     scaleLabel: row.scale || '',
+    parentId: row.parentId || null,
+    variantLabel: row.variantLabel || '',
+    type: row.type || 'single',
     branchId: row.branchId || null,
     branchName: row.branchName || '',
     baseCost,
@@ -54,7 +58,9 @@ export async function listTaxProfitProducts(tenantId, filters = {}) {
   const q = filters.q?.trim() || null
   const categoryId = filters.categoryId || null
   const subcategoryId = filters.subcategoryId || null
-  const scale = filters.scale && filters.scale !== 'All Scales' ? filters.scale.trim() : null
+  // Product / variant filters (TC-054) — replace legacy scale filter
+  const productId = filters.productId || null
+  const variantId = filters.variantId || null
   const sort = filters.sort || 'all'
 
   const { rows } = await tenantQuery(
@@ -68,6 +74,9 @@ export async function listTaxProfitProducts(tenantId, filters = {}) {
         p.barcode,
         p.scale,
         p.status,
+        p.type,
+        p.parent_id AS "parentId",
+        p.variant_label AS "variantLabel",
         p.branch_id AS "branchId",
         b.name AS "branchName",
         p.category_id AS "categoryId",
@@ -96,23 +105,31 @@ export async function listTaxProfitProducts(tenantId, filters = {}) {
         WHERE si.tenant_id = p.tenant_id
           AND si.product_id = p.id
           AND s.status IN ('completed', 'partial_refund')
-          AND s.sold_at >= now() - ($7::int * INTERVAL '1 day')
+          AND s.sold_at >= now() - ($8::int * INTERVAL '1 day')
       ) sales ON true
       WHERE p.tenant_id = $1
+        -- Hide empty variant parent shells from pricing table (children are priced)
+        AND NOT (p.type = 'variant' AND p.parent_id IS NULL)
         AND (
           $2::text IS NULL
           OR p.name ILIKE '%' || $2 || '%'
           OR p.item_code ILIKE '%' || $2 || '%'
           OR p.barcode ILIKE '%' || $2 || '%'
+          OR COALESCE(p.variant_label, '') ILIKE '%' || $2 || '%'
           OR p.id::text ILIKE '%' || $2 || '%'
         )
         AND ($3::uuid IS NULL OR p.category_id = $3)
         AND ($4::uuid IS NULL OR p.subcategory_id = $4)
-        AND ($5::text IS NULL OR p.scale = $5)
+        AND (
+          $5::uuid IS NULL
+          OR p.id = $5
+          OR p.parent_id = $5
+        )
+        AND ($6::uuid IS NULL OR p.id = $6)
       ORDER BY ${sortClause(sort)}
-      LIMIT $6 OFFSET $8
+      LIMIT $7 OFFSET $9
     `,
-    [q, categoryId, subcategoryId, scale, limit, SALES_WINDOW_DAYS, offset],
+    [q, categoryId, subcategoryId, productId, variantId, limit, SALES_WINDOW_DAYS, offset],
   )
 
   const total = rows[0]?._total || 0
@@ -121,7 +138,7 @@ export async function listTaxProfitProducts(tenantId, filters = {}) {
 }
 
 export async function getTaxProfitMeta(tenantId) {
-  const [{ rows: categoryRows }, { rows: scaleRows }, { rows: taxRows }, { rows: tenantRows }] =
+  const [{ rows: categoryRows }, { rows: productRows }, { rows: taxRows }, { rows: tenantRows }] =
     await Promise.all([
       tenantQuery(
         tenantId,
@@ -136,15 +153,35 @@ export async function getTaxProfitMeta(tenantId) {
           ORDER BY name ASC
         `,
       ),
+      // Top-level products for Product filter (+ nested variants when type=variant)
       tenantQuery(
         tenantId,
         `
-          SELECT DISTINCT scale
-          FROM products
-          WHERE tenant_id = $1
-            AND scale IS NOT NULL
-            AND trim(scale) <> ''
-          ORDER BY scale ASC
+          SELECT
+            p.id,
+            p.name,
+            p.type,
+            p.category_id AS "categoryId",
+            p.subcategory_id AS "subcategoryId",
+            COALESCE(
+              (
+                SELECT json_agg(
+                  json_build_object(
+                    'id', c.id,
+                    'label', COALESCE(NULLIF(trim(c.variant_label), ''), c.name)
+                  )
+                  ORDER BY c.variant_label ASC NULLS LAST, c.name ASC
+                )
+                FROM products c
+                WHERE c.tenant_id = p.tenant_id
+                  AND c.parent_id = p.id
+              ),
+              '[]'::json
+            ) AS variants
+          FROM products p
+          WHERE p.tenant_id = $1
+            AND p.parent_id IS NULL
+          ORDER BY p.name ASC
         `,
       ),
       tenantQuery(
@@ -189,7 +226,16 @@ export async function getTaxProfitMeta(tenantId) {
       name: p.name,
       children: childrenByParent.get(p.id) || [],
     })),
-    scales: scaleRows.map((r) => r.scale),
+    // Product filter options (TC-054); scales removed
+    products: productRows.map((p) => ({
+      id: p.id,
+      name: p.name,
+      type: p.type,
+      categoryId: p.categoryId || null,
+      subcategoryId: p.subcategoryId || null,
+      variants: Array.isArray(p.variants) ? p.variants : [],
+    })),
+    scales: [],
     taxes: taxRows.map((t) => ({
       id: t.id,
       name: t.name,

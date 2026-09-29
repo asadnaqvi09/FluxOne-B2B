@@ -22,6 +22,7 @@ import {
 import { ConfirmDialog } from '@/components/shared/ConfirmDialog'
 import { DataCard, ResponsiveDataShell } from '@/components/shared/ResponsiveDataShell'
 import { BRAND } from '@/lib/constants'
+import { formatDateTime } from '@/lib/formatDateTime'
 import { toastSuccess, toastError } from '@/lib/toast'
 import { fieldErrorClass } from '@/lib/validation/fieldErrors'
 import { displayStaffRef } from '@/lib/formatDisplayId'
@@ -67,7 +68,8 @@ function formatLastActive(value) {
   if (hours < 24) return `${hours}h ago`
   const days = Math.floor(hours / 24)
   if (days < 7) return `${days}d ago`
-  return d.toLocaleString()
+  // Older than a week — absolute 12h AM/PM
+  return formatDateTime(d)
 }
 
 const PASSWORD_FIELD_IDS = {
@@ -284,8 +286,7 @@ export function SettingsPage() {
     }
 
     toastSuccess(
-      `${targetSystem.deviceName} is now ${
-        nextStatus === 'blocked' ? 'BLOCKED from accessing the system' : 'ACTIVE & Authorized'
+      `${targetSystem.deviceName} is now ${nextStatus === 'blocked' ? 'BLOCKED from accessing the system' : 'ACTIVE & Authorized'
       }`,
     )
     setTargetSystem(null)
@@ -307,11 +308,10 @@ export function SettingsPage() {
           <button
             type="button"
             onClick={() => setActiveTab('security')}
-            className={`rounded-lg px-4 py-2 text-xs sm:text-sm font-semibold transition-all cursor-pointer flex items-center gap-2 ${
-              activeTab === 'security'
+            className={`rounded-lg px-4 py-2 text-xs sm:text-sm font-semibold transition-all cursor-pointer flex items-center gap-2 ${activeTab === 'security'
                 ? 'bg-white text-purple-900 shadow-xs font-bold'
                 : 'text-slate-600 hover:text-slate-900'
-            }`}
+              }`}
           >
             <KeyRound className="size-4" />
             Security & Password Change
@@ -319,11 +319,10 @@ export function SettingsPage() {
           <button
             type="button"
             onClick={() => setActiveTab('currency')}
-            className={`rounded-lg px-4 py-2 text-xs sm:text-sm font-semibold transition-all cursor-pointer flex items-center gap-2 ${
-              activeTab === 'currency'
+            className={`rounded-lg px-4 py-2 text-xs sm:text-sm font-semibold transition-all cursor-pointer flex items-center gap-2 ${activeTab === 'currency'
                 ? 'bg-white text-purple-900 shadow-xs font-bold'
                 : 'text-slate-600 hover:text-slate-900'
-            }`}
+              }`}
           >
             <Coins className="size-4" />
             Currency Settings
@@ -331,11 +330,10 @@ export function SettingsPage() {
           <button
             type="button"
             onClick={() => setActiveTab('systems')}
-            className={`rounded-lg px-4 py-2 text-xs sm:text-sm font-semibold transition-all cursor-pointer flex items-center gap-2 ${
-              activeTab === 'systems'
+            className={`rounded-lg px-4 py-2 text-xs sm:text-sm font-semibold transition-all cursor-pointer flex items-center gap-2 ${activeTab === 'systems'
                 ? 'bg-white text-purple-900 shadow-xs font-bold'
                 : 'text-slate-600 hover:text-slate-900'
-            }`}
+              }`}
           >
             <Monitor className="size-4" />
             All System Access ({stats.total})
@@ -708,11 +706,10 @@ export function SettingsPage() {
                       key={opt.key}
                       type="button"
                       onClick={() => setStatusFilter(opt.key)}
-                      className={`shrink-0 cursor-pointer rounded-lg px-3 py-1 text-xs font-semibold transition-all ${
-                        statusFilter === opt.key
+                      className={`shrink-0 cursor-pointer rounded-lg px-3 py-1 text-xs font-semibold transition-all ${statusFilter === opt.key
                           ? 'bg-white font-bold text-purple-900 shadow-xs'
                           : 'text-slate-600 hover:text-slate-900'
-                      }`}
+                        }`}
                     >
                       {opt.label}
                     </button>
@@ -772,9 +769,8 @@ export function SettingsPage() {
                         <DataCard key={sys.id}>
                           <div className="flex items-start gap-3">
                             <div
-                              className={`flex size-9 shrink-0 items-center justify-center rounded-xl text-white ${
-                                isActive ? 'bg-purple-900' : 'bg-rose-600'
-                              }`}
+                              className={`flex size-9 shrink-0 items-center justify-center rounded-xl text-white ${isActive ? 'bg-purple-900' : 'bg-rose-600'
+                                }`}
                             >
                               <Cpu className="size-4" />
                             </div>
@@ -867,9 +863,8 @@ export function SettingsPage() {
                                 <TableCell className="px-4 py-3.5">
                                   <div className="flex items-center gap-3">
                                     <div
-                                      className={`flex size-9 shrink-0 items-center justify-center rounded-xl text-white ${
-                                        isActive ? 'bg-purple-900' : 'bg-rose-600'
-                                      }`}
+                                      className={`flex size-9 shrink-0 items-center justify-center rounded-xl text-white ${isActive ? 'bg-purple-900' : 'bg-rose-600'
+                                        }`}
                                     >
                                       <Cpu className="size-4" />
                                     </div>
@@ -974,6 +969,8 @@ export function SettingsPage() {
         title={
           targetSystem?.status === 'active' ? 'Block System Access' : 'Authorize System Access'
         }
+        variant={targetSystem?.status === 'active' ? 'destructive' : 'default'}
+        icon={targetSystem?.status === 'active' ? Ban : CheckCircle2}
         description={
           targetSystem?.status === 'active' ? (
             <>
@@ -996,8 +993,7 @@ export function SettingsPage() {
         confirmLabel={
           targetSystem?.status === 'active' ? 'Yes, Block System' : 'Yes, Authorize System'
         }
-        variant={targetSystem?.status === 'active' ? 'destructive' : 'default'}
-        loading={mutating}
+        loading={mutating || loading}
         onConfirm={handleConfirmToggleBlock}
       />
     </div>

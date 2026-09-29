@@ -27,19 +27,11 @@ import {
 } from '@/components/ui/dialog'
 import { apiClient } from '@/api/api'
 import { toastError, toastSuccess } from '@/lib/toast'
+import { formatDateLine } from '@/lib/formatDateTime'
 import { useClientPagination } from '@/hooks/useClientPagination'
 
-function formatDate(value) {
-  if (!value) return '—'
-  return new Date(value).toLocaleDateString('en-GB', {
-    day: '2-digit',
-    month: 'short',
-    year: 'numeric',
-  })
-}
-
 function formatRange(start, end) {
-  return `${formatDate(start)} — ${formatDate(end)}`
+  return `${formatDateLine(start)} — ${formatDateLine(end)}`
 }
 
 function toInputDate(value) {

@@ -18,23 +18,12 @@ import {
 } from '@/components/ui/table'
 import { TableRowsSkeleton } from '@/components/ui/skeleton'
 import { displayStaffRef } from '@/lib/formatDisplayId'
+import { formatDateTime } from '@/lib/formatDateTime'
+import { DateTimeLines } from '@/components/shared/DateTimeLines'
 
-// Joining Date/Time per Doc v4 (date + time when available)
+// Joining Date/Time — date top / 12h AM/PM time bottom in tables
 function formatJoinedDateTime(value) {
-  if (!value) return '—'
-  try {
-    const date = new Date(value)
-    if (Number.isNaN(date.getTime())) return '—'
-    return date.toLocaleString('en-GB', {
-      day: '2-digit',
-      month: 'short',
-      year: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit',
-    })
-  } catch {
-    return '—'
-  }
+  return formatDateTime(value)
 }
 
 function formatTime(value) {
@@ -257,7 +246,7 @@ export function StaffTable({
                         </div>
                       </TableCell>
                       <TableCell className="px-2 py-3 align-middle whitespace-nowrap text-slate-600">
-                        {formatJoinedDateTime(row.joiningDate || row.createdAt)}
+                        <DateTimeLines value={row.joiningDate || row.createdAt} />
                       </TableCell>
                       <TableCell className="px-2 py-3 align-middle text-slate-700">
                         {designationLabel(row)}

@@ -15,14 +15,23 @@ import {
   activityActionLabel,
   activitySourceLabel,
   formatActivityLine,
+  formatActivityRelative,
   formatActivityTime,
 } from '@/lib/activityLogLabels'
+import { DateTimeLines } from '@/components/shared/DateTimeLines'
 import { roleDisplayName } from '@/lib/nav'
 import { ACTIVITY_LOGS_PAGE_SIZE } from '@/hooks/useActivityLogs'
 
 function roleLabel(role) {
   if (!role || role === 'unknown') return '—'
   return roleDisplayName(role) || role
+}
+
+// Relative label when fresh; else date top / 12h AM/PM time bottom
+function ActivityWhen({ value, className = '' }) {
+  const relative = formatActivityRelative(value)
+  if (relative) return <span className={className}>{relative}</span>
+  return <DateTimeLines value={value} className={className} />
 }
 
 function LogMessage({ log, includeTime = true }) {
@@ -103,7 +112,7 @@ export function ActivityLogsList({
               <MetaBadges log={log} />
             </div>
             <p className="mt-2 text-xs text-slate-400" title={log.createdAt}>
-              {formatActivityTime(log.createdAt)}
+              <ActivityWhen value={log.createdAt} />
             </p>
           </DataCard>
         ))}
@@ -137,7 +146,7 @@ export function ActivityLogsList({
                     </Badge>
                   </TableCell>
                   <TableCell className="text-right text-sm text-slate-600" title={log.createdAt}>
-                    {formatActivityTime(log.createdAt)}
+                    <ActivityWhen value={log.createdAt} className="items-end" />
                   </TableCell>
                 </TableRow>
               ))}

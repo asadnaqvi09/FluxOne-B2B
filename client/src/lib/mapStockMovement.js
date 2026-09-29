@@ -1,3 +1,5 @@
+import { formatDateTimeInline } from '@/lib/formatDateTime'
+
 export const MOVEMENT_TYPES = {
   IN: 'in',
   OUT: 'out',
@@ -53,18 +55,8 @@ export function mapStockMovement(row = {}) {
 }
 
 export function formatMovementDateTime(value) {
-  if (!value) return '—'
-  try {
-    return new Date(value).toLocaleString(undefined, {
-      year: 'numeric',
-      month: 'short',
-      day: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit',
-    })
-  } catch {
-    return String(value)
-  }
+  // Delegate to system-wide 12h AM/PM formatter
+  return formatDateTimeInline(value)
 }
 
 export function shortId(id) {

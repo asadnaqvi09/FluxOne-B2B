@@ -1,6 +1,7 @@
 import { jsPDF } from 'jspdf'
 import { downloadBillingInvoicePdf } from '@/lib/pdfDownload'
 import { currencyAmountLabel, DEFAULT_CURRENCY, formatMoney, normalizeCurrency } from '@/lib/currency'
+import { formatDateTimeInline } from '@/lib/formatDateTime'
 
 function safeFilename(value, fallback = 'download') {
   const base = String(value || fallback)
@@ -41,7 +42,7 @@ export function exportInvoicesToExcel(
 
   const lines = [
     `"${companyName} - Invoices & Payment History Report"`,
-    `"Exported Date: ${new Date().toLocaleString()}"`,
+    `"Exported Date: ${formatDateTimeInline(new Date())}"`,
     `"Period Filter: ${filterMonth !== 'all' ? `Month ${filterMonth}, ` : ''}${filterYear !== 'all' ? `Year ${filterYear}` : 'All Time'}"`,
     `"Total Records: ${invoices.length}"`,
     '',

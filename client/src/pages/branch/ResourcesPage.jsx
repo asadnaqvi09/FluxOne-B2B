@@ -416,7 +416,7 @@ export function ResourcesPage() {
                                   onClick={() => handleDeleteHardware(hw)}
                                   aria-label="Delete hardware"
                                 >
-                                  <Trash2 className="size-4" />
+                                  <Ban className="size-4" />
                                 </button>
                               </div>
                             </div>

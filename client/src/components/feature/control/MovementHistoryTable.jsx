@@ -13,7 +13,7 @@ import {
   TablePagination,
 } from '@/components/ui/table'
 import { TableRowsSkeleton } from '@/components/ui/skeleton'
-import { formatMovementDateTime } from '@/lib/mapStockMovement'
+import { DateTimeLines } from '@/components/shared/DateTimeLines'
 import { displayItemCode, displayMovementRef } from '@/lib/formatDisplayId'
 import { cn } from '@/lib/utils'
 
@@ -168,9 +168,7 @@ export function movementImageNameColumns() {
       key: 'when',
       label: 'Date · Time',
       className: 'whitespace-nowrap',
-      render: (row) => (
-        <span className="text-slate-600">{formatMovementDateTime(row.createdAt)}</span>
-      ),
+      render: (row) => <DateTimeLines value={row.createdAt} />,
     },
     {
       key: 'scale',

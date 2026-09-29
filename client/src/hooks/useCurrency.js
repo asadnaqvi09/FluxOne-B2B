@@ -2,6 +2,7 @@ import { useCallback, useMemo } from 'react'
 import { useAuth } from '@/context/AuthContext'
 import {
   DEFAULT_CURRENCY,
+  formatAmount,
   formatMoney,
   getCurrencyMeta,
   normalizeCurrency,
@@ -18,10 +19,14 @@ export function useCurrency() {
     [code],
   )
 
+  // Plain number for tables that show "Currency: CODE" once in the header
+  const formatPlain = useCallback((amount) => formatAmount(amount), [])
+
   return {
     currency: code,
     symbol: meta.symbol,
     label: meta.label,
     format,
+    formatPlain,
   }
 }

@@ -16,6 +16,7 @@ import {
 } from '@/components/ui/table'
 import { apiClient } from '@/api/api'
 import { BRAND } from '@/lib/constants'
+import { formatDateLine } from '@/lib/formatDateTime'
 import { toastError, toastSuccess } from '@/lib/toast'
 import { useClientPagination } from '@/hooks/useClientPagination'
 import { cn } from '@/lib/utils'
@@ -26,18 +27,7 @@ function todayIso() {
 
 // Shared display format for both Attendance Logs and Manual Attendance
 function formatAttendanceDate(value) {
-  if (!value) return '—'
-  try {
-    const date = new Date(value)
-    if (Number.isNaN(date.getTime())) return '—'
-    return date.toLocaleDateString('en-GB', {
-      day: '2-digit',
-      month: 'short',
-      year: 'numeric',
-    })
-  } catch {
-    return '—'
-  }
+  return formatDateLine(value)
 }
 
 function matchesDesignation(member, designationId) {

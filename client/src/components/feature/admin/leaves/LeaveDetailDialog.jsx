@@ -7,13 +7,15 @@ import { NativeSelect } from '@/components/ui/select'
 import { Textarea } from '@/components/ui/textarea'
 import { useFormBaseline } from '@/hooks/useFormBaseline'
 import { referenceFromUuid, displayStaffRef } from '@/lib/formatDisplayId'
+import { formatDateLine } from '@/lib/formatDateTime'
+import { DateTimeLines } from '@/components/shared/DateTimeLines'
 import { cn } from '@/lib/utils'
 
-// Decision options for pending leave (UI labels → API status values)
+// Decision options for pending leave — Pending → Approved / Rejected (TC-Leave-03s)
 const DECISION_OPTIONS = [
-  { value: 'pending', label: 'Initial Pending' },
-  { value: 'approved', label: 'Accept' },
-  { value: 'rejected', label: 'Reject' },
+  { value: 'pending', label: 'Pending' },
+  { value: 'approved', label: 'Approved' },
+  { value: 'rejected', label: 'Rejected' },
 ]
 
 function displayLeaveRef(row = {}) {
@@ -24,29 +26,8 @@ function displayLeaveStaffRef(row = {}) {
   return displayStaffRef({ id: row.requestedBy || row.staffId })
 }
 
-function formatDate(value) {
-  if (!value) return '—'
-  return new Date(value).toLocaleDateString('en-GB', {
-    day: '2-digit',
-    month: 'short',
-    year: 'numeric',
-  })
-}
-
 function formatRange(start, end) {
-  return `${formatDate(start)} - ${formatDate(end)}`
-}
-
-function formatDateTime(value) {
-  if (!value) return '—'
-  return new Date(value).toLocaleString('en-GB', {
-    day: '2-digit',
-    month: 'short',
-    year: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit',
-    hour12: true,
-  })
+  return `${formatDateLine(start)} - ${formatDateLine(end)}`
 }
 
 function resolveDayCount(row = {}) {
@@ -102,7 +83,7 @@ export function LeaveDetailDialog({
     const nextStatus = isPending && presetDecision ? presetDecision : 'pending'
     setDecisionStatus(nextStatus)
     setDecisionReason('')
-    // Baseline always starts as Initial Pending + empty reason so Accept/Reject presets count as dirty
+    // Baseline starts as Pending + empty reason so Approved/Rejected presets count as dirty
     captureBaseline({ status: 'pending', reason: '' })
   }, [open, row, presetDecision, isPending, captureBaseline])
 
@@ -136,10 +117,9 @@ export function LeaveDetailDialog({
       onOpenChange={onOpenChange}
       dirty={dirty}
       title={`Leave Details — ${displayLeaveRef(row || {})}`}
+      // Admin view: no subtitle (redundant with title) — TC-Leave-03s
       description={
-        isSelf
-          ? 'Review your leave request and Admin decision comments.'
-          : 'Branch manager personal leave request'
+        isSelf ? 'Review your leave request and Admin decision comments.' : undefined
       }
       footer={
         isPending ? (
@@ -177,14 +157,18 @@ export function LeaveDetailDialog({
                   {formatRange(row.startDate, row.endDate)}
                   {days > 0 ? ` (${dayLabel(days)})` : ''}
                 </DetailRow>
-                <DetailRow label="Applied">{formatDateTime(row.createdAt)}</DetailRow>
+                <DetailRow label="Applied">
+                  <DateTimeLines value={row.createdAt} />
+                </DetailRow>
                 <DetailRow label="Status">
                   <Badge className={cn('border capitalize', statusBadgeClass(row.status))}>
                     {row.status}
                   </Badge>
                 </DetailRow>
                 {row.decidedAt ? (
-                  <DetailRow label="Decided">{formatDateTime(row.decidedAt)}</DetailRow>
+                  <DetailRow label="Decided">
+                    <DateTimeLines value={row.decidedAt} />
+                  </DetailRow>
                 ) : null}
                 <DetailRow label="Admin note">{row.decisionReason || '—'}</DetailRow>
               </>
@@ -201,7 +185,9 @@ export function LeaveDetailDialog({
                 <DetailRow label="Dates">
                   {formatRange(row.startDate, row.endDate)} ({dayLabel(days)})
                 </DetailRow>
-                <DetailRow label="Applied">{formatDateTime(row.createdAt)}</DetailRow>
+                <DetailRow label="Applied">
+                  <DateTimeLines value={row.createdAt} />
+                </DetailRow>
                 <DetailRow label="Reason">{row.reason || '—'}</DetailRow>
 
                 <DetailRow label="Status">
@@ -233,7 +219,7 @@ export function LeaveDetailDialog({
             )}
           </div>
 
-          {/* Accept → optional note · Reject → required rejection reason */}
+          {/* Approved → optional note · Rejected → required rejection reason */}
           {showReasonBox ? (
             <div className="space-y-2">
               <Label htmlFor="leave-decision-reason">

@@ -30,6 +30,8 @@ import { apiClient } from '@/api/api'
 import { endpoints } from '@/api/endpoints'
 import { BRAND } from '@/lib/constants'
 import { referenceFromUuid, displayStaffRef, matchesDisplayRef, normalizeSearchQuery } from '@/lib/formatDisplayId'
+import { formatDateLine } from '@/lib/formatDateTime'
+import { DateTimeLines } from '@/components/shared/DateTimeLines'
 import { toastError, toastSuccess } from '@/lib/toast'
 import { useClientPagination } from '@/hooks/useClientPagination'
 import { useDebouncedValue } from '@/hooks/useDebouncedValue'
@@ -43,29 +45,8 @@ function displayLeaveStaffRef(row = {}) {
   return displayStaffRef({ id: row.requestedBy || row.staffId })
 }
 
-function formatDate(value) {
-  if (!value) return '—'
-  return new Date(value).toLocaleDateString('en-GB', {
-    day: '2-digit',
-    month: 'short',
-    year: 'numeric',
-  })
-}
-
 function formatRange(start, end) {
-  return `${formatDate(start)} - ${formatDate(end)}`
-}
-
-function formatDateTime(value) {
-  if (!value) return '—'
-  return new Date(value).toLocaleString('en-GB', {
-    day: '2-digit',
-    month: 'short',
-    year: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit',
-    hour12: true,
-  })
+  return `${formatDateLine(start)} - ${formatDateLine(end)}`
 }
 
 function dayLabel(count) {
@@ -451,7 +432,8 @@ export function LeavesPage() {
                           {dayLabel(row.dayCount)}
                         </TableCell>
                         <TableCell className="px-3 py-3 text-slate-600">
-                          {formatDateTime(row.createdAt)}
+                          {/* Date top · 12h AM/PM time bottom */}
+                          <DateTimeLines value={row.createdAt} />
                         </TableCell>
                         <TableCell className="px-3 py-3">
                           <Badge className={cn('border capitalize', statusBadgeClass(row.status))}>

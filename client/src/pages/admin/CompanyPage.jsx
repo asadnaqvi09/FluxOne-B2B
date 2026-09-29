@@ -75,40 +75,52 @@ import {
   Loader2,
 } from 'lucide-react'
 
-const CATEGORIES = [
-  'all',
-  'Retail Operations',
-  'Finance & Billing',
-  'Inventory & Procurement',
-  'Security & Compliance',
-]
+// Default policy types for Policies & Governance (TC-002F)
+const POLICY_TYPES = ['Return', 'Refund', 'Exchange', 'Wholesale']
+const DEFAULT_POLICY_TYPE = 'Return'
+const CATEGORIES = ['all', ...POLICY_TYPES]
+const POLICY_TYPE_OPTIONS = POLICY_TYPES
 
-const POLICY_CATEGORY_OPTIONS = CATEGORIES.filter((c) => c !== 'all')
+// Map legacy category labels → current policy types
+const LEGACY_POLICY_TYPE_MAP = {
+  'Return Operations': 'Return',
+  'Refund Operations': 'Refund',
+  'Exchange Operations': 'Exchange',
+  'Wholesale Operations': 'Wholesale',
+  'Retail Operations': 'Return',
+  'Finance & Billing': 'Refund',
+}
+
+function normalizePolicyType(value) {
+  if (!value) return DEFAULT_POLICY_TYPE
+  if (POLICY_TYPES.includes(value)) return value
+  return LEGACY_POLICY_TYPE_MAP[value] || DEFAULT_POLICY_TYPE
+}
 
 const CATEGORY_CONFIG = {
-  'Retail Operations': {
+  Return: {
     icon: Store,
     accentBorder: 'border-l-purple-600',
     badgeClass: 'bg-purple-50 text-purple-700 border-purple-200',
     iconBg: 'bg-purple-50 text-purple-700',
   },
-  'Finance & Billing': {
-    icon: FileText,
-    accentBorder: 'border-l-emerald-600',
-    badgeClass: 'bg-emerald-50 text-emerald-700 border-emerald-200',
-    iconBg: 'bg-emerald-50 text-emerald-700',
-  },
-  'Inventory & Procurement': {
+  Refund: {
     icon: Building2,
     accentBorder: 'border-l-blue-600',
     badgeClass: 'bg-blue-50 text-blue-700 border-blue-200',
     iconBg: 'bg-blue-50 text-blue-700',
   },
-  'Security & Compliance': {
+  Exchange: {
     icon: ShieldAlert,
     accentBorder: 'border-l-amber-600',
     badgeClass: 'bg-amber-50 text-amber-700 border-amber-200',
     iconBg: 'bg-amber-50 text-amber-700',
+  },
+  Wholesale: {
+    icon: FileText,
+    accentBorder: 'border-l-emerald-600',
+    badgeClass: 'bg-emerald-50 text-emerald-700 border-emerald-200',
+    iconBg: 'bg-emerald-50 text-emerald-700',
   },
 }
 
@@ -144,7 +156,7 @@ export function CompanyPage() {
   const [policyForm, setPolicyForm] = useState({
     name: '',
     detail: '',
-    category: 'Retail Operations',
+    category: DEFAULT_POLICY_TYPE,
     printOnSlip: false,
   })
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false)
@@ -294,7 +306,7 @@ export function CompanyPage() {
     setPolicyForm({
       name: '',
       detail: '',
-      category: 'Retail Operations',
+      category: DEFAULT_POLICY_TYPE,
       printOnSlip: false,
     })
     setPolicyDialogOpen(true)
@@ -306,7 +318,7 @@ export function CompanyPage() {
     setPolicyForm({
       name: policy.name,
       detail: policy.detail,
-      category: policy.category || 'Retail Operations',
+      category: normalizePolicyType(policy.category),
       printOnSlip: Boolean(policy.printOnSlip),
     })
     setPolicyDialogOpen(true)
@@ -378,20 +390,24 @@ export function CompanyPage() {
 
   // Client-side filter for snappy search within loaded page
   const filteredPolicies = useMemo(() => {
-    return policies.filter((p) => {
-      const matchesCategory =
-        selectedCategory === 'all' || p.category === selectedCategory
-      const q = policySearch.toLowerCase().trim()
-      const displayId = referenceFromUuid(p.id, 'POL').toLowerCase()
-      const matchesSearch =
-        !q ||
-        p.name?.toLowerCase().includes(q) ||
-        p.detail?.toLowerCase().includes(q) ||
-        displayId.includes(q) ||
-        String(p.id).toLowerCase().includes(q) ||
-        (p.category || '').toLowerCase().includes(q)
-      return matchesCategory && matchesSearch
-    })
+    return policies
+      .filter((p) => {
+        const policyType = normalizePolicyType(p.category)
+        const matchesCategory =
+          selectedCategory === 'all' || policyType === selectedCategory
+        const q = policySearch.toLowerCase().trim()
+        const displayId = referenceFromUuid(p.id, 'POL').toLowerCase()
+        const matchesSearch =
+          !q ||
+          p.name?.toLowerCase().includes(q) ||
+          p.detail?.toLowerCase().includes(q) ||
+          displayId.includes(q) ||
+          String(p.id).toLowerCase().includes(q) ||
+          policyType.toLowerCase().includes(q) ||
+          (p.category || '').toLowerCase().includes(q)
+        return matchesCategory && matchesSearch
+      })
+      .map((p) => ({ ...p, category: normalizePolicyType(p.category) }))
   }, [policies, selectedCategory, policySearch])
 
   return (
@@ -426,11 +442,10 @@ export function CompanyPage() {
           <button
             type="button"
             onClick={() => setActiveTab('details')}
-            className={`rounded-lg px-4 py-2 text-xs sm:text-sm font-semibold transition-all cursor-pointer flex items-center gap-2 ${
-              activeTab === 'details'
+            className={`rounded-lg px-4 py-2 text-xs sm:text-sm font-semibold transition-all cursor-pointer flex items-center gap-2 ${activeTab === 'details'
                 ? 'bg-white text-purple-900 shadow-xs font-bold'
                 : 'text-slate-600 hover:text-slate-900'
-            }`}
+              }`}
           >
             <Building2 className="size-4" />
             Company Details
@@ -438,11 +453,10 @@ export function CompanyPage() {
           <button
             type="button"
             onClick={() => setActiveTab('policies')}
-            className={`rounded-lg px-4 py-2 text-xs sm:text-sm font-semibold transition-all cursor-pointer flex items-center gap-2 ${
-              activeTab === 'policies'
+            className={`rounded-lg px-4 py-2 text-xs sm:text-sm font-semibold transition-all cursor-pointer flex items-center gap-2 ${activeTab === 'policies'
                 ? 'bg-white text-purple-900 shadow-xs font-bold'
                 : 'text-slate-600 hover:text-slate-900'
-            }`}
+              }`}
           >
             <FileText className="size-4" />
             Policies & Governance ({policies.length})
@@ -676,7 +690,7 @@ export function CompanyPage() {
                 <Search className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-slate-400" />
                 <input
                   type="text"
-                  placeholder="Search policies by name, clause, ID, or category..."
+                  placeholder="Search policies by name, clause, ID, or policy type..."
                   value={policySearch}
                   onChange={(e) => setPolicySearch(e.target.value)}
                   className="w-full rounded-xl border border-border bg-slate-50/70 py-2 pl-9 pr-4 text-xs sm:text-sm text-slate-900 outline-none focus:border-purple-300 focus:bg-white focus:ring-1 focus:ring-purple-300"
@@ -690,24 +704,22 @@ export function CompanyPage() {
                 const count =
                   cat === 'all'
                     ? policies.length
-                    : policies.filter((p) => p.category === cat).length
+                    : policies.filter((p) => normalizePolicyType(p.category) === cat).length
 
                 return (
                   <button
                     key={cat}
                     type="button"
                     onClick={() => setSelectedCategory(cat)}
-                    className={`rounded-xl px-3.5 py-1.5 text-xs font-semibold transition-all cursor-pointer flex items-center gap-1.5 ${
-                      isSelected
+                    className={`rounded-xl px-3.5 py-1.5 text-xs font-semibold transition-all cursor-pointer flex items-center gap-1.5 ${isSelected
                         ? 'bg-purple-900 text-white shadow-xs font-bold'
                         : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
-                    }`}
+                      }`}
                   >
                     <span>{cat === 'all' ? 'All Policies' : cat}</span>
                     <span
-                      className={`text-[10px] px-1.5 py-0.2 rounded-full font-bold ${
-                        isSelected ? 'bg-white/20 text-white' : 'bg-slate-200 text-slate-700'
-                      }`}
+                      className={`text-[10px] px-1.5 py-0.2 rounded-full font-bold ${isSelected ? 'bg-white/20 text-white' : 'bg-slate-200 text-slate-700'
+                        }`}
                     >
                       {count}
                     </span>
@@ -767,7 +779,7 @@ export function CompanyPage() {
             <DialogTitle>{viewPolicy?.name || 'Policy details'}</DialogTitle>
             <DialogDescription>
               {viewPolicy
-                ? `${referenceFromUuid(viewPolicy.id, 'POL')} · ${viewPolicy.category || 'Uncategorized'}`
+                ? `${referenceFromUuid(viewPolicy.id, 'POL')} · ${normalizePolicyType(viewPolicy.category)}`
                 : null}
             </DialogDescription>
           </DialogHeader>
@@ -842,16 +854,16 @@ export function CompanyPage() {
 
             <div className="space-y-1.5">
               <Label htmlFor="polCat" className="text-xs font-semibold">
-                Category
+                Policy Type
               </Label>
               <NativeSelect
                 id="polCat"
                 value={policyForm.category}
                 onChange={(e) => setPolicyForm({ ...policyForm, category: e.target.value })}
               >
-                {POLICY_CATEGORY_OPTIONS.map((cat) => (
-                  <option key={cat} value={cat}>
-                    {cat}
+                {POLICY_TYPE_OPTIONS.map((type) => (
+                  <option key={type} value={type}>
+                    {type}
                   </option>
                 ))}
               </NativeSelect>
@@ -890,11 +902,10 @@ export function CompanyPage() {
               />
               <span className="min-w-0">
                 <span className="block text-sm font-semibold text-slate-900">
-                  Enable on invoice slip
+                  Enable on Invoice Slip
                 </span>
                 <span className="mt-0.5 block text-xs text-slate-500">
-                  When enabled, this policy syncs to POS and appears on the customer receipt after a
-                  sale. Disabled policies are hidden from the slip.
+                  When enabled, this policy is printed on the customer invoice/receipt. When disabled, it will not appear on the slip.
                 </span>
               </span>
             </label>

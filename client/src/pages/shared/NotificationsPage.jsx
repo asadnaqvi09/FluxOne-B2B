@@ -10,18 +10,8 @@ import { apiClient } from '@/api/api'
 import { endpoints } from '@/api/endpoints'
 import { toastError, toastSuccess } from '@/lib/toast'
 import { displayNotification } from '@/lib/notificationDisplay'
+import { DateTimeLines } from '@/components/shared/DateTimeLines'
 import { cn } from '@/lib/utils'
-
-function formatDateTime(value) {
-  if (!value) return '—'
-  return new Date(value).toLocaleString('en-GB', {
-    day: '2-digit',
-    month: 'short',
-    year: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit',
-  })
-}
 
 // Full notification inbox for Admin or Branch Manager
 export function NotificationsPage() {
@@ -154,10 +144,15 @@ export function NotificationsPage() {
                         {body}
                       </p>
                     ) : null}
-                    <p className="mt-1 pl-4 text-[11px] text-slate-400">
-                      {formatDateTime(n.createdAt)}
-                      {n.linkPath ? ' · Click to open' : ''}
-                    </p>
+                    <div className="mt-1 pl-4 text-[11px] text-slate-400">
+                      <DateTimeLines
+                        value={n.createdAt}
+                        timeClassName="text-[11px] text-slate-400"
+                      />
+                      {n.linkPath ? (
+                        <span className="mt-0.5 block">Click to open</span>
+                      ) : null}
+                    </div>
                   </button>
                   <div className="flex shrink-0 gap-1">
                     {!n.isRead ? (

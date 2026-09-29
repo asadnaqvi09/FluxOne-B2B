@@ -1,5 +1,6 @@
 import { jsPDF } from 'jspdf'
 import { DEFAULT_CURRENCY, formatMoney, normalizeCurrency } from '@/lib/currency'
+import { formatDateTimeInline } from '@/lib/formatDateTime'
 
 function safeFilename(value, fallback = 'download') {
   const base = String(value || fallback)
@@ -273,7 +274,7 @@ export function downloadBranchDashboardPdf({
   const reportTo = to || date || reportFrom
   const rangeLabel =
     reportFrom === reportTo ? reportFrom : `${reportFrom} → ${reportTo}`
-  const generatedAt = new Date().toLocaleString()
+  const generatedAt = formatDateTimeInline(new Date())
   const company = String(companyName || 'Company').trim() || 'Company'
   const branch = String(branchName || 'Branch').trim() || 'Branch'
 

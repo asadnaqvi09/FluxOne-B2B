@@ -19,7 +19,8 @@ export const listTaxProfitQuerySchema = z.object({
     q: optionalString,
     categoryId: optionalUuid,
     subcategoryId: optionalUuid,
-    scale: optionalString,
+    productId: optionalUuid,
+    variantId: optionalUuid,
     sort: z.preprocess(
       (value) => (value === '' || value === null || value === undefined ? 'all' : value),
       sortEnum,

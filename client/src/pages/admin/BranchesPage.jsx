@@ -35,6 +35,7 @@ import { PhoneInput } from '@/components/shared/PhoneInput'
 import { TimePicker } from '@/components/shared/TimePicker'
 import { DataCard, ResponsiveDataShell } from '@/components/shared/ResponsiveDataShell'
 import { BRAND } from '@/lib/constants'
+import { formatDateTimeInline } from '@/lib/formatDateTime'
 import { toastSuccess, toastError } from '@/lib/toast'
 import {
   validatePhone,
@@ -48,6 +49,8 @@ import { useDebouncedValue } from '@/hooks/useDebouncedValue'
 import { useFormBaseline } from '@/hooks/useFormBaseline'
 import { useClientPagination } from '@/hooks/useClientPagination'
 import { displayBranchRef, normalizeSearchQuery } from '@/lib/formatDisplayId'
+import { exportRowsToCsv } from '@/lib/csvExport'
+import { ExportCsvButton } from '@/components/shared/ExportCsvButton'
 import {
   Plus,
   Search,
@@ -73,16 +76,8 @@ const AVATAR_FEMALE =
   'https://images.unsplash.com/photo-1580489944761-15a19d654956?w=150&auto=format&fit=crop&q=80'
 
 function formatCreatedAt(value) {
-  if (!value) return '—'
-  const date = new Date(value)
-  if (Number.isNaN(date.getTime())) return String(value)
-  return date.toLocaleString(undefined, {
-    year: 'numeric',
-    month: 'short',
-    day: '2-digit',
-    hour: '2-digit',
-    minute: '2-digit',
-  })
+  // Branch established timestamp — 12h AM/PM system helper
+  return formatDateTimeInline(value)
 }
 
 function managerAvatar(manager) {
@@ -293,6 +288,49 @@ export function BranchesPage() {
     slice: pagedBranches,
   } = useClientPagination(filteredBranches)
 
+  // Export filtered branch list (CSV / Excel-compatible)
+  function handleExportBranches() {
+    if (!filteredBranches.length) {
+      toastError('No branches to export')
+      return
+    }
+    try {
+      const stamp = new Date().toISOString().slice(0, 10)
+      exportRowsToCsv({
+        filename: `branches-export-${stamp}.csv`,
+        headers: [
+          'Branch ID',
+          'Branch Name',
+          'Location',
+          'Manager Name',
+          'Manager Email',
+          'Manager Phone',
+          'Branch Staff',
+          'Status',
+          'Opening Time',
+          'Closing Time',
+          'Created At',
+        ],
+        rows: filteredBranches.map((b) => [
+          displayBranchRef(b),
+          b.name || '',
+          b.location || '',
+          b.manager?.name || '',
+          b.manager?.email || '',
+          b.manager?.contact || '',
+          Number(b.totalStaff) || 0,
+          b.status === 'open' ? 'Open' : 'Blocked',
+          b.openingTime || '',
+          b.closingTime || '',
+          formatCreatedAt(b.createdAt),
+        ]),
+      })
+      toastSuccess(`Exported ${filteredBranches.length} branch record(s)`)
+    } catch (err) {
+      toastError(err?.message || 'Failed to export branches')
+    }
+  }
+
   function handleOpenAdd() {
     setFormData({
       ...emptyForm,
@@ -487,16 +525,25 @@ export function BranchesPage() {
           title="Manage Branches"
           description="Consolidated branch network, branch manager assignments, locations & access statuses"
           actions={
-            <Button
-              type="button"
-              onClick={handleOpenAdd}
-              disabled={loading}
-              className="text-white shadow-xs cursor-pointer font-semibold"
-              style={{ background: `linear-gradient(90deg, ${BRAND.purple}, ${BRAND.deep})` }}
-            >
-              <Plus className="mr-1.5 size-4" />
-              Add New Branch
-            </Button>
+            <div className="flex w-full flex-wrap items-center gap-2 sm:w-auto">
+              <ExportCsvButton
+                onClick={handleExportBranches}
+                disabled={loading || filteredBranches.length === 0}
+                label="Export"
+                title="Export branches to Excel / CSV"
+                className="h-10 px-3"
+              />
+              <Button
+                type="button"
+                onClick={handleOpenAdd}
+                disabled={loading}
+                className="text-white shadow-xs cursor-pointer font-semibold"
+                style={{ background: `linear-gradient(90deg, ${BRAND.purple}, ${BRAND.deep})` }}
+              >
+                <Plus className="mr-1.5 size-4" />
+                Add New Branch
+              </Button>
+            </div>
           }
         />
       </MotionHeader>
@@ -534,7 +581,7 @@ export function BranchesPage() {
 
           <StatCard
             index={3}
-            label="Branch Staff"
+            label="Total Branch Staff"
             value={loading ? '—' : stats.totalStaff}
             icon={Users}
             iconGradient="from-[#412283] to-[#24104f]"
@@ -673,6 +720,13 @@ export function BranchesPage() {
                             </p>
                           </div>
                         </div>
+                        <p className="mt-2 flex items-center gap-1.5 text-xs font-semibold text-slate-700">
+                          <Users className="size-3.5 text-slate-400" />
+                          Branch Staff:{' '}
+                          <span className="font-bold text-purple-900">
+                            {Number(b.totalStaff) || 0}
+                          </span>
+                        </p>
                         <div className="mt-3 flex justify-end">
                           <BranchRowActions
                             branch={b}
@@ -700,6 +754,9 @@ export function BranchesPage() {
                       </TableHead>
                       <TableHead className="px-2 py-3 font-medium whitespace-nowrap sm:px-3 min-w-[12rem]">
                         Manager
+                      </TableHead>
+                      <TableHead className="px-2 py-3 font-medium whitespace-nowrap sm:px-3">
+                        Branch Staff
                       </TableHead>
                       <TableHead className="px-2 py-3 font-medium whitespace-nowrap sm:px-3">Status</TableHead>
                       <TableHead className="sticky right-0 z-[1] bg-slate-200/80 px-2 py-3 font-medium whitespace-nowrap sm:px-3">
@@ -774,6 +831,12 @@ export function BranchesPage() {
                                 </p>
                               </div>
                             </div>
+                          </TableCell>
+                          <TableCell className="px-2 py-3 whitespace-nowrap sm:px-3">
+                            <span className="inline-flex items-center gap-1.5 rounded-lg border border-purple-100 bg-purple-50/80 px-2 py-1 text-xs font-bold text-purple-900">
+                              <Users className="size-3.5 text-purple-600" />
+                              {Number(b.totalStaff) || 0}
+                            </span>
                           </TableCell>
                           <TableCell className="px-2 py-3 whitespace-nowrap sm:px-3">
                             <Badge

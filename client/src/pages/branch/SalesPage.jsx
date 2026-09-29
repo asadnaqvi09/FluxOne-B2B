@@ -35,6 +35,8 @@ import { endpoints } from '@/api/endpoints'
 import { useDebouncedValue } from '@/hooks/useDebouncedValue'
 import { useClientPagination } from '@/hooks/useClientPagination'
 import { BRAND } from '@/lib/constants'
+import { formatDateTime } from '@/lib/formatDateTime'
+import { DateTimeLines } from '@/components/shared/DateTimeLines'
 import { toastError, toastSuccess } from '@/lib/toast'
 import { useCurrency } from '@/hooks/useCurrency'
 
@@ -253,14 +255,7 @@ export function SalesPage() {
                   const indexStr = String(sale.saleNumber || sale.id.slice(0, 4))
                   const salId = `SAL-${indexStr}`
                   const trkId = `TRK-${indexStr}`
-                  const soldAtLabel = new Date(sale.soldAt).toLocaleString('en-GB', {
-                    day: 'numeric',
-                    month: 'short',
-                    year: 'numeric',
-                    hour: 'numeric',
-                    minute: '2-digit',
-                    hour12: true,
-                  })
+                  const soldAtLabel = formatDateTime(sale.soldAt)
 
                   return (
                     <article
@@ -373,14 +368,7 @@ export function SalesPage() {
                             <div className="mt-0.5 font-mono text-[10px] text-slate-400">{trkId}</div>
                           </TableCell>
                           <TableCell className="text-slate-600">
-                            {new Date(sale.soldAt).toLocaleString('en-GB', {
-                              day: 'numeric',
-                              month: 'short',
-                              year: 'numeric',
-                              hour: 'numeric',
-                              minute: '2-digit',
-                              hour12: true,
-                            })}
+                            <DateTimeLines value={sale.soldAt} />
                           </TableCell>
                           <TableCell className="text-slate-700">
                             <div
@@ -499,7 +487,9 @@ export function SalesPage() {
               <div className="text-center border-b border-dashed border-slate-400 pb-3">
                 <div className="text-base font-bold">SOFTWARE FLUX SOLUTION</div>
                 <div>Branch Manager Terminal</div>
-                <div className="text-[10px] text-slate-400">Date: {new Date(invoiceTarget.soldAt).toLocaleString()}</div>
+                <div className="text-[10px] text-slate-400">
+                  Date: {formatDateTime(invoiceTarget.soldAt)}
+                </div>
                 <div>Invoice: {invoiceTarget.saleNumber}</div>
               </div>
               <div className="space-y-2 border-b border-dashed border-slate-400 pb-3">

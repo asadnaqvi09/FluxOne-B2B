@@ -34,6 +34,8 @@ import { useAdminCompany } from '@/hooks/useAdminCompany'
 import { useDebouncedValue } from '@/hooks/useDebouncedValue'
 import { useCurrency } from '@/hooks/useCurrency'
 import { BRAND } from '@/lib/constants'
+import { formatDateLine } from '@/lib/formatDateTime'
+import { DateTimeLines } from '@/components/shared/DateTimeLines'
 import { downloadBillingInvoicePdf } from '@/lib/pdfDownload'
 import {
   exportInvoicesToExcel,
@@ -72,13 +74,8 @@ const MONTHS_OPTIONS = [
 
 function formatRenewal(dateValue) {
   if (!dateValue) return 'Not scheduled'
-  const d = new Date(dateValue)
-  if (Number.isNaN(d.getTime())) return 'Not scheduled'
-  return d.toLocaleDateString('en-GB', {
-    day: '2-digit',
-    month: 'short',
-    year: 'numeric',
-  })
+  const formatted = formatDateLine(dateValue)
+  return formatted === '—' ? 'Not scheduled' : formatted
 }
 
 export function InvoicesPage() {
@@ -273,13 +270,13 @@ export function InvoicesPage() {
             />
           </div>
 
+          {/* Month / Year — dropdown values only (no duplicate labels) */}
           <div className="flex flex-wrap items-center gap-2 sm:gap-3">
-            <div className="flex items-center gap-1.5 rounded-xl border border-border bg-white px-2.5 py-1.5">
-              <Calendar className="size-3.5 text-slate-400" />
-              <span className="text-xs text-slate-500 font-medium">Month:</span>
+            <div className="flex items-center rounded-xl border border-border bg-white px-2.5 py-1.5">
               <NativeSelect
                 value={selectedMonth}
                 onChange={(e) => setSelectedMonth(e.target.value)}
+                aria-label="Filter by month"
                 className="h-7 border-0 bg-transparent py-0 text-xs font-semibold text-slate-800 shadow-none focus:ring-0"
               >
                 {MONTHS_OPTIONS.map((m) => (
@@ -290,11 +287,11 @@ export function InvoicesPage() {
               </NativeSelect>
             </div>
 
-            <div className="flex items-center gap-1.5 rounded-xl border border-border bg-white px-2.5 py-1.5">
-              <span className="text-xs text-slate-500 font-medium">Year:</span>
+            <div className="flex items-center rounded-xl border border-border bg-white px-2.5 py-1.5">
               <NativeSelect
                 value={selectedYear}
                 onChange={(e) => setSelectedYear(e.target.value)}
+                aria-label="Filter by year"
                 className="h-7 border-0 bg-transparent py-0 text-xs font-semibold text-slate-800 shadow-none focus:ring-0"
               >
                 <option value="all">All Years</option>
@@ -382,7 +379,9 @@ export function InvoicesPage() {
                       </Badge>
                     </div>
                     <p className="mt-2 text-sm font-semibold text-slate-800">{inv.source}</p>
-                    <p className="mt-0.5 text-xs text-slate-500">{inv.dateTime}</p>
+                    <p className="mt-0.5 text-xs text-slate-500">
+                      {inv.billedAt ? <DateTimeLines value={inv.billedAt} /> : inv.dateTime}
+                    </p>
                     <p className="mt-2 text-base font-extrabold text-slate-900">
                       {inv.formattedPrice}
                     </p>
@@ -449,7 +448,11 @@ export function InvoicesPage() {
                           </span>
                         </TableCell>
                         <TableCell className="px-4 py-3.5 text-xs font-medium text-slate-600">
-                          {inv.dateTime}
+                          {inv.billedAt ? (
+                            <DateTimeLines value={inv.billedAt} />
+                          ) : (
+                            inv.dateTime || '—'
+                          )}
                         </TableCell>
                         <TableCell className="px-4 py-3.5 text-xs font-semibold text-slate-800">
                           {inv.source}
@@ -555,7 +558,13 @@ export function InvoicesPage() {
                   <span className="font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200 uppercase text-[10px]">
                     Status: {selectedInvoice.status}
                   </span>
-                  <p className="text-[11px] text-slate-500 mt-1">{selectedInvoice.dateTime}</p>
+                  <p className="mt-1 text-[11px] text-slate-500">
+                    {selectedInvoice.billedAt ? (
+                      <DateTimeLines value={selectedInvoice.billedAt} />
+                    ) : (
+                      selectedInvoice.dateTime
+                    )}
+                  </p>
                 </div>
               </div>
 

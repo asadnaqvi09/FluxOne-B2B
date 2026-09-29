@@ -1,4 +1,6 @@
 /** Known activity action slugs → human labels (POS first; BM/IM grow later). */
+import { formatDateTimeInline } from '@/lib/formatDateTime'
+
 export const ACTIVITY_ACTION_LABELS = Object.freeze({
   login: 'Login',
   logout: 'Logout',
@@ -41,11 +43,11 @@ export function formatActivityLine(log) {
   return `${name} performed ${activityActionLabel(log?.action)}`
 }
 
-export function formatActivityTime(value) {
-  if (!value) return '—'
+export function formatActivityRelative(value) {
+  if (!value) return null
   try {
     const date = new Date(value)
-    if (Number.isNaN(date.getTime())) return String(value)
+    if (Number.isNaN(date.getTime())) return null
 
     const diffMs = Date.now() - date.getTime()
     const absMs = Math.abs(diffMs)
@@ -56,15 +58,14 @@ export function formatActivityTime(value) {
     if (hours < 24) return diffMs >= 0 ? `${hours}h ago` : `in ${hours}h`
     const days = Math.floor(hours / 24)
     if (days < 7) return diffMs >= 0 ? `${days}d ago` : `in ${days}d`
-
-    return date.toLocaleString(undefined, {
-      year: 'numeric',
-      month: 'short',
-      day: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit',
-    })
+    return null
   } catch {
-    return String(value)
+    return null
   }
+}
+
+export function formatActivityTime(value) {
+  if (!value) return '—'
+  // Prefer relative for recent; absolute uses 12h AM/PM
+  return formatActivityRelative(value) || formatDateTimeInline(value)
 }

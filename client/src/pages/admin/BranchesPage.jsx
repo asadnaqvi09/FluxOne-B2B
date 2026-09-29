@@ -35,7 +35,7 @@ import { PhoneInput } from '@/components/shared/PhoneInput'
 import { TimePicker } from '@/components/shared/TimePicker'
 import { DataCard, ResponsiveDataShell } from '@/components/shared/ResponsiveDataShell'
 import { BRAND } from '@/lib/constants'
-import { formatDateTimeInline } from '@/lib/formatDateTime'
+import { formatDateTimeInline, formatClockTime } from '@/lib/formatDateTime'
 import { toastSuccess, toastError } from '@/lib/toast'
 import {
   validatePhone,
@@ -129,10 +129,10 @@ function timeInputValue(value) {
 }
 
 function formatHoursRange(openingTime, closingTime) {
-  const open = timeInputValue(openingTime)
-  const close = timeInputValue(closingTime)
+  const open = formatClockTime(openingTime)
+  const close = formatClockTime(closingTime)
   if (!open || !close) return null
-  return `${open}–${close}`
+  return `${open} – ${close}`
 }
 
 function BranchRowActions({
@@ -320,8 +320,8 @@ export function BranchesPage() {
           b.manager?.contact || '',
           Number(b.totalStaff) || 0,
           b.status === 'open' ? 'Open' : 'Blocked',
-          b.openingTime || '',
-          b.closingTime || '',
+          formatClockTime(b.openingTime) || '',
+          formatClockTime(b.closingTime) || '',
           formatCreatedAt(b.createdAt),
         ]),
       })
@@ -575,7 +575,7 @@ export function BranchesPage() {
             label="Blocked Branches"
             value={loading ? '—' : stats.blocked}
             icon={Ban}
-            iconGradient="from-slate-500 to-slate-700"
+            iconGradient="from-rose-500 to-red-600"
           />
 
           <StatCard
@@ -683,12 +683,12 @@ export function BranchesPage() {
                             variant="outline"
                             className={
                               isOpen
-                                ? 'shrink-0 bg-purple-50 text-purple-900 border-purple-200 font-bold'
+                                ? 'shrink-0 bg-emerald-50 text-emerald-700 border-emerald-200 font-bold'
                                 : 'shrink-0 bg-rose-50 text-rose-700 border-rose-200 font-bold'
                             }
                           >
                             {isOpen ? (
-                              <CheckCircle className="mr-1 size-3 text-purple-700" />
+                              <CheckCircle className="mr-1 size-3 text-emerald-600" />
                             ) : (
                               <Ban className="mr-1 size-3 text-rose-600" />
                             )}
@@ -842,12 +842,12 @@ export function BranchesPage() {
                               variant="outline"
                               className={
                                 isOpen
-                                  ? 'bg-purple-50 text-purple-900 border-purple-200 font-bold whitespace-nowrap'
+                                  ? 'bg-emerald-50 text-emerald-700 border-emerald-200 font-bold whitespace-nowrap'
                                   : 'bg-rose-50 text-rose-700 border-rose-200 font-bold whitespace-nowrap'
                               }
                             >
                               {isOpen ? (
-                                <CheckCircle className="mr-1 size-3 text-purple-700" />
+                                <CheckCircle className="mr-1 size-3 text-emerald-600" />
                               ) : (
                                 <Ban className="mr-1 size-3 text-rose-600" />
                               )}
@@ -912,9 +912,9 @@ export function BranchesPage() {
                   </Label>
                   <Input
                     id="branchId"
-                    value={formData.id}
+                    value={editingBranch ? displayBranchRef(editingBranch) : formData.id}
                     disabled
-                    title={editingBranch ? formData.id : undefined}
+                    title={editingBranch?.id || undefined}
                     className="bg-slate-50 font-bold text-purple-900 text-xs"
                   />
                 </div>
@@ -1197,7 +1197,7 @@ export function BranchesPage() {
         confirmLabel={targetBranch?.status === 'open' ? 'Yes, Block Branch' : 'Yes, Open Branch'}
         // Block uses Ban (not trash); open uses Unlock
         icon={targetBranch?.status === 'open' ? Ban : Unlock}
-        variant={targetBranch?.status === 'open' ? 'destructive' : 'default'}
+        variant={targetBranch?.status === 'open' ? 'destructive' : 'success'}
         loading={mutating}
         onConfirm={handleConfirmToggleStatus}
       />

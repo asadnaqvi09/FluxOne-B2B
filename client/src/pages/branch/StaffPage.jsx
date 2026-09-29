@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { Plus } from 'lucide-react'
+import { Ban, Plus } from 'lucide-react'
 import { PageHeader } from '@/components/shared/PageHeader'
 import { MotionHeader, MotionReveal } from '@/components/shared/MotionReveal'
 import { ConfirmDialog } from '@/components/shared/ConfirmDialog'
@@ -341,7 +341,10 @@ export function StaffPage() {
             ? `${statusTarget.fullName || statusTarget.email} will be blocked from logging in. You can open access again later.`
             : undefined
         }
+        warning="This blocks login only. The staff record stays, and you can open access again from this roster."
         confirmLabel="Block"
+        icon={Ban}
+        variant="destructive"
         loading={mutating}
         onConfirm={handleConfirmDeactivate}
       />

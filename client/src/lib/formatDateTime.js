@@ -1,7 +1,8 @@
 /**
  * System-wide date/time display helpers.
- * Rule: 12-hour clock with AM/PM. When both date + time show in a cell,
- * stack with formatDateTimeParts (date top, time bottom).
+ * Rule: 12-hour clock with AM/PM everywhere in the UI (all roles).
+ * API / DB may still store clock values as HH:MM (24h); convert with formatClockTime for display.
+ * When both date + time show in a cell, stack with formatDateTimeParts (date top, time bottom).
  */
 
 const EMPTY = '—'
@@ -31,6 +32,23 @@ export function formatDateLine(value) {
   } catch {
     return EMPTY
   }
+}
+
+/**
+ * Clock-only value ("9:00", "18:00:00") → "09:00 AM" / "06:00 PM".
+ * Use for branch hours, staff shifts, and break times (API still stores HH:MM).
+ */
+export function formatClockTime(value) {
+  if (value == null || value === '') return ''
+  const match = String(value).trim().match(/^(\d{1,2}):(\d{2})/)
+  if (!match) return ''
+  let hour = Number(match[1])
+  const minute = match[2]
+  if (!Number.isFinite(hour) || hour > 23 || hour < 0) return ''
+  const period = hour >= 12 ? 'PM' : 'AM'
+  hour %= 12
+  if (hour === 0) hour = 12
+  return `${String(hour).padStart(2, '0')}:${minute} ${period}`
 }
 
 /** Time only — "02:32 PM" (always 12-hour) */

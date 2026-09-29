@@ -17,9 +17,12 @@ function hasValue(value) {
 }
 
 function formatMinutesLabel(minutes) {
-  const hours = Math.floor(minutes / 60)
+  let hours = Math.floor(minutes / 60)
   const mins = minutes % 60
-  return `${String(hours).padStart(2, '0')}:${String(mins).padStart(2, '0')}`
+  const period = hours >= 12 ? 'PM' : 'AM'
+  hours %= 12
+  if (hours === 0) hours = 12
+  return `${String(hours).padStart(2, '0')}:${String(mins).padStart(2, '0')} ${period}`
 }
 
 // When branch hours exist, shift must sit inside the open→close window.

@@ -668,14 +668,14 @@ export function SettingsPage() {
               </div>
 
               <div className="flex items-center gap-3 rounded-2xl border border-border bg-white p-3.5 shadow-2xs">
-                <div className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-slate-100 text-slate-600 border border-slate-200">
+                <div className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-rose-50 text-rose-600 border border-rose-200">
                   <Ban className="size-5" />
                 </div>
                 <div className="min-w-0">
                   <p className="text-[11px] font-medium text-slate-500 uppercase tracking-wider">
                     Blocked Systems
                   </p>
-                  <p className="text-lg font-bold text-slate-700 leading-tight">
+                  <p className="text-lg font-bold text-rose-700 leading-tight">
                     {loading ? '—' : stats.blocked}
                   </p>
                 </div>
@@ -815,8 +815,11 @@ export function SettingsPage() {
                                 size="sm"
                                 disabled={mutating}
                                 onClick={() => handlePromptBlockSystem(sys)}
-                                className="mt-3 h-8 w-full cursor-pointer px-3.5 text-xs font-semibold text-white shadow-xs"
-                                style={{ background: isActive ? BRAND.deep : BRAND.purple }}
+                                className={`mt-3 h-8 w-full cursor-pointer px-3.5 text-xs font-semibold text-white shadow-xs ${
+                                  isActive
+                                    ? 'bg-red-600 hover:bg-red-700'
+                                    : 'bg-emerald-600 hover:bg-emerald-700'
+                                }`}
                               >
                                 {isActive ? (
                                   <>
@@ -920,8 +923,11 @@ export function SettingsPage() {
                                     size="sm"
                                     disabled={mutating}
                                     onClick={() => handlePromptBlockSystem(sys)}
-                                    className="h-8 cursor-pointer px-3.5 text-xs font-semibold text-white shadow-xs"
-                                    style={{ background: isActive ? BRAND.deep : BRAND.purple }}
+                                    className={`h-8 cursor-pointer px-3.5 text-xs font-semibold text-white shadow-xs ${
+                                      isActive
+                                        ? 'bg-red-600 hover:bg-red-700'
+                                        : 'bg-emerald-600 hover:bg-emerald-700'
+                                    }`}
                                   >
                                     {isActive ? (
                                       <>
@@ -969,7 +975,7 @@ export function SettingsPage() {
         title={
           targetSystem?.status === 'active' ? 'Block System Access' : 'Authorize System Access'
         }
-        variant={targetSystem?.status === 'active' ? 'destructive' : 'default'}
+        variant={targetSystem?.status === 'active' ? 'destructive' : 'success'}
         icon={targetSystem?.status === 'active' ? Ban : CheckCircle2}
         description={
           targetSystem?.status === 'active' ? (

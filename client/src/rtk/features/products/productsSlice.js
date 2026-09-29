@@ -284,6 +284,8 @@ export const importProducts = createAsyncThunk(
       ...row,
       itemCode: row.itemCode || row.sku || undefined,
       sku: row.sku || row.itemCode || undefined,
+      quantity: row.quantity ?? row.stockQuantity,
+      reorderPoint: row.reorderPoint ?? row.threshold,
     }))
     const result = await apiClient.post(endpoints.products.import, { rows: payloadRows }, { timeoutMs: 300_000 })
     if (!result.success) return rejectWithValue(result.error || 'Import failed')

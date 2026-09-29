@@ -37,6 +37,7 @@ import { BRAND } from '@/lib/constants'
 import { toastSuccess, toastError } from '@/lib/toast'
 import { validatePercentage } from '@/lib/validation/formValidators'
 import { ExportCsvButton } from '@/components/shared/ExportCsvButton'
+import { CategoryLines } from '@/components/shared/CategoryLines'
 import { exportTaxProfitCsv, exportTaxProfitPdf } from '@/lib/taxProfitExport'
 import {
   Percent,
@@ -748,8 +749,12 @@ export function TaxProfitPage() {
                             {p.itemCode || p.id}
                           </p>
                           <p className="mt-1 text-xs text-slate-500">
-                            {p.category || 'Uncategorized'}
-                            {p.subcategory ? ` / ${p.subcategory}` : ''}
+                            <CategoryLines
+                              category={p.category}
+                              subcategory={p.subcategory}
+                              categoryClassName="font-medium text-slate-600"
+                              subcategoryClassName="text-[11px] text-slate-400"
+                            />
                           </p>
                           <div className="mt-2 flex flex-wrap gap-1.5">
                             <span
@@ -886,10 +891,10 @@ export function TaxProfitPage() {
 
                           {visibleColumns.category && (
                             <TableCell className="px-3 py-3 text-xs text-slate-600">
-                              <span className="block font-medium">
-                                {p.category || 'Uncategorized'}
-                                {p.subcategory ? ` / ${p.subcategory}` : ''}
-                              </span>
+                              <CategoryLines
+                                category={p.category}
+                                subcategory={p.subcategory}
+                              />
                             </TableCell>
                           )}
 

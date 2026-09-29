@@ -18,6 +18,7 @@ import { TaxMultiSelect } from '@/components/feature/products/TaxMultiSelect'
 import { ImageUploadField } from '@/components/shared/ImageUploadField'
 import { WholeNumberInput } from '@/components/shared/WholeNumberInput'
 import { FieldError } from '@/components/shared/FieldError'
+import { CategoryLines } from '@/components/shared/CategoryLines'
 import { BRAND } from '@/lib/constants'
 import { PRODUCT_TYPES, SCALE_OPTIONS, taxIdsForDefaultRate } from '@/lib/mapProduct'
 import { fieldErrorClass } from '@/lib/validation/fieldErrors'
@@ -842,13 +843,17 @@ export function ItemFormDialog({
                 <span className="text-slate-500">Scale:</span> {form.scale}
               </p>
               {!isBundle && form.categoryId ? (
-                <p className="mt-1">
-                  <span className="text-slate-500">Category:</span>{' '}
-                  {categories.find((cat) => cat.id === form.categoryId)?.name || '—'}
-                  {form.subcategoryId
-                    ? ` / ${subcategories.find((sub) => sub.id === form.subcategoryId)?.name || '—'}`
-                    : ''}
-                </p>
+                <div className="mt-1 flex items-start gap-1.5">
+                  <span className="shrink-0 text-slate-500">Category:</span>
+                  <CategoryLines
+                    category={categories.find((cat) => cat.id === form.categoryId)?.name}
+                    subcategory={
+                      form.subcategoryId
+                        ? subcategories.find((sub) => sub.id === form.subcategoryId)?.name
+                        : ''
+                    }
+                  />
+                </div>
               ) : null}
               {!isBundle ? (
                 <p className="mt-1">

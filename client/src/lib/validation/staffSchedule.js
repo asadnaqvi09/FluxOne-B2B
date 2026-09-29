@@ -1,3 +1,5 @@
+import { formatClockTime } from '@/lib/formatDateTime'
+
 // Parse HH:MM or HH:MM:SS to minutes since midnight; returns null if empty/invalid.
 export function parseTimeToMinutes(value) {
   if (value == null || value === '') return null
@@ -13,7 +15,7 @@ export function parseTimeToMinutes(value) {
 function formatMinutesLabel(minutes) {
   const hours = Math.floor(minutes / 60)
   const mins = minutes % 60
-  return `${String(hours).padStart(2, '0')}:${String(mins).padStart(2, '0')}`
+  return formatClockTime(`${String(hours).padStart(2, '0')}:${String(mins).padStart(2, '0')}`)
 }
 
 function hasValue(value) {

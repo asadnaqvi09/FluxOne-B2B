@@ -5,7 +5,9 @@ import { formatDateTimeInline } from '@/lib/formatDateTime'
 
 function categoryLabel(row = {}) {
   const cat = row.category || 'Uncategorized'
-  return row.subcategory ? `${cat} / ${row.subcategory}` : cat
+  if (!row.subcategory) return cat
+  // Stacked: category then subcategory (CSV / PDF cell)
+  return `${cat}\n${row.subcategory}`
 }
 
 function productLabel(row = {}) {
@@ -143,12 +145,17 @@ export function exportTaxProfitPdf({ items = [], currency = 'PKR' } = {}) {
     ]
     let x = startX
     doc.setFontSize(7.5)
+    let maxLines = 1
     for (let i = 0; i < cols.length; i += 1) {
       const text = String(cells[i] ?? '')
-      doc.text(text.length > 28 ? `${text.slice(0, 27)}…` : text, x, y)
+      const lines = text.split('\n').map((line) => (line.length > 28 ? `${line.slice(0, 27)}…` : line))
+      maxLines = Math.max(maxLines, lines.length)
+      lines.forEach((line, lineIndex) => {
+        doc.text(line, x, y + lineIndex * 3.2)
+      })
       x += cols[i].w
     }
-    y += rowH
+    y += Math.max(rowH, maxLines * 3.2 + 1.5)
   }
 
   doc.save(`tax-profit-catalog-${code}.pdf`)

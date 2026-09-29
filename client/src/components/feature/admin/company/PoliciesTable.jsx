@@ -112,7 +112,7 @@ export function PoliciesTable({
   return (
     <SurfaceCard
       title="Policies & Governance"
-      description="Corporate protocols enforced across branch portals. Enable a policy to show it on POS invoice slips."
+      description="Corporate protocols enforced across branch portals. Select Print on Invoice to show a policy on the customer receipt."
     >
       {loading ? (
         <p className="py-10 text-center text-sm text-slate-400">Loading policies…</p>
@@ -150,10 +150,10 @@ export function PoliciesTable({
                       active={Boolean(p.printOnSlip)}
                       loading={mutating && togglingId === p.id}
                       onChange={(next) => handleTogglePrint(p, next)}
-                      activeLabel="Enabled"
-                      inactiveLabel="Disabled"
-                      activeTitle="Click to disable — hide this policy on POS invoices"
-                      inactiveTitle="Click to enable — show this policy on POS invoices"
+                      activeLabel="Print"
+                      inactiveLabel="Hidden"
+                      activeTitle="Click to hide this policy from the invoice"
+                      inactiveTitle="Click to print this policy on the invoice"
                     />
                     <span><DateTimeLines value={p.updatedAt || p.createdAt} /></span>
                   </div>
@@ -200,10 +200,10 @@ export function PoliciesTable({
                               active={Boolean(p.printOnSlip)}
                               loading={mutating && togglingId === p.id}
                               onChange={(next) => handleTogglePrint(p, next)}
-                              activeLabel="Enabled"
-                              inactiveLabel="Disabled"
-                              activeTitle="Click to disable — hide this policy on POS invoices"
-                              inactiveTitle="Click to enable — show this policy on POS invoices"
+                              activeLabel="Print"
+                              inactiveLabel="Hidden"
+                              activeTitle="Click to hide this policy from the invoice"
+                              inactiveTitle="Click to print this policy on the invoice"
                             />
                           </div>
                         </TableCell>

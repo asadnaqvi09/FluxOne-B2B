@@ -13,8 +13,8 @@ export const PRODUCT_CSV_HEADERS = [
   'subcategory',
   'purchasePrice',
   'sellingPrice',
-  'quantity',
-  'reorderPoint',
+  'stockQuantity',
+  'threshold',
   'description',
   'discountPercent',
   'offerName',
@@ -86,19 +86,41 @@ function normalizeHeader(h) {
     .replace(/[\s_]+/g, '')
 }
 
+/** Map API/export row fields → CSV column values (headers use stockQuantity / threshold). */
+function csvValueForHeader(key, row) {
+  if (key === 'itemCode') return row.itemCode || row.sku || ''
+  if (key === 'stockQuantity') {
+    const v = row.stockQuantity ?? row.quantity
+    return v == null || v === '' ? '' : v
+  }
+  if (key === 'threshold') {
+    const v = row.threshold ?? row.reorderPoint
+    return v == null || v === '' ? '' : v
+  }
+  if (key === 'dailyPriceChange') {
+    if (row.dailyPriceChange == null || row.dailyPriceChange === '') return ''
+    return row.dailyPriceChange ? 'true' : 'false'
+  }
+  return row[key] ?? ''
+}
+
+/** After CSV parse — API import expects quantity / reorderPoint. */
+function mapParsedRowForApi(row) {
+  if (row.stockQuantity !== undefined) row.quantity = row.stockQuantity
+  else if (row.quantity !== undefined) row.stockQuantity = row.quantity
+
+  if (row.threshold !== undefined) row.reorderPoint = row.threshold
+  else if (row.reorderPoint !== undefined) row.threshold = row.reorderPoint
+
+  return row
+}
+
 // Serialize catalog rows → CSV text (same shape Import expects).
 export function productsToCsv(rows = []) {
   const lines = [PRODUCT_CSV_HEADERS.join(',')]
   for (const row of rows) {
     lines.push(
-      PRODUCT_CSV_HEADERS.map((key) => {
-        if (key === 'itemCode') return escapeCsvCell(row.itemCode || row.sku || '')
-        if (key === 'dailyPriceChange') {
-          if (row.dailyPriceChange == null || row.dailyPriceChange === '') return ''
-          return escapeCsvCell(row.dailyPriceChange ? 'true' : 'false')
-        }
-        return escapeCsvCell(row[key] ?? '')
-      }).join(','),
+      PRODUCT_CSV_HEADERS.map((key) => escapeCsvCell(csvValueForHeader(key, row))).join(','),
     )
   }
   return `${lines.join('\n')}\n`
@@ -164,10 +186,14 @@ export function parseProductsCsv(raw) {
         status: get('status') || undefined,
         category: get('category', 'categoryName', 'category_name') || undefined,
         subcategory: get('subcategory', 'subcategoryName', 'subcategory_name') || undefined,
-        quantity: numOrUndef(get('quantity')),
+        stockQuantity: numOrUndef(
+          get('stockQuantity', 'stockquantity', 'quantity', 'stock_quantity'),
+        ),
         purchasePrice: numOrUndef(get('purchasePrice', 'purchase_price')),
         sellingPrice: numOrUndef(get('sellingPrice', 'selling_price')),
-        reorderPoint: numOrUndef(get('reorderPoint', 'reorder_point')),
+        threshold: numOrUndef(
+          get('threshold', 'reorderpoint', 'reorderPoint', 'reorder_point'),
+        ),
         description: get('description') || undefined,
         discountPercent: numOrUndef(get('discountPercent', 'discount_percent')),
         offerName: get('offerName', 'offer_name') || undefined,
@@ -202,7 +228,7 @@ export function parseProductsCsv(raw) {
       if (!row.parentItemCode || !row.componentItemCode) continue
     }
 
-    rows.push(row)
+    rows.push(mapParsedRowForApi(row))
   }
 
   return rows
@@ -233,8 +259,8 @@ export function productCsvTemplate() {
       subcategory: 'Soft Drinks',
       purchasePrice: 80,
       sellingPrice: 120,
-      quantity: 48,
-      reorderPoint: 10,
+      stockQuantity: 48,
+      threshold: 10,
       description: 'Sample single item',
       discountPercent: 0,
       offerName: '',
@@ -253,8 +279,8 @@ export function productCsvTemplate() {
       subcategory: 'Tops',
       purchasePrice: 0,
       sellingPrice: 0,
-      quantity: 0,
-      reorderPoint: 10,
+      stockQuantity: 0,
+      threshold: 10,
       description: 'Variant parent',
       taxPercent: 10,
     },
@@ -271,8 +297,8 @@ export function productCsvTemplate() {
       variantOptions: 'Color:Red|Size:M',
       purchasePrice: 200,
       sellingPrice: 350,
-      quantity: 12,
-      reorderPoint: 5,
+      stockQuantity: 12,
+      threshold: 5,
       dailyPriceChange: false,
     },
     {
@@ -287,8 +313,8 @@ export function productCsvTemplate() {
       subcategory: '',
       purchasePrice: 0,
       sellingPrice: 500,
-      quantity: 5,
-      reorderPoint: 2,
+      stockQuantity: 5,
+      threshold: 2,
       description: 'Sample bundle',
       taxPercent: 10,
     },

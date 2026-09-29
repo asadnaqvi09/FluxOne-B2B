@@ -18,7 +18,7 @@ import {
 } from '@/components/ui/table'
 import { TableRowsSkeleton } from '@/components/ui/skeleton'
 import { displayStaffRef } from '@/lib/formatDisplayId'
-import { formatDateTime } from '@/lib/formatDateTime'
+import { formatDateTime, formatClockTime } from '@/lib/formatDateTime'
 import { DateTimeLines } from '@/components/shared/DateTimeLines'
 
 // Joining Date/Time — date top / 12h AM/PM time bottom in tables
@@ -27,9 +27,7 @@ function formatJoinedDateTime(value) {
 }
 
 function formatTime(value) {
-  if (!value) return '—'
-  const text = String(value)
-  return text.length >= 5 ? text.slice(0, 5) : text
+  return formatClockTime(value) || '—'
 }
 
 function designationLabel(row) {
@@ -80,6 +78,7 @@ function StaffStatusToggle({ row, loading, onChange }) {
       inactiveLabel="Block"
       activeTitle="Click to block"
       inactiveTitle="Click to open"
+      inactiveTone="danger"
     />
   )
 }

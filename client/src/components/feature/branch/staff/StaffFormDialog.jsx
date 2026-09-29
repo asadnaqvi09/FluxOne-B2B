@@ -15,6 +15,7 @@ import { NativeSelect } from '@/components/ui/select'
 import { ImageUploadField } from '@/components/shared/ImageUploadField'
 import { FieldError } from '@/components/shared/FieldError'
 import { TimePicker } from '@/components/shared/TimePicker'
+import { formatClockTime } from '@/lib/formatDateTime'
 import {
   getBranchHoursSoftWarning,
   STAFF_FIELD_ORDER,
@@ -300,7 +301,8 @@ export function StaffFormDialog({
               </p>
             ) : branchHours.openingTime && branchHours.closingTime ? (
               <p className="text-xs text-slate-500 sm:col-span-2">
-                Branch hours: {branchHours.openingTime}–{branchHours.closingTime}. Shift must fall
+                Branch hours: {formatClockTime(branchHours.openingTime)} –{' '}
+                {formatClockTime(branchHours.closingTime)}. Shift must fall
                 inside this window.
               </p>
             ) : null}

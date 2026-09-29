@@ -8,6 +8,7 @@ import { PageHeader } from '@/components/shared/PageHeader'
 import { ProductImageCell } from '@/components/feature/products/ProductStatusToggle'
 import { SurfaceCard } from '@/components/shared/SurfaceCard'
 import { WholeNumberInput } from '@/components/shared/WholeNumberInput'
+import { CategoryLines } from '@/components/shared/CategoryLines'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -511,7 +512,6 @@ export function AddBundlePage() {
                   <TableHead>Image</TableHead>
                   <TableHead>Item name</TableHead>
                   <TableHead>Category</TableHead>
-                  <TableHead>Sub category</TableHead>
                   <TableHead>Variant / Scale</TableHead>
                   <TableHead>Qty in bundle</TableHead>
                   <TableHead>Item price</TableHead>
@@ -525,8 +525,21 @@ export function AddBundlePage() {
                       <ProductImageCell src={row.item.imageUrl} name={row.item.name} />
                     </TableCell>
                     <TableCell className="font-medium text-slate-900">{row.item.name}</TableCell>
-                    <TableCell>{catalogName(catalog, row.item.categoryId)}</TableCell>
-                    <TableCell>{catalogName(catalog, row.item.subcategoryId)}</TableCell>
+                    <TableCell>
+                      <CategoryLines
+                        category={
+                          catalogName(catalog, row.item.categoryId) === '—'
+                            ? ''
+                            : catalogName(catalog, row.item.categoryId)
+                        }
+                        subcategory={
+                          catalogName(catalog, row.item.subcategoryId) === '—'
+                            ? ''
+                            : catalogName(catalog, row.item.subcategoryId)
+                        }
+                        emptyLabel="—"
+                      />
+                    </TableCell>
                     <TableCell>{row.item.scale || '—'}</TableCell>
                     <TableCell className="w-24">
                       <WholeNumberInput

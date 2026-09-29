@@ -11,6 +11,7 @@ const hardwareSelect = `
   h.company_name AS "companyName",
   h.type,
   h.status,
+  h.access_status AS "accessStatus",
   h.image_url AS "imageUrl",
   h.created_at AS "createdAt",
   h.branch_id AS "branchId",
@@ -27,6 +28,8 @@ function mapHardware(row) {
     companyName: row.companyName,
     type: row.type,
     status: row.status,
+    // System Access: active | blocked (Admin + BM can toggle)
+    accessStatus: row.accessStatus === 'blocked' ? 'blocked' : 'active',
     image: normalizeImageUrl(row.imageUrl) || '',
     imageUrl: normalizeImageUrl(row.imageUrl) || '',
     createdAt: row.createdAt,
@@ -187,6 +190,12 @@ export async function updateHardware(tenantId, id, payload, { branchId } = {}) {
       : existing.companyName
   const type = payload.type !== undefined ? payload.type : existing.type
   const status = payload.status !== undefined ? payload.status : existing.status
+  const accessStatus =
+    payload.accessStatus !== undefined
+      ? payload.accessStatus === 'blocked'
+        ? 'blocked'
+        : 'active'
+      : existing.accessStatus || 'active'
   const imageUrl =
     payload.image !== undefined || payload.imageUrl !== undefined
       ? payload.image || payload.imageUrl || null
@@ -205,11 +214,12 @@ export async function updateHardware(tenantId, id, payload, { branchId } = {}) {
           company_name = $3,
           type = $4,
           status = $5,
-          image_url = $6
-      WHERE tenant_id = $1 AND id = $7
-        AND ($8::uuid IS NULL OR branch_id = $8)
+          access_status = $6,
+          image_url = $7
+      WHERE tenant_id = $1 AND id = $8
+        AND ($9::uuid IS NULL OR branch_id = $9)
     `,
-    [name, companyName, type, status, imageUrl, id, branchId || null],
+    [name, companyName, type, status, accessStatus, imageUrl, id, branchId || null],
   )
 
   return getHardwareById(tenantId, id, { branchId })

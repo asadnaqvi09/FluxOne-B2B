@@ -1,5 +1,10 @@
 import { z } from 'zod'
-import { empty, optionalString, paginationQuery } from '../../branch-manager/shared.validator.js'
+import {
+  empty,
+  optionalString,
+  optionalUuid,
+  paginationQuery,
+} from '../../branch-manager/shared.validator.js'
 import { SUPPORTED_CURRENCIES } from '../../../utils/currency.util.js'
 
 const currencyCodes = SUPPORTED_CURRENCIES.map((c) => c.code)
@@ -16,6 +21,7 @@ export const listDevicesQuerySchema = z.object({
   params: empty,
   query: paginationQuery.extend({
     q: optionalString,
+    branchId: optionalUuid,
     status: z.preprocess(
       (value) => (value === '' || value === null || value === undefined ? 'all' : value),
       z.enum(['all', 'active', 'blocked']).default('all'),

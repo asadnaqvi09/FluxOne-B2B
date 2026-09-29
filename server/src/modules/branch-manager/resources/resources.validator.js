@@ -40,6 +40,8 @@ export const updateHardwareSchema = z.object({
     companyName: z.string().trim().max(120).optional().nullable(),
     type: hardwareType.optional(),
     status: hardwareStatus.optional(),
+    // System Access authorize / block
+    accessStatus: z.enum(['active', 'blocked']).optional(),
     branchId: optionalUuid,
     assignedToStaffId: optionalUuid,
     imageUrl: optionalImageUrl,

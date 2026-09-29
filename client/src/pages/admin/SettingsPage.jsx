@@ -24,6 +24,7 @@ import { DataCard, ResponsiveDataShell } from '@/components/shared/ResponsiveDat
 import { BRAND } from '@/lib/constants'
 import { toastSuccess, toastError } from '@/lib/toast'
 import { fieldErrorClass } from '@/lib/validation/fieldErrors'
+import { displayStaffRef } from '@/lib/formatDisplayId'
 import { useFieldErrors } from '@/hooks/useFieldErrors'
 import {
   ADMIN_DEVICES_PAGE_SIZE,
@@ -34,6 +35,8 @@ import {
 import { useDebouncedValue } from '@/hooks/useDebouncedValue'
 import { useAppDispatch } from '@/rtk/hooks'
 import { setDefaultCurrency } from '@/rtk/features/auth/authSlice'
+import { apiClient } from '@/api/api'
+import { endpoints } from '@/api/endpoints'
 import {
   KeyRound,
   Monitor,
@@ -49,6 +52,7 @@ import {
   Loader2,
   MonitorOff,
   Coins,
+  Building2,
 } from 'lucide-react'
 
 function formatLastActive(value) {
@@ -120,15 +124,38 @@ export function SettingsPage() {
   const [searchQuery, setSearchQuery] = useState('')
   const debouncedQ = useDebouncedValue(searchQuery.trim(), 300)
   const [statusFilter, setStatusFilter] = useState('all')
+  // Multi-branch filter for System Access list
+  const [branchFilter, setBranchFilter] = useState('all')
+  const [branchOptions, setBranchOptions] = useState([])
   const [page, setPage] = useState(1)
   const [limit, setLimit] = useState(ADMIN_DEVICES_PAGE_SIZE)
 
   const [confirmDialogOpen, setConfirmDialogOpen] = useState(false)
   const [targetSystem, setTargetSystem] = useState(null)
 
+  // Load company branches for the System Access dropdown
+  useEffect(() => {
+    let cancelled = false
+    async function loadBranches() {
+      const res = await apiClient.get(endpoints.admin.branches.list, { page: 1, limit: 100 })
+      if (cancelled || !res.success) return
+      const rows = res.data?.items || res.data || []
+      setBranchOptions(
+        (Array.isArray(rows) ? rows : []).map((b) => ({
+          id: b.id,
+          name: b.name || 'Branch',
+        })),
+      )
+    }
+    void loadBranches()
+    return () => {
+      cancelled = true
+    }
+  }, [])
+
   useEffect(() => {
     setPage(1)
-  }, [debouncedQ, statusFilter])
+  }, [debouncedQ, statusFilter, branchFilter])
 
   const {
     items: systems,
@@ -141,12 +168,14 @@ export function SettingsPage() {
   } = useAdminDevices({
     q: debouncedQ,
     status: statusFilter,
+    branchId: branchFilter,
     page,
     limit,
   })
 
   const slowHint = useSlowLoadingHint(loading && activeTab === 'systems')
-  const hasDeviceFilters = Boolean(debouncedQ) || statusFilter !== 'all'
+  const hasDeviceFilters =
+    Boolean(debouncedQ) || statusFilter !== 'all' || branchFilter !== 'all'
   const savedRate = ratesToPkr?.[selectedCurrency]
   const rateDirty =
     selectedCurrency !== 'PKR' &&
@@ -269,7 +298,7 @@ export function SettingsPage() {
         <PageHeader
           eyebrow="System Configuration & Security"
           title="Admin Settings"
-          description="Security, default currency, and hardware signature system access controls"
+          description="Security, default currency, and assigned hardware system access controls"
         />
       </MotionHeader>
 
@@ -467,10 +496,13 @@ export function SettingsPage() {
                     </Badge>
                   </div>
 
+                  {/* System access tip — signature UUID binding removed */}
                   <div className="flex items-center justify-between p-3 rounded-xl border border-slate-100 bg-slate-50/70">
                     <div className="space-y-0.5">
-                      <p className="font-bold text-xs text-slate-900">Hardware Signature Binding</p>
-                      <p className="text-[11px] text-slate-500">Only verified MAC & UUID devices allowed</p>
+                      <p className="font-bold text-xs text-slate-900">Assigned Hardware Access</p>
+                      <p className="text-[11px] text-slate-500">
+                        Block or authorize systems under All System Access
+                      </p>
                     </div>
                     <Badge variant="outline" className="bg-emerald-50 text-emerald-700 border-emerald-200 text-xs">
                       Enforced
@@ -657,7 +689,7 @@ export function SettingsPage() {
                 <Search className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-slate-400" />
                 <input
                   type="text"
-                  placeholder="Search by Device Name, UUID, Branch, or User..."
+                  placeholder="Search by Hardware ID, Name, Branch, or Employee..."
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
                   className="w-full rounded-xl border border-border bg-slate-50/70 py-2 pl-9 pr-4 text-xs sm:text-sm text-slate-900 outline-none focus:border-purple-300 focus:bg-white focus:ring-1 focus:ring-purple-300"
@@ -686,12 +718,30 @@ export function SettingsPage() {
                     </button>
                   ))}
                 </div>
+
+                {/* Branch filter — after Search + Status (multi-branch companies) */}
+                <label className="flex shrink-0 items-center gap-2 rounded-xl border border-border bg-slate-50/70 px-2.5 py-1.5 text-xs">
+                  <Building2 className="size-3.5 text-slate-400" />
+                  <span className="font-semibold text-slate-500">Branch</span>
+                  <NativeSelect
+                    value={branchFilter}
+                    onChange={(e) => setBranchFilter(e.target.value)}
+                    className="h-7 min-w-[8.5rem] border-0 bg-transparent py-0 text-xs font-semibold text-slate-800 shadow-none focus:ring-0"
+                  >
+                    <option value="all">All Branches</option>
+                    {branchOptions.map((b) => (
+                      <option key={b.id} value={b.id}>
+                        {b.name}
+                      </option>
+                    ))}
+                  </NativeSelect>
+                </label>
               </div>
             </div>
 
             <SurfaceCard
               title="List of System Access Terminals"
-              description="Hardware signature access, MAC/IP bindings & authorization statuses"
+              description="Assigned branch hardware, employee binding & authorization status"
             >
               {loading && systems.length === 0 ? (
                 <div className="flex items-center justify-center gap-2 py-16 text-sm text-slate-500">
@@ -704,12 +754,12 @@ export function SettingsPage() {
                   title={
                     hasDeviceFilters
                       ? 'No devices match these filters'
-                      : 'No hardware devices registered yet'
+                      : 'No hardware devices assigned yet'
                   }
                   description={
                     hasDeviceFilters
-                      ? 'Clear search or status filters to see registered terminals.'
-                      : 'POS and workstation devices will appear here once they register a hardware signature with this company.'
+                      ? 'Clear search, status, or branch filters to see assigned systems.'
+                      : 'Devices appear here after a branch manager creates hardware and assigns it to an employee.'
                   }
                   compact
                 />
@@ -734,8 +784,12 @@ export function SettingsPage() {
                                   <p className="truncate text-sm font-semibold text-slate-900">
                                     {sys.deviceName}
                                   </p>
-                                  <p className="text-[11px] font-medium text-slate-500">
-                                    Branch: {sys.branch || 'Unassigned'}
+                                  <p className="mt-0.5 font-mono text-[11px] font-semibold text-purple-900">
+                                    {sys.hardwareCode || '—'}
+                                  </p>
+                                  <p className="mt-1 flex items-center gap-1 text-[11px] font-medium text-slate-500">
+                                    <Building2 className="size-3 shrink-0 text-slate-400" />
+                                    {sys.branch || 'Unassigned'}
                                   </p>
                                 </div>
                                 <Badge
@@ -749,14 +803,14 @@ export function SettingsPage() {
                                   {isActive ? 'Active' : 'Blocked'}
                                 </Badge>
                               </div>
-                              <p className="mt-2 font-mono text-[11px] font-semibold tracking-wide text-purple-900">
-                                {sys.hardwareSignature}
+                              {/* hardwareSignature removed — Hardware ID is shown above */}
+                              <p className="mt-2 text-xs font-semibold text-slate-900">
+                                {sys.userName}
                               </p>
-                              <p className="mt-0.5 font-mono text-[11px] text-slate-500">
-                                IP: {sys.ipAddress || '—'} · MAC: {sys.macAddress || '—'}
+                              <p className="font-mono text-[11px] text-slate-500">
+                                {displayStaffRef({ id: sys.staffId })}
                               </p>
-                              <p className="mt-1 text-xs font-semibold text-slate-900">{sys.userName}</p>
-                              <p className="flex items-center gap-1 text-[11px] text-slate-500">
+                              <p className="mt-1 flex items-center gap-1 text-[11px] text-slate-500">
                                 <Clock className="size-3 text-slate-400" />
                                 {formatLastActive(sys.lastActiveAt)}
                               </p>
@@ -789,12 +843,12 @@ export function SettingsPage() {
                       <Table className="min-w-[44rem] w-full text-left text-sm">
                         <TableHeader>
                           <TableRow className="text-xs text-slate-500 uppercase">
-                            <TableHead className="px-4 py-3 font-medium">Device & Branch</TableHead>
                             <TableHead className="px-4 py-3 font-medium">
-                              Hardware Signature & Network
+                              Hardware ID & Name
                             </TableHead>
+                            <TableHead className="px-4 py-3 font-medium">Branch</TableHead>
                             <TableHead className="hidden px-4 py-3 font-medium lg:table-cell">
-                              Assigned User
+                              Assigned Employee
                             </TableHead>
                             <TableHead className="px-4 py-3 font-medium">Status & Activity</TableHead>
                             <TableHead className="sticky right-0 z-[1] bg-slate-200/80 px-4 py-3 text-right font-medium">
@@ -823,28 +877,26 @@ export function SettingsPage() {
                                       <p className="text-xs leading-tight font-semibold text-slate-900">
                                         {sys.deviceName}
                                       </p>
-                                      <p className="mt-0.5 text-[11px] font-medium text-slate-500">
-                                        Branch: {sys.branch || 'Unassigned'}
+                                      <p className="mt-0.5 font-mono text-[11px] font-semibold text-purple-900">
+                                        {sys.hardwareCode || '—'}
                                       </p>
                                     </div>
                                   </div>
                                 </TableCell>
 
                                 <TableCell className="px-4 py-3.5">
-                                  <div>
-                                    <span className="inline-block rounded-md border border-purple-100 bg-purple-50 px-2 py-0.5 font-mono text-xs font-semibold tracking-wide whitespace-nowrap text-purple-900">
-                                      {sys.hardwareSignature}
-                                    </span>
-                                    <p className="mt-1 font-mono text-[11px] text-slate-500">
-                                      IP: {sys.ipAddress || '—'} · MAC: {sys.macAddress || '—'}
-                                    </p>
-                                  </div>
+                                  <p className="flex items-center gap-1.5 text-xs font-medium text-slate-700">
+                                    <Building2 className="size-3.5 shrink-0 text-slate-400" />
+                                    {sys.branch || 'Unassigned'}
+                                  </p>
                                 </TableCell>
+
+                                {/* Hardware Signature & Network column removed */}
 
                                 <TableCell className="hidden px-4 py-3.5 text-xs text-slate-700 lg:table-cell">
                                   <p className="font-semibold text-slate-900">{sys.userName}</p>
                                   <p className="mt-0.5 font-mono text-[11px] text-slate-500">
-                                    {sys.userId || '—'}
+                                    {displayStaffRef({ id: sys.staffId })}
                                   </p>
                                 </TableCell>
 
@@ -927,7 +979,7 @@ export function SettingsPage() {
             <>
               Are you sure you want to block <strong>&quot;{targetSystem?.deviceName}&quot;</strong>?
               <span className="font-mono text-[11px] text-slate-500 mt-1 block">
-                UUID: {targetSystem?.hardwareSignature}
+                Hardware ID: {targetSystem?.hardwareCode || '—'}
               </span>
               This workstation will be blocked from accessing the system.
             </>
@@ -935,7 +987,7 @@ export function SettingsPage() {
             <>
               Are you sure you want to authorize <strong>&quot;{targetSystem?.deviceName}&quot;</strong>?
               <span className="font-mono text-[11px] text-slate-500 mt-1 block">
-                UUID: {targetSystem?.hardwareSignature}
+                Hardware ID: {targetSystem?.hardwareCode || '—'}
               </span>
               This workstation will regain operational access.
             </>

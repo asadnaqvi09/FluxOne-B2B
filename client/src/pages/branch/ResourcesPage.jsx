@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { Layers, Plus, Trash2, Edit3, Monitor, Search } from 'lucide-react'
+import { Layers, Plus, Trash2, Edit3, Monitor, Search, Ban, CheckCircle2 } from 'lucide-react'
 import { PageHeader } from '@/components/shared/PageHeader'
 import { MotionHeader, MotionReveal } from '@/components/shared/MotionReveal'
 import { SurfaceCard } from '@/components/shared/SurfaceCard'
@@ -214,6 +214,28 @@ export function ResourcesPage() {
     void loadHardware(filterHardware, debouncedHwSearch)
   }
 
+  // BM can block / authorize assigned systems (same access_status as Admin)
+  async function handleToggleAccess(hw) {
+    const next = hw.accessStatus === 'blocked' ? 'active' : 'blocked'
+    const formData = new FormData()
+    formData.append('accessStatus', next)
+    setSaving(true)
+    const res = await apiClient.put(
+      endpoints.branch.resources.hardware.update(hw.id),
+      formData,
+    )
+    setSaving(false)
+    if (!res.success) {
+      return toastError(res.error || 'Failed to update system access')
+    }
+    toastSuccess(
+      next === 'blocked'
+        ? `${hw.name} blocked from system access`
+        : `${hw.name} authorized for system access`,
+    )
+    void loadHardware(filterHardware, debouncedHwSearch)
+  }
+
   const getStatusBadge = (status) => {
     switch (status) {
       case 'New':
@@ -351,23 +373,52 @@ export function ResourcesPage() {
                             <p className="mt-1 text-xs text-slate-500">
                               {hw.companyName} · {hw.type}
                             </p>
-                            <div className="mt-2 flex gap-3">
-                              <button
-                                type="button"
-                                className={actionBtnClass}
-                                onClick={() => handleOpenHardwareEdit(hw)}
-                                aria-label="Edit hardware"
-                              >
-                                <Edit3 className="size-4" />
-                              </button>
-                              <button
-                                type="button"
-                                className={actionBtnClass}
-                                onClick={() => handleDeleteHardware(hw)}
-                                aria-label="Delete hardware"
-                              >
-                                <Trash2 className="size-4" />
-                              </button>
+                            <div className="mt-2 flex flex-wrap items-center gap-2">
+                              {hw.accessStatus === 'blocked' ? (
+                                <Badge className="border-none bg-rose-50 px-2 py-0.5 text-rose-700">
+                                  Access Blocked
+                                </Badge>
+                              ) : null}
+                              <div className="flex gap-3">
+                                <button
+                                  type="button"
+                                  className={actionBtnClass}
+                                  onClick={() => handleToggleAccess(hw)}
+                                  disabled={saving}
+                                  aria-label={
+                                    hw.accessStatus === 'blocked'
+                                      ? 'Authorize system'
+                                      : 'Block system'
+                                  }
+                                  title={
+                                    hw.accessStatus === 'blocked'
+                                      ? 'Authorize system'
+                                      : 'Block system'
+                                  }
+                                >
+                                  {hw.accessStatus === 'blocked' ? (
+                                    <CheckCircle2 className="size-4 text-emerald-600" />
+                                  ) : (
+                                    <Ban className="size-4 text-rose-600" />
+                                  )}
+                                </button>
+                                <button
+                                  type="button"
+                                  className={actionBtnClass}
+                                  onClick={() => handleOpenHardwareEdit(hw)}
+                                  aria-label="Edit hardware"
+                                >
+                                  <Edit3 className="size-4" />
+                                </button>
+                                <button
+                                  type="button"
+                                  className={actionBtnClass}
+                                  onClick={() => handleDeleteHardware(hw)}
+                                  aria-label="Delete hardware"
+                                >
+                                  <Trash2 className="size-4" />
+                                </button>
+                              </div>
                             </div>
                           </div>
                         </div>
@@ -410,9 +461,38 @@ export function ResourcesPage() {
                             </TableCell>
                             <TableCell className="px-2 py-3 text-slate-600">{hw.type}</TableCell>
                             <TableCell className="px-2 py-3">
-                              <Badge className={getStatusBadge(hw.status)}>{hw.status}</Badge>
+                              <div className="flex flex-col gap-1">
+                                <Badge className={getStatusBadge(hw.status)}>{hw.status}</Badge>
+                                {hw.accessStatus === 'blocked' ? (
+                                  <Badge className="w-fit border-none bg-rose-50 px-2 py-0.5 text-[10px] text-rose-700">
+                                    Blocked
+                                  </Badge>
+                                ) : null}
+                              </div>
                             </TableCell>
                             <TableActionsCell>
+                              <button
+                                type="button"
+                                className={actionBtnClass}
+                                onClick={() => handleToggleAccess(hw)}
+                                disabled={saving}
+                                aria-label={
+                                  hw.accessStatus === 'blocked'
+                                    ? 'Authorize system'
+                                    : 'Block system'
+                                }
+                                title={
+                                  hw.accessStatus === 'blocked'
+                                    ? 'Authorize system'
+                                    : 'Block system'
+                                }
+                              >
+                                {hw.accessStatus === 'blocked' ? (
+                                  <CheckCircle2 className="size-4 text-emerald-600" />
+                                ) : (
+                                  <Ban className="size-4 text-rose-600" />
+                                )}
+                              </button>
                               <button
                                 type="button"
                                 className={actionBtnClass}

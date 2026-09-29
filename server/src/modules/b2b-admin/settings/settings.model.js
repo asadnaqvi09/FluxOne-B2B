@@ -6,16 +6,17 @@ import {
 } from '../../../utils/currency.util.js'
 import { conversionFactor } from '../../../utils/fx.util.js'
 
+// Map assigned BM hardware → Admin System Access row
 function mapDeviceRow(row) {
   if (!row) return null
   return {
     id: row.id,
     deviceName: row.deviceName || '',
-    hardwareSignature: row.hardwareSignature || '',
-    ipAddress: row.ipAddress || '',
-    macAddress: row.macAddress || '',
+    hardwareCode: row.hardwareCode || '',
+    // hardwareSignature removed — Hardware ID (HW-xxx) is the system identity
     userId: row.userEmail || '',
     userName: row.userName || 'Unassigned',
+    staffId: row.staffId || null,
     branchId: row.branchId || null,
     branch: row.branchName || 'Unassigned',
     status: row.status === 'blocked' ? 'blocked' : 'active',
@@ -24,6 +25,34 @@ function mapDeviceRow(row) {
   }
 }
 
+// Shared FROM/JOIN: only hardware currently assigned to a staff member
+const ASSIGNED_HARDWARE_FROM = `
+  FROM branch_hardware h
+  INNER JOIN staff s
+    ON s.tenant_id = h.tenant_id
+   AND s.hardware_device_id = h.id::text
+  INNER JOIN users u
+    ON u.id = s.user_id
+   AND u.tenant_id = s.tenant_id
+  LEFT JOIN branches b
+    ON b.id = h.branch_id
+   AND b.tenant_id = h.tenant_id
+`
+
+const ASSIGNED_HARDWARE_SELECT = `
+  h.id,
+  h.name AS "deviceName",
+  h.code AS "hardwareCode",
+  h.branch_id AS "branchId",
+  b.name AS "branchName",
+  s.id AS "staffId",
+  u.email AS "userEmail",
+  u.full_name AS "userName",
+  h.access_status AS status,
+  h.created_at AS "lastActiveAt",
+  h.created_at AS "createdAt"
+`
+
 export async function listDevices(tenantId, filters = {}) {
   const page = Math.max(1, Number(filters.page) || 1)
   const limit = Math.min(100, Math.max(1, Number(filters.limit) || 6))
@@ -31,80 +60,62 @@ export async function listDevices(tenantId, filters = {}) {
   const q = filters.q?.trim() || null
   const status =
     filters.status && filters.status !== 'all' ? filters.status : null
+  const branchId = filters.branchId || null
 
+  // Stats mirror list scope (branch filter applies when set)
   const { rows: statsRows } = await tenantQuery(
     tenantId,
     `
       SELECT
         count(*)::int AS total,
-        count(*) FILTER (WHERE status = 'active')::int AS active,
-        count(*) FILTER (WHERE status = 'blocked')::int AS blocked
-      FROM hardware_devices
-      WHERE tenant_id = $1
+        count(*) FILTER (WHERE h.access_status = 'active')::int AS active,
+        count(*) FILTER (WHERE h.access_status = 'blocked')::int AS blocked
+      ${ASSIGNED_HARDWARE_FROM}
+      WHERE h.tenant_id = $1
+        AND ($2::uuid IS NULL OR h.branch_id = $2)
     `,
+    [branchId],
   )
+
+  const searchAndStatus = `
+    AND ($3::text IS NULL OR h.access_status = $3)
+    AND (
+      $4::text IS NULL
+      OR h.name ILIKE '%' || $4 || '%'
+      OR h.code ILIKE '%' || $4 || '%'
+      OR COALESCE(b.name, '') ILIKE '%' || $4 || '%'
+      OR COALESCE(u.full_name, '') ILIKE '%' || $4 || '%'
+      OR COALESCE(u.email, '') ILIKE '%' || $4 || '%'
+    )
+  `
 
   const { rows: countRows } = await tenantQuery(
     tenantId,
     `
       SELECT count(*)::int AS total
-      FROM hardware_devices d
-      LEFT JOIN branches b ON b.id = d.branch_id AND b.tenant_id = d.tenant_id
-      LEFT JOIN users u ON u.id = d.user_id AND u.tenant_id = d.tenant_id
-      WHERE d.tenant_id = $1
-        AND ($2::text IS NULL OR d.status = $2)
-        AND (
-          $3::text IS NULL
-          OR d.device_name ILIKE '%' || $3 || '%'
-          OR d.hardware_signature ILIKE '%' || $3 || '%'
-          OR COALESCE(d.ip_address, '') ILIKE '%' || $3 || '%'
-          OR COALESCE(d.mac_address, '') ILIKE '%' || $3 || '%'
-          OR COALESCE(b.name, '') ILIKE '%' || $3 || '%'
-          OR COALESCE(u.full_name, '') ILIKE '%' || $3 || '%'
-          OR COALESCE(u.email, '') ILIKE '%' || $3 || '%'
-        )
+      ${ASSIGNED_HARDWARE_FROM}
+      WHERE h.tenant_id = $1
+        AND ($2::uuid IS NULL OR h.branch_id = $2)
+        ${searchAndStatus}
     `,
-    [status, q],
+    [branchId, status, q],
   )
 
   const { rows } = await tenantQuery(
     tenantId,
     `
-      SELECT
-        d.id,
-        d.device_name AS "deviceName",
-        d.hardware_signature AS "hardwareSignature",
-        d.ip_address AS "ipAddress",
-        d.mac_address AS "macAddress",
-        d.branch_id AS "branchId",
-        b.name AS "branchName",
-        u.email AS "userEmail",
-        u.full_name AS "userName",
-        d.status,
-        d.last_active_at AS "lastActiveAt",
-        d.created_at AS "createdAt"
-      FROM hardware_devices d
-      LEFT JOIN branches b ON b.id = d.branch_id AND b.tenant_id = d.tenant_id
-      LEFT JOIN users u ON u.id = d.user_id AND u.tenant_id = d.tenant_id
-      WHERE d.tenant_id = $1
-        AND ($2::text IS NULL OR d.status = $2)
-        AND (
-          $3::text IS NULL
-          OR d.device_name ILIKE '%' || $3 || '%'
-          OR d.hardware_signature ILIKE '%' || $3 || '%'
-          OR COALESCE(d.ip_address, '') ILIKE '%' || $3 || '%'
-          OR COALESCE(d.mac_address, '') ILIKE '%' || $3 || '%'
-          OR COALESCE(b.name, '') ILIKE '%' || $3 || '%'
-          OR COALESCE(u.full_name, '') ILIKE '%' || $3 || '%'
-          OR COALESCE(u.email, '') ILIKE '%' || $3 || '%'
-        )
+      SELECT ${ASSIGNED_HARDWARE_SELECT}
+      ${ASSIGNED_HARDWARE_FROM}
+      WHERE h.tenant_id = $1
+        AND ($2::uuid IS NULL OR h.branch_id = $2)
+        ${searchAndStatus}
       ORDER BY
-        CASE WHEN d.status = 'active' THEN 0 ELSE 1 END,
-        d.last_active_at DESC NULLS LAST,
-        d.device_name ASC
-      LIMIT $4 OFFSET $5
+        CASE WHEN h.access_status = 'active' THEN 0 ELSE 1 END,
+        h.created_at DESC,
+        h.name ASC
+      LIMIT $5 OFFSET $6
     `,
-    [status, q, limit, offset],
+    [branchId, status, q, limit, offset],
   )
 
   const stats = statsRows[0] || { total: 0, active: 0, blocked: 0 }
@@ -120,28 +131,15 @@ export async function listDevices(tenantId, filters = {}) {
 }
 
 export async function updateDeviceStatus(tenantId, id, status) {
+  // Block / authorize BM-assigned hardware (shared with branch manager)
   const { rows } = await tenantQuery(
     tenantId,
     `
-      UPDATE hardware_devices
-      SET
-        status = $2,
-        updated_at = now()
+      UPDATE branch_hardware
+      SET access_status = $2
       WHERE tenant_id = $1
         AND id = $3
-      RETURNING
-        id,
-        device_name AS "deviceName",
-        hardware_signature AS "hardwareSignature",
-        ip_address AS "ipAddress",
-        mac_address AS "macAddress",
-        branch_id AS "branchId",
-        NULL::text AS "branchName",
-        NULL::text AS "userEmail",
-        NULL::text AS "userName",
-        status,
-        last_active_at AS "lastActiveAt",
-        created_at AS "createdAt"
+      RETURNING id
     `,
     [status, id],
   )
@@ -152,33 +150,44 @@ export async function updateDeviceStatus(tenantId, id, status) {
     throw error
   }
 
-  // Re-fetch with joins for response shape
   const { rows: full } = await tenantQuery(
     tenantId,
     `
-      SELECT
-        d.id,
-        d.device_name AS "deviceName",
-        d.hardware_signature AS "hardwareSignature",
-        d.ip_address AS "ipAddress",
-        d.mac_address AS "macAddress",
-        d.branch_id AS "branchId",
-        b.name AS "branchName",
-        u.email AS "userEmail",
-        u.full_name AS "userName",
-        d.status,
-        d.last_active_at AS "lastActiveAt",
-        d.created_at AS "createdAt"
-      FROM hardware_devices d
-      LEFT JOIN branches b ON b.id = d.branch_id AND b.tenant_id = d.tenant_id
-      LEFT JOIN users u ON u.id = d.user_id AND u.tenant_id = d.tenant_id
-      WHERE d.tenant_id = $1 AND d.id = $2
+      SELECT ${ASSIGNED_HARDWARE_SELECT}
+      ${ASSIGNED_HARDWARE_FROM}
+      WHERE h.tenant_id = $1 AND h.id = $2
       LIMIT 1
     `,
     [id],
   )
 
-  return mapDeviceRow(full[0] || rows[0])
+  // Device may exist but be unassigned — still return a minimal row
+  if (full[0]) return mapDeviceRow(full[0])
+
+  const { rows: bare } = await tenantQuery(
+    tenantId,
+    `
+      SELECT
+        h.id,
+        h.name AS "deviceName",
+        h.code AS "hardwareCode",
+        h.branch_id AS "branchId",
+        b.name AS "branchName",
+        NULL::uuid AS "staffId",
+        NULL::text AS "userEmail",
+        'Unassigned'::text AS "userName",
+        h.access_status AS status,
+        h.created_at AS "lastActiveAt",
+        h.created_at AS "createdAt"
+      FROM branch_hardware h
+      LEFT JOIN branches b ON b.id = h.branch_id AND b.tenant_id = h.tenant_id
+      WHERE h.tenant_id = $1 AND h.id = $2
+      LIMIT 1
+    `,
+    [id],
+  )
+
+  return mapDeviceRow(bare[0])
 }
 
 // Tenant default currency (display default across the company)

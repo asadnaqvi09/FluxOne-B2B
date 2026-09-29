@@ -4,10 +4,11 @@ import { endpoints } from '@/api/endpoints'
 
 export const ADMIN_DEVICES_PAGE_SIZE = 8
 
-// Live B2B Admin hardware devices (/api/admin/settings/devices).
+// Live B2B Admin System Access — assigned BM hardware (/api/admin/settings/devices).
 export function useAdminDevices({
   q = '',
   status = 'all',
+  branchId = 'all',
   page = 1,
   limit = ADMIN_DEVICES_PAGE_SIZE,
 } = {}) {
@@ -29,6 +30,7 @@ export function useAdminDevices({
     const result = await apiClient.get(endpoints.admin.settings.devices, {
       q: q?.trim() || undefined,
       status: status && status !== 'all' ? status : undefined,
+      branchId: branchId && branchId !== 'all' ? branchId : undefined,
       page,
       limit,
     })
@@ -56,7 +58,7 @@ export function useAdminDevices({
     )
     setLoading(false)
     return result
-  }, [q, status, page, limit])
+  }, [q, status, branchId, page, limit])
 
   useEffect(() => {
     void load()

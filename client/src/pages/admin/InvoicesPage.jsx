@@ -36,6 +36,7 @@ import { useCurrency } from '@/hooks/useCurrency'
 import { BRAND } from '@/lib/constants'
 import { formatDateLine } from '@/lib/formatDateTime'
 import { DateTimeLines } from '@/components/shared/DateTimeLines'
+import { ExportCsvButton } from '@/components/shared/ExportCsvButton'
 import { downloadBillingInvoicePdf } from '@/lib/pdfDownload'
 import {
   exportInvoicesToExcel,
@@ -312,30 +313,20 @@ export function InvoicesPage() {
           description="SaaS platform billing records (not POS sales)"
           actions={
             <div className="flex flex-wrap items-center gap-2">
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
+              <ExportCsvButton
                 onClick={handleExportTableExcel}
                 disabled={loading || invoices.length === 0}
-                className="h-8 cursor-pointer text-xs font-semibold border-slate-200 text-slate-700 hover:bg-slate-50 hover:text-slate-900 shadow-2xs"
+                label="Export Excel"
                 title="Export current table to Excel / CSV"
-              >
-                <FileSpreadsheet className="mr-1.5 size-3.5 text-emerald-600" />
-                Export Excel
-              </Button>
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
+                format="csv"
+              />
+              <ExportCsvButton
                 onClick={handleExportTablePDF}
                 disabled={loading || invoices.length === 0}
-                className="h-8 cursor-pointer text-xs font-semibold border-slate-200 text-slate-700 hover:bg-slate-50 hover:text-slate-900 shadow-2xs"
+                label="Export PDF"
                 title="Download table report as PDF"
-              >
-                <FileText className="mr-1.5 size-3.5 text-purple-600" />
-                Export PDF
-              </Button>
+                format="pdf"
+              />
             </div>
           }
         >

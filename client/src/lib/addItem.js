@@ -1,4 +1,5 @@
 // Add Item wizard constants + combination builder (API-backed create).
+import { formatMoneyInput, roundMoney } from '@/lib/money'
 
 export const ADD_ITEM_TABS = [
   { id: 'basic', label: 'Basic Info' },
@@ -87,8 +88,8 @@ export function buildAddItemApiPayload({
       scale: 'unit',
       ...(itemCode ? { itemCode } : {}),
       ...(barcode ? { barcode } : {}),
-      purchasePrice: Number(form.purchasePrice) || 0,
-      sellingPrice: Number(form.sellingPrice) || 0,
+      purchasePrice: roundMoney(form.purchasePrice),
+      sellingPrice: roundMoney(form.sellingPrice),
       quantity: Number(form.openingStock) || 0,
       reorderPoint:
         form.lowStockThreshold === '' || form.lowStockThreshold == null
@@ -107,8 +108,8 @@ export function buildAddItemApiPayload({
       label: row.label,
       ...(itemCode ? { itemCode } : {}),
       ...(barcode ? { barcode } : {}),
-      purchasePrice: Number(row.purchasePrice) || 0,
-      sellingPrice: Number(row.sellingPrice) || 0,
+      purchasePrice: roundMoney(row.purchasePrice),
+      sellingPrice: roundMoney(row.sellingPrice),
       quantity: Number(row.openingStock) || 0,
       reorderPoint:
         row.lowStockThreshold === '' || row.lowStockThreshold == null
@@ -241,8 +242,9 @@ export function variantsToCombinationRows(variants = []) {
       parts,
       sku: v.itemCode || '',
       barcode: v.barcode || '',
-      purchasePrice: v.purchasePrice === 0 || v.purchasePrice ? String(v.purchasePrice) : '',
-      sellingPrice: v.sellingPrice === 0 || v.sellingPrice ? String(v.sellingPrice) : '',
+      // Format for MoneyInput — 80.00 → "80", keep real cents like "2.87"
+      purchasePrice: formatMoneyInput(v.purchasePrice),
+      sellingPrice: formatMoneyInput(v.sellingPrice),
       openingStock: String(v.quantity ?? 0),
       lowStockThreshold:
         v.reorderPoint === 0 || v.reorderPoint ? String(v.reorderPoint) : '',
@@ -347,8 +349,8 @@ export function buildEditItemApiPayload({
       scale: 'unit',
       ...(itemCode ? { itemCode } : {}),
       ...(barcode ? { barcode } : {}),
-      purchasePrice: Number(form.purchasePrice) || 0,
-      sellingPrice: Number(form.sellingPrice) || 0,
+      purchasePrice: roundMoney(form.purchasePrice),
+      sellingPrice: roundMoney(form.sellingPrice),
       reorderPoint:
         form.lowStockThreshold === '' || form.lowStockThreshold == null
           ? undefined
@@ -365,8 +367,8 @@ export function buildEditItemApiPayload({
       label: row.label,
       ...(itemCode ? { itemCode } : {}),
       ...(barcode ? { barcode } : {}),
-      purchasePrice: Number(row.purchasePrice) || 0,
-      sellingPrice: Number(row.sellingPrice) || 0,
+      purchasePrice: roundMoney(row.purchasePrice),
+      sellingPrice: roundMoney(row.sellingPrice),
       reorderPoint:
         row.lowStockThreshold === '' || row.lowStockThreshold == null
           ? undefined

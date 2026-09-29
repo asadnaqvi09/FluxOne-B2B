@@ -56,6 +56,7 @@ export async function listTaxProfitProducts(tenantId, filters = {}) {
   const limit = Math.min(200, Math.max(1, Number(filters.limit) || 8))
   const offset = (page - 1) * limit
   const q = filters.q?.trim() || null
+  const branchId = filters.branchId || null
   const categoryId = filters.categoryId || null
   const subcategoryId = filters.subcategoryId || null
   // Product / variant filters (TC-054) — replace legacy scale filter
@@ -70,7 +71,11 @@ export async function listTaxProfitProducts(tenantId, filters = {}) {
         p.id,
         p.item_code AS "itemCode",
         p.name,
-        p.image_url AS "imageUrl",
+        -- Variant children often have empty image_url; fall back to parent (shared product image)
+        COALESCE(
+          NULLIF(trim(p.image_url), ''),
+          NULLIF(trim(parent.image_url), '')
+        ) AS "imageUrl",
         p.barcode,
         p.scale,
         p.status,
@@ -89,6 +94,8 @@ export async function listTaxProfitProducts(tenantId, filters = {}) {
         COALESCE(sales.qty_30d, 0) AS "salesVolume30D",
         count(*) OVER()::int AS "_total"
       FROM products p
+      LEFT JOIN products parent
+        ON parent.id = p.parent_id AND parent.tenant_id = p.tenant_id
       LEFT JOIN branches b ON b.id = p.branch_id AND b.tenant_id = p.tenant_id
       LEFT JOIN categories c ON c.id = p.category_id AND c.tenant_id = p.tenant_id
       LEFT JOIN categories sc ON sc.id = p.subcategory_id AND sc.tenant_id = p.tenant_id
@@ -105,7 +112,7 @@ export async function listTaxProfitProducts(tenantId, filters = {}) {
         WHERE si.tenant_id = p.tenant_id
           AND si.product_id = p.id
           AND s.status IN ('completed', 'partial_refund')
-          AND s.sold_at >= now() - ($8::int * INTERVAL '1 day')
+          AND s.sold_at >= now() - ($9::int * INTERVAL '1 day')
       ) sales ON true
       WHERE p.tenant_id = $1
         -- Hide empty variant parent shells from pricing table (children are priced)
@@ -118,18 +125,19 @@ export async function listTaxProfitProducts(tenantId, filters = {}) {
           OR COALESCE(p.variant_label, '') ILIKE '%' || $2 || '%'
           OR p.id::text ILIKE '%' || $2 || '%'
         )
-        AND ($3::uuid IS NULL OR p.category_id = $3)
-        AND ($4::uuid IS NULL OR p.subcategory_id = $4)
+        AND ($3::uuid IS NULL OR p.branch_id = $3)
+        AND ($4::uuid IS NULL OR p.category_id = $4)
+        AND ($5::uuid IS NULL OR p.subcategory_id = $5)
         AND (
-          $5::uuid IS NULL
-          OR p.id = $5
-          OR p.parent_id = $5
+          $6::uuid IS NULL
+          OR p.id = $6
+          OR p.parent_id = $6
         )
-        AND ($6::uuid IS NULL OR p.id = $6)
+        AND ($7::uuid IS NULL OR p.id = $7)
       ORDER BY ${sortClause(sort)}
-      LIMIT $7 OFFSET $9
+      LIMIT $8 OFFSET $10
     `,
-    [q, categoryId, subcategoryId, productId, variantId, limit, SALES_WINDOW_DAYS, offset],
+    [q, branchId, categoryId, subcategoryId, productId, variantId, limit, SALES_WINDOW_DAYS, offset],
   )
 
   const total = rows[0]?._total || 0
@@ -138,7 +146,13 @@ export async function listTaxProfitProducts(tenantId, filters = {}) {
 }
 
 export async function getTaxProfitMeta(tenantId) {
-  const [{ rows: categoryRows }, { rows: productRows }, { rows: taxRows }, { rows: tenantRows }] =
+  const [
+    { rows: categoryRows },
+    { rows: productRows },
+    { rows: taxRows },
+    { rows: tenantRows },
+    { rows: branchRows },
+  ] =
     await Promise.all([
       tenantQuery(
         tenantId,
@@ -146,7 +160,8 @@ export async function getTaxProfitMeta(tenantId) {
           SELECT
             id,
             name,
-            parent_id AS "parentId"
+            parent_id AS "parentId",
+            branch_id AS "branchId"
           FROM categories
           WHERE tenant_id = $1
             AND COALESCE(is_active, true) = true
@@ -161,6 +176,7 @@ export async function getTaxProfitMeta(tenantId) {
             p.id,
             p.name,
             p.type,
+            p.branch_id AS "branchId",
             p.category_id AS "categoryId",
             p.subcategory_id AS "subcategoryId",
             COALESCE(
@@ -207,6 +223,15 @@ export async function getTaxProfitMeta(tenantId) {
           LIMIT 1
         `,
       ),
+      tenantQuery(
+        tenantId,
+        `
+          SELECT id, name
+          FROM branches
+          WHERE tenant_id = $1
+          ORDER BY name ASC
+        `,
+      ),
     ])
 
   const parents = categoryRows.filter((c) => !c.parentId)
@@ -214,16 +239,21 @@ export async function getTaxProfitMeta(tenantId) {
   for (const row of categoryRows) {
     if (!row.parentId) continue
     const list = childrenByParent.get(row.parentId) || []
-    list.push({ id: row.id, name: row.name })
+    list.push({ id: row.id, name: row.name, branchId: row.branchId || null })
     childrenByParent.set(row.parentId, list)
   }
 
   const tenantDef = tenantRows[0] || {}
 
   return {
+    branches: branchRows.map((b) => ({
+      id: b.id,
+      name: b.name,
+    })),
     categories: parents.map((p) => ({
       id: p.id,
       name: p.name,
+      branchId: p.branchId || null,
       children: childrenByParent.get(p.id) || [],
     })),
     // Product filter options (TC-054); scales removed
@@ -231,6 +261,7 @@ export async function getTaxProfitMeta(tenantId) {
       id: p.id,
       name: p.name,
       type: p.type,
+      branchId: p.branchId || null,
       categoryId: p.categoryId || null,
       subcategoryId: p.subcategoryId || null,
       variants: Array.isArray(p.variants) ? p.variants : [],

@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { ArrowDownToLine, ArrowUpFromLine, Camera, Plus } from 'lucide-react'
+import { ArrowUpFromLine, Camera, Plus } from 'lucide-react'
 import { ImportItemsDialog } from '@/components/feature/products/ImportItemsDialog'
 import { ItemFormDialog } from '@/components/feature/products/ItemFormDialog'
 import { PrintBarcodeDialog } from '@/components/feature/products/PrintBarcodeDialog'
@@ -11,6 +11,7 @@ import { AddStockInDialog } from '@/components/feature/control/AddStockInDialog'
 import { MotionHeader, MotionReveal } from '@/components/shared/MotionReveal'
 import { ConfirmDialog } from '@/components/shared/ConfirmDialog'
 import { DeleteEntityDialog } from '@/components/shared/DeleteEntityDialog'
+import { ExportCsvButton } from '@/components/shared/ExportCsvButton'
 import { PageHeader } from '@/components/shared/PageHeader'
 import { Button } from '@/components/ui/button'
 import { apiClient } from '@/api/api'
@@ -332,17 +333,12 @@ export function ProductsPage() {
                 <ArrowUpFromLine className="size-4" />
                 Import
               </Button>
-              <Button
-                type="button"
-                variant="outline"
-                className="cursor-pointer"
-                style={{ color: BRAND.deep }}
-                disabled={mutating}
+              <ExportCsvButton
                 onClick={handleExport}
-              >
-                <ArrowDownToLine className="size-4" />
-                Export
-              </Button>
+                disabled={mutating}
+                label="Export"
+                title="Export products to CSV"
+              />
               <Button
                 type="button"
                 variant="outline"

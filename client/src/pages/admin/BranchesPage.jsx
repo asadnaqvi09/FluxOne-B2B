@@ -531,7 +531,6 @@ export function BranchesPage() {
                 disabled={loading || filteredBranches.length === 0}
                 label="Export"
                 title="Export branches to Excel / CSV"
-                className="h-10 px-3"
               />
               <Button
                 type="button"

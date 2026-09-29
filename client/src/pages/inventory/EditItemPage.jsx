@@ -26,6 +26,7 @@ import {
   variantsToCombinationRows,
 } from '@/lib/addItem'
 import { PRODUCT_TYPES } from '@/lib/mapProduct'
+import { formatMoneyInput } from '@/lib/money'
 import { BRAND } from '@/lib/constants'
 import { PATHS } from '@/router/paths'
 import { toastError, toastSuccess, toastInfo } from '@/lib/toast'
@@ -185,14 +186,8 @@ export function EditItemPage() {
         productKind: kind,
         sku: product.itemCode || '',
         barcode: product.barcode || '',
-        purchasePrice:
-          product.purchasePrice === 0 || product.purchasePrice
-            ? String(product.purchasePrice)
-            : '',
-        sellingPrice:
-          product.sellingPrice === 0 || product.sellingPrice
-            ? String(product.sellingPrice)
-            : '',
+        purchasePrice: formatMoneyInput(product.purchasePrice),
+        sellingPrice: formatMoneyInput(product.sellingPrice),
         openingStock: String(product.quantity ?? 0),
         lowStockThreshold:
           product.reorderPoint === 0 || product.reorderPoint

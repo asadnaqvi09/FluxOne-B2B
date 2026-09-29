@@ -59,14 +59,20 @@ const variantPartSchema = z.object({
   isCustomValue: optionalBool,
 })
 
+// Money = non-negative, rounded to 2dp (matches products.purchase_price NUMERIC(12,2))
+const moneyField = z.coerce
+  .number()
+  .nonnegative()
+  .transform((n) => Math.round(n * 100) / 100)
+
 const variantSkuSchema = z.object({
   label: z.string().min(1),
   itemCode: z.string().min(1).optional(),
   sku: z.string().min(1).optional(),
   // Optional — server generates when omitted (same as single-item create)
   barcode: z.string().min(1).optional(),
-  purchasePrice: z.coerce.number().int().nonnegative(),
-  sellingPrice: z.coerce.number().int().nonnegative(),
+  purchasePrice: moneyField,
+  sellingPrice: moneyField,
   quantity: z.coerce.number().int().nonnegative().optional().default(0),
   reorderPoint: z.coerce.number().int().nonnegative().optional(),
   dailyPriceChange: optionalBool,
@@ -92,24 +98,24 @@ export const createProductSchema = z
       itemCode: z.string().min(1).optional(),
       sku: z.string().min(1).optional(),
       barcode: z.string().min(1).optional(),
-      purchasePrice: z.coerce.number().int().nonnegative().optional(),
-      sellingPrice: z.coerce.number().int().nonnegative().optional(),
+      purchasePrice: moneyField.optional(),
+      sellingPrice: moneyField.optional(),
       taxIds: z.array(looseUuid).optional(),
       // Optional; omit → server uses tenants.default_profit_percent
-      profitPercent: z.coerce.number().int().min(0).max(100).optional(),
+      profitPercent: z.number().min(0).max(100).optional(),
       offerId: optionalLooseUuid,
-      discountPercent: z.coerce.number().int().min(0).max(100).optional(),
+      discountPercent: z.number().min(0).max(100).optional(),
       confirmed: z.coerce.boolean().optional(),
       // Opening stock (single) or finished bundle count
-      quantity: z.coerce.number().int().nonnegative().optional(),
+      quantity: z.number().nonnegative().optional(),
       status: z.enum([PRODUCT_STATUS.ACTIVE, PRODUCT_STATUS.INACTIVE]).optional(),
-      reorderPoint: z.coerce.number().int().nonnegative().optional(),
+      reorderPoint: z.number().nonnegative().optional(),
       dailyPriceChange: optionalBool,
       bundleItems: z
         .array(
           z.object({
             itemId: looseUuid,
-            quantity: z.coerce.number().int().positive(),
+            quantity: z.number().positive(),
           }),
         )
         .optional(),
@@ -255,8 +261,8 @@ const variantSkuUpdateSchema = z.object({
   sku: z.string().min(1).optional(),
   // Optional for new child SKUs — server generates when omitted
   barcode: z.string().min(1).optional(),
-  purchasePrice: z.coerce.number().int().nonnegative(),
-  sellingPrice: z.coerce.number().int().nonnegative(),
+  purchasePrice: moneyField,
+  sellingPrice: moneyField,
   // Opening stock only for NEW child SKUs (existing stock via Control)
   quantity: z.coerce.number().int().nonnegative().optional(),
   reorderPoint: z.coerce.number().int().nonnegative().optional(),
@@ -283,8 +289,8 @@ export const updateProductSchema = z
           if (value === 'close') return PRODUCT_STATUS.INACTIVE
           return value
         }),
-      sellingPrice: z.coerce.number().int().nonnegative().optional(),
-      purchasePrice: z.coerce.number().int().nonnegative().optional(),
+      sellingPrice: moneyField.optional(),
+      purchasePrice: moneyField.optional(),
       itemCode: z.string().min(1).optional(),
       sku: z.string().min(1).optional(),
       barcode: z.string().min(1).optional(),

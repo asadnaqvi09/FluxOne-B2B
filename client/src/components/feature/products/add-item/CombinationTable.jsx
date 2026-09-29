@@ -3,6 +3,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { WholeNumberInput } from '@/components/shared/WholeNumberInput'
+import { MoneyInput } from '@/components/shared/MoneyInput'
 import { BRAND } from '@/lib/constants'
 import { cn } from '@/lib/utils'
 
@@ -83,7 +84,7 @@ export function CombinationTable({
         </p>
         <div className="space-y-1">
           <Label className="text-[11px] text-slate-500">Purchase</Label>
-          <WholeNumberInput
+          <MoneyInput
             min={0}
             value={bulk.purchasePrice}
             onChange={(e) => patchBulk('purchasePrice', e.target.value)}
@@ -92,7 +93,7 @@ export function CombinationTable({
         </div>
         <div className="space-y-1">
           <Label className="text-[11px] text-slate-500">Selling</Label>
-          <WholeNumberInput
+          <MoneyInput
             min={0}
             value={bulk.sellingPrice}
             onChange={(e) => patchBulk('sellingPrice', e.target.value)}
@@ -224,7 +225,7 @@ export function CombinationTable({
                     )}
                   </td>
                   <td className="px-3 py-2">
-                    <WholeNumberInput
+                    <MoneyInput
                       min={0}
                       value={row.purchasePrice}
                       disabled={inactive}
@@ -233,7 +234,7 @@ export function CombinationTable({
                     />
                   </td>
                   <td className="px-3 py-2">
-                    <WholeNumberInput
+                    <MoneyInput
                       min={0}
                       value={row.sellingPrice}
                       disabled={inactive}
@@ -350,7 +351,7 @@ export function NormalProductFields({ form, patch, stockMode = 'create' }) {
       </div>
       <div className="space-y-1.5">
         <Label htmlFor="normal-purchase">Purchase price</Label>
-        <WholeNumberInput
+        <MoneyInput
           id="normal-purchase"
           min={0}
           value={form.purchasePrice}
@@ -359,7 +360,7 @@ export function NormalProductFields({ form, patch, stockMode = 'create' }) {
       </div>
       <div className="space-y-1.5">
         <Label htmlFor="normal-selling">Selling price</Label>
-        <WholeNumberInput
+        <MoneyInput
           id="normal-selling"
           min={0}
           value={form.sellingPrice}

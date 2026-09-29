@@ -1362,6 +1362,9 @@ async function syncVariantChildrenInTx(client, tenantId, parent, payload, { bran
   const effectiveBranchId = parent.branchId || branchId
   const parentName = payload.name || parent.name
   const parentScale = payload.scale || parent.scale || 'unit'
+  // Variants share one product image (no per-SKU upload) — prefer patch, else parent
+  const parentImageUrl =
+    payload.imageUrl !== undefined ? payload.imageUrl || null : parent.imageUrl || null
   const creationBatchId = parent.creationBatchId || crypto.randomUUID()
   const createdAt = new Date().toISOString()
 
@@ -1431,6 +1434,7 @@ async function syncVariantChildrenInTx(client, tenantId, parent, payload, { bran
             variant_label = $11,
             category_id = $12,
             subcategory_id = $13,
+            image_url = $14,
             updated_at = now()
           WHERE tenant_id = $1 AND id = $2
         `,
@@ -1447,6 +1451,7 @@ async function syncVariantChildrenInTx(client, tenantId, parent, payload, { bran
           label,
           categoryId,
           subcategoryId,
+          parentImageUrl,
         ],
       )
 
@@ -1477,7 +1482,7 @@ async function syncVariantChildrenInTx(client, tenantId, parent, payload, { bran
         type: PRODUCT_TYPES.SINGLE,
         itemCode,
         name: parentName,
-        imageUrl: payload.imageUrl || parent.imageUrl || null,
+        imageUrl: parentImageUrl,
         scale: parentScale,
         barcode,
         description: payload.description !== undefined ? payload.description : parent.description,
@@ -1757,6 +1762,24 @@ export async function updateProduct(tenantId, id, payload, { branchId = null } =
             [id, payload.name],
           )
         }
+      }
+
+      // Keep child images in sync when parent image is updated
+      // (variants have no per-SKU image field — children inherit parent image)
+      if (
+        existing.type === PRODUCT_TYPES.VARIANT &&
+        payload.imageUrl !== undefined
+      ) {
+        await tenantClientQuery(
+          client,
+          tenantId,
+          `
+            UPDATE products
+            SET image_url = $3, updated_at = now()
+            WHERE tenant_id = $1 AND parent_id = $2
+          `,
+          [id, payload.imageUrl || null],
+        )
       }
 
       return product

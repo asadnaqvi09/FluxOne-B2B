@@ -17,6 +17,7 @@ export const listTaxProfitQuerySchema = z.object({
   params: empty,
   query: paginationQuery.extend({
     q: optionalString,
+    branchId: optionalUuid,
     categoryId: optionalUuid,
     subcategoryId: optionalUuid,
     productId: optionalUuid,

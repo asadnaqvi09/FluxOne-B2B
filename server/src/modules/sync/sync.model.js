@@ -1103,7 +1103,11 @@ async function fetchBootstrapProducts(tenantId, branchId, since = null) {
         COALESCE(p.price_currency, 'PKR') AS "priceCurrency",
         p.discount_percent AS "discountPercent",
         p.status,
-        p.image_url AS "imageUrl",
+        -- POS: variant SKUs inherit parent product image when child has none
+        COALESCE(
+          NULLIF(trim(p.image_url), ''),
+          NULLIF(trim(parent.image_url), '')
+        ) AS "imageUrl",
         p.description,
         p.category_id AS "categoryId",
         p.subcategory_id AS "subcategoryId",
@@ -1111,6 +1115,8 @@ async function fetchBootstrapProducts(tenantId, branchId, since = null) {
         p.offer_id AS "offerId",
         p.updated_at AS "updatedAt"
       FROM products p
+      LEFT JOIN products parent
+        ON parent.id = p.parent_id AND parent.tenant_id = p.tenant_id
       WHERE p.tenant_id = $1
         AND p.branch_id = $2
         AND (

@@ -5,6 +5,7 @@ import { endpoints } from '@/api/endpoints'
 export const ADMIN_TAX_PROFIT_PAGE_SIZE = 8
 
 const EMPTY_META = {
+  branches: [],
   categories: [],
   products: [],
   scales: [],
@@ -18,6 +19,7 @@ const EMPTY_META = {
 // Live B2B Admin Tax & Profit (/api/admin/tax-profit).
 export function useAdminTaxProfit({
   q = '',
+  branchId = '',
   categoryId = '',
   subcategoryId = '',
   productId = '',
@@ -48,6 +50,7 @@ export function useAdminTaxProfit({
       return result
     }
     setMeta({
+      branches: result.data?.branches || [],
       categories: result.data?.categories || [],
       products: result.data?.products || [],
       scales: result.data?.scales || [],
@@ -66,6 +69,7 @@ export function useAdminTaxProfit({
     setError(null)
     const result = await apiClient.get(endpoints.admin.taxProfit.products, {
       q: q?.trim() || undefined,
+      branchId: branchId || undefined,
       categoryId: categoryId || undefined,
       subcategoryId: subcategoryId || undefined,
       productId: productId || undefined,
@@ -92,7 +96,7 @@ export function useAdminTaxProfit({
     )
     setLoading(false)
     return result
-  }, [q, categoryId, subcategoryId, productId, variantId, sort, page, limit])
+  }, [q, branchId, categoryId, subcategoryId, productId, variantId, sort, page, limit])
 
   useEffect(() => {
     void loadMeta()
@@ -157,6 +161,7 @@ export function useAdminTaxProfit({
     async ({ limit: exportLimit = 200 } = {}) => {
       const result = await apiClient.get(endpoints.admin.taxProfit.products, {
         q: q?.trim() || undefined,
+        branchId: branchId || undefined,
         categoryId: categoryId || undefined,
         subcategoryId: subcategoryId || undefined,
         productId: productId || undefined,
@@ -168,7 +173,7 @@ export function useAdminTaxProfit({
       if (!result.success) return result
       return { success: true, data: result.data?.items || [] }
     },
-    [q, categoryId, subcategoryId, productId, variantId, sort],
+    [q, branchId, categoryId, subcategoryId, productId, variantId, sort],
   )
 
   return {

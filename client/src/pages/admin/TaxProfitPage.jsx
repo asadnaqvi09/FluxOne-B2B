@@ -48,7 +48,7 @@ import {
   Loader2,
   PackageOpen,
   Settings,
-  FileText,
+  RotateCcw,
 } from 'lucide-react'
 
 const COLUMN_LABELS = {
@@ -68,6 +68,7 @@ export function TaxProfitPage() {
   const [selectedIds, setSelectedIds] = useState([])
   const [searchQuery, setSearchQuery] = useState('')
   const debouncedQ = useDebouncedValue(searchQuery.trim(), 300)
+  const [selectedBranchId, setSelectedBranchId] = useState('')
   const [selectedCategoryId, setSelectedCategoryId] = useState('')
   const [selectedSubcategoryId, setSelectedSubcategoryId] = useState('')
   const [selectedProductId, setSelectedProductId] = useState('')
@@ -105,6 +106,7 @@ export function TaxProfitPage() {
     setSelectedIds([])
   }, [
     debouncedQ,
+    selectedBranchId,
     selectedCategoryId,
     selectedSubcategoryId,
     selectedProductId,
@@ -125,6 +127,7 @@ export function TaxProfitPage() {
     fetchExportRows,
   } = useAdminTaxProfit({
     q: debouncedQ,
+    branchId: selectedBranchId,
     categoryId: selectedCategoryId,
     subcategoryId: selectedSubcategoryId,
     productId: selectedProductId,
@@ -144,29 +147,44 @@ export function TaxProfitPage() {
 
   const slowHint = useSlowLoadingHint(loading)
   const totalCatalog = pagination.total || 0
-  const hasFilters =
-    Boolean(debouncedQ) ||
+  // Table filter bar — Clear Filters only when any table filter is active
+  const hasTableFilters =
+    Boolean(searchQuery.trim()) ||
+    Boolean(selectedBranchId) ||
     Boolean(selectedCategoryId) ||
     Boolean(selectedSubcategoryId) ||
     Boolean(selectedProductId) ||
-    Boolean(selectedVariantId) ||
-    presetFilter !== 'all'
+    Boolean(selectedVariantId)
+  const hasFilters = hasTableFilters || presetFilter !== 'all'
+
+  const selectClass =
+    'h-10 w-full min-w-[8.5rem] rounded-xl border-border bg-white text-xs font-medium text-slate-800 sm:w-40'
+
+  // Categories are per-branch — when a branch is selected, only show that branch's categories
+  const categoryOptions = useMemo(() => {
+    const list = meta.categories || []
+    if (!selectedBranchId) return list
+    return list.filter((c) => c.branchId === selectedBranchId)
+  }, [meta.categories, selectedBranchId])
 
   const subcategoryOptions = useMemo(() => {
     if (!selectedCategoryId) return []
-    const parent = meta.categories.find((c) => c.id === selectedCategoryId)
-    return parent?.children || []
-  }, [meta.categories, selectedCategoryId])
+    const parent = categoryOptions.find((c) => c.id === selectedCategoryId)
+    const children = parent?.children || []
+    if (!selectedBranchId) return children
+    return children.filter((s) => !s.branchId || s.branchId === selectedBranchId)
+  }, [categoryOptions, selectedCategoryId, selectedBranchId])
 
-  // Product filter options scoped by category / subcategory
+  // Product filter options scoped by branch / category / subcategory
   const productOptions = useMemo(() => {
     const list = meta.products || []
     return list.filter((p) => {
+      if (selectedBranchId && p.branchId !== selectedBranchId) return false
       if (selectedCategoryId && p.categoryId !== selectedCategoryId) return false
       if (selectedSubcategoryId && p.subcategoryId !== selectedSubcategoryId) return false
       return true
     })
-  }, [meta.products, selectedCategoryId, selectedSubcategoryId])
+  }, [meta.products, selectedBranchId, selectedCategoryId, selectedSubcategoryId])
 
   const selectedProduct = useMemo(
     () => productOptions.find((p) => p.id === selectedProductId) || null,
@@ -176,6 +194,36 @@ export function TaxProfitPage() {
   // Variant filter only when the selected product has combinations
   const variantOptions = selectedProduct?.variants?.length ? selectedProduct.variants : []
   const showVariantFilter = variantOptions.length > 0
+
+  function handleClearTableFilters() {
+    setSearchQuery('')
+    setSelectedBranchId('')
+    setSelectedCategoryId('')
+    setSelectedSubcategoryId('')
+    setSelectedProductId('')
+    setSelectedVariantId('')
+  }
+
+  // Drop category/subcategory when they fall outside the selected branch
+  useEffect(() => {
+    if (selectedCategoryId && !categoryOptions.some((c) => c.id === selectedCategoryId)) {
+      setSelectedCategoryId('')
+      setSelectedSubcategoryId('')
+      setSelectedProductId('')
+      setSelectedVariantId('')
+    }
+  }, [categoryOptions, selectedCategoryId])
+
+  useEffect(() => {
+    if (
+      selectedSubcategoryId &&
+      !subcategoryOptions.some((s) => s.id === selectedSubcategoryId)
+    ) {
+      setSelectedSubcategoryId('')
+      setSelectedProductId('')
+      setSelectedVariantId('')
+    }
+  }, [subcategoryOptions, selectedSubcategoryId])
 
   // Clear product/variant when they fall out of scoped options
   useEffect(() => {
@@ -366,7 +414,6 @@ export function TaxProfitPage() {
                 disabled={exporting || loading}
                 label="Export"
                 title="Export pricing catalog to CSV"
-                className="h-10 px-3"
               />
               <Button
                 type="button"
@@ -427,115 +474,146 @@ export function TaxProfitPage() {
       </MotionReveal>
 
       <MotionReveal delay={0.1}>
-        <div className="flex flex-col gap-3 rounded-2xl border border-border bg-white p-4 shadow-2xs">
-          {/* Search → Category → Subcategory → Product → Variant (if any) → Columns */}
-          <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-12">
-            <div className="relative sm:col-span-6 lg:col-span-3">
-              <Search className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-slate-400" />
+        <div className="rounded-2xl border border-border bg-white p-3 shadow-2xs sm:p-4">
+          {/* Search → Branches → Category → Subcategory → Product → Variant → Clear → Columns */}
+          <div className="flex flex-wrap items-center gap-2">
+            <div className="relative min-w-[14rem] flex-1 basis-[16rem]">
+              <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-slate-400" />
               <input
                 type="text"
                 placeholder="Search by SKU, name, or barcode..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                className="h-10 w-full rounded-xl border border-border bg-slate-50/70 py-2 pl-9 pr-4 text-xs sm:text-sm text-slate-900 outline-none focus:border-purple-300 focus:bg-white focus:ring-1 focus:ring-purple-300"
+                className="h-10 w-full rounded-xl border border-border bg-white py-2 pl-9 pr-4 text-xs text-slate-900 outline-none focus:border-purple-300 focus:ring-1 focus:ring-purple-300 sm:text-sm"
               />
             </div>
 
-            <div className="sm:col-span-3 lg:col-span-2">
-              <NativeSelect
-                value={selectedCategoryId}
-                onChange={(e) => {
-                  setSelectedCategoryId(e.target.value)
-                  setSelectedSubcategoryId('')
-                  setSelectedProductId('')
-                  setSelectedVariantId('')
-                }}
-                className="h-10 w-full rounded-xl border-border bg-slate-50 text-xs font-medium"
-              >
-                <option value="">All Categories</option>
-                {meta.categories.map((c) => (
-                  <option key={c.id} value={c.id}>
-                    {c.name}
-                  </option>
-                ))}
-              </NativeSelect>
-            </div>
+            <NativeSelect
+              value={selectedBranchId}
+              onChange={(e) => {
+                setSelectedBranchId(e.target.value)
+                // Categories are branch-scoped — reset dependent filters
+                setSelectedCategoryId('')
+                setSelectedSubcategoryId('')
+                setSelectedProductId('')
+                setSelectedVariantId('')
+              }}
+              className={selectClass}
+              aria-label="Filter by branch"
+            >
+              <option value="">All Branches</option>
+              {(meta.branches || []).map((b) => (
+                <option key={b.id} value={b.id}>
+                  {b.name}
+                </option>
+              ))}
+            </NativeSelect>
 
-            <div className="sm:col-span-3 lg:col-span-2">
-              <NativeSelect
-                value={selectedSubcategoryId}
-                onChange={(e) => {
-                  setSelectedSubcategoryId(e.target.value)
-                  setSelectedProductId('')
-                  setSelectedVariantId('')
-                }}
-                disabled={!selectedCategoryId || subcategoryOptions.length === 0}
-                className="h-10 w-full rounded-xl border-border bg-slate-50 text-xs font-medium"
-              >
-                <option value="">All Subcategories</option>
-                {subcategoryOptions.map((s) => (
-                  <option key={s.id} value={s.id}>
-                    {s.name}
-                  </option>
-                ))}
-              </NativeSelect>
-            </div>
+            <NativeSelect
+              value={selectedCategoryId}
+              onChange={(e) => {
+                setSelectedCategoryId(e.target.value)
+                setSelectedSubcategoryId('')
+                setSelectedProductId('')
+                setSelectedVariantId('')
+              }}
+              className={selectClass}
+              aria-label="Filter by category"
+            >
+              <option value="">All Categories</option>
+              {categoryOptions.map((c) => (
+                <option key={c.id} value={c.id}>
+                  {c.name}
+                </option>
+              ))}
+            </NativeSelect>
 
-            <div className="sm:col-span-3 lg:col-span-2">
-              <NativeSelect
-                value={selectedProductId}
-                onChange={(e) => {
-                  setSelectedProductId(e.target.value)
-                  setSelectedVariantId('')
-                }}
-                className="h-10 w-full rounded-xl border-border bg-slate-50 text-xs font-medium"
-              >
-                <option value="">All Products</option>
-                {productOptions.map((p) => (
-                  <option key={p.id} value={p.id}>
-                    {p.name}
-                  </option>
-                ))}
-              </NativeSelect>
-            </div>
+            <NativeSelect
+              value={selectedSubcategoryId}
+              onChange={(e) => {
+                setSelectedSubcategoryId(e.target.value)
+                setSelectedProductId('')
+                setSelectedVariantId('')
+              }}
+              disabled={!selectedCategoryId || subcategoryOptions.length === 0}
+              className={selectClass}
+              aria-label="Filter by subcategory"
+            >
+              <option value="">All Subcategories</option>
+              {subcategoryOptions.map((s) => (
+                <option key={s.id} value={s.id}>
+                  {s.name}
+                </option>
+              ))}
+            </NativeSelect>
+
+            <NativeSelect
+              value={selectedProductId}
+              onChange={(e) => {
+                setSelectedProductId(e.target.value)
+                setSelectedVariantId('')
+              }}
+              className={selectClass}
+              aria-label="Filter by product"
+            >
+              <option value="">All Products</option>
+              {productOptions.map((p) => (
+                <option key={p.id} value={p.id}>
+                  {p.name}
+                </option>
+              ))}
+            </NativeSelect>
 
             {showVariantFilter ? (
-              <div className="sm:col-span-3 lg:col-span-2">
-                <NativeSelect
-                  value={selectedVariantId}
-                  onChange={(e) => setSelectedVariantId(e.target.value)}
-                  className="h-10 w-full rounded-xl border-border bg-slate-50 text-xs font-medium"
-                >
-                  <option value="">All Variants</option>
-                  {variantOptions.map((v) => (
-                    <option key={v.id} value={v.id}>
-                      {v.label}
-                    </option>
-                  ))}
-                </NativeSelect>
-              </div>
+              <NativeSelect
+                value={selectedVariantId}
+                onChange={(e) => setSelectedVariantId(e.target.value)}
+                className={selectClass}
+                aria-label="Filter by variant"
+              >
+                <option value="">All Variants</option>
+                {variantOptions.map((v) => (
+                  <option key={v.id} value={v.id}>
+                    {v.label}
+                  </option>
+                ))}
+              </NativeSelect>
             ) : null}
 
-            <div className={`relative sm:col-span-12 ${showVariantFilter ? 'lg:col-span-1' : 'lg:col-span-3'}`}>
+            {hasTableFilters ? (
+              <button
+                type="button"
+                onClick={handleClearTableFilters}
+                className="inline-flex h-10 shrink-0 items-center gap-1.5 rounded-xl px-2.5 text-sm font-semibold cursor-pointer transition-opacity hover:opacity-80"
+                style={{ color: BRAND.purple }}
+              >
+                <RotateCcw className="size-4" />
+                Clear Filters
+              </button>
+            ) : null}
+
+            <div className="hidden h-8 w-px shrink-0 bg-slate-200 sm:block" aria-hidden />
+
+            <div className="relative shrink-0">
               <Button
                 type="button"
                 variant="outline"
                 onClick={() => setColMenuOpen(!colMenuOpen)}
-                className="h-10 w-full rounded-xl border-border text-xs cursor-pointer gap-1.5 font-semibold text-slate-700 hover:bg-slate-50"
+                className="h-10 cursor-pointer gap-1.5 rounded-xl border-border px-3 text-xs font-semibold text-slate-700 hover:bg-slate-50"
               >
-                <Columns className="size-3.5 text-slate-500" />
+                <Columns className="size-4 text-slate-500" />
                 <span>Columns</span>
               </Button>
 
               {colMenuOpen && (
-                <div className="absolute right-0 top-12 z-50 w-56 rounded-xl border border-border bg-white p-3 shadow-xl space-y-1.5 text-xs">
-                  <span className="font-bold text-slate-700 block pb-1 border-b border-slate-100 text-[11px] uppercase tracking-wider">
+                <div className="absolute right-0 top-12 z-50 w-56 space-y-1.5 rounded-xl border border-border bg-white p-3 text-xs shadow-xl">
+                  <span className="block border-b border-slate-100 pb-1 text-[11px] font-bold tracking-wider text-slate-700 uppercase">
                     Toggle Table Columns
                   </span>
                   {Object.keys(visibleColumns).map((colKey) => (
                     <label
                       key={colKey}
-                      className="flex items-center gap-2 px-1.5 py-1 hover:bg-slate-50 rounded-lg cursor-pointer font-medium text-slate-700"
+                      className="flex cursor-pointer items-center gap-2 rounded-lg px-1.5 py-1 font-medium text-slate-700 hover:bg-slate-50"
                     >
                       <input
                         type="checkbox"
@@ -832,7 +910,7 @@ export function TaxProfitPage() {
                           {visibleColumns.taxPct && (
                             <TableCell className="px-3 py-3">
                               <span className="inline-flex items-center rounded border border-blue-200 bg-blue-50 px-2 py-0.5 text-xs font-bold text-blue-700">
-                                {p.taxPct > 0 ? `${p.taxPct}%` : '0% (Exempt)'}
+                                {p.taxPct > 0 ? `${p.taxPct}%` : '0%'}
                               </span>
                             </TableCell>
                           )}

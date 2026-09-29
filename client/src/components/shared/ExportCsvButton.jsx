@@ -1,16 +1,24 @@
-import { FileSpreadsheet } from 'lucide-react'
+import { FileSpreadsheet, FileText } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
 
-// Reusable Export (CSV / Excel) action — wire onClick per page
+// Shared Export action (CSV / Excel / PDF) — use across B2B, IM, BM for consistent size
 export function ExportCsvButton({
   onClick,
   disabled = false,
   label = 'Export',
-  title = 'Export data to Excel / CSV',
+  title,
+  // csv | excel | pdf — icon + default title
+  format = 'csv',
   className,
-  size = 'sm',
+  size = 'default',
 }) {
+  const isPdf = format === 'pdf'
+  const Icon = isPdf ? FileText : FileSpreadsheet
+  const resolvedTitle =
+    title ||
+    (isPdf ? 'Export data to PDF' : 'Export data to Excel / CSV')
+
   return (
     <Button
       type="button"
@@ -18,13 +26,22 @@ export function ExportCsvButton({
       size={size}
       onClick={onClick}
       disabled={disabled}
-      title={title}
+      title={resolvedTitle}
       className={cn(
-        'h-8 cursor-pointer text-xs font-semibold border-slate-200 text-slate-700 hover:bg-slate-50 hover:text-slate-900 shadow-2xs',
+        // Consistent larger control — matches primary header actions
+        'h-10 cursor-pointer gap-2 rounded-xl px-4 text-sm font-semibold',
+        'border-slate-200 text-slate-700 shadow-2xs',
+        'hover:bg-slate-50 hover:text-slate-900',
+        'disabled:opacity-50',
         className,
       )}
     >
-      <FileSpreadsheet className="mr-1.5 size-3.5 text-emerald-600" />
+      <Icon
+        className={cn(
+          'size-4 shrink-0',
+          isPdf ? 'text-purple-600' : 'text-emerald-600',
+        )}
+      />
       {label}
     </Button>
   )

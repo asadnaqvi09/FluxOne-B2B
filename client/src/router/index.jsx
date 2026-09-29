@@ -133,7 +133,7 @@ const router = createBrowserRouter([
               // Phase 2 — restore when Reports module ships
               // { path: 'reports', element: <ReportsPage /> },
               { path: 'resources', element: <ResourcesPage /> },
-              { path: 'discounts', element: <DiscountsPage /> },
+              // { path: 'discounts', element: <DiscountsPage /> },
               { path: 'logs', element: <ActivityLogsPage /> },
               { path: 'notifications', element: <NotificationsPage /> },
               { path: 'profile', element: <ProfilePage /> },

@@ -850,7 +850,7 @@ export function SettingsPage() {
                             <TableHead className="hidden px-4 py-3 font-medium lg:table-cell">
                               Assigned Employee
                             </TableHead>
-                            <TableHead className="px-4 py-3 font-medium">Status & Activity</TableHead>
+                            <TableHead className="px-4 py-3 font-medium">Status</TableHead>
                             <TableHead className="sticky right-0 z-[1] bg-slate-200/80 px-4 py-3 text-right font-medium">
                               Action
                             </TableHead>
@@ -912,10 +912,10 @@ export function SettingsPage() {
                                     >
                                       {isActive ? 'Active' : 'Blocked'}
                                     </Badge>
-                                    <span className="inline-flex items-center gap-1 text-[11px] font-medium text-slate-500">
+                                    {/* <span className="inline-flex items-center gap-1 text-[11px] font-medium text-slate-500">
                                       <Clock className="size-3 text-slate-400" />
                                       {formatLastActive(sys.lastActiveAt)}
-                                    </span>
+                                    </span> */}
                                   </div>
                                 </TableCell>
 

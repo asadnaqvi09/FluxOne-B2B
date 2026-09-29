@@ -14,6 +14,7 @@ import { useAuthSession } from '@/hooks/useAuthSession'
 
 export function DashboardPage() {
   const { user } = useAuthSession()
+  // Page-header filters — drive full dashboard (KPIs, Branch Overview, Inventory)
   const [date, setDate] = useState(new Date().toISOString().split('T')[0])
   const [selectedBranch, setSelectedBranch] = useState('all')
 
@@ -25,6 +26,12 @@ export function DashboardPage() {
     branchProfitOverview,
     branchInventoryStatus,
   } = useAdminDashboard({ date, branchId: selectedBranch })
+
+  // Resolve label for Branch Overview description when a single branch is selected
+  const selectedBranchName =
+    selectedBranch === 'all'
+      ? null
+      : branches.find((b) => b.id === selectedBranch)?.name || null
 
   const slowHint = useSlowLoadingHint(loading)
 
@@ -93,7 +100,12 @@ export function DashboardPage() {
           {loading && !branchProfitOverview ? (
             <div className="h-96 animate-pulse rounded-2xl border border-slate-200 bg-white" />
           ) : (
-            <BranchProfitOverviewChart data={branchProfitOverview || {}} />
+            // Branch Overview uses page-header Branch + Date (API-scoped net profit)
+            <BranchProfitOverviewChart
+              data={branchProfitOverview || {}}
+              branchId={selectedBranch}
+              branchName={selectedBranchName}
+            />
           )}
         </MotionReveal>
 

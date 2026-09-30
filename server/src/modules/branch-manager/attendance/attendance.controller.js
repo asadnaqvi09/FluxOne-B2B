@@ -1,8 +1,10 @@
 import { listAttendance, upsertAttendance } from './attendance.model.js'
+import { resolveListBranchId } from '../staff/staff.access.js'
 import { success } from '../../../utils/response.util.js'
 
 export async function attendanceList(req, res) {
-  const rows = await listAttendance(req.tenantId)
+  const branchId = resolveListBranchId(req, req.validated.query?.branchId)
+  const rows = await listAttendance(req.tenantId, { branchId })
   return success(res, rows)
 }
 

@@ -32,7 +32,11 @@ export async function listSales(tenantId, filters = {}) {
     LEFT JOIN products p ON p.id = si.product_id AND p.tenant_id = si.tenant_id
     WHERE s.tenant_id = $1
   `
-  const params = []  // tenantId mat daalo — tenantQuery khud add karega
+  const params = []
+  if (filters.branchId) {
+    params.push(filters.branchId)
+    query += ` AND s.branch_id = $${params.length + 1}`
+  }
   if (filters.q) {
     params.push(`%${filters.q.trim()}%`)
     const idx = params.length + 1  // +1 kyunki $1 hamesha tenant_id hai
@@ -58,16 +62,17 @@ export async function listSales(tenantId, filters = {}) {
   return rows
 }
 
-export async function refundSale(tenantId, saleId) {
+export async function refundSale(tenantId, saleId, { branchId = null } = {}) {
   const { rows } = await tenantQuery(
     tenantId,
     `
       UPDATE sales
       SET status = 'refunded', return_amount = final_amount
       WHERE tenant_id = $1 AND id = $2 AND status != 'refunded'
+        AND ($3::uuid IS NULL OR branch_id = $3)
       RETURNING id, status, final_amount AS "refundedAmount"
     `,
-    [saleId],
+    [saleId, branchId],
   )
   return rows[0]
 }

@@ -17,6 +17,23 @@ function mapOffer(row) {
   }
 }
 
+export async function assertCategoryInBranch(tenantId, categoryId, branchId) {
+  if (!categoryId || !branchId) return
+  const { rows } = await tenantQuery(
+    tenantId,
+    `
+      SELECT id
+      FROM categories
+      WHERE tenant_id = $1 AND id = $2 AND branch_id = $3 AND is_active = true
+      LIMIT 1
+    `,
+    [categoryId, branchId],
+  )
+  if (!rows[0]) {
+    throw httpError(422, 'Category not found for this branch')
+  }
+}
+
 export async function createOffer(tenantId, { name, percent, categoryId }) {
   const { rows } = await tenantQuery(
     tenantId,

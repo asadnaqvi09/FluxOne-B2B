@@ -1,12 +1,15 @@
 import { listSales, refundSale } from './sales.model.js'
+import { resolveListBranchId } from '../staff/staff.access.js'
 import { success, fail, failFromError } from '../../../utils/response.util.js'
 
 export async function salesList(req, res) {
   try {
+    const branchId = resolveListBranchId(req, req.validated.query.branchId)
     const filters = {
       q: req.validated.query.q,
       date: req.validated.query.date,
       category_id: req.validated.query.categoryId,
+      branchId,
     }
     const rows = await listSales(req.tenantId, filters)
 
@@ -31,7 +34,8 @@ export async function salesList(req, res) {
 export async function processRefund(req, res) {
   const { id } = req.validated.params
   try {
-    const row = await refundSale(req.tenantId, id)
+    const branchId = resolveListBranchId(req, req.validated.query?.branchId)
+    const row = await refundSale(req.tenantId, id, { branchId })
     if (!row) {
       return fail(res, 'Sale record not found or already refunded', 404)
     }

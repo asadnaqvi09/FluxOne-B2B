@@ -15,7 +15,7 @@ export async function upsertAttendance(tenantId, payload) {
   return rows[0]
 }
 
-export async function listAttendance(tenantId) {
+export async function listAttendance(tenantId, { branchId = null } = {}) {
   const { rows } = await tenantQuery(
     tenantId,
     `
@@ -23,8 +23,10 @@ export async function listAttendance(tenantId) {
       FROM attendance a
       JOIN staff s ON s.id = a.staff_id AND s.tenant_id = a.tenant_id
       WHERE a.tenant_id = $1
+        AND ($2::uuid IS NULL OR s.branch_id = $2)
       ORDER BY a.work_date DESC
     `,
+    [branchId],
   )
   return rows
 }

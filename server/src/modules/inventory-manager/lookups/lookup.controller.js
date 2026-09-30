@@ -32,8 +32,7 @@ export async function branchInventory(req, res) {
     const { tenantId, branchId } = resolveInventoryScope(req)
     const result = await listBranchInventory(tenantId, {
       ...req.validated.query,
-      // Branch scope: IM JWT wins over query branchId
-      branchId: branchId || req.validated.query?.branchId || null,
+      branchId,
     })
     return success(res, paginatedResult(result.items, result))
   } catch (err) {

@@ -10,12 +10,11 @@ import {
 } from './dashboard.model.js'
 import { success } from '../../../utils/response.util.js'
 import { paginatedResult } from '../../../utils/pagination.util.js'
+import { resolveListBranchId } from '../staff/staff.access.js'
 
 function withBranchScope(req) {
   const query = { ...req.validated.query }
-  if (!query.branchId && req.user.branchId) {
-    query.branchId = req.user.branchId
-  }
+  query.branchId = resolveListBranchId(req, query.branchId)
   return query
 }
 

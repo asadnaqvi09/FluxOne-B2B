@@ -1,4 +1,5 @@
 import { ROLES } from '../../../config/constants.js'
+import { isTenantWideAdmin, resolveTenantBranchScope } from '../../../utils/branchScope.util.js'
 
 function httpError(status, message) {
   const error = new Error(message)
@@ -27,39 +28,17 @@ export const STAFF_ROLE_TO_DESIGNATION = {
   [ROLES.WEBSITE_MANAGER]: 'Website Manager',
 }
 
-// Branch Managers are locked to their JWT branch.
-// B2B Admins may pass an explicit branchId (required when creating staff).
+// Branch roles use JWT branch on writes. B2B admin may pass body.branchId.
 export function resolveScopedBranchId(req, bodyBranchId) {
-  const role = req.user?.role
-  const tokenBranchId = req.user?.branchId || null
-
-  if (role === ROLES.BRANCH_MANAGER) {
-    if (!tokenBranchId) {
-      throw httpError(403, 'Branch Manager account is not assigned to a branch')
-    }
-    return tokenBranchId
-  }
-
-  if (role === ROLES.B2B_ADMIN) {
+  if (isTenantWideAdmin(req.user?.role)) {
     return bodyBranchId || null
   }
-
-  return bodyBranchId || tokenBranchId || null
+  return resolveTenantBranchScope(req).branchId
 }
 
-// List/filter branch scope — BM always forced to own branch.
+// List/filter branch scope — branch roles locked to JWT; B2B admin may filter or see all.
 export function resolveListBranchId(req, queryBranchId) {
-  const role = req.user?.role
-  const tokenBranchId = req.user?.branchId || null
-
-  if (role === ROLES.BRANCH_MANAGER) {
-    if (!tokenBranchId) {
-      throw httpError(403, 'Branch Manager account is not assigned to a branch')
-    }
-    return tokenBranchId
-  }
-
-  return queryBranchId || null
+  return resolveTenantBranchScope(req, queryBranchId || null).branchId
 }
 
 // Ensures a staff row is visible/editable for the caller.
@@ -69,10 +48,10 @@ export function assertStaffBranchAccess(req, staffRow) {
     throw httpError(404, 'Staff not found')
   }
 
-  if (req.user?.role === ROLES.BRANCH_MANAGER) {
+  if (!isTenantWideAdmin(req.user?.role)) {
     const tokenBranchId = req.user.branchId || null
     if (!tokenBranchId) {
-      throw httpError(403, 'Branch Manager account is not assigned to a branch')
+      throw httpError(403, 'This account is not assigned to a branch')
     }
     if (staffRow.branchId !== tokenBranchId) {
       throw httpError(404, 'Staff not found')
@@ -85,7 +64,7 @@ export function assertStaffBranchAccess(req, staffRow) {
 // Strip branch reassignment from BM update payloads.
 export function sanitizeStaffWritePayload(req, body) {
   const next = { ...body }
-  if (req.user?.role === ROLES.BRANCH_MANAGER) {
+  if (!isTenantWideAdmin(req.user?.role)) {
     delete next.branchId
     next.branchId = req.user.branchId
   }

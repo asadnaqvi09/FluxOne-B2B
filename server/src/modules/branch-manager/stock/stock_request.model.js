@@ -6,7 +6,7 @@ function httpError(status, message) {
   return error
 }
 
-export async function listStockRequests(tenantId, { status } = {}) {
+export async function listStockRequests(tenantId, { status, branchId = null } = {}) {
   const { rows } = await tenantQuery(
     tenantId,
     `
@@ -24,23 +24,26 @@ export async function listStockRequests(tenantId, { status } = {}) {
       JOIN products p ON p.id = sr.product_id AND p.tenant_id = sr.tenant_id
       WHERE sr.tenant_id = $1
         AND ($2::text IS NULL OR sr.status = $2)
+        AND ($3::uuid IS NULL OR sr.branch_id = $3)
       ORDER BY sr.created_at DESC
     `,
-    [status || null],
+    [status || null, branchId],
   )
   return rows
 }
 
 export async function createStockRequest(tenantId, payload) {
+  const branchId = payload.branchId || null
   const { rows: products } = await tenantQuery(
     tenantId,
     `
-      SELECT id, name, quantity, item_code AS "itemCode"
+      SELECT id, name, quantity, item_code AS "itemCode", branch_id AS "branchId"
       FROM products
       WHERE tenant_id = $1 AND id = $2
+        AND ($3::uuid IS NULL OR branch_id = $3)
       LIMIT 1
     `,
-    [payload.productId],
+    [payload.productId, branchId],
   )
   if (!products[0]) throw httpError(404, 'Product not found')
 
@@ -49,7 +52,6 @@ export async function createStockRequest(tenantId, payload) {
     throw httpError(400, 'Required quantity must be a whole number of at least 1')
   }
 
-  const branchId = payload.branchId || null
   let branchName = null
   if (branchId) {
     const { rows: branches } = await tenantQuery(

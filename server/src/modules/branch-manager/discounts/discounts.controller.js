@@ -1,4 +1,11 @@
-import { createOffer, listOffers, updateOffer, deleteOffer } from './discounts.model.js'
+import {
+  assertCategoryInBranch,
+  createOffer,
+  listOffers,
+  updateOffer,
+  deleteOffer,
+} from './discounts.model.js'
+import { resolveScopedBranchId } from '../staff/staff.access.js'
 import { success, fail, failFromError } from '../../../utils/response.util.js'
 
 export async function getDiscounts(req, res) {
@@ -15,6 +22,8 @@ export async function addDiscount(req, res) {
   const { name, percent, categoryId } = req.validated.body
 
   try {
+    const branchId = resolveScopedBranchId(req, null)
+    await assertCategoryInBranch(req.tenantId, categoryId, branchId)
     const row = await createOffer(req.tenantId, { name, percent, categoryId })
     return success(res, row, 201)
   } catch (err) {
@@ -27,6 +36,8 @@ export async function editDiscount(req, res) {
   const { name, percent, categoryId } = req.validated.body
 
   try {
+    const branchId = resolveScopedBranchId(req, null)
+    await assertCategoryInBranch(req.tenantId, categoryId, branchId)
     const row = await updateOffer(req.tenantId, id, { name, percent, categoryId })
     if (!row) {
       return fail(res, 'Discount not found', 404)

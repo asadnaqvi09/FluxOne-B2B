@@ -10,21 +10,21 @@ import {
   listItemScales,
   updateItemScale,
 } from './scales.model.js'
-import { ROLES } from '../../../config/constants.js'
 import { fail, failFromError, success } from '../../../utils/response.util.js'
 import { resolveUploadUrl } from '../../../utils/uploadUrl.util.js'
+import { isTenantWideAdmin, resolveTenantBranchScope } from '../../../utils/branchScope.util.js'
 
 function resolveBranchId(req, explicit) {
-  if (req.user?.role === ROLES.BRANCH_MANAGER) {
-    return req.user.branchId || null
+  if (isTenantWideAdmin(req.user?.role)) {
+    return explicit || req.user?.branchId || null
   }
-  return explicit || req.user?.branchId || null
+  return resolveTenantBranchScope(req).branchId
 }
 
 export async function hardwareList(req, res) {
   try {
     const branchId = resolveBranchId(req, req.validated.query.branchId)
-    if (req.user?.role === ROLES.BRANCH_MANAGER && !branchId) {
+    if (!isTenantWideAdmin(req.user?.role) && !branchId) {
       return fail(res, 'Branch context is required', 400)
     }
     const type = req.validated.query.type || undefined

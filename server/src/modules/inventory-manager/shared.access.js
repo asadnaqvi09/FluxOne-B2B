@@ -1,4 +1,4 @@
-import { ROLES } from '../../config/constants.js'
+import { isTenantWideAdmin, resolveTenantBranchScope } from '../../utils/branchScope.util.js'
 
 function httpError(status, message) {
   const error = new Error(message)
@@ -6,44 +6,36 @@ function httpError(status, message) {
   return error
 }
 
-// Resolve tenant + branch scope for inventory-manager APIs.
-// - inventory_manager: JWT branch required (403 if missing)
-// - b2b_admin (and other permitted roles): all branches by default; optional ?branchId=
-// Never trust client-sent branchId for IM — JWT wins.
-export function resolveInventoryScope(req) {
-  const tenantId = req.tenantId
-  const role = req.user?.role
-  const tokenBranchId = req.user?.branchId || null
-
-  if (role === ROLES.INVENTORY_MANAGER) {
-    if (!tokenBranchId) {
-      throw httpError(403, 'Inventory Manager account is not assigned to a branch')
-    }
-    return { tenantId, branchId: tokenBranchId }
-  }
-
-  const queryBranchId =
-    req.validated?.query?.branchId || req.query?.branchId || null
-  return { tenantId, branchId: queryBranchId || null }
+function readQueryBranchId(req) {
+  return req.validated?.query?.branchId || req.query?.branchId || null
 }
 
-// Scope for CREATE — branch_id must be set (NOT NULL).
-// IM: JWT branch. B2B admin: body.branchId required (same pattern as BM staff create).
-export function resolveInventoryCreateScope(req) {
-  const { tenantId, branchId } = resolveInventoryScope(req)
-  if (branchId) return { tenantId, branchId }
+function readBodyBranchId(req) {
+  return req.validated?.body?.branchId || req.body?.branchId || null
+}
 
-  const bodyBranchId = req.validated?.body?.branchId || req.body?.branchId || null
+// Inventory APIs: products, categories, suppliers, POs, stock ledger, reports, etc.
+export function resolveInventoryScope(req) {
+  const queryBranchId = readQueryBranchId(req)
+  return resolveTenantBranchScope(req, queryBranchId)
+}
+
+// Creates must persist branch_id — B2B admin supplies body.branchId when not filtering.
+export function resolveInventoryCreateScope(req) {
+  const scoped = resolveInventoryScope(req)
+  if (scoped.branchId) return scoped
+
+  const bodyBranchId = readBodyBranchId(req)
   if (!bodyBranchId) {
     throw httpError(422, 'branchId is required to create inventory records')
   }
-  return { tenantId, branchId: bodyBranchId }
+  return { tenantId: scoped.tenantId, branchId: bodyBranchId }
 }
 
-// Force IM stock destination / allocation to JWT branch; B2B may pass body branchId.
+// Stock movements / transfers: branch roles use JWT branch; B2B may pass body branchId.
 export function resolveInventoryBranchId(req, bodyBranchId = null) {
   const { branchId } = resolveInventoryScope(req)
-  if (req.user?.role === ROLES.INVENTORY_MANAGER) {
+  if (!isTenantWideAdmin(req.user?.role)) {
     return branchId
   }
   return bodyBranchId || branchId || null

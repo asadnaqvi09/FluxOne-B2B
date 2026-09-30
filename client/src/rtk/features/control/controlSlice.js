@@ -102,7 +102,8 @@ function ensureBucket(state, movementType) {
 
 export const loadControlCatalog = createAsyncThunk(
   'control/loadCatalog',
-  async ({ force = false } = {}) => catalogToState(await getProductCatalog({ force })),
+  async ({ force = false, categoryActive = 'active' } = {}) =>
+    catalogToState(await getProductCatalog({ force, categoryActive })),
 )
 
 export const fetchControlMovements = createAsyncThunk(

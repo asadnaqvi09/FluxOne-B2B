@@ -236,17 +236,40 @@ export function ResourcesPage() {
     void loadHardware(filterHardware, debouncedHwSearch)
   }
 
-  const getStatusBadge = (status) => {
+  // Asset condition (New / Used / …) — pill styling matches access Blocked badge.
+  const getConditionBadgeClass = (status) => {
     switch (status) {
       case 'New':
-        return 'bg-emerald-50 text-emerald-700 hover:bg-emerald-100 border-none px-2.5 py-0.5'
+        return 'border-none bg-emerald-50 text-emerald-700 hover:bg-emerald-100'
       case 'Good':
-        return 'bg-sky-50 text-sky-700 hover:bg-sky-100 border-none px-2.5 py-0.5'
+        return 'border-none bg-sky-50 text-sky-700 hover:bg-sky-100'
       case 'Used':
-        return 'bg-amber-50 text-amber-700 hover:bg-amber-100 border-none px-2.5 py-0.5'
+        return 'border-none bg-amber-50 text-amber-700 hover:bg-amber-100'
       default:
-        return 'bg-rose-50 text-rose-700 hover:bg-rose-100 border-none px-2.5 py-0.5'
+        return 'border-none bg-rose-50 text-rose-700 hover:bg-rose-100'
     }
+  }
+
+  // Status column: access block wins — only “Blocked”; otherwise show condition capsule.
+  function HardwareStatusBadge({ hw }) {
+    if (hw.accessStatus === 'blocked') {
+      return (
+        <Badge
+          variant="outline"
+          className="w-fit shrink-0 border-rose-200 bg-rose-50 px-2.5 py-0.5 text-xs font-bold text-rose-700"
+        >
+          Blocked
+        </Badge>
+      )
+    }
+    return (
+      <Badge
+        variant="outline"
+        className={`w-fit shrink-0 px-2.5 py-0.5 text-xs font-bold ${getConditionBadgeClass(hw.status)}`}
+      >
+        {hw.status}
+      </Badge>
+    )
   }
 
   const displayCode = (hw) =>
@@ -368,17 +391,12 @@ export function ResourcesPage() {
                                   {displayCode(hw)}
                                 </p>
                               </div>
-                              <Badge className={getStatusBadge(hw.status)}>{hw.status}</Badge>
+                              <HardwareStatusBadge hw={hw} />
                             </div>
                             <p className="mt-1 text-xs text-slate-500">
                               {hw.companyName} · {hw.type}
                             </p>
                             <div className="mt-2 flex flex-wrap items-center gap-2">
-                              {hw.accessStatus === 'blocked' ? (
-                                <Badge className="border-none bg-rose-50 px-2 py-0.5 text-rose-700">
-                                  Access Blocked
-                                </Badge>
-                              ) : null}
                               <div className="flex gap-3">
                                 <button
                                   type="button"
@@ -461,14 +479,7 @@ export function ResourcesPage() {
                             </TableCell>
                             <TableCell className="px-2 py-3 text-slate-600">{hw.type}</TableCell>
                             <TableCell className="px-2 py-3">
-                              <div className="flex flex-col gap-1">
-                                <Badge className={getStatusBadge(hw.status)}>{hw.status}</Badge>
-                                {hw.accessStatus === 'blocked' ? (
-                                  <Badge className="w-fit border-none bg-rose-50 px-2 py-0.5 text-[10px] text-rose-700">
-                                    Blocked
-                                  </Badge>
-                                ) : null}
-                              </div>
+                              <HardwareStatusBadge hw={hw} />
                             </TableCell>
                             <TableActionsCell>
                               <button

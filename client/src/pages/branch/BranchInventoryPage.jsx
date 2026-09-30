@@ -26,6 +26,8 @@ import { BRAND } from '@/lib/constants'
 import { displayItemCode } from '@/lib/formatDisplayId'
 import { CategoryLines } from '@/components/shared/CategoryLines'
 import { toastError, toastSuccess } from '@/lib/toast'
+import { CATEGORY_ACTIVE_QUERY } from '@/lib/productCatalogCache'
+import { filterActiveCategories } from '@/lib/mapProduct'
 
 export function BranchInventoryPage() {
   const [products, setProducts] = useState([])
@@ -82,9 +84,9 @@ export function BranchInventoryPage() {
   }
 
   const fetchCategories = async () => {
-    const res = await apiClient.get('/inventory/products/categories')
+    const res = await apiClient.get('/inventory/products/categories', CATEGORY_ACTIVE_QUERY)
     if (res.success && res.data) {
-      setCategories(res.data || [])
+      setCategories(filterActiveCategories(res.data || []))
     }
   }
 

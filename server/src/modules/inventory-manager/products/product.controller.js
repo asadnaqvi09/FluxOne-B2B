@@ -31,7 +31,8 @@ function scopeError(res, err) {
 export async function categories(req, res) {
   try {
     const { tenantId, branchId } = resolveInventoryScope(req)
-    const active = req.query?.active || 'all'
+    // Default active — filter dropdowns; pass active=all|inactive on Categories management.
+    const active = req.query?.active || 'active'
     return success(res, await listCategories(tenantId, { active, branchId }))
   } catch (err) {
     return scopeError(res, err)

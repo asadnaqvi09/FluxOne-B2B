@@ -195,8 +195,8 @@ function ControlTabPanel({ tab, onTabChange }) {
           scale={filters.scale || ''}
           categoryId={filters.categoryId || ''}
           subcategoryId={filters.subcategoryId || ''}
-          categories={catalog.parents}
-          subcategories={selectedCategorySubs}
+          categories={catalog.parents || []}
+          subcategories={selectedCategorySubs || []}
           onSearchChange={onSearchChange}
           onChange={handleFilterChange}
         />

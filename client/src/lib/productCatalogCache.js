@@ -4,6 +4,10 @@ import { splitCategories } from '@/lib/mapProduct'
 
 const TTL_MS = 5 * 60 * 1000
 
+// Query for category list API — use in filter dropdowns across the app.
+export const CATEGORY_ACTIVE_QUERY = { active: 'active' }
+export const CATEGORY_ALL_QUERY = { active: 'all' }
+
 const emptyCatalog = () => ({
   parents: [],
   childrenByParent: new Map(),
@@ -22,12 +26,17 @@ let cache = {
   data: null,
   fetchedAt: 0,
   inFlight: null,
+  categoryActive: 'active',
 }
 // Bumped on category refresh so a stale full-catalog fetch cannot overwrite delete/status
 let cacheGeneration = 0
 
 function isFresh() {
   return Boolean(cache.data) && Date.now() - cache.fetchedAt < TTL_MS
+}
+
+function categoryQueryParams(active) {
+  return active === 'active' ? CATEGORY_ACTIVE_QUERY : { active }
 }
 
 function applyCategories(rows) {
@@ -57,9 +66,12 @@ function applyFull({ categories, taxes, offers, defaults }) {
 }
 
 // Load categories + taxes + offers once; dedupe parallel callers.
-// @param {{ force?: boolean }} [options]
+// @param {{ force?: boolean, categoryActive?: 'active' | 'inactive' | 'all' }} [options]
 export async function getProductCatalog(options = {}) {
   const force = Boolean(options.force)
+  const categoryActive = options.categoryActive || 'active'
+  cache.categoryActive = categoryActive
+
   if (!force && isFresh()) return cache.data
   if (!force && cache.inFlight) return cache.inFlight
 
@@ -67,7 +79,7 @@ export async function getProductCatalog(options = {}) {
   cache.inFlight = (async () => {
     try {
       const [catsRes, taxesRes, offersRes, defaultsRes] = await Promise.all([
-        apiClient.get(endpoints.products.categories),
+        apiClient.get(endpoints.products.categories, categoryQueryParams(categoryActive)),
         apiClient.get(endpoints.products.taxes),
         apiClient.get(endpoints.products.offers),
         apiClient.get(endpoints.products.taxProfitDefaults),
@@ -89,17 +101,19 @@ export async function getProductCatalog(options = {}) {
 }
 
 // After category/subcategory CRUD — refresh categories only; keep taxes/offers.
-export async function refreshProductCategories() {
+export async function refreshProductCategories(categoryActive) {
+  const active = categoryActive || cache.categoryActive || 'active'
+  cache.categoryActive = active
   // Invalidate in-flight full catalog so it cannot overwrite this refresh
   cacheGeneration += 1
   cache.inFlight = null
-  // Cache-bust query so intermediaries cannot serve a pre-delete list
   const catsRes = await apiClient.get(endpoints.products.categories, {
+    ...categoryQueryParams(active),
     _ts: Date.now(),
   })
   if (!catsRes.success || !Array.isArray(catsRes.data)) {
     // Never wipe a good catalog with null/empty from a failed/stale response
-    if (!cache.data) return getProductCatalog({ force: true })
+    if (!cache.data) return getProductCatalog({ force: true, categoryActive: active })
     return cache.data
   }
   return applyCategories(catsRes.data)
@@ -134,5 +148,5 @@ export function patchCatalogCategoryActive(id, isActive) {
 
 export function invalidateProductCatalog() {
   cacheGeneration += 1
-  cache = { data: null, fetchedAt: 0, inFlight: null }
+  cache = { data: null, fetchedAt: 0, inFlight: null, categoryActive: 'active' }
 }

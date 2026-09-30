@@ -130,6 +130,15 @@ export function mapCategory(row = {}) {
   }
 }
 
+export function isCategoryActive(row) {
+  return row?.isActive !== false
+}
+
+// Filter dropdowns — active parents/subcategories only (unless page loads inactive on purpose).
+export function filterActiveCategories(rows = []) {
+  return (rows || []).filter(isCategoryActive)
+}
+
 export function splitCategories(rows = []) {
   const list = rows.map(mapCategory)
   const parents = list.filter((row) => !row.parentId)

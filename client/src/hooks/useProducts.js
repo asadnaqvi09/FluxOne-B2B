@@ -1,7 +1,7 @@
 // useProducts — RTK products slice wrapper (Express → RTK → hook → UI)
 import { useCallback, useEffect, useMemo, useRef } from 'react'
 import { useAppDispatch, useAppSelector } from '@/rtk/hooks'
-import { asResult, catalogForUi } from '@/rtk/asResult'
+import { asResult, catalogActiveOnly, catalogForUi } from '@/rtk/asResult'
 import {
   PRODUCTS_PAGE_SIZE,
   patchProductFilters,
@@ -31,6 +31,8 @@ const EMPTY_FILTERS = {}
 
 export function useProducts(initialFilters = EMPTY_FILTERS, options = {}) {
   const skipList = Boolean(options.skipList)
+  const categoryActive = options.categoryActive || 'active'
+  const catalogIncludeInactive = categoryActive === 'all'
   const dispatch = useAppDispatch()
   const {
     items,
@@ -45,7 +47,10 @@ export function useProducts(initialFilters = EMPTY_FILTERS, options = {}) {
     bundleOptionsLoading,
   } = useAppSelector((state) => state.products)
 
-  const catalog = useMemo(() => catalogForUi(catalogRaw), [catalogRaw])
+  const catalog = useMemo(() => {
+    const ui = catalogForUi(catalogRaw)
+    return catalogIncludeInactive ? ui : catalogActiveOnly(ui)
+  }, [catalogRaw, catalogIncludeInactive])
   const filtersRef = useRef(filters)
   filtersRef.current = filters
   const initRef = useRef(false)
@@ -59,8 +64,8 @@ export function useProducts(initialFilters = EMPTY_FILTERS, options = {}) {
   }, [dispatch, initialFilters])
 
   useEffect(() => {
-    void dispatch(loadProductCatalog())
-  }, [dispatch])
+    void dispatch(loadProductCatalog({ categoryActive }))
+  }, [dispatch, categoryActive])
 
   useEffect(() => {
     if (skipList) return
@@ -76,17 +81,19 @@ export function useProducts(initialFilters = EMPTY_FILTERS, options = {}) {
 
   const selectedCategorySubs = useMemo(() => {
     if (!filters.categoryId) return []
-    return catalog.childrenByParent.get(filters.categoryId) || []
-  }, [catalog.childrenByParent, filters.categoryId])
+    const subs = catalog.childrenByParent.get(filters.categoryId) || []
+    return catalogIncludeInactive ? subs : subs.filter((row) => row.isActive !== false)
+  }, [catalog.childrenByParent, filters.categoryId, catalogIncludeInactive])
 
   const loadCatalog = useCallback(
-    ({ force = false } = {}) => dispatch(loadProductCatalog({ force })).unwrap(),
-    [dispatch],
+    ({ force = false } = {}) =>
+      dispatch(loadProductCatalog({ force, categoryActive })).unwrap(),
+    [dispatch, categoryActive],
   )
 
   const reloadCategories = useCallback(
-    () => dispatch(reloadProductCategories()).unwrap(),
-    [dispatch],
+    () => dispatch(reloadProductCategories(categoryActive)).unwrap(),
+    [dispatch, categoryActive],
   )
 
   const loadBundleOptions = useCallback(

@@ -38,6 +38,8 @@ import { BRAND } from '@/lib/constants'
 import { formatDateTime } from '@/lib/formatDateTime'
 import { DateTimeLines } from '@/components/shared/DateTimeLines'
 import { toastError, toastSuccess } from '@/lib/toast'
+import { CATEGORY_ACTIVE_QUERY } from '@/lib/productCatalogCache'
+import { filterActiveCategories } from '@/lib/mapProduct'
 import { useCurrency } from '@/hooks/useCurrency'
 
 export function SalesPage() {
@@ -104,9 +106,9 @@ export function SalesPage() {
   }
 
   const fetchCategories = async () => {
-    const res = await apiClient.get('/inventory/products/categories')
+    const res = await apiClient.get('/inventory/products/categories', CATEGORY_ACTIVE_QUERY)
     if (res.success && res.data) {
-      setCategories(res.data || [])
+      setCategories(filterActiveCategories(res.data || []))
     }
   }
 

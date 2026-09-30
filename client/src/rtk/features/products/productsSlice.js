@@ -103,15 +103,15 @@ const initialState = {
 // Load shared category / tax / offer catalog
 export const loadProductCatalog = createAsyncThunk(
   'products/loadCatalog',
-  async ({ force = false } = {}) => {
-    const next = await getProductCatalog({ force })
+  async ({ force = false, categoryActive = 'active' } = {}) => {
+    const next = await getProductCatalog({ force, categoryActive })
     return catalogToState(next)
   },
 )
 
 export const reloadProductCategories = createAsyncThunk(
   'products/reloadCategories',
-  async () => catalogToState(await refreshProductCategories()),
+  async (categoryActive) => catalogToState(await refreshProductCategories(categoryActive)),
 )
 
 export const fetchProducts = createAsyncThunk(

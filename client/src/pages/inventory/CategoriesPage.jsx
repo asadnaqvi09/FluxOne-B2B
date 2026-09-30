@@ -23,7 +23,7 @@ export function CategoriesPage() {
     updateCategory,
     deleteCategory,
     setCategoryActive,
-  } = useProducts({}, { skipList: true })
+  } = useProducts({}, { skipList: true, categoryActive: 'all' })
 
   // Default Active so soft-deleted categories disappear from the main list
   const [statusFilter, setStatusFilter] = useState('active')

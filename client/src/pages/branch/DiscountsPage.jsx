@@ -28,6 +28,8 @@ import { endpoints } from '@/api/endpoints'
 import { displayDiscountRef } from '@/lib/formatDisplayId'
 import { toastError, toastSuccess } from '@/lib/toast'
 import { validateDiscountForm } from '@/lib/validation/branchForms'
+import { CATEGORY_ACTIVE_QUERY } from '@/lib/productCatalogCache'
+import { filterActiveCategories } from '@/lib/mapProduct'
 import { useFormBaseline } from '@/hooks/useFormBaseline'
 import { useClientPagination } from '@/hooks/useClientPagination'
 
@@ -81,9 +83,11 @@ export function DiscountsPage() {
   }
 
   const fetchCategories = async () => {
-    const res = await apiClient.get('/inventory/products/categories')
+    const res = await apiClient.get('/inventory/products/categories', CATEGORY_ACTIVE_QUERY)
     if (res.success && res.data) {
-      const all = Array.isArray(res.data) ? res.data : res.data.items || []
+      const all = filterActiveCategories(
+        Array.isArray(res.data) ? res.data : res.data.items || [],
+      )
       setCategories(all.filter((c) => !c.parentId))
     }
   }

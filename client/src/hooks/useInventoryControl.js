@@ -2,27 +2,34 @@
 import { useCallback, useEffect, useMemo } from 'react'
 import { useAppDispatch, useAppSelector } from '@/rtk/hooks'
 import { asResult, catalogActiveOnly } from '@/rtk/asResult'
+import { MOVEMENT_TYPES } from '@/lib/mapStockMovement'
 import {
   CONTROL_PAGE_SIZE,
   ensureControlType,
   patchControlFilters,
+  patchGlobalFilters,
+  resetGlobalFilters,
   setControlPage,
   loadControlCatalog,
   fetchControlMovements,
+  fetchControlSummary,
   createMovement as createMovementThunk,
   updateMovement as updateMovementThunk,
   deleteMovement as deleteMovementThunk,
   stockInFromOrder as stockInFromOrderThunk,
   fetchControlProductOptions,
+  fetchControlProductDetail,
   fetchControlSuppliers,
   fetchApprovedPurchaseOrders,
   fetchPurchaseOrderDetail,
   fetchEmployeeLookups,
+  defaultGlobalFilters,
 } from '@/rtk/features/control/controlSlice'
 
 export { CONTROL_PAGE_SIZE }
 export {
   fetchControlProductOptions,
+  fetchControlProductDetail,
   fetchControlSuppliers,
   fetchApprovedPurchaseOrders,
   fetchPurchaseOrderDetail,
@@ -40,11 +47,6 @@ const EMPTY_BUCKET = {
     pageCount: 1,
   },
   filters: {
-    q: '',
-    type: '',
-    categoryId: '',
-    subcategoryId: '',
-    scale: '',
     page: 1,
     limit: CONTROL_PAGE_SIZE,
   },
@@ -57,11 +59,26 @@ export function useInventoryControl(movementType, initialFilters = EMPTY_FILTERS
   const dispatch = useAppDispatch()
   const catalogRaw = useAppSelector((state) => state.control.catalog)
   const catalogLoading = useAppSelector((state) => state.control.catalogLoading)
+  const globalFilters = useAppSelector((state) => state.control.globalFilters)
+  const summary = useAppSelector((state) => state.control.summary)
+  const summaryLoading = useAppSelector((state) => state.control.summaryLoading)
   const bucket = useAppSelector(
     (state) => state.control.byType[movementType] || EMPTY_BUCKET,
   )
-  const filters = bucket.filters
-  const filtersKey = JSON.stringify(filters)
+  const bucketFilters = bucket.filters
+  const filtersKey = JSON.stringify({ globalFilters, bucketFilters })
+  const globalFiltersKey = JSON.stringify(globalFilters)
+
+  // UI sees one merged filter object (global + page/limit).
+  const filters = useMemo(
+    () => ({
+      ...defaultGlobalFilters(),
+      ...globalFilters,
+      page: bucketFilters.page || 1,
+      limit: bucketFilters.limit || CONTROL_PAGE_SIZE,
+    }),
+    [globalFilters, bucketFilters],
+  )
 
   const catalog = useMemo(() => catalogActiveOnly(catalogRaw), [catalogRaw])
 
@@ -78,10 +95,18 @@ export function useInventoryControl(movementType, initialFilters = EMPTY_FILTERS
     void dispatch(
       fetchControlMovements({
         movementType,
-        filters,
+        filters: bucketFilters,
+        globalFilters,
       }),
     )
+    // filtersKey serializes globalFilters + bucketFilters (page/limit)
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- intentional serialized key
   }, [dispatch, movementType, filtersKey])
+
+  useEffect(() => {
+    void dispatch(fetchControlSummary({ globalFilters }))
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- intentional serialized key
+  }, [dispatch, globalFiltersKey])
 
   const updateFilters = useCallback(
     (patch) => {
@@ -89,6 +114,17 @@ export function useInventoryControl(movementType, initialFilters = EMPTY_FILTERS
     },
     [dispatch, movementType],
   )
+
+  const setGlobalFilters = useCallback(
+    (patch) => {
+      dispatch(patchGlobalFilters(patch))
+    },
+    [dispatch],
+  )
+
+  const clearFilters = useCallback(() => {
+    dispatch(resetGlobalFilters())
+  }, [dispatch])
 
   const setPage = useCallback(
     (page) => {
@@ -108,6 +144,17 @@ export function useInventoryControl(movementType, initialFilters = EMPTY_FILTERS
     [dispatch, movementType],
   )
 
+  // Always posts to stock-in regardless of active tab (global Add Stock In CTA).
+  const createStockIn = useCallback(
+    (body) =>
+      asResult(
+        dispatch(
+          createMovementThunk({ movementType: MOVEMENT_TYPES.IN, body }),
+        ).unwrap(),
+      ),
+    [dispatch],
+  )
+
   const updateMovement = useCallback(
     (id, body) =>
       asResult(dispatch(updateMovementThunk({ movementType, id, body })).unwrap()),
@@ -119,12 +166,18 @@ export function useInventoryControl(movementType, initialFilters = EMPTY_FILTERS
     [dispatch, movementType],
   )
 
+  // Always refresh Stock In bucket — Order Demand is a global header CTA.
   const stockInFromOrder = useCallback(
     (purchaseOrderId) =>
       asResult(
-        dispatch(stockInFromOrderThunk({ movementType, purchaseOrderId })).unwrap(),
+        dispatch(
+          stockInFromOrderThunk({
+            movementType: MOVEMENT_TYPES.IN,
+            purchaseOrderId,
+          }),
+        ).unwrap(),
       ),
-    [dispatch, movementType],
+    [dispatch],
   )
 
   return {
@@ -132,6 +185,9 @@ export function useInventoryControl(movementType, initialFilters = EMPTY_FILTERS
     items: bucket.items,
     pagination: bucket.pagination,
     filters,
+    globalFilters,
+    summary,
+    summaryLoading,
     loading: bucket.loading,
     mutating: bucket.mutating,
     error: bucket.error,
@@ -139,11 +195,22 @@ export function useInventoryControl(movementType, initialFilters = EMPTY_FILTERS
     catalogLoading,
     selectedCategorySubs,
     updateFilters,
+    setGlobalFilters,
+    clearFilters,
     setPage,
-    reload: () => dispatch(fetchControlMovements({ movementType, filters })),
+    reload: () =>
+      dispatch(
+        fetchControlMovements({
+          movementType,
+          filters: bucketFilters,
+          globalFilters,
+        }),
+      ),
+    reloadSummary: () => dispatch(fetchControlSummary({ globalFilters })),
     loadCatalog: ({ force = false } = {}) =>
       dispatch(loadControlCatalog({ force })).unwrap(),
     createMovement,
+    createStockIn,
     updateMovement,
     deleteMovement,
     stockInFromOrder,

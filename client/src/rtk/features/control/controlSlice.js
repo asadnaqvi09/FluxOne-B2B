@@ -19,6 +19,7 @@ export const LIST_PATH = {
   [MOVEMENT_TYPES.ADJUSTMENT]: endpoints.control.adjustments,
   [MOVEMENT_TYPES.DAMAGED]: endpoints.control.damaged,
   [MOVEMENT_TYPES.EXPIRED]: endpoints.control.expired,
+  [MOVEMENT_TYPES.OTHER]: endpoints.control.others,
 }
 
 const CREATE_PATH = {
@@ -27,12 +28,32 @@ const CREATE_PATH = {
   [MOVEMENT_TYPES.ADJUSTMENT]: endpoints.control.adjustments,
   [MOVEMENT_TYPES.DAMAGED]: endpoints.control.damaged,
   [MOVEMENT_TYPES.EXPIRED]: endpoints.control.expired,
+  [MOVEMENT_TYPES.OTHER]: endpoints.control.others,
 }
 
 const ITEM_PATH = {
   [MOVEMENT_TYPES.ADJUSTMENT]: endpoints.control.adjustment,
   [MOVEMENT_TYPES.DAMAGED]: endpoints.control.damagedItem,
   [MOVEMENT_TYPES.EXPIRED]: endpoints.control.expiredItem,
+  [MOVEMENT_TYPES.OTHER]: endpoints.control.otherItem,
+}
+
+// Shared across tabs — page/limit stay per movement type.
+export function defaultGlobalFilters(overrides = {}) {
+  return {
+    q: '',
+    type: '',
+    categoryId: '',
+    subcategoryId: '',
+    productId: '',
+    variantId: '',
+    variantTypeId: '',
+    variantValueId: '',
+    scale: '',
+    from: '',
+    to: '',
+    ...overrides,
+  }
 }
 
 function emptyCatalog() {
@@ -58,13 +79,8 @@ function catalogToState(catalog) {
   }
 }
 
-function defaultFilters(overrides = {}) {
+function defaultBucketFilters(overrides = {}) {
   return {
-    q: '',
-    type: '',
-    categoryId: '',
-    subcategoryId: '',
-    scale: '',
     page: 1,
     limit: CONTROL_PAGE_SIZE,
     ...overrides,
@@ -80,7 +96,7 @@ function emptyBucket(overrides = {}) {
       total: 0,
       pageCount: 1,
     },
-    filters: defaultFilters(overrides),
+    filters: defaultBucketFilters(overrides),
     loading: false,
     mutating: false,
     error: null,
@@ -90,7 +106,11 @@ function emptyBucket(overrides = {}) {
 const initialState = {
   catalog: catalogToState(peekProductCatalog()),
   catalogLoading: !peekProductCatalog(),
+  globalFilters: defaultGlobalFilters(),
   byType: {},
+  summary: null,
+  summaryLoading: false,
+  summaryError: null,
 }
 
 function ensureBucket(state, movementType) {
@@ -98,6 +118,33 @@ function ensureBucket(state, movementType) {
     state.byType[movementType] = emptyBucket()
   }
   return state.byType[movementType]
+}
+
+// Merge global + per-tab page/limit for list API (AND across all applied fields).
+export function buildListQuery(globalFilters, bucketFilters = {}) {
+  const g = globalFilters || defaultGlobalFilters()
+  const productId = g.variantId || g.productId || undefined
+  return {
+    page: bucketFilters.page || 1,
+    limit: bucketFilters.limit || CONTROL_PAGE_SIZE,
+    q: g.q || undefined,
+    categoryId: g.categoryId || undefined,
+    subcategoryId: g.subcategoryId || undefined,
+    productId: productId || undefined,
+    variantTypeId: g.variantTypeId || undefined,
+    variantValueId: g.variantValueId || undefined,
+    scale: g.scale || undefined,
+    type: g.type || undefined,
+    from: g.from || undefined,
+    to: g.to || undefined,
+  }
+}
+
+function resetBucketPages(state) {
+  Object.keys(state.byType).forEach((key) => {
+    const bucket = state.byType[key]
+    if (bucket?.filters) bucket.filters = { ...bucket.filters, page: 1 }
+  })
 }
 
 export const loadControlCatalog = createAsyncThunk(
@@ -108,19 +155,16 @@ export const loadControlCatalog = createAsyncThunk(
 
 export const fetchControlMovements = createAsyncThunk(
   'control/fetchList',
-  async ({ movementType, filters }, { rejectWithValue }) => {
+  async ({ movementType, filters, globalFilters }, { getState, rejectWithValue }) => {
     const listPath = LIST_PATH[movementType]
     if (!listPath) return rejectWithValue('Unknown movement type')
-    const next = filters || defaultFilters()
-    const result = await apiClient.get(listPath, {
-      page: next.page || 1,
-      limit: next.limit || CONTROL_PAGE_SIZE,
-      q: next.q || undefined,
-      categoryId: next.categoryId || undefined,
-      subcategoryId: next.subcategoryId || undefined,
-      scale: next.scale || undefined,
-      type: next.type || undefined,
-    })
+    const state = getState().control
+    const bucket = state.byType[movementType]
+    const query = buildListQuery(
+      globalFilters || state.globalFilters,
+      filters || bucket?.filters || defaultBucketFilters(),
+    )
+    const result = await apiClient.get(listPath, query)
     if (!result.success) {
       return rejectWithValue(result.error || 'Failed to load movements')
     }
@@ -131,14 +175,48 @@ export const fetchControlMovements = createAsyncThunk(
       items: rows.map(mapStockMovement),
       pagination:
         data.pagination || {
-          page: next.page || 1,
-          limit: next.limit || CONTROL_PAGE_SIZE,
+          page: query.page || 1,
+          limit: query.limit || CONTROL_PAGE_SIZE,
           total: rows.length,
           pageCount: 1,
         },
     }
   },
 )
+
+// Control summary — KPIs + tab counts (Phase 2).
+export const fetchControlSummary = createAsyncThunk(
+  'control/fetchSummary',
+  async ({ globalFilters } = {}, { getState, rejectWithValue }) => {
+    const state = getState().control
+    const g = globalFilters || state.globalFilters || defaultGlobalFilters()
+    const query = buildListQuery(g, { page: 1, limit: 1 })
+    // Summary ignores page/limit
+    const summaryQuery = { ...query }
+    delete summaryQuery.page
+    delete summaryQuery.limit
+    const result = await apiClient.get(endpoints.control.summary, summaryQuery)
+    if (!result.success) {
+      return rejectWithValue(result.error || 'Failed to load control summary')
+    }
+    return result.data || null
+  },
+)
+
+function refetchWithState(dispatch, getState, movementType) {
+  const state = getState().control
+  const bucket = state.byType[movementType]
+  void dispatch(
+    fetchControlSummary({ globalFilters: state.globalFilters }),
+  )
+  return dispatch(
+    fetchControlMovements({
+      movementType,
+      filters: bucket?.filters,
+      globalFilters: state.globalFilters,
+    }),
+  )
+}
 
 export const createMovement = createAsyncThunk(
   'control/create',
@@ -147,8 +225,7 @@ export const createMovement = createAsyncThunk(
     if (!path) return rejectWithValue('Unknown movement type')
     const result = await apiClient.post(path, body)
     if (!result.success) return rejectWithValue(result.error || 'Create failed')
-    const filters = getState().control.byType[movementType]?.filters || defaultFilters()
-    void dispatch(fetchControlMovements({ movementType, filters }))
+    void refetchWithState(dispatch, getState, movementType)
     return result
   },
 )
@@ -160,8 +237,7 @@ export const updateMovement = createAsyncThunk(
     if (!pathFn) return rejectWithValue('Edit not supported for this tab')
     const result = await apiClient.patch(pathFn(id), body)
     if (!result.success) return rejectWithValue(result.error || 'Update failed')
-    const filters = getState().control.byType[movementType]?.filters || defaultFilters()
-    void dispatch(fetchControlMovements({ movementType, filters }))
+    void refetchWithState(dispatch, getState, movementType)
     return result
   },
 )
@@ -173,8 +249,7 @@ export const deleteMovement = createAsyncThunk(
     if (!pathFn) return rejectWithValue('Delete not supported for this tab')
     const result = await apiClient.delete(pathFn(id))
     if (!result.success) return rejectWithValue(result.error || 'Delete failed')
-    const filters = getState().control.byType[movementType]?.filters || defaultFilters()
-    void dispatch(fetchControlMovements({ movementType, filters }))
+    void refetchWithState(dispatch, getState, movementType)
     return result
   },
 )
@@ -186,8 +261,7 @@ export const stockInFromOrder = createAsyncThunk(
       purchaseOrderId,
     })
     if (!result.success) return rejectWithValue(result.error || 'Stock-in failed')
-    const filters = getState().control.byType[movementType]?.filters || defaultFilters()
-    void dispatch(fetchControlMovements({ movementType, filters }))
+    void refetchWithState(dispatch, getState, movementType)
     return result
   },
 )
@@ -210,6 +284,13 @@ export async function fetchControlProductOptions({
   if (!result.success) return { success: false, error: result.error, items: [] }
   const rows = Array.isArray(result.data?.items) ? result.data.items : []
   return { success: true, items: rows.map(mapProduct) }
+}
+
+export async function fetchControlProductDetail(id) {
+  if (!id) return { success: false, error: 'Missing product id', data: null }
+  const result = await apiClient.get(endpoints.products.detail(id))
+  if (!result.success) return { success: false, error: result.error, data: null }
+  return { success: true, data: mapProduct(result.data) }
 }
 
 export async function fetchControlSuppliers() {
@@ -260,6 +341,20 @@ export async function fetchEmployeeLookups({ q } = {}) {
   }
 }
 
+const GLOBAL_FILTER_KEYS = new Set([
+  'q',
+  'type',
+  'categoryId',
+  'subcategoryId',
+  'productId',
+  'variantId',
+  'variantTypeId',
+  'variantValueId',
+  'scale',
+  'from',
+  'to',
+])
+
 const controlSlice = createSlice({
   name: 'control',
   initialState,
@@ -267,22 +362,42 @@ const controlSlice = createSlice({
     ensureControlType(state, action) {
       const { movementType, initialFilters } = action.payload
       if (!state.byType[movementType]) {
-        state.byType[movementType] = emptyBucket(initialFilters)
+        const pageLimit = {}
+        if (initialFilters?.page != null) pageLimit.page = initialFilters.page
+        if (initialFilters?.limit != null) pageLimit.limit = initialFilters.limit
+        state.byType[movementType] = emptyBucket(pageLimit)
       }
     },
+    // Prefer patchGlobalFilters for shared filters; keeps page/limit tab-local.
     patchControlFilters(state, action) {
       const { movementType, patch } = action.payload
       const bucket = ensureBucket(state, movementType)
-      const next = { ...bucket.filters, ...patch }
-      const resets =
-        patch.q !== undefined ||
-        patch.categoryId !== undefined ||
-        patch.subcategoryId !== undefined ||
-        patch.scale !== undefined ||
-        patch.type !== undefined ||
-        patch.limit !== undefined
-      if (resets && patch.page === undefined) next.page = 1
-      bucket.filters = next
+      const globalPatch = {}
+      const bucketPatch = {}
+      Object.entries(patch || {}).forEach(([key, value]) => {
+        if (GLOBAL_FILTER_KEYS.has(key)) globalPatch[key] = value
+        else bucketPatch[key] = value
+      })
+      if (Object.keys(globalPatch).length) {
+        state.globalFilters = { ...state.globalFilters, ...globalPatch }
+        resetBucketPages(state)
+      }
+      if (Object.keys(bucketPatch).length) {
+        const next = { ...bucket.filters, ...bucketPatch }
+        if (bucketPatch.limit !== undefined && bucketPatch.page === undefined) {
+          next.page = 1
+        }
+        bucket.filters = next
+      }
+    },
+    patchGlobalFilters(state, action) {
+      const patch = action.payload || {}
+      state.globalFilters = { ...state.globalFilters, ...patch }
+      resetBucketPages(state)
+    },
+    resetGlobalFilters(state) {
+      state.globalFilters = defaultGlobalFilters()
+      resetBucketPages(state)
     },
     setControlPage(state, action) {
       const { movementType, page } = action.payload
@@ -321,6 +436,18 @@ const controlSlice = createSlice({
         bucket.loading = false
         bucket.items = []
         bucket.error = action.payload || action.error.message
+      })
+      .addCase(fetchControlSummary.pending, (state) => {
+        state.summaryLoading = true
+        state.summaryError = null
+      })
+      .addCase(fetchControlSummary.fulfilled, (state, action) => {
+        state.summaryLoading = false
+        state.summary = action.payload
+      })
+      .addCase(fetchControlSummary.rejected, (state, action) => {
+        state.summaryLoading = false
+        state.summaryError = action.payload || action.error.message
       })
       .addCase(createMovement.pending, (state, action) => {
         ensureBucket(state, action.meta.arg.movementType).mutating = true
@@ -361,5 +488,11 @@ const controlSlice = createSlice({
   },
 })
 
-export const { ensureControlType, patchControlFilters, setControlPage } = controlSlice.actions
+export const {
+  ensureControlType,
+  patchControlFilters,
+  patchGlobalFilters,
+  resetGlobalFilters,
+  setControlPage,
+} = controlSlice.actions
 export default controlSlice.reducer

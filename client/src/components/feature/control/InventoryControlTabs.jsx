@@ -1,44 +1,80 @@
+import {
+  ArrowDownToLine,
+  ArrowUpFromLine,
+  MoreHorizontal,
+  PackageX,
+  Scale,
+  TimerOff,
+} from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { BRAND } from '@/lib/constants'
 import { MOVEMENT_TYPES } from '@/lib/mapStockMovement'
 
 export const CONTROL_TABS = [
-  { id: MOVEMENT_TYPES.IN, label: 'Stock In' },
-  { id: MOVEMENT_TYPES.OUT, label: 'Stock Out' },
-  { id: MOVEMENT_TYPES.ADJUSTMENT, label: 'Adjustment' },
-  { id: MOVEMENT_TYPES.DAMAGED, label: 'Damaged' },
-  { id: MOVEMENT_TYPES.EXPIRED, label: 'Expired' },
+  { id: MOVEMENT_TYPES.IN, label: 'Stock In', icon: ArrowDownToLine },
+  { id: MOVEMENT_TYPES.OUT, label: 'Stock Out', icon: ArrowUpFromLine },
+  { id: MOVEMENT_TYPES.ADJUSTMENT, label: 'Adjustment', icon: Scale },
+  { id: MOVEMENT_TYPES.DAMAGED, label: 'Damaged', icon: PackageX },
+  { id: MOVEMENT_TYPES.EXPIRED, label: 'Expired', icon: TimerOff },
+  { id: MOVEMENT_TYPES.OTHER, label: 'Others', icon: MoreHorizontal },
 ]
 
-// Phase-1 Control tabs (Transfer deferred).
-export function InventoryControlTabs({ value, onChange, className }) {
+// Control tabs — count badges from summary API (Phase 2).
+export function InventoryControlTabs({
+  value,
+  onChange,
+  counts = null,
+  className,
+}) {
   return (
-    <div className={cn('flex flex-wrap gap-2', className)}>
+    <div
+      className={cn(
+        'flex flex-wrap gap-1 border-b border-slate-200 pb-px',
+        className,
+      )}
+      role="tablist"
+    >
       {CONTROL_TABS.map((tab) => {
         const active = value === tab.id
+        const count = counts?.[tab.id]
+        const Icon = tab.icon
         return (
           <button
             key={tab.id}
             type="button"
+            role="tab"
+            aria-selected={active}
             onClick={() => onChange?.(tab.id)}
             className={cn(
-              'cursor-pointer rounded-full border px-3 py-1.5 text-xs font-semibold transition-all duration-200 active:scale-[0.97] sm:px-4 sm:py-2 sm:text-sm',
+              'relative inline-flex cursor-pointer items-center gap-2 px-3 py-2.5 text-sm font-semibold transition-colors duration-200 sm:px-4',
               active
-                ? 'border-transparent text-white shadow-sm'
-                : 'border-border bg-white text-slate-700 hover:border-slate-300 hover:bg-slate-50',
+                ? 'text-slate-900'
+                : 'text-slate-500 hover:text-slate-800',
             )}
-            style={active ? { background: BRAND.purple } : undefined}
           >
-            {tab.label}
+            <Icon className="size-4 shrink-0" strokeWidth={2} />
+            <span>{tab.label}</span>
+            {count != null ? (
+              <span
+                className={cn(
+                  'inline-flex min-w-5 items-center justify-center rounded-md px-1.5 py-0.5 text-[11px] font-bold tabular-nums',
+                  active
+                    ? 'bg-purple-100 text-purple-800'
+                    : 'bg-slate-100 text-slate-600',
+                )}
+              >
+                {Number(count).toLocaleString()}
+              </span>
+            ) : null}
+            {active ? (
+              <span
+                className="absolute inset-x-2 -bottom-px h-0.5 rounded-full"
+                style={{ background: BRAND.purple }}
+              />
+            ) : null}
           </button>
         )
       })}
-      <span
-        className="inline-flex items-center rounded-full border border-dashed border-border px-3 py-1.5 text-[11px] font-medium text-slate-400 sm:px-4 sm:py-2 sm:text-xs"
-        title="Stock Transfer UI ships in Phase 2"
-      >
-        Transfer · Phase 2
-      </span>
     </div>
   )
 }

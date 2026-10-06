@@ -43,6 +43,7 @@ export const MOVEMENT_TYPES = {
   DAMAGED: 'damaged',
   EXPIRED: 'expired',
   TRANSFER: 'transfer',
+  OTHER: 'other',
 }
 
 export const PURCHASE_ORDER_STATUS = {

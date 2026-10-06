@@ -1,7 +1,7 @@
-import {
-  MovementHistoryTable,
-  movementImageNameColumns,
-} from '@/components/feature/control/MovementHistoryTable'
+import { MovementHistoryTable } from '@/components/feature/control/MovementHistoryTable'
+import { MovementRowMenu } from '@/components/feature/control/MovementRowMenu'
+import { controlColumnsForTab } from '@/lib/controlTableColumns'
+import { MOVEMENT_TYPES } from '@/lib/mapStockMovement'
 
 export function AdjustmentTable({
   items,
@@ -9,31 +9,13 @@ export function AdjustmentTable({
   pagination,
   onPageChange,
   onPageSizeChange,
+  onUpdateThreshold,
+  onUpdatePrice,
+  onViewDetails,
   onEdit,
   onDelete,
   className,
 }) {
-  const columns = [
-    ...movementImageNameColumns(),
-    {
-      key: 'qty',
-      label: 'Adjustment qty',
-      render: (row) => {
-        const q = Number(row.quantity || 0)
-        return (
-          <span className={q >= 0 ? 'font-semibold text-emerald-700' : 'font-semibold text-red-600'}>
-            {q >= 0 ? `+${q}` : q}
-          </span>
-        )
-      },
-    },
-    {
-      key: 'reason',
-      label: 'Reason',
-      render: (row) => <span className="line-clamp-2 text-slate-600">{row.reason || '—'}</span>,
-    },
-  ]
-
   return (
     <MovementHistoryTable
       title="Adjustment history"
@@ -41,11 +23,20 @@ export function AdjustmentTable({
       items={items}
       loading={loading}
       pagination={pagination}
-      columns={columns}
+      columns={controlColumnsForTab(MOVEMENT_TYPES.ADJUSTMENT)}
       onPageChange={onPageChange}
       onPageSizeChange={onPageSizeChange}
-      onEdit={onEdit}
-      onDelete={onDelete}
+      renderRowActions={(row) => (
+        <MovementRowMenu
+          row={row}
+          tab={MOVEMENT_TYPES.ADJUSTMENT}
+          onUpdateThreshold={onUpdateThreshold}
+          onUpdatePrice={onUpdatePrice}
+          onViewDetails={onViewDetails}
+          onEdit={onEdit}
+          onDelete={onDelete}
+        />
+      )}
       emptyTitle="No adjustments"
       emptyHint="Create an adjustment with a required reason."
       className={className}

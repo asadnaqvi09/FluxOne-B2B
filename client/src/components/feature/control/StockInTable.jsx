@@ -1,7 +1,7 @@
-import {
-  MovementHistoryTable,
-  movementImageNameColumns,
-} from '@/components/feature/control/MovementHistoryTable'
+import { MovementHistoryTable } from '@/components/feature/control/MovementHistoryTable'
+import { MovementRowMenu } from '@/components/feature/control/MovementRowMenu'
+import { controlColumnsForTab } from '@/lib/controlTableColumns'
+import { MOVEMENT_TYPES } from '@/lib/mapStockMovement'
 
 export function StockInTable({
   items,
@@ -9,29 +9,12 @@ export function StockInTable({
   pagination,
   onPageChange,
   onPageSizeChange,
+  onUpdateStock,
+  onUpdateThreshold,
+  onUpdatePrice,
+  onViewDetails,
   className,
 }) {
-  const columns = [
-    ...movementImageNameColumns(),
-    {
-      key: 'type',
-      label: 'Type',
-      render: (row) => <span className="capitalize text-slate-700">{row.type || '—'}</span>,
-    },
-    {
-      key: 'qty',
-      label: 'Stock-in qty',
-      render: (row) => (
-        <span className="font-semibold text-emerald-700">+{Number(row.quantity || 0)}</span>
-      ),
-    },
-    {
-      key: 'company',
-      label: 'Company Name',
-      render: (row) => <span className="text-slate-700">{row.companyName || '—'}</span>,
-    },
-  ]
-
   return (
     <MovementHistoryTable
       title="Stock in history"
@@ -39,9 +22,19 @@ export function StockInTable({
       items={items}
       loading={loading}
       pagination={pagination}
-      columns={columns}
+      columns={controlColumnsForTab(MOVEMENT_TYPES.IN)}
       onPageChange={onPageChange}
       onPageSizeChange={onPageSizeChange}
+      renderRowActions={(row) => (
+        <MovementRowMenu
+          row={row}
+          tab={MOVEMENT_TYPES.IN}
+          onUpdateStock={onUpdateStock}
+          onUpdateThreshold={onUpdateThreshold}
+          onUpdatePrice={onUpdatePrice}
+          onViewDetails={onViewDetails}
+        />
+      )}
       emptyTitle="No stock-in records"
       emptyHint="Add stock manually or receive an approved purchase order."
       className={className}

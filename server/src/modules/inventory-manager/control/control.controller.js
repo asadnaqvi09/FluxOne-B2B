@@ -1,12 +1,23 @@
 import {
+  clearThreshold,
   createStockTransfer,
   deleteLedgerEvent,
+  exportLedgerRows,
+  getControlSummary,
+  getPriceUtilizationRule,
+  importControlMovements,
   insertLedgerEvent,
   insertLedgerLines,
+  listControlAlerts,
+  listDailyPricePending,
   listLedger,
+  listThresholds,
   listTransfers,
   processDueExpirations,
+  setPriceUtilizationRule,
+  updateDailyPrice,
   updateLedgerEvent,
+  upsertThreshold,
 } from './control.model.js'
 import { receivePurchaseOrder } from '../purchase-orders/purchase_order.model.js'
 import {
@@ -68,9 +79,24 @@ function removeByType(movementType) {
   }
 }
 
+// Control summary KPIs + tab counts (Phase 2 chrome).
+export async function getSummary(req, res) {
+  try {
+    const { tenantId, branchId } = resolveInventoryScope(req)
+    const data = await getControlSummary(tenantId, {
+      ...req.validated.query,
+      branchId,
+    })
+    return success(res, data)
+  } catch (err) {
+    return scopeError(res, err)
+  }
+}
+
 export const listStockIn = listByType(MOVEMENT_TYPES.IN)
 export const listAdjustments = listByType(MOVEMENT_TYPES.ADJUSTMENT)
 export const listDamaged = listByType(MOVEMENT_TYPES.DAMAGED)
+export const listOthers = listByType(MOVEMENT_TYPES.OTHER)
 
 // Stock-out history: sales + damaged + expired (no manual create).
 export async function listStockOut(req, res) {
@@ -185,6 +211,21 @@ export async function createDamaged(req, res) {
   }
 }
 
+export async function createOther(req, res) {
+  try {
+    const { tenantId, branchId } = resolveInventoryScope(req)
+    const row = await insertLedgerEvent(tenantId, {
+      ...req.validated.body,
+      movementType: MOVEMENT_TYPES.OTHER,
+      createdBy: req.user.id,
+      scopeBranchId: branchId,
+    })
+    return success(res, row, 201)
+  } catch (err) {
+    return scopeError(res, err)
+  }
+}
+
 export async function createStockOut(req, res) {
   try {
     const { tenantId, branchId } = resolveInventoryScope(req)
@@ -235,7 +276,143 @@ export async function createTransfer(req, res) {
 export const updateAdjustment = updateByType(MOVEMENT_TYPES.ADJUSTMENT)
 export const updateDamaged = updateByType(MOVEMENT_TYPES.DAMAGED)
 export const updateExpired = updateByType(MOVEMENT_TYPES.EXPIRED)
+export const updateOther = updateByType(MOVEMENT_TYPES.OTHER)
 
 export const removeAdjustment = removeByType(MOVEMENT_TYPES.ADJUSTMENT)
 export const removeDamaged = removeByType(MOVEMENT_TYPES.DAMAGED)
 export const removeExpired = removeByType(MOVEMENT_TYPES.EXPIRED)
+export const removeOther = removeByType(MOVEMENT_TYPES.OTHER)
+
+// Phase 5 — export / import / price utilization rule
+export async function exportControl(req, res) {
+  try {
+    const { tenantId, branchId } = resolveInventoryScope(req)
+    const query = req.validated.query || {}
+    const movementType = query.movementType
+    const filters = {
+      ...query,
+      branchId,
+      movementType:
+        movementType === MOVEMENT_TYPES.OUT
+          ? undefined
+          : movementType,
+      movementTypes:
+        movementType === MOVEMENT_TYPES.OUT
+          ? [MOVEMENT_TYPES.OUT, MOVEMENT_TYPES.DAMAGED, MOVEMENT_TYPES.EXPIRED]
+          : undefined,
+    }
+    const rows = await exportLedgerRows(tenantId, filters)
+    return success(res, { rows, exported: rows.length, movementType })
+  } catch (err) {
+    return scopeError(res, err)
+  }
+}
+
+export async function importControl(req, res) {
+  try {
+    const { tenantId, branchId } = resolveInventoryScope(req)
+    const data = await importControlMovements(tenantId, {
+      movementType: req.validated.body.movementType,
+      rows: req.validated.body.rows,
+      createdBy: req.user.id,
+      branchId,
+    })
+    return success(res, data)
+  } catch (err) {
+    return scopeError(res, err)
+  }
+}
+
+export async function getPriceRule(req, res) {
+  try {
+    const { tenantId } = resolveInventoryScope(req)
+    const data = await getPriceUtilizationRule(tenantId)
+    return success(res, data)
+  } catch (err) {
+    return scopeError(res, err)
+  }
+}
+
+export async function patchPriceRule(req, res) {
+  try {
+    const { tenantId } = resolveInventoryScope(req)
+    const data = await setPriceUtilizationRule(
+      tenantId,
+      req.validated.body.priceRequiresStockUtilized,
+    )
+    return success(res, data)
+  } catch (err) {
+    return scopeError(res, err)
+  }
+}
+
+// Phase 4 — daily prices / thresholds / alerts
+export async function listDailyPrices(req, res) {
+  try {
+    const { tenantId, branchId } = resolveInventoryScope(req)
+    const items = await listDailyPricePending(tenantId, { branchId })
+    return success(res, { items, count: items.length })
+  } catch (err) {
+    return scopeError(res, err)
+  }
+}
+
+export async function patchDailyPrice(req, res) {
+  try {
+    const { tenantId, branchId } = resolveInventoryScope(req)
+    const row = await updateDailyPrice(tenantId, req.validated.params.id, {
+      ...req.validated.body,
+      branchId,
+    })
+    if (!row) return fail(res, 'Product not found or daily price change is off', 404)
+    return success(res, row)
+  } catch (err) {
+    return scopeError(res, err)
+  }
+}
+
+export async function getThresholds(req, res) {
+  try {
+    const { tenantId, branchId } = resolveInventoryScope(req)
+    const items = await listThresholds(tenantId, {
+      branchId,
+      q: req.validated.query?.q,
+    })
+    return success(res, { items, count: items.length })
+  } catch (err) {
+    return scopeError(res, err)
+  }
+}
+
+export async function saveThreshold(req, res) {
+  try {
+    const { tenantId, branchId } = resolveInventoryScope(req)
+    const { productId, reorderPoint } = req.validated.body
+    const row = await upsertThreshold(tenantId, productId, reorderPoint, { branchId })
+    if (!row) return fail(res, 'Product not found', 404)
+    return success(res, row)
+  } catch (err) {
+    return scopeError(res, err)
+  }
+}
+
+export async function deleteThreshold(req, res) {
+  try {
+    const { tenantId, branchId } = resolveInventoryScope(req)
+    const row = await clearThreshold(tenantId, req.validated.params.id, { branchId })
+    if (!row) return fail(res, 'Product not found', 404)
+    return success(res, row)
+  } catch (err) {
+    return scopeError(res, err)
+  }
+}
+
+export async function getAlerts(req, res) {
+  try {
+    const { tenantId, branchId } = resolveInventoryScope(req)
+    const items = await listControlAlerts(tenantId, { branchId })
+    return success(res, { items, count: items.length })
+  } catch (err) {
+    return scopeError(res, err)
+  }
+}

@@ -7,6 +7,7 @@ export const MOVEMENT_TYPES = {
   DAMAGED: 'damaged',
   EXPIRED: 'expired',
   TRANSFER: 'transfer',
+  OTHER: 'other',
 }
 
 export const DAMAGED_LOCATIONS = [
@@ -22,28 +23,37 @@ export function mapStockMovement(row = {}) {
     row.movementType,
     row.movement_type,
     // Legacy mock rows used `type` for movement kind
-    ['in', 'out', 'adjustment', 'damaged', 'expired', 'transfer'].includes(row.type)
+    ['in', 'out', 'adjustment', 'damaged', 'expired', 'transfer', 'other'].includes(row.type)
       ? row.type
       : null,
   ]
   const productType =
     row.productType ||
-    (['single', 'bundle'].includes(row.type) ? row.type : null) ||
+    row.product_type ||
+    (['single', 'bundle', 'variant'].includes(row.type) ? row.type : null) ||
     'single'
+
+  const reason = row.reason || ''
 
   return {
     id: row.id,
     productId: row.productId ?? row.product_id ?? null,
+    parentId: row.parentId ?? row.parent_id ?? null,
     movementType: movementCandidates.find(Boolean) || '',
     quantity: Number(row.quantity ?? 0),
     scale: row.scale || 'unit',
-    reason: row.reason || '',
+    variantLabel: row.variantLabel || row.variant_label || '',
+    reason,
+    notes: row.notes || reason,
     createdAt: row.createdAt ?? row.created_at ?? null,
     expiresAt: row.expiresAt ?? row.expires_at ?? null,
     productName: row.productName || row.product_name || row.itemName || '',
     imageUrl: row.imageUrl || row.image_url || null,
     type: productType,
     itemCode: row.itemCode || row.item_code || '',
+    barcode: row.barcode || '',
+    categoryName: row.categoryName || row.category_name || '',
+    subcategoryName: row.subcategoryName || row.subcategory_name || '',
     companyName: row.companyName || row.company_name || '',
     supplierId: row.supplierId ?? row.supplier_id ?? null,
     purchaseOrderId: row.purchaseOrderId ?? row.purchase_order_id ?? null,

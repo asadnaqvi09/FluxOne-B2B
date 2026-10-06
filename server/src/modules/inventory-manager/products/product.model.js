@@ -3,7 +3,10 @@ import { tenantClientQuery, tenantQuery, withTransaction } from '../../../config
 import { MOVEMENT_TYPES, PRODUCT_TYPES } from '../../../config/constants.js'
 import { generateBarcodeValue, generateItemCode } from '../../../utils/barcode.util.js'
 import { normalizeImageUrl } from '../../../utils/uploadUrl.util.js'
-import { insertLedgerEventInTx } from '../control/control.model.js'
+import {
+  assertPriceChangeAllowed,
+  insertLedgerEventInTx,
+} from '../control/control.model.js'
 
 function httpError(status, message) {
   const error = new Error(message)
@@ -1557,6 +1560,14 @@ export async function updateProduct(tenantId, id, payload, { branchId = null } =
         throw httpError(400, 'Edit the parent variant product to update this SKU')
       }
 
+      // Utilization-gated price: block purchase/sell changes while on-hand remains.
+      if ('purchasePrice' in payload || 'sellingPrice' in payload) {
+        await assertPriceChangeAllowed(client, tenantId, id, {
+          purchasePrice: 'purchasePrice' in payload ? payload.purchasePrice : undefined,
+          sellingPrice: 'sellingPrice' in payload ? payload.sellingPrice : undefined,
+        })
+      }
+
       const effectiveBranchId = existing.branchId || branchId
       const hasCategoryPatch = 'categoryId' in payload || 'subcategoryId' in payload
 
@@ -1663,6 +1674,14 @@ export async function updateProduct(tenantId, id, payload, { branchId = null } =
 
       if (setClauses.length) {
         setClauses.push('updated_at = now()')
+        // Daily-price products: mark today's price review when purchase/sell changes.
+        if ('purchasePrice' in payload || 'sellingPrice' in payload) {
+          setClauses.push(`
+            daily_price_updated_on = CASE
+              WHEN daily_price_change THEN CURRENT_DATE
+              ELSE daily_price_updated_on
+            END`)
+        }
         const { rows } = await tenantClientQuery(
           client,
           tenantId,

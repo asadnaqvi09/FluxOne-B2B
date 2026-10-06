@@ -1,8 +1,6 @@
 import { Package } from 'lucide-react'
-import { ProductImageCell } from '@/components/feature/products/ProductStatusToggle'
 import { EmptyState } from '@/components/shared/EmptyState'
 import { SurfaceCard } from '@/components/shared/SurfaceCard'
-import { RowActionButtons } from '@/components/shared/ActionIconButton'
 import {
   Table,
   TableHeader,
@@ -13,20 +11,9 @@ import {
   TablePagination,
 } from '@/components/ui/table'
 import { TableRowsSkeleton } from '@/components/ui/skeleton'
-import { DateTimeLines } from '@/components/shared/DateTimeLines'
-import { displayItemCode, displayMovementRef } from '@/lib/formatDisplayId'
 import { cn } from '@/lib/utils'
 
-function MovementRowActions({ row, onEdit, onDelete }) {
-  return (
-    <RowActionButtons
-      onEdit={onEdit ? () => onEdit(row) : undefined}
-      onDelete={onDelete ? () => onDelete(row) : undefined}
-    />
-  )
-}
-
-// Shared ledger history — mobile cards + desktop table
+// Shared ledger history — mobile cards + desktop table (Phase 3 row menu via renderRowActions)
 export function MovementHistoryTable({
   title,
   description,
@@ -36,8 +23,7 @@ export function MovementHistoryTable({
   columns = [],
   onPageChange,
   onPageSizeChange,
-  onEdit,
-  onDelete,
+  renderRowActions,
   emptyTitle = 'No movements yet',
   emptyHint = 'Add a movement or adjust filters.',
   className,
@@ -48,14 +34,10 @@ export function MovementHistoryTable({
   const pageCount = Math.max(1, pagination?.pageCount || 1)
   const total = pagination?.total ?? list.length
   const pageSize = pagination?.limit || 8
-  const showActions = Boolean(onEdit || onDelete)
+  const showActions = Boolean(renderRowActions)
 
   return (
-    <SurfaceCard
-      className={className}
-      title={title}
-      description={description}
-    >
+    <SurfaceCard className={className} title={title} description={description}>
       {loading ? (
         <TableRowsSkeleton rows={6} />
       ) : isEmpty ? (
@@ -80,7 +62,7 @@ export function MovementHistoryTable({
                 </div>
                 {showActions ? (
                   <div className="mt-3 flex justify-start border-t border-border pt-2">
-                    <MovementRowActions row={row} onEdit={onEdit} onDelete={onDelete} />
+                    {renderRowActions(row)}
                   </div>
                 ) : null}
               </article>
@@ -88,11 +70,14 @@ export function MovementHistoryTable({
           </div>
 
           <div className="hidden overflow-x-auto md:block -mx-1 px-1 sm:mx-0 sm:px-0">
-            <Table className="min-w-[640px] text-left text-sm md:min-w-[720px]">
+            <Table className="min-w-[720px] text-left text-sm md:min-w-[880px]">
               <TableHeader>
                 <TableRow className="text-xs tracking-wide text-slate-400 uppercase">
                   {columns.map((col) => (
-                    <TableHead key={col.key} className={cn('px-2 py-2 font-semibold', col.className)}>
+                    <TableHead
+                      key={col.key}
+                      className={cn('px-2 py-2 font-semibold', col.className)}
+                    >
                       {col.label}
                     </TableHead>
                   ))}
@@ -105,14 +90,15 @@ export function MovementHistoryTable({
                 {list.map((row) => (
                   <TableRow key={row.id} className="hover:bg-slate-50/80">
                     {columns.map((col) => (
-                      <TableCell key={col.key} className={cn('px-2 py-3 align-middle', col.className)}>
+                      <TableCell
+                        key={col.key}
+                        className={cn('px-2 py-3 align-middle', col.className)}
+                      >
                         {col.render(row)}
                       </TableCell>
                     ))}
                     {showActions ? (
-                      <TableCell className="px-2 py-3">
-                        <MovementRowActions row={row} onEdit={onEdit} onDelete={onDelete} />
-                      </TableCell>
+                      <TableCell className="px-2 py-3">{renderRowActions(row)}</TableCell>
                     ) : null}
                   </TableRow>
                 ))}
@@ -134,46 +120,4 @@ export function MovementHistoryTable({
   )
 }
 
-export function movementImageNameColumns() {
-  return [
-    {
-      key: 'reference',
-      label: 'Stock ID',
-      className: 'w-28',
-      render: (row) => (
-        <span className="font-mono text-xs text-slate-600" title={row.id}>
-          {displayMovementRef(row)}
-        </span>
-      ),
-    },
-    {
-      key: 'image',
-      label: 'Image',
-      className: 'w-14',
-      render: (row) => <ProductImageCell src={row.imageUrl} name={row.productName} />,
-    },
-    {
-      key: 'name',
-      label: 'Name',
-      render: (row) => (
-        <div className="min-w-0">
-          <p className="font-medium text-slate-900">{row.productName || '—'}</p>
-          <p className="text-xs text-slate-400">
-            {displayItemCode({ itemCode: row.itemCode, productId: row.productId })}
-          </p>
-        </div>
-      ),
-    },
-    {
-      key: 'when',
-      label: 'Date · Time',
-      className: 'whitespace-nowrap',
-      render: (row) => <DateTimeLines value={row.createdAt} />,
-    },
-    {
-      key: 'scale',
-      label: 'Scale',
-      render: (row) => <span className="capitalize text-slate-700">{row.scale || '—'}</span>,
-    },
-  ]
-}
+export default MovementHistoryTable

@@ -3,7 +3,7 @@ import { MovementRowMenu } from '@/components/feature/control/MovementRowMenu'
 import { controlColumnsForTab } from '@/lib/controlTableColumns'
 import { MOVEMENT_TYPES } from '@/lib/mapStockMovement'
 
-export function DamagedTable({
+export function OthersTable({
   items,
   loading,
   pagination,
@@ -18,18 +18,18 @@ export function DamagedTable({
 }) {
   return (
     <MovementHistoryTable
-      title="Damaged items history"
-      description="Losses with employee and location"
+      title="Others history"
+      description="Miscellaneous stock movements with a required reason"
       items={items}
       loading={loading}
       pagination={pagination}
-      columns={controlColumnsForTab(MOVEMENT_TYPES.DAMAGED)}
+      columns={controlColumnsForTab(MOVEMENT_TYPES.OTHER)}
       onPageChange={onPageChange}
       onPageSizeChange={onPageSizeChange}
       renderRowActions={(row) => (
         <MovementRowMenu
           row={row}
-          tab={MOVEMENT_TYPES.DAMAGED}
+          tab={MOVEMENT_TYPES.OTHER}
           onUpdateThreshold={onUpdateThreshold}
           onUpdatePrice={onUpdatePrice}
           onViewDetails={onViewDetails}
@@ -37,8 +37,8 @@ export function DamagedTable({
           onDelete={onDelete}
         />
       )}
-      emptyTitle="No damaged records"
-      emptyHint="Log damage with employee, location, and reason."
+      emptyTitle="No other movements"
+      emptyHint="Add an other movement with a required reason."
       className={className}
     />
   )

@@ -7,13 +7,117 @@ import { MOVEMENT_TYPES } from '../../../config/constants.js'
 function onHandDelta(movementType, quantity) {
   const amount = Number(quantity)
   if (movementType === MOVEMENT_TYPES.IN) return amount
-  if (movementType === MOVEMENT_TYPES.ADJUSTMENT) return amount
+  // Adjustment + Others: signed qty (positive increases, negative decreases).
+  if (movementType === MOVEMENT_TYPES.ADJUSTMENT || movementType === MOVEMENT_TYPES.OTHER) {
+    return amount
+  }
   if (movementType === MOVEMENT_TYPES.TRANSFER) return 0
   return -Math.abs(amount)
 }
 
+const PRICE_UTILIZATION_MESSAGE =
+  'New purchase/selling price applies only after previous stock is fully utilized (on-hand must be 0).'
+
+// Tenant BM setting: block price changes while leftover stock remains.
+export async function getPriceUtilizationRule(tenantId) {
+  const { rows } = await tenantQuery(
+    tenantId,
+    `
+      SELECT price_requires_stock_utilized AS "priceRequiresStockUtilized"
+      FROM tenants
+      WHERE id = $1
+      LIMIT 1
+    `,
+    [],
+  )
+  return {
+    priceRequiresStockUtilized: Boolean(rows[0]?.priceRequiresStockUtilized),
+  }
+}
+
+export async function setPriceUtilizationRule(tenantId, enabled) {
+  const { rows } = await tenantQuery(
+    tenantId,
+    `
+      UPDATE tenants
+      SET price_requires_stock_utilized = $2
+      WHERE id = $1
+      RETURNING price_requires_stock_utilized AS "priceRequiresStockUtilized"
+    `,
+    [Boolean(enabled)],
+  )
+  return {
+    priceRequiresStockUtilized: Boolean(rows[0]?.priceRequiresStockUtilized),
+  }
+}
+
+export async function assertPriceChangeAllowed(
+  client,
+  tenantId,
+  productId,
+  { purchasePrice, sellingPrice } = {},
+) {
+  const { rows: settingRows } = await tenantClientQuery(
+    client,
+    tenantId,
+    `SELECT price_requires_stock_utilized AS enabled FROM tenants WHERE id = $1 LIMIT 1`,
+    [],
+  )
+  if (!settingRows[0]?.enabled) return
+
+  const { rows } = await tenantClientQuery(
+    client,
+    tenantId,
+    `
+      SELECT
+        quantity,
+        purchase_price AS "purchasePrice",
+        selling_price AS "sellingPrice"
+      FROM products
+      WHERE tenant_id = $1 AND id = $2
+      FOR UPDATE
+    `,
+    [productId],
+  )
+  const product = rows[0]
+  if (!product) throw httpError(404, 'Product not found')
+
+  const onHand = Number(product.quantity) || 0
+  if (onHand <= 0) return
+
+  const purchaseChanging =
+    purchasePrice != null &&
+    Number(purchasePrice) !== Number(product.purchasePrice)
+  const sellingChanging =
+    sellingPrice != null &&
+    Number(sellingPrice) !== Number(product.sellingPrice)
+
+  if (purchaseChanging || sellingChanging) {
+    throw httpError(422, PRICE_UTILIZATION_MESSAGE)
+  }
+}
+
+// Public helper for product PATCH / daily price (own transaction).
+export async function assertPriceChangeAllowedForProduct(
+  tenantId,
+  productId,
+  { purchasePrice, sellingPrice } = {},
+) {
+  return withTransaction((client) =>
+    assertPriceChangeAllowed(client, tenantId, productId, { purchasePrice, sellingPrice }),
+  )
+}
+
 async function applyPurchaseSnapshot(client, tenantId, { productId, supplierId, unitCost }) {
   if (unitCost == null && !supplierId) return
+
+  // Gate purchase snapshot when leftover stock exists and setting is on.
+  if (unitCost != null) {
+    await assertPriceChangeAllowed(client, tenantId, productId, {
+      purchasePrice: unitCost,
+    })
+  }
+
   await tenantClientQuery(
     client,
     tenantId,
@@ -167,8 +271,18 @@ async function adjustBranchInventory(client, tenantId, branchId, productId, delt
 function validateQuantityForType(movementType, quantity) {
   const amount = Number(quantity)
   if (Number.isNaN(amount)) throw httpError(422, 'Invalid quantity')
-  if (movementType === MOVEMENT_TYPES.ADJUSTMENT) {
-    if (amount === 0) throw httpError(422, 'Adjustment quantity cannot be zero')
+  if (
+    movementType === MOVEMENT_TYPES.ADJUSTMENT ||
+    movementType === MOVEMENT_TYPES.OTHER
+  ) {
+    if (amount === 0) {
+      throw httpError(
+        422,
+        movementType === MOVEMENT_TYPES.OTHER
+          ? 'Other quantity cannot be zero'
+          : 'Adjustment quantity cannot be zero',
+      )
+    }
     return
   }
   if (OUTBOUND_TYPES.has(movementType) || movementType === MOVEMENT_TYPES.IN) {
@@ -295,26 +409,306 @@ export async function createStockTransfer(tenantId, event) {
   })
 }
 
-export async function listLedger(tenantId, filters = {}) {
-  const page = Math.max(1, Number(filters.page) || 1)
-  const limit = Math.min(50, Math.max(1, Number(filters.limit) || 8))
-  const offset = (page - 1) * limit
+// Shared WHERE for ledger list — AND logic across all applied filters.
+// Variant type/value match child SKU option rows (product_variant_options).
+const LEDGER_LIST_WHERE = `
+  WHERE l.tenant_id = $1
+    AND ($2::text[] IS NULL OR l.movement_type = ANY($2::text[]))
+    AND (
+      $3::text IS NULL
+      OR p.name ILIKE '%' || $3 || '%'
+      OR p.item_code ILIKE '%' || $3 || '%'
+      OR COALESCE(p.barcode, '') ILIKE '%' || $3 || '%'
+    )
+    AND ($4::uuid IS NULL OR p.category_id = $4)
+    AND ($5::uuid IS NULL OR p.subcategory_id = $5)
+    AND ($6::text IS NULL OR p.scale = $6)
+    AND ($7::text IS NULL OR p.type = $7)
+    AND ($8::uuid IS NULL OR p.branch_id = $8)
+    AND ($9::uuid IS NULL OR p.id = $9 OR p.parent_id = $9)
+    AND ($10::date IS NULL OR l.created_at::date >= $10::date)
+    AND ($11::date IS NULL OR l.created_at::date <= $11::date)
+    AND ($12::text IS NULL OR COALESCE(p.variant_label, '') ILIKE '%' || $12 || '%')
+    AND (
+      $13::uuid IS NULL
+      OR EXISTS (
+        SELECT 1
+        FROM product_variant_options pvo
+        WHERE pvo.tenant_id = l.tenant_id
+          AND pvo.product_id = p.id
+          AND pvo.variant_type_id = $13
+      )
+    )
+    AND (
+      $14::uuid IS NULL
+      OR EXISTS (
+        SELECT 1
+        FROM product_variant_options pvo
+        WHERE pvo.tenant_id = l.tenant_id
+          AND pvo.product_id = p.id
+          AND pvo.variant_value_id = $14
+      )
+    )
+`
 
-  const movementTypes = Array.isArray(filters.movementTypes)
-    ? filters.movementTypes
-    : filters.movementType
-      ? [filters.movementType]
-      : null
+function ledgerFilterParams(filters = {}, overrides = {}) {
+  let types = null
+  if (Object.prototype.hasOwnProperty.call(overrides, 'movementTypes')) {
+    types = overrides.movementTypes
+  } else if (Array.isArray(filters.movementTypes)) {
+    types = filters.movementTypes
+  } else if (filters.movementType) {
+    types = [filters.movementType]
+  }
 
-  const filterParams = [
-    movementTypes,
+  const from = Object.prototype.hasOwnProperty.call(overrides, 'from')
+    ? overrides.from
+    : filters.from || null
+  const to = Object.prototype.hasOwnProperty.call(overrides, 'to')
+    ? overrides.to
+    : filters.to || null
+
+  return [
+    types,
     filters.q || null,
     filters.categoryId || null,
     filters.subcategoryId || null,
     filters.scale || null,
     filters.type || null,
     filters.branchId || null,
+    filters.productId || null,
+    from,
+    to,
+    filters.variantLabel || null,
+    filters.variantTypeId || null,
+    filters.variantValueId || null,
   ]
+}
+
+// Control summary — KPIs + tab counts for Phase 2 chrome.
+export async function getControlSummary(tenantId, filters = {}) {
+  const branchId = filters.branchId || null
+  const productFilters = [
+    filters.q || null,
+    filters.categoryId || null,
+    filters.subcategoryId || null,
+    filters.scale || null,
+    filters.type || null,
+    branchId,
+    filters.productId || null,
+    filters.variantLabel || null,
+    filters.variantTypeId || null,
+    filters.variantValueId || null,
+  ]
+
+  const PRODUCT_FILTER_WHERE = `
+    WHERE p.tenant_id = $1
+      AND p.status = 'active'
+      AND NOT (p.type = 'variant' AND p.parent_id IS NULL)
+      AND (
+        $2::text IS NULL
+        OR p.name ILIKE '%' || $2 || '%'
+        OR p.item_code ILIKE '%' || $2 || '%'
+        OR COALESCE(p.barcode, '') ILIKE '%' || $2 || '%'
+      )
+      AND ($3::uuid IS NULL OR p.category_id = $3)
+      AND ($4::uuid IS NULL OR p.subcategory_id = $4)
+      AND ($5::text IS NULL OR p.scale = $5)
+      AND ($6::text IS NULL OR p.type = $6)
+      AND ($7::uuid IS NULL OR p.branch_id = $7)
+      AND ($8::uuid IS NULL OR p.id = $8 OR p.parent_id = $8)
+      AND ($9::text IS NULL OR COALESCE(p.variant_label, '') ILIKE '%' || $9 || '%')
+      AND (
+        $10::uuid IS NULL
+        OR EXISTS (
+          SELECT 1
+          FROM product_variant_options pvo
+          WHERE pvo.tenant_id = p.tenant_id
+            AND pvo.product_id = p.id
+            AND pvo.variant_type_id = $10
+        )
+      )
+      AND (
+        $11::uuid IS NULL
+        OR EXISTS (
+          SELECT 1
+          FROM product_variant_options pvo
+          WHERE pvo.tenant_id = p.tenant_id
+            AND pvo.product_id = p.id
+            AND pvo.variant_value_id = $11
+        )
+      )
+  `
+
+  const { rows: stockRows } = await tenantQuery(
+    tenantId,
+    `
+      SELECT
+        COALESCE(sum(p.quantity), 0)::numeric AS "totalStockOnHand",
+        count(*)::int AS "productCount",
+        count(*) FILTER (WHERE p.quantity <= 0)::int AS "outOfStockCount",
+        count(*) FILTER (
+          WHERE p.quantity > 0 AND p.quantity <= COALESCE(p.reorder_point, 0)
+        )::int AS "lowStockCount"
+      FROM products p
+      ${PRODUCT_FILTER_WHERE}
+    `,
+    productFilters,
+  )
+
+  const stock = stockRows[0] || {}
+  const lowStockCount = Number(stock.lowStockCount) || 0
+  const outOfStockCount = Number(stock.outOfStockCount) || 0
+  const attentionCount = lowStockCount + outOfStockCount
+
+  // Active alerts: only after at least one stock-in (TL: no alert on zero opening stock).
+  const { rows: alertCountRows } = await tenantQuery(
+    tenantId,
+    `
+      SELECT count(*)::int AS "alertCount"
+      FROM products p
+      ${PRODUCT_FILTER_WHERE}
+        AND EXISTS (
+          SELECT 1 FROM inventory_ledger l
+          WHERE l.tenant_id = p.tenant_id
+            AND l.product_id = p.id
+            AND l.movement_type = 'in'
+        )
+        AND (
+          p.quantity <= 0
+          OR (
+            COALESCE(p.reorder_point, 0) > 0
+            AND p.quantity > 0
+            AND p.quantity <= p.reorder_point
+          )
+        )
+    `,
+    productFilters,
+  )
+  const alertCount = Number(alertCountRows[0]?.alertCount) || 0
+
+  // Today totals — ignore date range filters; respect catalog filters.
+  const { rows: todayRows } = await tenantQuery(
+    tenantId,
+    `
+      SELECT
+        COALESCE(sum(l.quantity) FILTER (WHERE l.movement_type = 'in'), 0)::numeric AS "stockInToday",
+        COALESCE(
+          sum(ABS(l.quantity)) FILTER (WHERE l.movement_type = 'out'),
+          0
+        )::numeric AS "stockOutToday"
+      FROM inventory_ledger l
+      JOIN products p ON p.id = l.product_id AND p.tenant_id = l.tenant_id
+      WHERE l.tenant_id = $1
+        AND l.created_at::date = CURRENT_DATE
+        AND (
+          $2::text IS NULL
+          OR p.name ILIKE '%' || $2 || '%'
+          OR p.item_code ILIKE '%' || $2 || '%'
+          OR COALESCE(p.barcode, '') ILIKE '%' || $2 || '%'
+        )
+        AND ($3::uuid IS NULL OR p.category_id = $3)
+        AND ($4::uuid IS NULL OR p.subcategory_id = $4)
+        AND ($5::text IS NULL OR p.scale = $5)
+        AND ($6::text IS NULL OR p.type = $6)
+        AND ($7::uuid IS NULL OR p.branch_id = $7)
+        AND ($8::uuid IS NULL OR p.id = $8 OR p.parent_id = $8)
+        AND ($9::text IS NULL OR COALESCE(p.variant_label, '') ILIKE '%' || $9 || '%')
+        AND (
+          $10::uuid IS NULL
+          OR EXISTS (
+            SELECT 1
+            FROM product_variant_options pvo
+            WHERE pvo.tenant_id = l.tenant_id
+              AND pvo.product_id = p.id
+              AND pvo.variant_type_id = $10
+          )
+        )
+        AND (
+          $11::uuid IS NULL
+          OR EXISTS (
+            SELECT 1
+            FROM product_variant_options pvo
+            WHERE pvo.tenant_id = l.tenant_id
+              AND pvo.product_id = p.id
+              AND pvo.variant_value_id = $11
+          )
+        )
+    `,
+    productFilters,
+  )
+
+  const today = todayRows[0] || {}
+
+  // Tab counts — same filter set as listLedger (including date range).
+  const baseParams = ledgerFilterParams(filters)
+  const { rows: countRows } = await tenantQuery(
+    tenantId,
+    `
+      SELECT
+        count(*) FILTER (WHERE l.movement_type = 'in')::int AS "in",
+        count(*) FILTER (
+          WHERE l.movement_type IN ('out', 'damaged', 'expired')
+        )::int AS "out",
+        count(*) FILTER (WHERE l.movement_type = 'adjustment')::int AS "adjustment",
+        count(*) FILTER (WHERE l.movement_type = 'damaged')::int AS "damaged",
+        count(*) FILTER (WHERE l.movement_type = 'expired')::int AS "expired",
+        count(*) FILTER (WHERE l.movement_type = 'other')::int AS "other"
+      FROM inventory_ledger l
+      JOIN products p ON p.id = l.product_id AND p.tenant_id = l.tenant_id
+      ${LEDGER_LIST_WHERE}
+    `,
+    baseParams,
+  )
+
+  const tabCounts = countRows[0] || {}
+
+  // Products with daily price toggle that still need today's update.
+  const { rows: dailyPendingRows } = await tenantQuery(
+    tenantId,
+    `
+      SELECT count(*)::int AS pending
+      FROM products p
+      ${PRODUCT_FILTER_WHERE}
+        AND p.daily_price_change = TRUE
+        AND (
+          p.daily_price_updated_on IS NULL
+          OR p.daily_price_updated_on < CURRENT_DATE
+        )
+    `,
+    productFilters,
+  )
+
+  const priceRule = await getPriceUtilizationRule(tenantId)
+
+  return {
+    totalStockOnHand: Number(stock.totalStockOnHand) || 0,
+    productCount: Number(stock.productCount) || 0,
+    stockInToday: Number(today.stockInToday) || 0,
+    stockOutToday: Number(today.stockOutToday) || 0,
+    attentionCount,
+    lowStockCount,
+    outOfStockCount,
+    alertCount,
+    dailyPricePendingCount: Number(dailyPendingRows[0]?.pending) || 0,
+    priceRequiresStockUtilized: priceRule.priceRequiresStockUtilized,
+    tabCounts: {
+      in: Number(tabCounts.in) || 0,
+      out: Number(tabCounts.out) || 0,
+      adjustment: Number(tabCounts.adjustment) || 0,
+      damaged: Number(tabCounts.damaged) || 0,
+      expired: Number(tabCounts.expired) || 0,
+      other: Number(tabCounts.other) || 0,
+    },
+  }
+}
+
+export async function listLedger(tenantId, filters = {}) {
+  const page = Math.max(1, Number(filters.page) || 1)
+  const limit = Math.min(50, Math.max(1, Number(filters.limit) || 8))
+  const offset = (page - 1) * limit
+
+  const filterParams = ledgerFilterParams(filters)
 
   const { rows: countRows } = await tenantQuery(
     tenantId,
@@ -322,14 +716,7 @@ export async function listLedger(tenantId, filters = {}) {
       SELECT count(*)::int AS total
       FROM inventory_ledger l
       JOIN products p ON p.id = l.product_id AND p.tenant_id = l.tenant_id
-      WHERE l.tenant_id = $1
-        AND ($2::text[] IS NULL OR l.movement_type = ANY($2::text[]))
-        AND ($3::text IS NULL OR p.name ILIKE '%' || $3 || '%' OR p.item_code ILIKE '%' || $3 || '%')
-        AND ($4::uuid IS NULL OR p.category_id = $4)
-        AND ($5::uuid IS NULL OR p.subcategory_id = $5)
-        AND ($6::text IS NULL OR p.scale = $6)
-        AND ($7::text IS NULL OR p.type = $7)
-        AND ($8::uuid IS NULL OR p.branch_id = $8)
+      ${LEDGER_LIST_WHERE}
     `,
     filterParams,
   )
@@ -354,24 +741,25 @@ export async function listLedger(tenantId, filters = {}) {
         l.to_branch_id AS "toBranchId",
         p.name AS "productName",
         p.image_url AS "imageUrl",
+        p.type AS "productType",
         p.type,
         p.item_code AS "itemCode",
+        p.barcode,
+        p.parent_id AS "parentId",
+        p.variant_label AS "variantLabel",
+        cat.name AS "categoryName",
+        sub.name AS "subcategoryName",
         s.company_name AS "companyName",
         du.full_name AS "damagedByName"
       FROM inventory_ledger l
       JOIN products p ON p.id = l.product_id AND p.tenant_id = l.tenant_id
+      LEFT JOIN categories cat ON cat.id = p.category_id AND cat.tenant_id = l.tenant_id
+      LEFT JOIN categories sub ON sub.id = p.subcategory_id AND sub.tenant_id = l.tenant_id
       LEFT JOIN suppliers s ON s.id = l.supplier_id AND s.tenant_id = l.tenant_id
       LEFT JOIN users du ON du.id = l.damaged_by_user_id AND du.tenant_id = l.tenant_id
-      WHERE l.tenant_id = $1
-        AND ($2::text[] IS NULL OR l.movement_type = ANY($2::text[]))
-        AND ($3::text IS NULL OR p.name ILIKE '%' || $3 || '%' OR p.item_code ILIKE '%' || $3 || '%')
-        AND ($4::uuid IS NULL OR p.category_id = $4)
-        AND ($5::uuid IS NULL OR p.subcategory_id = $5)
-        AND ($6::text IS NULL OR p.scale = $6)
-        AND ($7::text IS NULL OR p.type = $7)
-        AND ($8::uuid IS NULL OR p.branch_id = $8)
+      ${LEDGER_LIST_WHERE}
       ORDER BY l.created_at DESC
-      LIMIT $9 OFFSET $10
+      LIMIT $15 OFFSET $16
     `,
     [...filterParams, limit, offset],
   )
@@ -442,7 +830,11 @@ export async function insertLedgerEventInTx(client, tenantId, event) {
 
   if (OUTBOUND_TYPES.has(event.movementType)) {
     await assertSufficientStock(client, tenantId, event.productId, outboundQty)
-  } else if (event.movementType === MOVEMENT_TYPES.ADJUSTMENT && qty < 0) {
+  } else if (
+    (event.movementType === MOVEMENT_TYPES.ADJUSTMENT ||
+      event.movementType === MOVEMENT_TYPES.OTHER) &&
+    qty < 0
+  ) {
     await assertSufficientStock(client, tenantId, event.productId, outboundQty)
   } else if (event.movementType !== MOVEMENT_TYPES.TRANSFER) {
     await lockProduct(client, tenantId, event.productId)
@@ -747,5 +1139,418 @@ export async function processDueExpirations(tenantId, createdBy = null, { branch
 
     return { processed, scanned: due.length }
   })
+}
+
+const SELLABLE_PRODUCT_WHERE = `
+  WHERE p.tenant_id = $1
+    AND p.status = 'active'
+    AND NOT (p.type = 'variant' AND p.parent_id IS NULL)
+    AND ($2::uuid IS NULL OR p.branch_id = $2)
+`
+
+function stockStatus(quantity, reorderPoint) {
+  const qty = Number(quantity) || 0
+  const threshold = Number(reorderPoint) || 0
+  if (qty <= 0) return 'out'
+  if (threshold > 0 && qty <= threshold) return 'low'
+  return 'in'
+}
+
+// Phase 4 — daily price pending rows (only products with dailyPriceChange enabled).
+export async function listDailyPricePending(tenantId, { branchId = null } = {}) {
+  const { rows } = await tenantQuery(
+    tenantId,
+    `
+      SELECT
+        p.id,
+        p.name,
+        p.image_url AS "imageUrl",
+        p.item_code AS "itemCode",
+        p.scale,
+        p.variant_label AS "variantLabel",
+        p.type AS "productType",
+        p.purchase_price AS "purchasePrice",
+        p.selling_price AS "sellingPrice",
+        p.daily_price_updated_on AS "dailyPriceUpdatedOn",
+        cat.name AS "categoryName",
+        sub.name AS "subcategoryName"
+      FROM products p
+      LEFT JOIN categories cat ON cat.id = p.category_id AND cat.tenant_id = p.tenant_id
+      LEFT JOIN categories sub ON sub.id = p.subcategory_id AND sub.tenant_id = p.tenant_id
+      ${SELLABLE_PRODUCT_WHERE}
+        AND p.daily_price_change = TRUE
+        AND (
+          p.daily_price_updated_on IS NULL
+          OR p.daily_price_updated_on < CURRENT_DATE
+        )
+      ORDER BY p.name ASC
+      LIMIT 200
+    `,
+    [branchId || null],
+  )
+  return rows
+}
+
+export async function updateDailyPrice(
+  tenantId,
+  productId,
+  { purchasePrice, sellingPrice, branchId = null } = {},
+) {
+  return withTransaction(async (client) => {
+    await assertPriceChangeAllowed(client, tenantId, productId, {
+      purchasePrice,
+      sellingPrice,
+    })
+
+    const { rows } = await tenantClientQuery(
+      client,
+      tenantId,
+      `
+        UPDATE products
+        SET
+          last_selling_price = CASE
+            WHEN $4::numeric IS NOT NULL AND selling_price IS DISTINCT FROM $4::numeric
+              THEN selling_price
+            ELSE last_selling_price
+          END,
+          purchase_price = COALESCE($3::numeric, purchase_price),
+          selling_price = COALESCE($4::numeric, selling_price),
+          daily_price_updated_on = CURRENT_DATE,
+          updated_at = now()
+        WHERE tenant_id = $1
+          AND id = $2
+          AND daily_price_change = TRUE
+          AND status = 'active'
+          AND ($5::uuid IS NULL OR branch_id = $5)
+        RETURNING
+          id,
+          name,
+          purchase_price AS "purchasePrice",
+          selling_price AS "sellingPrice",
+          daily_price_updated_on AS "dailyPriceUpdatedOn"
+      `,
+      [productId, purchasePrice ?? null, sellingPrice ?? null, branchId || null],
+    )
+    return rows[0] || null
+  })
+}
+
+// Phase 4 — Manage Thresholds list (all sellable SKUs).
+export async function listThresholds(tenantId, { branchId = null, q = null } = {}) {
+  const { rows } = await tenantQuery(
+    tenantId,
+    `
+      SELECT
+        p.id,
+        p.name,
+        p.image_url AS "imageUrl",
+        p.item_code AS "itemCode",
+        p.scale,
+        p.variant_label AS "variantLabel",
+        p.type AS "productType",
+        p.quantity,
+        p.reorder_point AS "reorderPoint",
+        cat.name AS "categoryName",
+        sub.name AS "subcategoryName"
+      FROM products p
+      LEFT JOIN categories cat ON cat.id = p.category_id AND cat.tenant_id = p.tenant_id
+      LEFT JOIN categories sub ON sub.id = p.subcategory_id AND sub.tenant_id = p.tenant_id
+      ${SELLABLE_PRODUCT_WHERE}
+        AND (
+          $3::text IS NULL
+          OR p.name ILIKE '%' || $3 || '%'
+          OR p.item_code ILIKE '%' || $3 || '%'
+        )
+      ORDER BY p.name ASC
+      LIMIT 300
+    `,
+    [branchId || null, q || null],
+  )
+  return rows.map((row) => ({
+    ...row,
+    quantity: Number(row.quantity) || 0,
+    reorderPoint: Number(row.reorderPoint) || 0,
+    stockStatus: stockStatus(row.quantity, row.reorderPoint),
+  }))
+}
+
+export async function upsertThreshold(
+  tenantId,
+  productId,
+  reorderPoint,
+  { branchId = null } = {},
+) {
+  const { rows } = await tenantQuery(
+    tenantId,
+    `
+      UPDATE products
+      SET reorder_point = $3::numeric, updated_at = now()
+      WHERE tenant_id = $1
+        AND id = $2
+        AND status = 'active'
+        AND ($4::uuid IS NULL OR branch_id = $4)
+      RETURNING
+        id,
+        name,
+        quantity,
+        reorder_point AS "reorderPoint"
+    `,
+    [productId, reorderPoint, branchId || null],
+  )
+  if (!rows[0]) return null
+  return {
+    ...rows[0],
+    quantity: Number(rows[0].quantity) || 0,
+    reorderPoint: Number(rows[0].reorderPoint) || 0,
+    stockStatus: stockStatus(rows[0].quantity, rows[0].reorderPoint),
+  }
+}
+
+// Remove threshold monitoring — reorder_point 0 disables low-stock alerts.
+export async function clearThreshold(tenantId, productId, { branchId = null } = {}) {
+  return upsertThreshold(tenantId, productId, 0, { branchId })
+}
+
+// Phase 4 — active low / out-of-stock alerts (only after stock was ever received).
+export async function listControlAlerts(tenantId, { branchId = null } = {}) {
+  const { rows } = await tenantQuery(
+    tenantId,
+    `
+      SELECT
+        p.id,
+        p.name,
+        p.image_url AS "imageUrl",
+        p.item_code AS "itemCode",
+        p.scale,
+        p.variant_label AS "variantLabel",
+        p.type AS "productType",
+        p.quantity,
+        p.reorder_point AS "reorderPoint",
+        cat.name AS "categoryName",
+        sub.name AS "subcategoryName"
+      FROM products p
+      LEFT JOIN categories cat ON cat.id = p.category_id AND cat.tenant_id = p.tenant_id
+      LEFT JOIN categories sub ON sub.id = p.subcategory_id AND sub.tenant_id = p.tenant_id
+      ${SELLABLE_PRODUCT_WHERE}
+        AND EXISTS (
+          SELECT 1
+          FROM inventory_ledger l
+          WHERE l.tenant_id = p.tenant_id
+            AND l.product_id = p.id
+            AND l.movement_type = 'in'
+        )
+        AND (
+          p.quantity <= 0
+          OR (
+            p.reorder_point > 0
+            AND p.quantity > 0
+            AND p.quantity <= p.reorder_point
+          )
+        )
+      ORDER BY
+        CASE WHEN p.quantity <= 0 THEN 0 ELSE 1 END,
+        p.quantity ASC,
+        p.name ASC
+      LIMIT 200
+    `,
+    [branchId || null],
+  )
+  return rows.map((row) => ({
+    ...row,
+    quantity: Number(row.quantity) || 0,
+    reorderPoint: Number(row.reorderPoint) || 0,
+    stockStatus: stockStatus(row.quantity, row.reorderPoint),
+  }))
+}
+
+// Phase 5 — Export ledger rows for active Control tab + filters.
+export async function exportLedgerRows(tenantId, filters = {}) {
+  const filterParams = ledgerFilterParams(filters)
+  const { rows } = await tenantQuery(
+    tenantId,
+    `
+      SELECT
+        l.id,
+        l.movement_type AS "movementType",
+        l.quantity,
+        l.scale,
+        l.reason,
+        l.unit_cost AS "unitCost",
+        l.damaged_location AS "damagedLocation",
+        l.created_at AS "createdAt",
+        p.item_code AS "itemCode",
+        p.barcode,
+        p.name AS "productName",
+        p.type AS "productType",
+        p.variant_label AS "variantLabel",
+        cat.name AS "categoryName",
+        sub.name AS "subcategoryName",
+        s.company_name AS "companyName",
+        du.full_name AS "damagedByName",
+        du.email AS "damagedByEmail"
+      FROM inventory_ledger l
+      JOIN products p ON p.id = l.product_id AND p.tenant_id = l.tenant_id
+      LEFT JOIN categories cat ON cat.id = p.category_id AND cat.tenant_id = p.tenant_id
+      LEFT JOIN categories sub ON sub.id = p.subcategory_id AND sub.tenant_id = p.tenant_id
+      LEFT JOIN suppliers s ON s.id = l.supplier_id AND s.tenant_id = l.tenant_id
+      LEFT JOIN users du ON du.id = l.damaged_by_user_id AND du.tenant_id = l.tenant_id
+      ${LEDGER_LIST_WHERE}
+      ORDER BY l.created_at DESC
+      LIMIT 5000
+    `,
+    filterParams,
+  )
+  return rows
+}
+
+async function resolveProductForImport(client, tenantId, row, { branchId = null } = {}) {
+  const itemCode = String(row.itemCode || '').trim()
+  const barcode = String(row.barcode || '').trim()
+  const variantType = String(row.variantType || '').trim()
+  const variantValue = String(row.variantValue || '').trim()
+  const variantLabel =
+    String(row.variantLabel || '').trim() ||
+    (variantType && variantValue ? `${variantType}:${variantValue}` : '') ||
+    (variantValue || '')
+
+  if (!itemCode && !barcode) {
+    throw httpError(422, 'itemCode or barcode is required')
+  }
+
+  const { rows } = await tenantClientQuery(
+    client,
+    tenantId,
+    `
+      SELECT
+        id,
+        name,
+        scale,
+        quantity,
+        status,
+        variant_label AS "variantLabel"
+      FROM products
+      WHERE tenant_id = $1
+        AND status = 'active'
+        AND NOT (type = 'variant' AND parent_id IS NULL)
+        AND ($2::uuid IS NULL OR branch_id = $2)
+        AND (
+          ($3::text IS NOT NULL AND lower(item_code) = lower($3))
+          OR ($4::text IS NOT NULL AND barcode = $4)
+        )
+        AND (
+          $5::text IS NULL
+          OR COALESCE(variant_label, '') ILIKE '%' || $5 || '%'
+        )
+      ORDER BY
+        CASE WHEN $3::text IS NOT NULL AND lower(item_code) = lower($3) THEN 0 ELSE 1 END,
+        created_at ASC
+      LIMIT 5
+    `,
+    [branchId || null, itemCode || null, barcode || null, variantLabel || null],
+  )
+
+  if (!rows.length) throw httpError(422, 'Product not found for itemCode/barcode')
+  if (rows.length > 1 && variantLabel) {
+    const exact = rows.find(
+      (r) => String(r.variantLabel || '').toLowerCase() === variantLabel.toLowerCase(),
+    )
+    if (exact) return exact
+  }
+  if (rows.length > 1) {
+    throw httpError(422, 'Multiple products matched — set Variant Type/Value to disambiguate')
+  }
+  return rows[0]
+}
+
+// Phase 5 — Import movement rows for one Control tab (valid rows applied; errors reported).
+export async function importControlMovements(
+  tenantId,
+  { movementType, rows = [], createdBy = null, branchId = null } = {},
+) {
+  const allowed = new Set([
+    MOVEMENT_TYPES.IN,
+    MOVEMENT_TYPES.ADJUSTMENT,
+    MOVEMENT_TYPES.DAMAGED,
+    MOVEMENT_TYPES.OTHER,
+  ])
+  if (!allowed.has(movementType)) {
+    throw httpError(422, 'Import is not supported for this tab')
+  }
+
+  const results = { imported: 0, failed: 0, errors: [] }
+
+  for (let i = 0; i < rows.length; i += 1) {
+    const row = rows[i] || {}
+    const rowNum = i + 2
+    try {
+      await withTransaction(async (client) => {
+        const product = await resolveProductForImport(client, tenantId, row, { branchId })
+        const quantity = Number(row.quantity)
+        if (!Number.isFinite(quantity) || quantity === 0) {
+          throw httpError(422, 'quantity is required and cannot be zero')
+        }
+        const scale = String(row.scale || product.scale || 'unit').trim() || 'unit'
+        const reason = String(row.reason || row.notes || '').trim()
+
+        if (
+          movementType === MOVEMENT_TYPES.ADJUSTMENT ||
+          movementType === MOVEMENT_TYPES.DAMAGED ||
+          movementType === MOVEMENT_TYPES.OTHER
+        ) {
+          if (reason.length < 3) throw httpError(422, 'reason is required (min 3 characters)')
+        }
+
+        const event = {
+          productId: product.id,
+          movementType,
+          quantity:
+            movementType === MOVEMENT_TYPES.IN || movementType === MOVEMENT_TYPES.DAMAGED
+              ? Math.abs(quantity)
+              : quantity,
+          scale,
+          reason: reason || null,
+          createdBy,
+          scopeBranchId: branchId,
+          branchId: movementType === MOVEMENT_TYPES.IN ? branchId : undefined,
+          unitCost:
+            row.unitCost != null && row.unitCost !== ''
+              ? Math.round(Number(row.unitCost))
+              : undefined,
+          damagedLocation: row.damagedLocation || undefined,
+        }
+
+        if (movementType === MOVEMENT_TYPES.DAMAGED) {
+          if (!event.damagedLocation) {
+            throw httpError(422, 'damagedLocation is required for damaged import')
+          }
+          const email = String(row.damagedByEmail || '').trim()
+          if (!email) throw httpError(422, 'damagedByEmail is required for damaged import')
+          const { rows: users } = await tenantClientQuery(
+            client,
+            tenantId,
+            `
+              SELECT id FROM users
+              WHERE tenant_id = $1 AND lower(email) = lower($2)
+              LIMIT 1
+            `,
+            [email],
+          )
+          if (!users[0]) throw httpError(422, `User not found for damagedByEmail: ${email}`)
+          event.damagedByUserId = users[0].id
+        }
+
+        await insertLedgerEventInTx(client, tenantId, event)
+      })
+      results.imported += 1
+    } catch (err) {
+      results.failed += 1
+      results.errors.push({
+        row: rowNum,
+        error: err?.message || 'Import failed',
+      })
+    }
+  }
+
+  return results
 }
 

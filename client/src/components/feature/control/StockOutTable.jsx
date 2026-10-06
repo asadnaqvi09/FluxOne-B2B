@@ -1,13 +1,7 @@
-import {
-  MovementHistoryTable,
-  movementImageNameColumns,
-} from '@/components/feature/control/MovementHistoryTable'
-
-const SOURCE_LABEL = {
-  out: 'Sale / stock out',
-  damaged: 'Damaged',
-  expired: 'Expired',
-}
+import { MovementHistoryTable } from '@/components/feature/control/MovementHistoryTable'
+import { MovementRowMenu } from '@/components/feature/control/MovementRowMenu'
+import { controlColumnsForTab } from '@/lib/controlTableColumns'
+import { MOVEMENT_TYPES } from '@/lib/mapStockMovement'
 
 export function StockOutTable({
   items,
@@ -15,45 +9,32 @@ export function StockOutTable({
   pagination,
   onPageChange,
   onPageSizeChange,
+  onUpdateThreshold,
+  onUpdatePrice,
+  onViewDetails,
   className,
 }) {
-  const columns = [
-    ...movementImageNameColumns(),
-    {
-      key: 'type',
-      label: 'Type',
-      render: (row) => <span className="capitalize text-slate-700">{row.type || '—'}</span>,
-    },
-    {
-      key: 'source',
-      label: 'Source',
-      render: (row) => (
-        <span className="text-slate-600">
-          {SOURCE_LABEL[row.movementType] || row.movementType || '—'}
-        </span>
-      ),
-    },
-    {
-      key: 'qty',
-      label: 'Stock-out qty',
-      render: (row) => (
-        <span className="font-semibold text-red-600">−{Math.abs(Number(row.quantity || 0))}</span>
-      ),
-    },
-  ]
-
   return (
     <MovementHistoryTable
       title="Stock out history"
-      description="Inventory leaving stock via sales, damaged, or expired"
+      description="Inventory leaving stock via sales and related outbound movements"
       items={items}
       loading={loading}
       pagination={pagination}
-      columns={columns}
+      columns={controlColumnsForTab(MOVEMENT_TYPES.OUT)}
       onPageChange={onPageChange}
       onPageSizeChange={onPageSizeChange}
+      renderRowActions={(row) => (
+        <MovementRowMenu
+          row={row}
+          tab={MOVEMENT_TYPES.OUT}
+          onUpdateThreshold={onUpdateThreshold}
+          onUpdatePrice={onUpdatePrice}
+          onViewDetails={onViewDetails}
+        />
+      )}
       emptyTitle="No stock-out records"
-      emptyHint="Damaged, expired, and POS sales appear here automatically."
+      emptyHint="POS sales and outbound movements appear here automatically."
       className={className}
     />
   )

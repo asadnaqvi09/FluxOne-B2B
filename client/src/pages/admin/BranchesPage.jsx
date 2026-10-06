@@ -181,11 +181,10 @@ function BranchRowActions({
         disabled={mutating}
         title={isOpen ? 'Block' : 'Unblock'}
         aria-label={isOpen ? `Block ${b.name}` : `Unblock ${b.name}`}
-        className={`size-8 ${
-          isOpen
+        className={`size-8 ${isOpen
             ? 'text-rose-600 hover:bg-rose-50 hover:text-rose-800'
             : 'text-emerald-700 hover:bg-emerald-50 hover:text-emerald-900'
-        }`}
+          }`}
       >
         {isOpen ? <Ban className="size-4" /> : <Unlock className="size-4" />}
       </Button>
@@ -626,11 +625,10 @@ export function BranchesPage() {
                     setStatusFilter(tab.key)
                     setPage(1)
                   }}
-                  className={`rounded-lg px-3 py-1 text-xs font-semibold transition-all cursor-pointer whitespace-nowrap ${
-                    statusFilter === tab.key
+                  className={`rounded-lg px-3 py-1 text-xs font-semibold transition-all cursor-pointer whitespace-nowrap ${statusFilter === tab.key
                       ? 'bg-white text-purple-900 shadow-xs font-bold'
                       : 'text-slate-600 hover:text-slate-900'
-                  }`}
+                    }`}
                 >
                   {tab.label}
                 </button>
@@ -1065,12 +1063,18 @@ export function BranchesPage() {
                     type="email"
                     placeholder="e.g. bm.wah@softwareflux.com"
                     value={formData.managerEmail}
+                    disabled={Boolean(editingBranch)}
                     onChange={(e) => {
+                      if (editingBranch) return
                       setFormData({ ...formData, managerEmail: e.target.value })
                       clearField('managerEmail')
                     }}
                     aria-invalid={Boolean(fieldErrors.managerEmail)}
-                    className={fieldErrorClass(fieldErrors.managerEmail)}
+                    className={
+                      editingBranch
+                        ? 'bg-slate-50 text-slate-600 text-xs'
+                        : fieldErrorClass(fieldErrors.managerEmail)
+                    }
                   />
                   <FieldError message={fieldErrors.managerEmail} />
                 </div>

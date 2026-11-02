@@ -1708,29 +1708,29 @@ export async function exportLedgerRows(tenantId, filters = {}) {
     `
       SELECT
         l.id,
-        l.movement_type AS "movementType",
+        l.movement_type                          AS "movementType",
         l.quantity,
         l.scale,
         l.reason,
-        l.unit_cost AS "unitCost",
-        l.damaged_location AS "damagedLocation",
-        l.created_at AS "createdAt",
-        p.item_code AS "itemCode",
+        l.control_source                         AS "controlSource",
+        l.created_at                             AS "createdAt",
+        p.last_purchase_price                    AS "oldPurchasePrice",
+        l.unit_cost                              AS "newPurchasePrice",
+        p.last_selling_price                     AS "oldSellingPrice",
+        p.selling_price                          AS "newSellingPrice",
+        p.item_code                              AS "itemCode",
         p.barcode,
-        p.name AS "productName",
-        p.type AS "productType",
-        p.variant_label AS "variantLabel",
-        cat.name AS "categoryName",
-        sub.name AS "subcategoryName",
-        s.company_name AS "companyName",
-        du.full_name AS "damagedByName",
-        du.email AS "damagedByEmail"
+        p.name                                   AS "productName",
+        p.type                                   AS "productType",
+        p.variant_label                          AS "variantLabel",
+        cat.name                                 AS "categoryName",
+        sub.name                                 AS "subcategoryName",
+        s.company_name                           AS "supplierName"
       FROM inventory_ledger l
       JOIN products p ON p.id = l.product_id AND p.tenant_id = l.tenant_id
-      LEFT JOIN categories cat ON cat.id = p.category_id AND cat.tenant_id = p.tenant_id
-      LEFT JOIN categories sub ON sub.id = p.subcategory_id AND sub.tenant_id = p.tenant_id
-      LEFT JOIN suppliers s ON s.id = l.supplier_id AND s.tenant_id = l.tenant_id
-      LEFT JOIN users du ON du.id = l.damaged_by_user_id AND du.tenant_id = l.tenant_id
+      LEFT JOIN categories cat ON cat.id = p.category_id    AND cat.tenant_id = l.tenant_id
+      LEFT JOIN categories sub ON sub.id = p.subcategory_id AND sub.tenant_id = l.tenant_id
+      LEFT JOIN suppliers  s   ON s.id  = l.supplier_id     AND s.tenant_id   = l.tenant_id
       ${LEDGER_LIST_WHERE}
       ORDER BY l.created_at DESC
       LIMIT 5000

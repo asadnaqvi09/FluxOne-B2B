@@ -1,9 +1,13 @@
 import { tenantClientQuery, tenantQuery, withTransaction } from '../../../config/db.js'
-import { CONTROL_SOURCES, MOVEMENT_TYPES } from '../../../config/constants.js'
+import { CONTROL_SOURCES, MOVEMENT_TYPES, PRODUCT_TYPES } from '../../../config/constants.js'
 import {
   applyPriceLayersForMovement,
   shouldKeepExistingStockPrice,
 } from './priceLayers.js'
+import {
+  applyBundleAssembleDelta,
+  loadBundleRecipe,
+} from '../products/bundleAssemble.js'
 import {
   formatStockActionText,
   stockActionFromMovement,
@@ -893,7 +897,87 @@ export async function getLedgerById(tenantId, id, client = null, { branchId = nu
   return rows[0] || null
 }
 
+/**
+ * Control Stock In on a bundle must assemble (same as Edit Bundle top-up):
+ * deduct recipe components, then IN finished qty.
+ * Returns { handled: false } for non-bundles, or { handled: true, row } after assemble.
+ */
+async function tryAssembleBundleOnStockIn(client, tenantId, event) {
+  const { rows } = await tenantClientQuery(
+    client,
+    tenantId,
+    `
+      SELECT
+        id,
+        type,
+        name,
+        scale,
+        quantity,
+        branch_id AS "branchId"
+      FROM products
+      WHERE tenant_id = $1 AND id = $2
+      FOR UPDATE
+    `,
+    [event.productId],
+  )
+  const product = rows[0]
+  // Not a bundle — normal Stock In path continues
+  if (!product || product.type !== PRODUCT_TYPES.BUNDLE) {
+    return { handled: false }
+  }
+
+  const added = Math.abs(Number(event.quantity) || 0)
+  if (!(added > 0)) {
+    throw httpError(422, 'Bundle stock-in quantity must be greater than zero')
+  }
+
+  const recipe = await loadBundleRecipe(client, tenantId, product.id)
+  if (!recipe.length) {
+    throw httpError(422, 'Bundle has no recipe items and cannot be stocked in')
+  }
+
+  const oldQty = Math.max(0, Number(product.quantity) || 0)
+  const branchId = event.branchId || event.scopeBranchId || product.branchId || null
+
+  // Reuse Product Management assemble engine (component OUT + bundle IN)
+  const row = await applyBundleAssembleDelta(
+    client,
+    tenantId,
+    {
+      bundleId: product.id,
+      bundleName: product.name,
+      bundleScale: event.scale || product.scale || 'unit',
+      oldBundleQty: oldQty,
+      newBundleQty: oldQty + added,
+      oldItems: recipe,
+      newItems: recipe,
+      createdBy: event.createdBy || null,
+      scopeBranchId: event.scopeBranchId || branchId,
+      branchId,
+      bundleLedgerExtras: {
+        supplierId: event.supplierId || null,
+        unitCost: event.unitCost ?? null,
+        sellingPrice: event.sellingPrice ?? null,
+        controlSource: event.controlSource || null,
+        purchaseOrderId: event.purchaseOrderId || null,
+        toBranchId: event.toBranchId || null,
+        actorName: event.actorName,
+        actorRole: event.actorRole,
+      },
+    },
+    insertLedgerEventInTx,
+  )
+
+  return { handled: true, row }
+}
+
 export async function insertLedgerEventInTx(client, tenantId, event) {
+  // Bundle Stock In → assemble components first (skip when already inside assemble)
+  if (event.movementType === MOVEMENT_TYPES.IN && !event.skipBundleAssemble) {
+    const assembled = await tryAssembleBundleOnStockIn(client, tenantId, event)
+    if (assembled.handled) return assembled.row
+  }
+
   // Branch scope: when scoped, product must belong to that branch
   if (event.scopeBranchId != null) {
     const { rows: scoped } = await tenantClientQuery(

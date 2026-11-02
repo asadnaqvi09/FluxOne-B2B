@@ -46,6 +46,8 @@ function lineFromProduct(product) {
     productName: product.productName || product.name || 'Item',
     itemCode: product.itemCode || '',
     scale: product.scale || 'unit',
+    // Used to warn that Stock In assembles recipe components
+    type: product.type || '',
     quantity: '1',
     purchasePrice: '',
     sellingPrice: '',
@@ -321,12 +323,20 @@ export function AddStockInDialog({
               Review {selectedLines.length} line(s)
               {supplierId ? ' for the selected supplier' : ''}, then save to update stock.
             </p>
+            {/* Bundles: Stock In deducts recipe components (same as Edit Bundle top-up) */}
+            {selectedLines.some((row) => row.type === PRODUCT_TYPES.BUNDLE) ? (
+              <p className="rounded-lg bg-amber-50 px-3 py-2 text-xs text-amber-900">
+                Bundle stock-in assembles finished units: component stock is deducted by the
+                recipe. Save fails if any component has insufficient quantity.
+              </p>
+            ) : null}
             <ul className="max-h-64 space-y-2 overflow-y-auto text-sm">
               {selectedLines.map((row) => (
                 <li key={row.productId} className="rounded-lg border border-border px-3 py-2">
                   <p className="font-semibold text-slate-900">{row.productName}</p>
                   <p className="text-xs text-slate-500">
                     Qty {row.quantity}
+                    {row.type === PRODUCT_TYPES.BUNDLE ? ' · Bundle (assembles components)' : ''}
                     {row.purchasePrice !== '' ? ` · Purchase ${row.purchasePrice}` : ''}
                     {row.sellingPrice !== '' ? ` · Selling ${row.sellingPrice}` : ''}
                   </p>

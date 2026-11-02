@@ -42,6 +42,7 @@ import { ApplyDefaultTaxField } from '@/components/feature/products/ApplyDefault
 import { PATHS } from '@/router/paths'
 import { toastError, toastSuccess } from '@/lib/toast'
 import { fieldErrorClass } from '@/lib/validation/fieldErrors'
+import { finalPriceFromSelling } from '@/lib/pricing'
 import { useFieldErrors } from '@/hooks/useFieldErrors'
 import { cn } from '@/lib/utils'
 
@@ -351,9 +352,9 @@ export function BundleFormPage({ mode = 'create', initialBundle = null, loadingD
     selectedOffer?.percent != null ? Number(selectedOffer.percent) : 0
   const priceNum = Number(bundlePrice) || 0
   const finalAfterOffer = Math.round(priceNum * (1 - offerPercent / 100))
-  // Preview only — save uses buildImTaxPayload (Admin default rate when checked)
   const taxRate = applyDefaultTax ? defaultTaxPercent : 0
   const taxAmount = Math.round(finalAfterOffer * (taxRate / 100))
+  const finalBundlePrice = finalPriceFromSelling(priceNum, offerPercent, taxRate)
 
   function resetPicker() {
     setProductId('')
@@ -925,18 +926,6 @@ export function BundleFormPage({ mode = 'create', initialBundle = null, loadingD
             <FieldError message={fieldErrors.sellingPrice} />
           </div>
           <div className="space-y-1.5">
-            <Label>Final bundle price</Label>
-            <Input
-              value={bundlePrice ? money(finalAfterOffer) : '—'}
-              disabled
-              className="bg-slate-50"
-            />
-            <p className="text-[11px] text-slate-400">
-              Bundle price − offer %
-              {offerPercent ? ` (${offerPercent}%)` : ''}.
-            </p>
-          </div>
-          <div className="space-y-1.5">
             <Label>Tax amount</Label>
             <Input
               value={applyDefaultTax && taxRate ? money(taxAmount) : money(0)}
@@ -945,8 +934,20 @@ export function BundleFormPage({ mode = 'create', initialBundle = null, loadingD
             />
             <p className="text-[11px] text-slate-400">
               {applyDefaultTax && taxRate
-                ? `${taxRate}% of final price (invoice line).`
+                ? `${taxRate}% of price after offer (invoice line).`
                 : 'Tax not applied.'}
+            </p>
+          </div>
+          <div className="space-y-1.5">
+            <Label>Final bundle price</Label>
+            <Input
+              value={bundlePrice ? money(finalBundlePrice) : '—'}
+              disabled
+              className="bg-slate-50"
+            />
+            <p className="text-[11px] text-slate-400">
+              Bundle price − offer %{offerPercent ? ` (${offerPercent}%)` : ''}
+              {applyDefaultTax && taxRate ? ` + tax (${taxRate}%)` : ''}.
             </p>
           </div>
         </div>

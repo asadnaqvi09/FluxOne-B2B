@@ -1,4 +1,4 @@
-import { exportRowsToStyledExcel } from '@/lib/csvExport'
+import { exportRowsToStyledExcel } from '@/lib/export/csvExport'
 import {
   ADMIN_LOG_CATEGORY_LABELS,
   ADMIN_LOG_ROLE_OPTIONS,
@@ -6,7 +6,7 @@ import {
   adminLogTabFileSlug,
   formatAdminLogTimestamp,
   localDateInputValue,
-} from '@/lib/adminLogs'
+} from '@/lib/admin/adminLogs'
 import { roleDisplayName } from '@/lib/nav'
 
 const EXPORT_HEADERS = [

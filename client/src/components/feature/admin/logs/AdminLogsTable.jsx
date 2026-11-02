@@ -18,7 +18,7 @@ import {
   adminLogCategoryBadgeClass,
   adminLogCategoryLabel,
   formatAdminLogTimestamp,
-} from '@/lib/adminLogs'
+} from '@/lib/admin/adminLogs'
 import { roleDisplayName } from '@/lib/nav'
 
 function roleLabel(role) {

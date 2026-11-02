@@ -4,7 +4,7 @@ import {
   Receipt,
   TrendingUp,
 } from 'lucide-react'
-import { useCurrency } from '@/hooks/useCurrency'
+import { useCurrency } from '@/hooks/shared/useCurrency'
 import { cn } from '@/lib/utils'
 
 // KPI cards — Total Sales, Profit, Transactions (no Average Ticket)

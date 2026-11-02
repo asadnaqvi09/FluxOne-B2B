@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import { AnimatePresence, motion } from 'motion/react'
 import { X } from 'lucide-react'
-import { useAuthSession } from '@/hooks/useAuthSession'
+import { useAuthSession } from '@/hooks/shared/useAuthSession'
 import { BRAND } from '@/lib/constants'
 import { cn } from '@/lib/utils'
 

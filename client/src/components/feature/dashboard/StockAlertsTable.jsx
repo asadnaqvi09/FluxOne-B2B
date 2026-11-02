@@ -14,7 +14,7 @@ import {
   TablePagination,
 } from '@/components/ui/table'
 import { TableRowsSkeleton } from '@/components/ui/skeleton'
-import { sourceLabel, STOCK_STATUS_META } from '@/lib/mapInventoryDashboard'
+import { sourceLabel, STOCK_STATUS_META } from '@/lib/inventory/mapInventoryDashboard'
 import { referenceFromUuid } from '@/lib/formatDisplayId'
 import { cn } from '@/lib/utils'
 

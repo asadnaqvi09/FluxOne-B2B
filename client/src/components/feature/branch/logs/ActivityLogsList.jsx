@@ -18,10 +18,10 @@ import {
   formatActivityLine,
   formatActivityRelative,
   formatActivityTime,
-} from '@/lib/activityLogLabels'
+} from '@/lib/branch/activityLogLabels'
 import { DateTimeLines } from '@/components/shared/DateTimeLines'
 import { roleDisplayName } from '@/lib/nav'
-import { ACTIVITY_LOGS_PAGE_SIZE } from '@/hooks/useActivityLogs'
+import { ACTIVITY_LOGS_PAGE_SIZE } from '@/hooks/branch/useActivityLogs'
 
 function roleLabel(role) {
   if (!role || role === 'unknown') return '—'

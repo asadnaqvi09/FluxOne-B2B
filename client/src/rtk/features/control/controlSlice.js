@@ -7,16 +7,16 @@ import {
   CONTROL_SOURCES,
   CONTROL_UI_TAB,
   STOCK_OUT_LEDGER_TYPES,
-} from '@/lib/controlTabs'
-import { mapStockMovement, MOVEMENT_TYPES } from '@/lib/mapStockMovement'
-import { mapPurchaseOrder } from '@/lib/mapPurchaseOrder'
-import { mapProduct } from '@/lib/mapProduct'
-import { mapSupplier } from '@/lib/mapSupplier'
+} from '@/lib/control/controlTabs'
+import { mapStockMovement, MOVEMENT_TYPES } from '@/lib/control/mapStockMovement'
+import { mapPurchaseOrder } from '@/lib/orders/mapPurchaseOrder'
+import { mapProduct } from '@/lib/products/mapProduct'
+import { mapSupplier } from '@/lib/suppliers/mapSupplier'
 import {
   catalogToState,
   getProductCatalog,
   peekProductCatalog,
-} from '@/lib/productCatalogCache'
+} from '@/lib/products/productCatalogCache'
 
 export const CONTROL_PAGE_SIZE = 8
 

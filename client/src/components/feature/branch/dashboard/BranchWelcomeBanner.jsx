@@ -1,5 +1,5 @@
 import { WelcomeBanner } from '@/components/shared/WelcomeBanner'
-import { useAuthSession } from '@/hooks/useAuthSession'
+import { useAuthSession } from '@/hooks/shared/useAuthSession'
 import { ROLES } from '@/lib/constants'
 
 function sessionKey(user, token) {

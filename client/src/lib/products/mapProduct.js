@@ -377,5 +377,5 @@ export function splitProductWrite(fields, { withConfirmed = true } = {}) {
 }
 
 // @deprecated use productCsv.js — kept for older imports
-export { productsToCsv, downloadTextFile } from '@/lib/productCsv'
+export { productsToCsv, downloadTextFile } from '@/lib/products/productCsv'
 

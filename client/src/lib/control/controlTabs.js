@@ -1,4 +1,4 @@
-import { MOVEMENT_TYPES } from '@/lib/mapStockMovement'
+import { MOVEMENT_TYPES } from '@/lib/control/mapStockMovement'
 
 // UI-only tab ids (thresholds is not a ledger movement type).
 export const CONTROL_UI_TAB = {

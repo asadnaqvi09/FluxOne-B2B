@@ -11,17 +11,17 @@ import {
 import { Button } from '@/components/ui/button'
 import { OrderCompanyBlock } from '@/components/feature/orders/OrderCompanyBlock'
 import { displayOrderRef } from '@/lib/formatDisplayId'
-import { OrderStatusBadge } from '@/lib/orderStatus'
+import { OrderStatusBadge } from '@/components/feature/orders/OrderStatusBadge'
 import {
   emptyCompanyBlock,
   emptyOrderFilters,
   newCompanyBlockKey,
   summarizeBlocks,
-} from '@/lib/orderGenerate'
+} from '@/lib/orders/orderGenerate'
 import { useAppDispatch, useAppSelector } from '@/rtk/hooks'
 import { catalogActiveOnly } from '@/rtk/asResult'
 import { loadControlCatalog } from '@/rtk/features/control/controlSlice'
-import { fetchControlSuppliers } from '@/hooks/useInventoryControl'
+import { fetchControlSuppliers } from '@/hooks/inventory/useInventoryControl'
 import { TableRowsSkeleton } from '@/components/ui/skeleton'
 
 function orderToBlocks(order) {

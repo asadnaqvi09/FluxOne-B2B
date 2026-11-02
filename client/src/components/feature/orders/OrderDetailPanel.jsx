@@ -6,7 +6,7 @@ import {
 } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
 import { OrderDetailBody } from '@/components/feature/orders/OrderDetailBody'
-import { canDownloadPurchaseOrderInvoices } from '@/lib/purchaseOrderInvoiceExport'
+import { canDownloadPurchaseOrderInvoices } from '@/lib/orders/purchaseOrderInvoiceExport'
 
 // Override Dialog defaults (sm:max-w-lg md:max-w-xl) so item tables stay readable.
 const DETAIL_DIALOG_WIDTH =

@@ -19,17 +19,19 @@ import { UpdateThresholdDialog } from '@/components/feature/control/UpdateThresh
 import { ViewMovementDetailsDialog } from '@/components/feature/control/ViewMovementDetailsDialog'
 import { MotionHeader, MotionReveal } from '@/components/shared/MotionReveal'
 import { PageHeader } from '@/components/shared/PageHeader'
-import { apiClient } from '@/api/api'
-import { endpoints } from '@/api/endpoints'
-import { useDebouncedSearch } from '@/hooks/useDebouncedSearch'
-import { useInventoryControl } from '@/hooks/useInventoryControl'
-import { downloadControlExport } from '@/lib/controlCsv'
+import { useDebouncedSearch } from '@/hooks/shared/useDebouncedSearch'
+import {
+  exportControlRows,
+  patchControlProduct,
+  useInventoryControl,
+} from '@/hooks/inventory/useInventoryControl'
+import { downloadControlExport } from '@/lib/control/controlCsv'
 import {
   CONTROL_UI_TAB,
   LEDGER_KIND_OPTIONS,
   STOCK_OUT_KIND_OPTIONS,
-} from '@/lib/controlTabs'
-import { MOVEMENT_TYPES } from '@/lib/mapStockMovement'
+} from '@/lib/control/controlTabs'
+import { MOVEMENT_TYPES } from '@/lib/control/mapStockMovement'
 import { toastError, toastInfo, toastSuccess } from '@/lib/toast'
 import { useAppSelector } from '@/rtk/hooks'
 import { buildListQuery } from '@/rtk/features/control/controlSlice'
@@ -139,10 +141,7 @@ export function InventoryControlPage() {
     if (line.unitCost != null) productPatch.purchasePrice = Number(line.unitCost)
 
     if (Object.keys(productPatch).length > 0) {
-      const patchRes = await apiClient.patch(
-        endpoints.products.update(line.productId),
-        productPatch,
-      )
+      const patchRes = await patchControlProduct(line.productId, productPatch)
       if (!patchRes.success) {
         const message = String(patchRes.error || '')
         if (/utilized|previous stock/i.test(message)) {
@@ -176,7 +175,7 @@ export function InventoryControlPage() {
   async function handleThresholdSubmit(payload) {
     setProductActionLoading(true)
     try {
-      const result = await apiClient.patch(endpoints.products.update(payload.productId), {
+      const result = await patchControlProduct(payload.productId, {
         reorderPoint: payload.reorderPoint,
       })
       if (!result.success) {
@@ -206,7 +205,7 @@ export function InventoryControlPage() {
       }
       delete query.page
       delete query.limit
-      const result = await apiClient.get(endpoints.control.export, query)
+      const result = await exportControlRows(query)
       if (!result.success) {
         toastError(result.error || 'Export failed')
         return

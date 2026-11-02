@@ -14,7 +14,7 @@ import { WholeNumberInput } from '@/components/shared/WholeNumberInput'
 import { BRAND } from '@/lib/constants'
 import { formatMoney } from '@/lib/currency'
 import { displayItemCode } from '@/lib/formatDisplayId'
-import { formatShelfQuantity, suggestRestockQty } from '@/lib/shelfStockStatus'
+import { formatShelfQuantity, suggestRestockQty } from '@/lib/products/shelfStockStatus'
 import { toastError, toastSuccess } from '@/lib/toast'
 import { apiClient } from '@/api/api'
 

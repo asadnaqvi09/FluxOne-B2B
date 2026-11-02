@@ -1,6 +1,6 @@
 // Product catalog Excel export — friendly columns, parent/child colors (TC-IM-EXPORT-001)
 // No itemCode in file — Import Ref links variants/bundles; server generates item codes on import.
-import { exportRowsToStyledExcel } from '@/lib/csvExport'
+import { exportRowsToStyledExcel } from '@/lib/export/csvExport'
 
 export const PRODUCT_EXCEL_HEADERS = [
   'Product Name',

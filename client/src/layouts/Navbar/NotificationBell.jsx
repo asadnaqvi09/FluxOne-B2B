@@ -2,10 +2,13 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Bell, X } from 'lucide-react'
 import { Button } from '@/components/ui/button'
-import { apiClient } from '@/api/api'
-import { endpoints } from '@/api/endpoints'
+import {
+  fetchNotifications,
+  markAllNotificationsRead,
+  markNotificationRead,
+} from '@/hooks/shared/useNotifications'
 import { PATHS } from '@/router/paths'
-import { useAuthSession } from '@/hooks/useAuthSession'
+import { useAuthSession } from '@/hooks/shared/useAuthSession'
 import { ROLES } from '@/lib/constants'
 import { BranchCapsule } from '@/components/shared/BranchRoleCapsules'
 import { displayNotification } from '@/lib/notificationDisplay'
@@ -44,7 +47,7 @@ export function NotificationBell({ className }) {
 
   const refresh = useCallback(async () => {
     setLoading(true)
-    const res = await apiClient.get(endpoints.notifications.list, { limit: 8 })
+    const res = await fetchNotifications({ limit: 8 })
     setLoading(false)
     if (res.success && res.data) {
       setItems(res.data.items || [])
@@ -87,7 +90,7 @@ export function NotificationBell({ className }) {
 
   const handleClickItem = async (n) => {
     if (!n.isRead) {
-      await apiClient.patch(endpoints.notifications.read(n.id))
+      await markNotificationRead(n.id)
     }
     setOpen(false)
     // Dynamic redirect — linkPath drives destination (future notification types)
@@ -144,7 +147,7 @@ export function NotificationBell({ className }) {
                     type="button"
                     className="cursor-pointer text-xs font-medium text-[#8E238F] hover:underline dark:text-[#c084c1]"
                     onClick={async () => {
-                      await apiClient.patch(endpoints.notifications.readAll)
+                      await markAllNotificationsRead()
                       void refresh()
                     }}
                   >

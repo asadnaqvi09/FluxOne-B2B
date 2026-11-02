@@ -1,7 +1,7 @@
 import { Navigate, Outlet, useLocation } from 'react-router-dom'
 import { useEffect } from 'react'
 import { clearAdminSession } from '@/config/adminAuth.config'
-import { useAuthSession } from '@/hooks/useAuthSession'
+import { useAuthSession } from '@/hooks/shared/useAuthSession'
 import { PATHS } from '@/router/paths'
 
 // Admin shell requires a real backend session with role `b2b_admin`.

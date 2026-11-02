@@ -6,7 +6,7 @@ import { MotionHeader, MotionReveal } from '@/components/shared/MotionReveal'
 import { PageHeader } from '@/components/shared/PageHeader'
 import { SurfaceCard } from '@/components/shared/SurfaceCard'
 import { Button } from '@/components/ui/button'
-import { useOrderDetail } from '@/hooks/useOrderDetail'
+import { useOrderDetail } from '@/hooks/inventory/useOrderDetail'
 import { PATHS } from '@/router/paths'
 import { toastError, toastSuccess } from '@/lib/toast'
 

@@ -1,6 +1,6 @@
 import { apiClient } from '@/api/api'
 import { endpoints } from '@/api/endpoints'
-import { splitCategories } from '@/lib/mapProduct'
+import { splitCategories } from '@/lib/products/mapProduct'
 
 const TTL_MS = 5 * 60 * 1000
 

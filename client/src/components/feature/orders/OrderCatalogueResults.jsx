@@ -1,7 +1,7 @@
 import { Check, Plus } from 'lucide-react'
 import { Button } from '@/components/ui/button'
-import { money } from '@/lib/mapProduct'
-import { orderableDisplayName, prevPurchasePrice } from '@/lib/orderGenerate'
+import { money } from '@/lib/products/mapProduct'
+import { orderableDisplayName, prevPurchasePrice } from '@/lib/orders/orderGenerate'
 import { cn } from '@/lib/utils'
 import { TableRowsSkeleton } from '@/components/ui/skeleton'
 

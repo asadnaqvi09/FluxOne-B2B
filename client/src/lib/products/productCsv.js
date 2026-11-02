@@ -1,6 +1,6 @@
 // Shared product CSV helpers — template serialize + parse.
 // No itemCode in files — Import Ref links rows; server generates item codes on import.
-import { parseProductsImport } from '@/lib/productImport'
+import { parseProductsImport } from '@/lib/products/productImport'
 
 export const PRODUCT_CSV_HEADERS = [
   'rowKind',

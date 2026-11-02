@@ -17,14 +17,14 @@ import { TaxProfitTable } from '@/components/feature/admin/tax-profit/TaxProfitT
 import {
   ADMIN_TAX_PROFIT_PAGE_SIZE,
   useAdminTaxProfit,
-} from '@/hooks/useAdminTaxProfit'
-import { useDebouncedValue } from '@/hooks/useDebouncedValue'
-import { useCurrency } from '@/hooks/useCurrency'
+} from '@/hooks/admin/useAdminTaxProfit'
+import { useDebouncedValue } from '@/hooks/shared/useDebouncedValue'
+import { useCurrency } from '@/hooks/shared/useCurrency'
 import { BRAND, UI_RADIUS } from '@/lib/constants'
 import { cn } from '@/lib/utils'
 import { toastSuccess, toastError } from '@/lib/toast'
 import { validatePercentage } from '@/lib/validation/formValidators'
-import { exportTaxProfitCsv, exportTaxProfitPdf } from '@/lib/taxProfitExport'
+import { exportTaxProfitCsv, exportTaxProfitPdf } from '@/lib/export/taxProfitExport'
 import { Settings } from 'lucide-react'
 
 export function TaxProfitPage() {

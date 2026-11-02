@@ -173,3 +173,7 @@ export function useAdminBranches({ q = '', status = 'all', page = 1, limit = DEF
 }
 
 export { DEFAULT_PAGE_SIZE as ADMIN_BRANCHES_PAGE_SIZE }
+
+export async function fetchAdminBranchOptions({ page = 1, limit = 100 } = {}) {
+  return apiClient.get(endpoints.admin.branches.list, { page, limit })
+}

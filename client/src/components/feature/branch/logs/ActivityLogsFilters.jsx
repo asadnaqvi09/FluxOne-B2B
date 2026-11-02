@@ -5,11 +5,11 @@ import { Input } from '@/components/ui/input'
 import { NativeSelect } from '@/components/ui/select'
 import { Button } from '@/components/ui/button'
 import { SurfaceCard } from '@/components/shared/SurfaceCard'
-import { useDebouncedSearch } from '@/hooks/useDebouncedSearch'
+import { useDebouncedSearch } from '@/hooks/shared/useDebouncedSearch'
 import {
   ACTIVITY_ACTION_LABELS,
   ACTIVITY_SOURCES,
-} from '@/lib/activityLogLabels'
+} from '@/lib/branch/activityLogLabels'
 
 const ACTION_OPTIONS = Object.entries(ACTIVITY_ACTION_LABELS).map(([value, label]) => ({
   value,

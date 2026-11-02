@@ -1,5 +1,5 @@
 // Staff roster export — split schedule + hardware columns; FluxOne-styled Excel
-import { exportRowsToStyledExcel } from '@/lib/csvExport'
+import { exportRowsToStyledExcel } from '@/lib/export/csvExport'
 import { displayStaffRef } from '@/lib/formatDisplayId'
 import { formatClockTime, formatDateTimeInline } from '@/lib/formatDateTime'
 import { formatWorkingDaysShort } from '@/lib/validation/branchForms'

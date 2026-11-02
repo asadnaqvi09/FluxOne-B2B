@@ -15,13 +15,13 @@ import { NativeSelect } from '@/components/ui/select'
 import { ControlCatalogFilters } from '@/components/feature/control/ControlCatalogFilters'
 import { ProductStockPickerList } from '@/components/feature/control/ProductStockPickerList'
 import { BRAND } from '@/lib/constants'
-import { PRODUCT_TYPES } from '@/lib/mapProduct'
-import { useFieldErrors } from '@/hooks/useFieldErrors'
+import { PRODUCT_TYPES } from '@/lib/products/mapProduct'
+import { useFieldErrors } from '@/hooks/shared/useFieldErrors'
 import {
   fetchControlProductDetail,
   fetchControlProductOptions,
   fetchControlSuppliers,
-} from '@/hooks/useInventoryControl'
+} from '@/hooks/inventory/useInventoryControl'
 import { cn } from '@/lib/utils'
 
 // Review is the final step — Save runs here (no separate Confirm).

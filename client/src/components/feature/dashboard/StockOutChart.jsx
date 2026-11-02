@@ -8,7 +8,7 @@ import {
   aggregateStockOutPie,
   listStockGraphDates,
   PIE_COLORS,
-} from '@/lib/mapInventoryDashboard'
+} from '@/lib/inventory/mapInventoryDashboard'
 import { cn } from '@/lib/utils'
 
 const CHART_H = 280

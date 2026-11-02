@@ -7,8 +7,8 @@ import { MotionHeader, MotionReveal } from '@/components/shared/MotionReveal'
 import { PageHeader } from '@/components/shared/PageHeader'
 import { SlowLoadingBanner, useSlowLoadingHint } from '@/components/shared/SlowLoadingBanner'
 import { Button } from '@/components/ui/button'
-import { useAuthSession } from '@/hooks/useAuthSession'
-import { useInventoryDashboard } from '@/hooks/useInventoryDashboard'
+import { useAuthSession } from '@/hooks/shared/useAuthSession'
+import { useInventoryDashboard } from '@/hooks/inventory/useInventoryDashboard'
 import { toastError, toastInfo } from '@/lib/toast'
 
 export function DashboardPage() {

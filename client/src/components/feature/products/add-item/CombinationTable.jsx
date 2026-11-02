@@ -6,7 +6,7 @@ import { NativeSelect } from '@/components/ui/select'
 import { WholeNumberInput } from '@/components/shared/WholeNumberInput'
 import { ApplyDefaultTaxField } from '@/components/feature/products/ApplyDefaultTaxField'
 import { CombinationImageCell } from '@/components/feature/products/add-item/CombinationImageCell'
-import { formatOfferOptionLabel, promoFromOfferId } from '@/lib/addItem'
+import { formatOfferOptionLabel, promoFromOfferId } from '@/lib/products/addItem'
 import { BRAND } from '@/lib/constants'
 import { cn } from '@/lib/utils'
 

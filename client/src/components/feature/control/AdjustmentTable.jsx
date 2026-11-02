@@ -2,8 +2,8 @@ import { Plus } from 'lucide-react'
 import { MovementHistoryTable } from '@/components/feature/control/MovementHistoryTable'
 import { MovementRowMenu } from '@/components/feature/control/MovementRowMenu'
 import { Button } from '@/components/ui/button'
-import { controlColumnsForTab } from '@/lib/controlTableColumns'
-import { MOVEMENT_TYPES } from '@/lib/mapStockMovement'
+import { controlColumnsForTab } from '@/components/feature/control/controlTableColumns'
+import { MOVEMENT_TYPES } from '@/lib/control/mapStockMovement'
 
 export function AdjustmentTable({
   items,

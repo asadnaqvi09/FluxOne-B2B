@@ -9,10 +9,10 @@ import {
   parseScaleMaxPoints,
   SCALE_SUM_TARGET,
   sumScalePoints,
-} from '@/lib/performanceScales'
+} from '@/lib/branch/performanceScales'
 import { fieldErrorClass } from '@/lib/validation/fieldErrors'
-import { useFieldErrors } from '@/hooks/useFieldErrors'
-import { useFormBaseline } from '@/hooks/useFormBaseline'
+import { useFieldErrors } from '@/hooks/shared/useFieldErrors'
+import { useFormBaseline } from '@/hooks/shared/useFormBaseline'
 
 const EMPTY = { name: '', maxPoints: '' }
 

@@ -1,5 +1,5 @@
 // Control movement CSV helpers — Export (tab-specific, not Products CSV).
-import { rowsToCsv, downloadCsv } from '@/lib/csvExport'
+import { rowsToCsv, downloadCsv } from '@/lib/export/csvExport'
 
 export const CONTROL_CSV_HEADERS = [
   'itemCode',

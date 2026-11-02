@@ -17,7 +17,7 @@ import {
   ADMIN_LOG_SETTING_CATEGORIES,
   ADMIN_LOG_STOCK_MOVEMENTS,
   ADMIN_LOG_VARIANT_ACTIONS,
-} from '@/lib/adminLogsFilterConfig'
+} from '@/lib/admin/adminLogsFilterConfig'
 
 function useFilterOptions(kind, branchId, productType) {
   const [options, setOptions] = useState([])

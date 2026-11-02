@@ -1,8 +1,8 @@
 import { useState } from 'react'
 import { TrendingUp, TrendingDown, ArrowUpRight, ArrowDownRight } from 'lucide-react'
 import { SurfaceCard } from '@/components/shared/SurfaceCard'
-import { useCurrency } from '@/hooks/useCurrency'
-import { formatPct } from '@/lib/mapBranchDashboard'
+import { useCurrency } from '@/hooks/shared/useCurrency'
+import { formatPct } from '@/lib/branch/mapBranchDashboard'
 
 const LIST_MIN_H = 260
 

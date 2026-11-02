@@ -9,8 +9,8 @@ import { PerformanceCriteriaBreakdown } from '@/components/feature/branch/perfor
 import { PerformanceHistoryTimeline } from '@/components/feature/branch/performance/PerformanceHistoryTimeline'
 import { ScoreEmployeeDialog } from '@/components/feature/branch/performance/ScoreEmployeeDialog'
 import { Button } from '@/components/ui/button'
-import { apiClient } from '@/api/api'
 import { PATHS } from '@/router/paths'
+import { useBranchPerformanceDetail } from '@/hooks/branch/useBranchPerformanceDetail'
 
 const SLOW_LOAD_MS = 8000
 
@@ -18,9 +18,8 @@ export function PerformanceEmployeePage() {
   const { staffId } = useParams()
   const [searchParams] = useSearchParams()
 
-  const [detail, setDetail] = useState(null)
-  const [criteria, setCriteria] = useState([])
-  const [loading, setLoading] = useState(true)
+  const { detail, criteria, loading, loadEmployeeDetail, loadScales } =
+    useBranchPerformanceDetail()
   const [error, setError] = useState(null)
   const [slow, setSlow] = useState(false)
   const [range, setRange] = useState('12M')
@@ -42,36 +41,26 @@ export function PerformanceEmployeePage() {
 
   const loadDetail = useCallback(async () => {
     if (!staffId) return
-    setLoading(true)
     setError(null)
     setSlow(false)
-    const res = await apiClient.get(`/branch/performance/employees/${staffId}`, {
+    const res = await loadEmployeeDetail(staffId, {
       range,
       timelinePage,
       timelineLimit: 10,
     })
-    setLoading(false)
     setSlow(false)
     if (!res.success) {
       setError(res.error || 'Failed to load performance detail')
-      setDetail(null)
-      return
     }
-    setDetail(res.data)
-  }, [staffId, range, timelinePage])
-
-  const loadCriteria = useCallback(async () => {
-    const res = await apiClient.get('/branch/performance/scales')
-    if (res.success) setCriteria(res.data?.criteria || [])
-  }, [])
+  }, [staffId, range, timelinePage, loadEmployeeDetail])
 
   useEffect(() => {
     void loadDetail()
   }, [loadDetail])
 
   useEffect(() => {
-    void loadCriteria()
-  }, [loadCriteria])
+    void loadScales()
+  }, [loadScales])
 
   // Soft slow-load hint — does not block; Retry available when still loading
   useEffect(() => {

@@ -1,13 +1,13 @@
 import { jsPDF } from 'jspdf'
-import { exportRowsToCsv } from '@/lib/csvExport'
+import { exportRowsToCsv } from '@/lib/export/csvExport'
 import { formatAmount, normalizeCurrency } from '@/lib/currency'
 import { formatDateTimeInline } from '@/lib/formatDateTime'
 import {
   actualMarginAmount,
   actualMarginPercent,
   finalPriceFromSelling,
-} from '@/lib/pricing'
-import { FINAL_PRICE_FORMULA, MARGIN_FORMULA } from '@/lib/pricingFormulaCopy'
+} from '@/lib/products/pricing'
+import { FINAL_PRICE_FORMULA, MARGIN_FORMULA } from '@/lib/products/pricingFormulaCopy'
 
 function categoryLabel(row = {}) {
   const cat = row.category || 'Uncategorized'

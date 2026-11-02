@@ -1,7 +1,7 @@
 // TL §10 — purchase order invoice PDF + Excel (one supplier per invoice)
 import { jsPDF } from 'jspdf'
 import { formatDateLine } from '@/lib/formatDateTime'
-import { exportRowsToStyledExcel } from '@/lib/csvExport'
+import { exportRowsToStyledExcel } from '@/lib/export/csvExport'
 
 const DOWNLOAD_STATUSES = new Set(['approved', 'partially_received', 'received'])
 

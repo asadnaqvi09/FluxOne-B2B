@@ -63,7 +63,7 @@ import { AdminProfilePage } from '@/pages/admin/AdminProfilePage'
 import { NotificationsPage } from '@/pages/shared/NotificationsPage'
 import { NotFoundPage, RootNotFoundPage } from '@/pages/shared/NotFoundPage'
 import { RouteErrorPage } from '@/pages/shared/RouteErrorPage'
-import { useAuthSession } from '@/hooks/useAuthSession'
+import { useAuthSession } from '@/hooks/shared/useAuthSession'
 import CategoriesPage from '@/pages/inventory/CategoriesPage'
 
 function ProfileRedirect() {

@@ -1,4 +1,4 @@
-import { PRODUCT_TYPES, formatVariantParts } from '@/lib/mapProduct'
+import { PRODUCT_TYPES, formatVariantParts } from '@/lib/products/mapProduct'
 
 export function newCompanyBlockKey() {
   return `co-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 7)}`

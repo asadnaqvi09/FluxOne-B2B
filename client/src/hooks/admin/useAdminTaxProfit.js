@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import { apiClient } from '@/api/api'
 import { endpoints } from '@/api/endpoints'
-import { invalidateProductCatalog } from '@/lib/productCatalogCache'
+import { invalidateProductCatalog } from '@/lib/products/productCatalogCache'
 
 export const ADMIN_TAX_PROFIT_PAGE_SIZE = 8
 

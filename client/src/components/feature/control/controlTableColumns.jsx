@@ -1,7 +1,7 @@
 import { ProductImageCell } from '@/components/feature/products/ProductStatusToggle'
 import { DateTimeLines } from '@/components/shared/DateTimeLines'
 import { displayItemCode } from '@/lib/formatDisplayId'
-import { DAMAGED_LOCATIONS, MOVEMENT_TYPES } from '@/lib/mapStockMovement'
+import { DAMAGED_LOCATIONS, MOVEMENT_TYPES } from '@/lib/control/mapStockMovement'
 
 // Control table columns — shared cells + per-tab defs (Phase 3)
 

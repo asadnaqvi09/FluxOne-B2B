@@ -1,4 +1,4 @@
-import { STOCK_STATUS_META } from '@/lib/mapInventoryDashboard'
+import { STOCK_STATUS_META } from '@/lib/inventory/mapInventoryDashboard'
 import { cn } from '@/lib/utils'
 
 export function StockStatusDot({ status = 'green', size = 'md', className }) {

@@ -1,6 +1,6 @@
 import { MovementHistoryTable } from '@/components/feature/control/MovementHistoryTable'
-import { controlColumnsForTab } from '@/lib/controlTableColumns'
-import { MOVEMENT_TYPES } from '@/lib/mapStockMovement'
+import { controlColumnsForTab } from '@/components/feature/control/controlTableColumns'
+import { MOVEMENT_TYPES } from '@/lib/control/mapStockMovement'
 
 // Stock out is read-only — no row actions.
 export function StockOutTable({

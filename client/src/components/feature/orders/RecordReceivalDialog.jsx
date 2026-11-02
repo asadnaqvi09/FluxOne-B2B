@@ -20,7 +20,7 @@ import {
 } from '@/components/ui/table'
 import { WholeNumberInput } from '@/components/shared/WholeNumberInput'
 import { displayItemCode, displayOrderRef } from '@/lib/formatDisplayId'
-import { money } from '@/lib/mapProduct'
+import { money } from '@/lib/products/mapProduct'
 
 function remainingOf(line) {
   return Math.max(0, Number(line.quantity) - Number(line.receivedQuantity || 0))

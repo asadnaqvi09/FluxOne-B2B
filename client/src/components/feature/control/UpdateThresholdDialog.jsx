@@ -13,9 +13,9 @@ import { Label } from '@/components/ui/label'
 import { FieldError } from '@/components/shared/FieldError'
 import { WholeNumberInput } from '@/components/shared/WholeNumberInput'
 import { BRAND } from '@/lib/constants'
-import { fetchControlProductDetail } from '@/hooks/useInventoryControl'
-import { useFieldErrors } from '@/hooks/useFieldErrors'
-import { useFormBaseline } from '@/hooks/useFormBaseline'
+import { fetchControlProductDetail } from '@/hooks/inventory/useInventoryControl'
+import { useFieldErrors } from '@/hooks/shared/useFieldErrors'
+import { useFormBaseline } from '@/hooks/shared/useFormBaseline'
 import { fieldErrorClass } from '@/lib/validation/fieldErrors'
 
 const FIELD_IDS = { threshold: 'upd-threshold-qty' }

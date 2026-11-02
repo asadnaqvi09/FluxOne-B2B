@@ -1,6 +1,6 @@
 import { useCallback, useMemo } from 'react'
 import { hasPermission } from '@/lib/rbac'
-import { useAuthSession } from '@/hooks/useAuthSession'
+import { useAuthSession } from '@/hooks/shared/useAuthSession'
 
 export function usePermissions() {
   const { role } = useAuthSession()

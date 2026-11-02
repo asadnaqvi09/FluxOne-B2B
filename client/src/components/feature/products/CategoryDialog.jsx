@@ -16,8 +16,8 @@ import { ImageUploadField } from '@/components/shared/ImageUploadField'
 import { FieldError } from '@/components/shared/FieldError'
 import { BRAND, CATEGORY_NAME_MAX, SUBCATEGORY_NAME_MAX } from '@/lib/constants'
 import { fieldErrorClass } from '@/lib/validation/fieldErrors'
-import { useFieldErrors } from '@/hooks/useFieldErrors'
-import { useFormBaseline } from '@/hooks/useFormBaseline'
+import { useFieldErrors } from '@/hooks/shared/useFieldErrors'
+import { useFormBaseline } from '@/hooks/shared/useFormBaseline'
 
 export function CategoryDialog({
   open,

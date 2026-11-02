@@ -1,5 +1,5 @@
 import { jsPDF } from 'jspdf'
-import { downloadBillingInvoicePdf } from '@/lib/pdfDownload'
+import { downloadBillingInvoicePdf } from '@/lib/export/pdfDownload'
 import { currencyAmountLabel, DEFAULT_CURRENCY, formatMoney, normalizeCurrency } from '@/lib/currency'
 import { formatDateTimeInline } from '@/lib/formatDateTime'
 

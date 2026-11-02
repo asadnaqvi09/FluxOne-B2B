@@ -30,16 +30,15 @@ import {
   DialogTitle,
   DialogCancelButton,
 } from '@/components/ui/dialog'
-import { apiClient } from '@/api/api'
-import { endpoints } from '@/api/endpoints'
+import { useBranchHardware } from '@/hooks/branch/useBranchHardware'
 import { BRAND } from '@/lib/constants'
 import { referenceFromUuid } from '@/lib/formatDisplayId'
 import { toastError, toastSuccess } from '@/lib/toast'
 import { ImageUploadField } from '@/components/shared/ImageUploadField'
-import { useDebouncedValue } from '@/hooks/useDebouncedValue'
-import { useFormBaseline } from '@/hooks/useFormBaseline'
+import { useDebouncedValue } from '@/hooks/shared/useDebouncedValue'
+import { useFormBaseline } from '@/hooks/shared/useFormBaseline'
 import { validateHardwareForm } from '@/lib/validation/branchForms'
-import { useClientPagination } from '@/hooks/useClientPagination'
+import { useClientPagination } from '@/hooks/shared/useClientPagination'
 import { TableRowsSkeleton } from '@/components/ui/skeleton'
 
 const actionBtnClass =
@@ -47,10 +46,17 @@ const actionBtnClass =
 
 export function ResourcesPage() {
   const [activeTab, setActiveTab] = useState('hardware')
-  const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
 
-  const [hardwareList, setHardwareList] = useState([])
+  const {
+    hardwareList,
+    loading,
+    setLoading,
+    loadHardware,
+    saveHardware,
+    deleteHardware,
+    updateAccessStatus,
+  } = useBranchHardware()
   const hwPaging = useClientPagination(hardwareList)
   const [filterHardware, setFilterHardware] = useState('')
   const [hwSearch, setHwSearch] = useState('')
@@ -86,23 +92,22 @@ export function ResourcesPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps -- capture once per open
   }, [hardwareOpen, captureBaseline])
 
-  async function loadHardware(type = filterHardware, q = debouncedHwSearch) {
+  async function refreshHardware(type = filterHardware, q = debouncedHwSearch) {
     const params = {}
     if (type) params.type = type
     if (q?.trim()) params.q = q.trim()
-    const res = await apiClient.get(endpoints.branch.resources.hardware.list, params)
-    if (res.success) {
-      setHardwareList(res.data || [])
-    } else {
+    const res = await loadHardware(params)
+    if (!res.success) {
       toastError(res.error || 'Failed to load hardware')
     }
+    return res
   }
 
   useEffect(() => {
     if (activeTab !== 'hardware') return
     hwPaging.setPage(1)
     setLoading(true)
-    void loadHardware(filterHardware, debouncedHwSearch).finally(() => setLoading(false))
+    void refreshHardware(filterHardware, debouncedHwSearch).finally(() => setLoading(false))
     // eslint-disable-next-line react-hooks/exhaustive-deps -- reload on filter/search/tab
   }, [activeTab, filterHardware, debouncedHwSearch])
 
@@ -172,12 +177,10 @@ export function ResourcesPage() {
 
     setSaving(true)
     try {
-      const res = isCreate
-        ? await apiClient.post(endpoints.branch.resources.hardware.create, formData)
-        : await apiClient.put(
-            endpoints.branch.resources.hardware.update(editingHardware.id),
-            formData,
-          )
+      const res = await saveHardware(formData, {
+        mode: isCreate ? 'create' : 'edit',
+        id: editingHardware?.id,
+      })
 
       if (!res.success) {
         setFormError(res.error || 'Failed to save hardware')
@@ -193,7 +196,7 @@ export function ResourcesPage() {
           : 'Hardware updated successfully',
       )
       setHardwareOpen(false)
-      void loadHardware(filterHardware, debouncedHwSearch)
+      void refreshHardware(filterHardware, debouncedHwSearch)
     } catch (err) {
       const msg = err?.message || 'Failed to save hardware'
       setFormError(msg)
@@ -215,28 +218,21 @@ export function ResourcesPage() {
   async function confirmDeleteHardware() {
     if (!deleteTargetHardware) return
     setSaving(true)
-    const res = await apiClient.delete(
-      endpoints.branch.resources.hardware.delete(deleteTargetHardware.id),
-    )
+    const res = await deleteHardware(deleteTargetHardware.id)
     setSaving(false)
     if (!res.success) {
       return toastError(res.error || 'Failed to deactivate hardware')
     }
     toastSuccess('Hardware deactivated')
     setDeleteTargetHardware(null)
-    void loadHardware(filterHardware, debouncedHwSearch)
+    void refreshHardware(filterHardware, debouncedHwSearch)
   }
 
   // BM can block / authorize assigned systems (same access_status as Admin)
   async function handleToggleAccess(hw) {
     const next = hw.accessStatus === 'blocked' ? 'active' : 'blocked'
-    const formData = new FormData()
-    formData.append('accessStatus', next)
     setSaving(true)
-    const res = await apiClient.put(
-      endpoints.branch.resources.hardware.update(hw.id),
-      formData,
-    )
+    const res = await updateAccessStatus(hw.id, next)
     setSaving(false)
     if (!res.success) {
       return toastError(res.error || 'Failed to update system access')
@@ -246,7 +242,7 @@ export function ResourcesPage() {
         ? `${hw.name} blocked from system access`
         : `${hw.name} authorized for system access`,
     )
-    void loadHardware(filterHardware, debouncedHwSearch)
+    void refreshHardware(filterHardware, debouncedHwSearch)
   }
 
   // Device condition label '-' legacy "Used" shows as "Old" (QA TC-hardware-07a).

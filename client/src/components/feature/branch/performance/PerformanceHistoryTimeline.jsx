@@ -1,12 +1,12 @@
 import { useEffect, useRef } from 'react'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
-import { formatScorePercent } from '@/lib/performanceScales'
+import { formatScorePercent } from '@/lib/branch/performanceScales'
 import {
   formatRelativeScored,
   ratingBadgeClass,
   trendDisplay,
-} from '@/lib/performanceRatings'
+} from '@/lib/branch/performanceRatings'
 import { formatDateTimeInline } from '@/lib/formatDateTime'
 
 export function PerformanceHistoryTimeline({

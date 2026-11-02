@@ -1,5 +1,7 @@
 // useProducts — RTK products slice wrapper (Express → RTK → hook → UI)
 import { useCallback, useEffect, useMemo, useRef } from 'react'
+import { apiClient } from '@/api/api'
+import { endpoints } from '@/api/endpoints'
 import { useAppDispatch, useAppSelector } from '@/rtk/hooks'
 import { asResult, catalogActiveOnly, catalogForUi } from '@/rtk/asResult'
 import {
@@ -26,6 +28,14 @@ import {
 } from '@/rtk/features/products/productsSlice'
 
 export { PRODUCTS_PAGE_SIZE }
+
+export async function fetchProductDetail(id) {
+  return apiClient.get(endpoints.products.detail(id))
+}
+
+export async function fetchCategoryDependencies(id) {
+  return apiClient.get(endpoints.products.categoryDependencies(id))
+}
 
 const EMPTY_FILTERS = {}
 

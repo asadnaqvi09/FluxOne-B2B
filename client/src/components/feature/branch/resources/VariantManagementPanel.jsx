@@ -13,13 +13,13 @@ import {
 } from '@/components/shared/parent-child/ParentChildEntityTables'
 import { apiClient } from '@/api/api'
 import { endpoints } from '@/api/endpoints'
-import { useClientPagination } from '@/hooks/useClientPagination'
-import { useDebouncedValue } from '@/hooks/useDebouncedValue'
+import { useClientPagination } from '@/hooks/shared/useClientPagination'
+import { useDebouncedValue } from '@/hooks/shared/useDebouncedValue'
 import {
   filterFlatChildRows,
   filterParentChildRows,
   flattenParentChildRows,
-} from '@/lib/filterParentChildRows'
+} from '@/lib/products/filterParentChildRows'
 import { TABLE_PAGE_SIZE } from '@/lib/tablePagination'
 import { toastError, toastSuccess } from '@/lib/toast'
 

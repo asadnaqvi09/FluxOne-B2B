@@ -1,4 +1,4 @@
-import { DEFAULT_REORDER_POINT } from '@/lib/mapProduct'
+import { DEFAULT_REORDER_POINT } from '@/lib/products/mapProduct'
 
 /**
  * Branch Manager shelf badges: Empty / Limited / In Stock.

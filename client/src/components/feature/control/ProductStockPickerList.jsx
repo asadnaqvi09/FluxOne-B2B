@@ -3,7 +3,7 @@ import { Checkbox } from '@/components/ui/checkbox'
 import { Label } from '@/components/ui/label'
 import { ProductImageCell } from '@/components/feature/products/ProductStatusToggle'
 import { WholeNumberInput } from '@/components/shared/WholeNumberInput'
-import { money, PRODUCT_TYPES } from '@/lib/mapProduct'
+import { money, PRODUCT_TYPES } from '@/lib/products/mapProduct'
 import { cn } from '@/lib/utils'
 import { TableRowsSkeleton } from '@/components/ui/skeleton'
 

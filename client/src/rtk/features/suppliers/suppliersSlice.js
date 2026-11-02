@@ -2,7 +2,7 @@
 import { createAsyncThunk, createSlice } from '@reduxjs/toolkit'
 import { apiClient } from '@/api/api'
 import { endpoints } from '@/api/endpoints'
-import { buildSupplierPayload, mapSupplier } from '@/lib/mapSupplier'
+import { buildSupplierPayload, mapSupplier } from '@/lib/suppliers/mapSupplier'
 
 export const SUPPLIERS_PAGE_SIZE = 8
 

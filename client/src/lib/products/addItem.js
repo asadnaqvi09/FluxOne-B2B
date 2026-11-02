@@ -1,6 +1,6 @@
 // Add Item wizard constants + combination builder (API-backed create).
 import { roundMoney } from '@/lib/money'
-import { buildImTaxPayload } from '@/lib/imTaxProfitPolicy'
+import { buildImTaxPayload } from '@/lib/products/imTaxProfitPolicy'
 
 // Form display for prices — whole units only (10, not 10.01)
 function formatPriceInput(value) {

@@ -5,8 +5,8 @@ import {
   ADMIN_LOGS_EXPORT_MAX_ROWS,
   ADMIN_LOGS_PAGE_SIZE,
   localDateInputValue,
-} from '@/lib/adminLogs'
-import { ADMIN_LOG_TAB_FILTER_KEYS } from '@/lib/adminLogsFilterConfig'
+} from '@/lib/admin/adminLogs'
+import { ADMIN_LOG_TAB_FILTER_KEYS } from '@/lib/admin/adminLogsFilterConfig'
 
 function todayRange() {
   const today = localDateInputValue()

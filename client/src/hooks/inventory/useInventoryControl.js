@@ -1,9 +1,11 @@
 // useInventoryControl — RTK control slice wrapper (Express → RTK → hook → UI)
 import { useCallback, useEffect, useMemo } from 'react'
+import { apiClient } from '@/api/api'
+import { endpoints } from '@/api/endpoints'
 import { useAppDispatch, useAppSelector } from '@/rtk/hooks'
 import { asResult, catalogActiveOnly } from '@/rtk/asResult'
-import { CONTROL_UI_TAB } from '@/lib/controlTabs'
-import { MOVEMENT_TYPES } from '@/lib/mapStockMovement'
+import { CONTROL_UI_TAB } from '@/lib/control/controlTabs'
+import { MOVEMENT_TYPES } from '@/lib/control/mapStockMovement'
 import {
   CONTROL_PAGE_SIZE,
   ensureControlType,
@@ -36,6 +38,14 @@ export {
   fetchApprovedPurchaseOrders,
   fetchPurchaseOrderDetail,
   fetchEmployeeLookups,
+}
+
+export async function patchControlProduct(productId, body) {
+  return apiClient.patch(endpoints.products.update(productId), body)
+}
+
+export async function exportControlRows(query) {
+  return apiClient.get(endpoints.control.export, query)
 }
 
 const EMPTY_FILTERS = {}

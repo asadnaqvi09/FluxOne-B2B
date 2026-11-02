@@ -1,9 +1,9 @@
-import { EMPTY_DASH, money, PRODUCT_TYPES } from '@/lib/mapProduct'
+import { EMPTY_DASH, money, PRODUCT_TYPES } from '@/lib/products/mapProduct'
 import {
   FINAL_PRICE_FORMULA,
   SELLING_PRICE_FORMULA,
   TAX_PCT_FORMULA,
-} from '@/lib/pricingFormulaCopy'
+} from '@/lib/products/pricingFormulaCopy'
 
 //
 // Shared price display helpers for catalog rows.

@@ -1,4 +1,4 @@
-import { STOCK_STATUS_META } from '@/lib/mapInventoryDashboard'
+import { STOCK_STATUS_META } from '@/lib/inventory/mapInventoryDashboard'
 import { cn } from '@/lib/utils'
 
 const ORDER = ['red', 'yellow', 'green']

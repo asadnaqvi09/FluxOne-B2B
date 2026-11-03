@@ -17,8 +17,8 @@ import {
   formatScorePercent,
   sumActualPoints,
   sumScalePoints,
-} from '@/lib/performanceScales'
-import { ratingBadgeClass, ratingLabelFromScore } from '@/lib/performanceRatings'
+} from '@/lib/branch/performanceScales'
+import { ratingBadgeClass, ratingLabelFromScore } from '@/lib/branch/performanceRatings'
 import { toastError, toastSuccess } from '@/lib/toast'
 
 // Shared Score Employee panel (roster + detail page)

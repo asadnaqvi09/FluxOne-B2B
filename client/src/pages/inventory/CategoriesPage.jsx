@@ -1,7 +1,5 @@
 import { useMemo, useState } from 'react'
 import { Ban, FolderTree } from 'lucide-react'
-import { apiClient } from '@/api/api'
-import { endpoints } from '@/api/endpoints'
 import { CategoryDialog } from '@/components/feature/products/CategoryDialog'
 import { ConfirmDialog } from '@/components/shared/ConfirmDialog'
 import { DeleteEntityDialog } from '@/components/shared/DeleteEntityDialog'
@@ -12,13 +10,13 @@ import {
   ChildEntityTable,
   ParentEntityTable,
 } from '@/components/shared/parent-child/ParentChildEntityTables'
-import { useClientPagination } from '@/hooks/useClientPagination'
-import { useProducts } from '@/hooks/useProducts'
+import { useClientPagination } from '@/hooks/shared/useClientPagination'
+import { fetchCategoryDependencies, useProducts } from '@/hooks/inventory/useProducts'
 import {
   filterFlatChildRows,
   filterParentChildRows,
   flattenParentChildRows,
-} from '@/lib/filterParentChildRows'
+} from '@/lib/products/filterParentChildRows'
 import { CATEGORY_NAME_MAX, SUBCATEGORY_NAME_MAX } from '@/lib/constants'
 import { TABLE_PAGE_SIZE } from '@/lib/tablePagination'
 import { toastError, toastSuccess } from '@/lib/toast'
@@ -63,7 +61,7 @@ export function CategoriesPage() {
     if (!target?.id) return
     setDeleteTarget(target)
     setDeleteDeps(null)
-    const result = await apiClient.get(endpoints.products.categoryDependencies(target.id))
+    const result = await fetchCategoryDependencies(target.id)
     if (result.success) setDeleteDeps(result.data)
   }
 

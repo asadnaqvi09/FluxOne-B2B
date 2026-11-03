@@ -12,7 +12,7 @@ import {
   downloadPurchaseOrderInvoicePdf,
   exportPurchaseOrderInvoiceItemsExcel,
   exportPurchaseOrderInvoicesWorkbook,
-} from '@/lib/purchaseOrderInvoiceExport'
+} from '@/lib/orders/purchaseOrderInvoiceExport'
 import { toastError, toastSuccess } from '@/lib/toast'
 
 async function fetchInvoiceDetail(orderId, invoiceId) {

@@ -12,7 +12,7 @@ import {
   ADMIN_LOG_ROLE_OPTIONS,
   ADMIN_LOGS_MAX_RANGE_DAYS,
   localDateInputValue,
-} from '@/lib/adminLogs'
+} from '@/lib/admin/adminLogs'
 import { apiClient } from '@/api/api'
 import { endpoints } from '@/api/endpoints'
 

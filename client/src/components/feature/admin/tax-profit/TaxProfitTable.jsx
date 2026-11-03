@@ -18,7 +18,7 @@ import {
   actualMarginAmount,
   actualMarginPercent,
   finalPriceFromSelling,
-} from '@/lib/pricing'
+} from '@/lib/products/pricing'
 import {
   ADMIN_PRICING_LEGEND,
   FINAL_PRICE_FORMULA,
@@ -27,7 +27,7 @@ import {
   PURCHASE_COST_FORMULA,
   SELLING_PRICE_FORMULA,
   TAX_PCT_FORMULA,
-} from '@/lib/pricingFormulaCopy'
+} from '@/lib/products/pricingFormulaCopy'
 import { BadgePercent, PackageOpen, Receipt } from 'lucide-react'
 import { TableRowsSkeleton } from '@/components/ui/skeleton'
 

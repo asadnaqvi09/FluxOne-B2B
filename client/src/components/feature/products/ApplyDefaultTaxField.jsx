@@ -1,6 +1,6 @@
 import { Checkbox } from '@/components/ui/checkbox'
 import { Label } from '@/components/ui/label'
-import { normalizeDefaultTaxPercent } from '@/lib/imTaxProfitPolicy'
+import { normalizeDefaultTaxPercent } from '@/lib/products/imTaxProfitPolicy'
 import { cn } from '@/lib/utils'
 
 /**

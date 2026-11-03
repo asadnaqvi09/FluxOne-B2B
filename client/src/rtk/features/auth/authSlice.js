@@ -3,7 +3,7 @@ import { createAsyncThunk, createSlice } from '@reduxjs/toolkit'
 import { apiClient } from '@/api/api'
 import { endpoints } from '@/api/endpoints'
 import { tokenStorage } from '@/api/tokenStorage'
-import { invalidateProductCatalog } from '@/lib/productCatalogCache'
+import { invalidateProductCatalog } from '@/lib/products/productCatalogCache'
 
 const storedUser = tokenStorage.getUser()
 const storedToken = tokenStorage.getToken()

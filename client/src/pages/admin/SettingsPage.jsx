@@ -26,18 +26,17 @@ import { toastSuccess, toastError } from '@/lib/toast'
 import { fieldErrorClass } from '@/lib/validation/fieldErrors'
 import { HARDWARE_TYPE_OPTIONS } from '@/lib/validation/branchForms'
 import { displayStaffRef } from '@/lib/formatDisplayId'
-import { useFieldErrors } from '@/hooks/useFieldErrors'
+import { useFieldErrors } from '@/hooks/shared/useFieldErrors'
 import {
   ADMIN_DEVICES_PAGE_SIZE,
   changeAdminPassword,
   useAdminCurrency,
   useAdminDevices,
-} from '@/hooks/useAdminSettings'
-import { useDebouncedValue } from '@/hooks/useDebouncedValue'
+} from '@/hooks/admin/useAdminSettings'
+import { useDebouncedValue } from '@/hooks/shared/useDebouncedValue'
 import { useAppDispatch } from '@/rtk/hooks'
 import { setDefaultCurrency } from '@/rtk/features/auth/authSlice'
-import { apiClient } from '@/api/api'
-import { endpoints } from '@/api/endpoints'
+import { fetchAdminBranchOptions } from '@/hooks/admin/useAdminBranches'
 import { Skeleton, TableRowsSkeleton } from '@/components/ui/skeleton'
 import {
   KeyRound,
@@ -121,7 +120,7 @@ export function SettingsPage() {
   useEffect(() => {
     let cancelled = false
     async function loadBranches() {
-      const res = await apiClient.get(endpoints.admin.branches.list, { page: 1, limit: 100 })
+      const res = await fetchAdminBranchOptions({ page: 1, limit: 100 })
       if (cancelled || !res.success) return
       const rows = res.data?.items || res.data || []
       setBranchOptions(

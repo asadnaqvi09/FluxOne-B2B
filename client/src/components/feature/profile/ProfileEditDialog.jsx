@@ -14,8 +14,8 @@ import { Label } from '@/components/ui/label'
 import { ImageUploadField } from '@/components/shared/ImageUploadField'
 import { FieldError } from '@/components/shared/FieldError'
 import { fieldErrorClass } from '@/lib/validation/fieldErrors'
-import { useFieldErrors } from '@/hooks/useFieldErrors'
-import { useFormBaseline } from '@/hooks/useFormBaseline'
+import { useFieldErrors } from '@/hooks/shared/useFieldErrors'
+import { useFormBaseline } from '@/hooks/shared/useFormBaseline'
 
 const PROFILE_FIELD_IDS = {
   name: 'profile-name',

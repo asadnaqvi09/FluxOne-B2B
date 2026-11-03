@@ -1,5 +1,5 @@
 import { CatalogCascadeFilters } from '@/components/shared/CatalogCascadeFilters'
-import { LEDGER_KIND_OPTIONS } from '@/lib/controlTabs'
+import { LEDGER_KIND_OPTIONS } from '@/lib/control/controlTabs'
 
 // Control filter bar — shared cascade + dates + product type (+ ledger kind on Adj/Out).
 export function MovementFilters({

@@ -12,7 +12,7 @@ import {
   TableCell,
   TablePagination,
 } from '@/components/ui/table'
-import { useClientPagination } from '@/hooks/useClientPagination'
+import { useClientPagination } from '@/hooks/shared/useClientPagination'
 import { displayStaffRef } from '@/lib/formatDisplayId'
 import { cn } from '@/lib/utils'
 

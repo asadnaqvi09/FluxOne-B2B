@@ -20,16 +20,16 @@ import {
 } from '@/components/ui/table'
 import { ProductImageCell } from '@/components/feature/products/ProductStatusToggle'
 import { BRAND } from '@/lib/constants'
-import { useCurrency } from '@/hooks/useCurrency'
-import { finalPriceFromSelling } from '@/lib/pricing'
+import { useCurrency } from '@/hooks/shared/useCurrency'
+import { finalPriceFromSelling } from '@/lib/products/pricing'
 import {
   EMPTY_DASH,
   formatInventoryStock,
   money,
   PRODUCT_STATUS,
-} from '@/lib/mapProduct'
+} from '@/lib/products/mapProduct'
 import { displayItemCode } from '@/lib/formatDisplayId'
-import { variantSkuLabel } from '@/lib/variantDisplay'
+import { variantSkuLabel } from '@/lib/products/variantDisplay'
 
 function promotionLabel(sku) {
   const offer = Number(sku.offerPercent || 0)

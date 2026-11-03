@@ -30,8 +30,6 @@ import {
   DialogTitle,
   DialogCancelButton,
 } from '@/components/ui/dialog'
-import { apiClient } from '@/api/api'
-import { endpoints } from '@/api/endpoints'
 import {
   displayDiscountRef,
   matchesDisplayRef,
@@ -41,16 +39,22 @@ import { UI_RADIUS } from '@/lib/constants'
 import { cn } from '@/lib/utils'
 import { toastError, toastSuccess } from '@/lib/toast'
 import { validateDiscountForm } from '@/lib/validation/branchForms'
-import { CATEGORY_ACTIVE_QUERY } from '@/lib/productCatalogCache'
-import { filterActiveCategories } from '@/lib/mapProduct'
-import { useFormBaseline } from '@/hooks/useFormBaseline'
-import { useClientPagination } from '@/hooks/useClientPagination'
-import { useDebouncedValue } from '@/hooks/useDebouncedValue'
+import { useFormBaseline } from '@/hooks/shared/useFormBaseline'
+import { useBranchDiscounts } from '@/hooks/branch/useBranchDiscounts'
+import { useClientPagination } from '@/hooks/shared/useClientPagination'
+import { useDebouncedValue } from '@/hooks/shared/useDebouncedValue'
 
 export function DiscountsPage() {
-  const [discounts, setDiscounts] = useState([])
-  const [loading, setLoading] = useState(false)
-  const [categories, setCategories] = useState([])
+  const {
+    discounts,
+    categories,
+    loading,
+    fetchDiscounts,
+    fetchCategories,
+    createDiscount,
+    updateDiscount,
+    deleteDiscount,
+  } = useBranchDiscounts()
   const [filterCategory, setFilterCategory] = useState('')
   const [searchQuery, setSearchQuery] = useState('')
   const debouncedQ = useDebouncedValue(normalizeSearchQuery(searchQuery), 300)
@@ -95,40 +99,20 @@ export function DiscountsPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps -- capture once per open
   }, [open, captureBaseline])
 
-  const fetchDiscounts = async () => {
-    setLoading(true)
-    const params = {}
-    if (filterCategory) params.categoryId = filterCategory
-    // Server also accepts q — keeps list small when many offers
-    if (debouncedQ) params.q = debouncedQ
-    const res = await apiClient.get(endpoints.branch.discounts.list, params)
-    setLoading(false)
-    if (res.success && res.data) {
-      setDiscounts(res.data || [])
-    } else if (!res.success) {
-      toastError(res.error || 'Failed to load discounts')
-    }
-  }
-
-  const fetchCategories = async () => {
-    const res = await apiClient.get('/inventory/products/categories', CATEGORY_ACTIVE_QUERY)
-    if (res.success && res.data) {
-      const all = filterActiveCategories(
-        Array.isArray(res.data) ? res.data : res.data.items || [],
-      )
-      setCategories(all.filter((c) => !c.parentId))
-    }
-  }
-
   useEffect(() => {
     void fetchCategories()
-  }, [])
+  }, [fetchCategories])
 
   useEffect(() => {
     setPage(1)
-    void fetchDiscounts()
+    const params = {}
+    if (filterCategory) params.categoryId = filterCategory
+    if (debouncedQ) params.q = debouncedQ
+    void fetchDiscounts(params).then((res) => {
+      if (res && !res.success) toastError(res.error || 'Failed to load discounts')
+    })
     // eslint-disable-next-line react-hooks/exhaustive-deps -- reload on filter/search
-  }, [filterCategory, debouncedQ])
+  }, [filterCategory, debouncedQ, fetchDiscounts])
 
   const handleOpenCreate = () => {
     setMode('create')
@@ -168,17 +152,18 @@ export function DiscountsPage() {
 
     setSaving(true)
     try {
-      let res
-      if (mode === 'create') {
-        res = await apiClient.post(endpoints.branch.discounts.create, payload)
-      } else {
-        res = await apiClient.put(endpoints.branch.discounts.update(editing.id), payload)
-      }
+      const res =
+        mode === 'create'
+          ? await createDiscount(payload)
+          : await updateDiscount(editing.id, payload)
 
       if (res.success) {
         toastSuccess(mode === 'create' ? 'Discount offer created' : 'Discount offer updated')
         setOpen(false)
-        void fetchDiscounts()
+        const params = {}
+        if (filterCategory) params.categoryId = filterCategory
+        if (debouncedQ) params.q = debouncedQ
+        void fetchDiscounts(params)
       } else {
         toastError(res.error || 'Failed to save discount')
       }
@@ -197,12 +182,15 @@ export function DiscountsPage() {
   const confirmDeleteDiscount = async () => {
     if (!deleteTargetDiscount) return
     setSaving(true)
-    const res = await apiClient.delete(endpoints.branch.discounts.delete(deleteTargetDiscount.id))
+    const res = await deleteDiscount(deleteTargetDiscount.id)
     setSaving(false)
     if (res.success) {
       toastSuccess('Discount deleted successfully')
       setDeleteTargetDiscount(null)
-      void fetchDiscounts()
+      const params = {}
+      if (filterCategory) params.categoryId = filterCategory
+      if (debouncedQ) params.q = debouncedQ
+      void fetchDiscounts(params)
     } else {
       toastError(res.error || 'Failed to delete discount')
     }

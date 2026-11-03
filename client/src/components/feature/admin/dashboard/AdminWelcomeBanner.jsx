@@ -1,5 +1,5 @@
 import { WelcomeBanner } from '@/components/shared/WelcomeBanner'
-import { useAuthSession } from '@/hooks/useAuthSession'
+import { useAuthSession } from '@/hooks/shared/useAuthSession'
 
 function sessionKey(user, token) {
   const who = user?.id || user?.email || user?.username || 'anon'

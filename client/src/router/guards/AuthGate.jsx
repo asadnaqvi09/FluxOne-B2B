@@ -1,5 +1,5 @@
 import { Navigate, Outlet, useLocation } from 'react-router-dom'
-import { useAuthSession } from '@/hooks/useAuthSession'
+import { useAuthSession } from '@/hooks/shared/useAuthSession'
 import { PATHS } from '@/router/paths'
 
 export function AuthGate() {

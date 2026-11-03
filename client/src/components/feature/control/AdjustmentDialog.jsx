@@ -16,19 +16,19 @@ import { DownwardSelect } from '@/components/shared/DownwardSelect'
 import { FieldError } from '@/components/shared/FieldError'
 import { WholeNumberInput } from '@/components/shared/WholeNumberInput'
 import { BRAND } from '@/lib/constants'
-import { PRODUCT_TYPES } from '@/lib/mapProduct'
-import { CONTROL_SOURCES } from '@/lib/controlTabs'
-import { DAMAGED_LOCATIONS, MOVEMENT_TYPES } from '@/lib/mapStockMovement'
-import { deriveVariantAxes } from '@/lib/variantAxes'
+import { PRODUCT_TYPES } from '@/lib/products/mapProduct'
+import { CONTROL_SOURCES } from '@/lib/control/controlTabs'
+import { DAMAGED_LOCATIONS, MOVEMENT_TYPES } from '@/lib/control/mapStockMovement'
+import { deriveVariantAxes } from '@/lib/products/variantAxes'
 import { fieldErrorClass } from '@/lib/validation/fieldErrors'
-import { useFieldErrors } from '@/hooks/useFieldErrors'
+import { useFieldErrors } from '@/hooks/shared/useFieldErrors'
 import {
   fetchControlProductDetail,
   fetchControlProductOptions,
   fetchControlSuppliers,
   fetchEmployeeLookups,
-} from '@/hooks/useInventoryControl'
-import { useFormBaseline } from '@/hooks/useFormBaseline'
+} from '@/hooks/inventory/useInventoryControl'
+import { useFormBaseline } from '@/hooks/shared/useFormBaseline'
 
 const OPERATIONS = {
   IN: 'in',

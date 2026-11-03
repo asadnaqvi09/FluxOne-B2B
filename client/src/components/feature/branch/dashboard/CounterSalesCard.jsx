@@ -1,7 +1,7 @@
 import { Monitor } from 'lucide-react'
 import { EmptyState } from '@/components/shared/EmptyState'
 import { SurfaceCard } from '@/components/shared/SurfaceCard'
-import { useCurrency } from '@/hooks/useCurrency'
+import { useCurrency } from '@/hooks/shared/useCurrency'
 import { BRAND } from '@/lib/constants'
 import { cn } from '@/lib/utils'
 

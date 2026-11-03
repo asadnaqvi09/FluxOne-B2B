@@ -2,14 +2,14 @@
 import { createAsyncThunk, createSlice } from '@reduxjs/toolkit'
 import { apiClient } from '@/api/api'
 import { endpoints } from '@/api/endpoints'
-import { mapPurchaseHistory, mapPurchaseOrder } from '@/lib/mapPurchaseOrder'
-import { mapSupplier } from '@/lib/mapSupplier'
-import { mapProduct } from '@/lib/mapProduct'
-import { downloadPurchaseOrderPdf } from '@/lib/pdfDownload'
+import { mapPurchaseHistory, mapPurchaseOrder } from '@/lib/orders/mapPurchaseOrder'
+import { mapSupplier } from '@/lib/suppliers/mapSupplier'
+import { mapProduct } from '@/lib/products/mapProduct'
+import { downloadPurchaseOrderPdf } from '@/lib/export/pdfDownload'
 import {
   canDownloadPurchaseOrderInvoices,
   downloadPurchaseOrderInvoicePdf,
-} from '@/lib/purchaseOrderInvoiceExport'
+} from '@/lib/orders/purchaseOrderInvoiceExport'
 
 export const ORDERS_PAGE_SIZE = 8
 

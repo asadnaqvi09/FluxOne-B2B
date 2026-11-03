@@ -24,9 +24,9 @@ import { ProductImageCell } from '@/components/feature/products/ProductStatusTog
 import { apiClient } from '@/api/api'
 import { endpoints } from '@/api/endpoints'
 import { displayItemCode } from '@/lib/formatDisplayId'
-import { mapProduct, PRODUCT_STATUS } from '@/lib/mapProduct'
-import { formatShelfQuantity, getShelfStockStatus } from '@/lib/shelfStockStatus'
-import { variantSkuLabel } from '@/lib/variantDisplay'
+import { mapProduct, PRODUCT_STATUS } from '@/lib/products/mapProduct'
+import { formatShelfQuantity, getShelfStockStatus } from '@/lib/products/shelfStockStatus'
+import { variantSkuLabel } from '@/lib/products/variantDisplay'
 
 async function fetchProductWithVariants(productId) {
   const res = await apiClient.get(endpoints.products.detail(productId))

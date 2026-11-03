@@ -33,14 +33,14 @@ import {
   TABLE_PIN,
 } from '@/components/ui/table'
 import { TableRowsSkeleton } from '@/components/ui/skeleton'
-import { EMPTY_DASH, formatInventoryStock, PRODUCT_TYPES } from '@/lib/mapProduct'
+import { EMPTY_DASH, formatInventoryStock, PRODUCT_TYPES } from '@/lib/products/mapProduct'
 import { displayItemCode } from '@/lib/formatDisplayId'
 import { BRAND } from '@/lib/constants'
 import {
   FINAL_PRICE_FORMULA,
   SELLING_PRICE_FORMULA,
   TAX_PCT_FORMULA,
-} from '@/lib/pricingFormulaCopy'
+} from '@/lib/products/pricingFormulaCopy'
 
 // Print / Add Stock / Edit / Deactivate|Activate / Delete for one catalog row
 function ProductRowActions({

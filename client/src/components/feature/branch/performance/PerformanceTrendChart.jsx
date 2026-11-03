@@ -11,8 +11,8 @@ import {
   YAxis,
 } from 'recharts'
 import { Button } from '@/components/ui/button'
-import { RATING_BANDS } from '@/lib/performanceRatings'
-import { formatScorePercent } from '@/lib/performanceScales'
+import { RATING_BANDS } from '@/lib/branch/performanceRatings'
+import { formatScorePercent } from '@/lib/branch/performanceScales'
 import { formatDateLine, formatDateTimeInline } from '@/lib/formatDateTime'
 
 // Static range presets (TL) — filter is applied on the server

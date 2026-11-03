@@ -11,7 +11,7 @@ import { endpoints } from '@/api/endpoints'
 import { DateTimeLines } from '@/components/shared/DateTimeLines'
 import { displayItemCode } from '@/lib/formatDisplayId'
 import { formatDateTimeInline } from '@/lib/formatDateTime'
-import { mapStockMovement, MOVEMENT_TYPES } from '@/lib/mapStockMovement'
+import { mapStockMovement, MOVEMENT_TYPES } from '@/lib/control/mapStockMovement'
 import { TableRowsSkeleton } from '@/components/ui/skeleton'
 
 const LIST_PATH = {

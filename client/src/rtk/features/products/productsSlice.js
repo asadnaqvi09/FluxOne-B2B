@@ -6,8 +6,8 @@ import { API_BASE_URL } from '@/lib/constants'
 import {
   mapProduct,
   splitProductWrite,
-} from '@/lib/mapProduct'
-import { exportProductsToStyledExcel } from '@/lib/productExport'
+} from '@/lib/products/mapProduct'
+import { exportProductsToStyledExcel } from '@/lib/products/productExport'
 import {
   catalogToState,
   getProductCatalog,
@@ -15,7 +15,7 @@ import {
   patchCatalogCategoryActive,
   peekProductCatalog,
   refreshProductCategories,
-} from '@/lib/productCatalogCache'
+} from '@/lib/products/productCatalogCache'
 import { tokenStorage } from '@/api/tokenStorage'
 
 export const PRODUCTS_PAGE_SIZE = 8

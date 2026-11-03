@@ -26,16 +26,15 @@ import {
   TableCell,
   TablePagination,
 } from '@/components/ui/table'
-import { apiClient } from '@/api/api'
-import { endpoints } from '@/api/endpoints'
+import { useAdminLeaves } from '@/hooks/admin/useAdminLeaves'
 import { TableRowsSkeleton } from '@/components/ui/skeleton'
 import { BRAND } from '@/lib/constants'
 import { referenceFromUuid, displayStaffRef, matchesDisplayRef, normalizeSearchQuery } from '@/lib/formatDisplayId'
 import { formatDateLine } from '@/lib/formatDateTime'
 import { DateTimeLines } from '@/components/shared/DateTimeLines'
 import { toastError, toastSuccess } from '@/lib/toast'
-import { useClientPagination } from '@/hooks/useClientPagination'
-import { useDebouncedValue } from '@/hooks/useDebouncedValue'
+import { useClientPagination } from '@/hooks/shared/useClientPagination'
+import { useDebouncedValue } from '@/hooks/shared/useDebouncedValue'
 import { cn } from '@/lib/utils'
 
 function displayLeaveRef(row = {}) {
@@ -90,9 +89,7 @@ export function LeavesPage() {
   const [searchParams, setSearchParams] = useSearchParams()
   const highlightId = searchParams.get('highlight') || ''
 
-  const [items, setItems] = useState([])
-  const [branches, setBranches] = useState([])
-  const [loading, setLoading] = useState(false)
+  const { items, branches, loading, fetchLeaves, decideLeave } = useAdminLeaves()
   const [mutatingId, setMutatingId] = useState(null)
   const [statusFilter, setStatusFilter] = useState('all')
   const [branchFilter, setBranchFilter] = useState('')
@@ -102,30 +99,14 @@ export function LeavesPage() {
   const [detailRow, setDetailRow] = useState(null)
   const [presetDecision, setPresetDecision] = useState(null)
 
-  const fetchLeaves = useCallback(async () => {
-    setLoading(true)
-    // Branch-scoped list only — search/status applied client-side so KPIs stay accurate
-    const res = await apiClient.get(endpoints.admin.leaves.list, {
-      branchId: branchFilter || undefined,
-    })
-    setLoading(false)
-    if (res.success) setItems(res.data || [])
-    else toastError(res.error || 'Failed to load leave requests')
-  }, [branchFilter])
+  const reloadLeaves = useCallback(async () => {
+    const res = await fetchLeaves(branchFilter)
+    if (!res.success) toastError(res.error || 'Failed to load leave requests')
+  }, [branchFilter, fetchLeaves])
 
   useEffect(() => {
-    void fetchLeaves()
-  }, [fetchLeaves])
-
-  useEffect(() => {
-    void (async () => {
-      const res = await apiClient.get(endpoints.admin.branches.list, { page: 1, limit: 100 })
-      if (res.success) {
-        const list = res.data?.items || res.data || []
-        setBranches(Array.isArray(list) ? list : [])
-      }
-    })()
-  }, [])
+    void reloadLeaves()
+  }, [reloadLeaves])
 
   // Dynamic KPIs from full branch-scoped set (not search/status filtered)
   const counts = useMemo(() => {
@@ -193,7 +174,7 @@ export function LeavesPage() {
       return toastError('Please provide a rejection reason')
     }
     setMutatingId(detailRow.id)
-    const res = await apiClient.patch(endpoints.admin.leaves.decide(detailRow.id), {
+    const res = await decideLeave(detailRow.id, {
       status,
       decisionReason: decisionReason?.trim() || null,
     })
@@ -206,7 +187,7 @@ export function LeavesPage() {
         searchParams.delete('highlight')
         setSearchParams(searchParams, { replace: true })
       }
-      void fetchLeaves()
+      void reloadLeaves()
     } else {
       toastError(res.error || 'Failed to update leave request')
     }

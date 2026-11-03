@@ -16,7 +16,7 @@ import {
 import { TableRowsSkeleton } from '@/components/ui/skeleton'
 import { DateTimeLines } from '@/components/shared/DateTimeLines'
 import { displayOrderRef } from '@/lib/formatDisplayId'
-import { OrderStatusBadge } from '@/lib/orderStatus'
+import { OrderStatusBadge } from '@/components/feature/orders/OrderStatusBadge'
 import { cn } from '@/lib/utils'
 
 // QA Bug 5 — list actions: View / History / Print only (Receival + Complete on detail page)

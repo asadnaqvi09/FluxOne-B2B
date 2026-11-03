@@ -8,8 +8,8 @@ import { ConfirmDialog } from '@/components/shared/ConfirmDialog'
 import { MotionHeader, MotionReveal } from '@/components/shared/MotionReveal'
 import { PageHeader } from '@/components/shared/PageHeader'
 import { Button } from '@/components/ui/button'
-import { usePermissions } from '@/hooks/usePermissions'
-import { useSuppliers } from '@/hooks/useSuppliers'
+import { usePermissions } from '@/hooks/shared/usePermissions'
+import { useSuppliers } from '@/hooks/inventory/useSuppliers'
 import { toastError, toastSuccess } from '@/lib/toast'
 
 export function SuppliersPage() {

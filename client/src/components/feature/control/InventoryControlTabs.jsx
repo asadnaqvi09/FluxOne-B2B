@@ -6,8 +6,8 @@ import {
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { BRAND } from '@/lib/constants'
-import { CONTROL_UI_TAB } from '@/lib/controlTabs'
-import { MOVEMENT_TYPES } from '@/lib/mapStockMovement'
+import { CONTROL_UI_TAB } from '@/lib/control/controlTabs'
+import { MOVEMENT_TYPES } from '@/lib/control/mapStockMovement'
 
 export const CONTROL_TABS = [
   { id: CONTROL_UI_TAB.IN, label: 'Stock In', icon: ArrowDownToLine },

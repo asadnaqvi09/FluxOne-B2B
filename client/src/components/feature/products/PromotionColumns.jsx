@@ -1,4 +1,4 @@
-import { EMPTY_DASH } from '@/lib/mapProduct'
+import { EMPTY_DASH } from '@/lib/products/mapProduct'
 
 //
 // Discount & Offers = one promo (offer name wins; else discount %).

@@ -6,11 +6,10 @@ import { AdminLogsTabs } from '@/components/feature/admin/logs/AdminLogsTabs'
 import { AdminLogsFilters } from '@/components/feature/admin/logs/AdminLogsFilters'
 import { AdminLogsTable } from '@/components/feature/admin/logs/AdminLogsTable'
 import { AdminLogsExportBar } from '@/components/feature/admin/logs/AdminLogsExportBar'
-import { useAdminLogs } from '@/hooks/useAdminLogs'
-import { ADMIN_LOG_CATEGORY_LABELS } from '@/lib/adminLogs'
-import { exportAdminLogsSelection } from '@/lib/adminLogsExport'
-import { apiClient } from '@/api/api'
-import { endpoints } from '@/api/endpoints'
+import { useAdminLogs } from '@/hooks/admin/useAdminLogs'
+import { ADMIN_LOG_CATEGORY_LABELS } from '@/lib/admin/adminLogs'
+import { exportAdminLogsSelection } from '@/lib/export/adminLogsExport'
+import { fetchAdminBranchOptions } from '@/hooks/admin/useAdminBranches'
 
 // Parent: owns tab/filters/selection/fetch — Children: Tabs, Filters, Table, ExportBar
 export function AdminLogsPage() {
@@ -37,7 +36,7 @@ export function AdminLogsPage() {
   useEffect(() => {
     let cancelled = false
     async function loadBranches() {
-      const res = await apiClient.get(endpoints.admin.branches.list, { page: 1, limit: 100 })
+      const res = await fetchAdminBranchOptions({ page: 1, limit: 100 })
       if (cancelled || !res.success) return
       const rows = res.data?.items || res.data || []
       const map = {}

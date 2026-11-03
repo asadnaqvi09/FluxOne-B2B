@@ -1,6 +1,6 @@
 import { cn } from '@/lib/utils'
 import { BRAND } from '@/lib/constants'
-import { ADMIN_LOG_TABS } from '@/lib/adminLogs'
+import { ADMIN_LOG_TABS } from '@/lib/admin/adminLogs'
 
 // Child: category tab list — Parent: AdminLogsPage
 export function AdminLogsTabs({ value, onChange, className }) {

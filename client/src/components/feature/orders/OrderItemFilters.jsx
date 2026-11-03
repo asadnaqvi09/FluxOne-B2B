@@ -1,7 +1,7 @@
 import { Label } from '@/components/ui/label'
 import { NativeSelect } from '@/components/ui/select'
 import { Button } from '@/components/ui/button'
-import { PRODUCT_TYPES } from '@/lib/mapProduct'
+import { PRODUCT_TYPES } from '@/lib/products/mapProduct'
 import { cn } from '@/lib/utils'
 
 function FilterSelect({

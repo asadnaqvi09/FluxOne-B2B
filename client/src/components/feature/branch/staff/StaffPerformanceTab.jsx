@@ -24,18 +24,18 @@ import {
 } from '@/components/ui/table'
 import { apiClient } from '@/api/api'
 import { useAuth } from '@/context/AuthContext'
-import { useClientPagination } from '@/hooks/useClientPagination'
+import { useClientPagination } from '@/hooks/shared/useClientPagination'
 import {
   isScaleDraftDirty,
   isScaleSumValid,
   SCALE_SUM_TARGET,
   sumScalePoints,
-} from '@/lib/performanceScales'
+} from '@/lib/branch/performanceScales'
 import {
   formatRelativeScored,
   ratingBadgeClass,
   trendDisplay,
-} from '@/lib/performanceRatings'
+} from '@/lib/branch/performanceRatings'
 import { formatDateLine } from '@/lib/formatDateTime'
 import { BRAND } from '@/lib/constants'
 import { displayStaffRef, matchesDisplayRef } from '@/lib/formatDisplayId'

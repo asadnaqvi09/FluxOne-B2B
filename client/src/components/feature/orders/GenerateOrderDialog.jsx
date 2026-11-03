@@ -16,10 +16,10 @@ import { NativeSelect } from '@/components/ui/select'
 import { FieldError } from '@/components/shared/FieldError'
 import { WholeNumberInput } from '@/components/shared/WholeNumberInput'
 import { BRAND } from '@/lib/constants'
-import { money } from '@/lib/mapProduct'
+import { money } from '@/lib/products/mapProduct'
 import { fieldErrorClass } from '@/lib/validation/fieldErrors'
-import { useFieldErrors } from '@/hooks/useFieldErrors'
-import { useFormBaseline } from '@/hooks/useFormBaseline'
+import { useFieldErrors } from '@/hooks/shared/useFieldErrors'
+import { useFormBaseline } from '@/hooks/shared/useFormBaseline'
 
 const PO_FIELD_IDS = {
   supplierId: 'po-supplier',

@@ -1,18 +1,23 @@
-# React + Vite
+# FluxOne Inventory — Client
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+React + Vite admin / inventory / branch portals.
 
-Currently, two official plugins are available:
+- **Language:** JavaScript / JSX only (no TypeScript unless the team decides later)
+- **Architecture & conventions:** see **[ARCHITECTURE.md](./ARCHITECTURE.md)** (folder map, data-fetching rules, golden examples, cross-links)
+- **Hooks live under** `src/hooks/{admin|inventory|branch|shared}/` — pages/layouts must not call `apiClient` directly
+- **Lib helpers** under `src/lib/{products|control|orders|export|…}/` (shared utils stay at `lib/` root)
+- **PR checklist:** [`.github/PULL_REQUEST_TEMPLATE.md`](../.github/PULL_REQUEST_TEMPLATE.md)
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+## Scripts
+
+```bash
+npm install
+npm run dev      # http://localhost:5173 (proxies /api → :5000)
+npm run build
+npm run lint
+npm run preview
+```
 
 ## React Compiler
 
-The React Compiler is enabled on this template. See [this documentation](https://react.dev/learn/react-compiler) for more information.
-
-Note: This will impact Vite dev & build performances.
-
-## Expanding the ESLint configuration
-
-If you are developing a production application, we recommend using TypeScript with type-aware lint rules enabled. Check out the [TS template](https://github.com/vitejs/vite/tree/main/packages/create-vite/template-react-ts) for information on how to integrate TypeScript and [`typescript-eslint`](https://typescript-eslint.io) in your project.
+The React Compiler is enabled via the Vite React plugin. See [React Compiler docs](https://react.dev/learn/react-compiler).

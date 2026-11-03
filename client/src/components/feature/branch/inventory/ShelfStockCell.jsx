@@ -1,5 +1,5 @@
-import { PRODUCT_TYPES } from '@/lib/mapProduct'
-import { formatShelfQuantity } from '@/lib/shelfStockStatus'
+import { PRODUCT_TYPES } from '@/lib/products/mapProduct'
+import { formatShelfQuantity } from '@/lib/products/shelfStockStatus'
 import { ViewVariantsButton } from '@/components/feature/branch/inventory/ViewVariantsButton'
 
 /**

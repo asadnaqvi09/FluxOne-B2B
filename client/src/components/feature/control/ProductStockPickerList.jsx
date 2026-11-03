@@ -3,7 +3,7 @@ import { Checkbox } from '@/components/ui/checkbox'
 import { Label } from '@/components/ui/label'
 import { ProductImageCell } from '@/components/feature/products/ProductStatusToggle'
 import { WholeNumberInput } from '@/components/shared/WholeNumberInput'
-import { money, PRODUCT_TYPES } from '@/lib/mapProduct'
+import { money, PRODUCT_TYPES } from '@/lib/products/mapProduct'
 import { cn } from '@/lib/utils'
 import { TableRowsSkeleton } from '@/components/ui/skeleton'
 
@@ -106,7 +106,9 @@ export function ProductStockPickerList({
       </div>
       <p className="flex items-center gap-1.5 text-xs text-slate-500">
         <Package className="size-3.5 shrink-0" />
-        Choose individual items, bundles, or variant SKUs. Previous prices show as placeholders.
+        {/* Bundles assemble on Stock In — component qty is deducted server-side */}
+        Choose individual items, bundles, or variant SKUs. Bundle stock-in deducts recipe
+        components. Previous prices show as placeholders.
       </p>
     </div>
   )

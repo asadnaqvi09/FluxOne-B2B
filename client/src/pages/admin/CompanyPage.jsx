@@ -23,8 +23,8 @@ import {
 import { ConfirmDialog } from '@/components/shared/ConfirmDialog'
 import { PhoneInput } from '@/components/shared/PhoneInput'
 import { PoliciesTable } from '@/components/feature/admin/company/PoliciesTable'
-import { useAdminCompany } from '@/hooks/useAdminCompany'
-import { useAdminPolicies } from '@/hooks/useAdminPolicies'
+import { useAdminCompany } from '@/hooks/admin/useAdminCompany'
+import { useAdminPolicies } from '@/hooks/admin/useAdminPolicies'
 import { BRAND } from '@/lib/constants'
 import { referenceFromUuid } from '@/lib/formatDisplayId'
 import { toastSuccess, toastError } from '@/lib/toast'
@@ -34,8 +34,8 @@ import {
   validateUrl,
 } from '@/lib/validation/formValidators'
 import { fieldErrorClass } from '@/lib/validation/fieldErrors'
-import { useFieldErrors } from '@/hooks/useFieldErrors'
-import { useFormBaseline } from '@/hooks/useFormBaseline'
+import { useFieldErrors } from '@/hooks/shared/useFieldErrors'
+import { useFormBaseline } from '@/hooks/shared/useFormBaseline'
 import { Skeleton, TableRowsSkeleton } from '@/components/ui/skeleton'
 
 const COMPANY_FIELD_IDS = {

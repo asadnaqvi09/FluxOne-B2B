@@ -16,7 +16,7 @@ import {
   TablePagination,
   TableRow,
 } from '@/components/ui/table'
-import { useClientPagination } from '@/hooks/useClientPagination'
+import { useClientPagination } from '@/hooks/shared/useClientPagination'
 import { referenceFromUuid } from '@/lib/formatDisplayId'
 import { DateTimeLines } from '@/components/shared/DateTimeLines'
 import { cn } from '@/lib/utils'

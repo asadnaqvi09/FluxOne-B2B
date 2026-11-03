@@ -37,10 +37,10 @@ import {
   slotWithinEmployeeShift,
 } from '@/lib/validation/hardwareSlots'
 import { fieldErrorClass } from '@/lib/validation/fieldErrors'
-import { useFieldErrors } from '@/hooks/useFieldErrors'
+import { useFieldErrors } from '@/hooks/shared/useFieldErrors'
 import { apiClient } from '@/api/api'
 import { endpoints } from '@/api/endpoints'
-import { useFormBaseline } from '@/hooks/useFormBaseline'
+import { useFormBaseline } from '@/hooks/shared/useFormBaseline'
 
 const FIELD_IDS = {
   email: 'staff-email',

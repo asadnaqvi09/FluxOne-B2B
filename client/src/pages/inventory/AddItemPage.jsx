@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { ArrowLeft, ArrowRight, Check } from 'lucide-react'
 import {
@@ -16,9 +16,8 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { NativeSelect } from '@/components/ui/select'
 import { Textarea } from '@/components/ui/textarea'
-import { apiClient } from '@/api/api'
-import { endpoints } from '@/api/endpoints'
-import { useProducts } from '@/hooks/useProducts'
+import { useProducts } from '@/hooks/inventory/useProducts'
+import { useVariantTypeCatalog } from '@/hooks/inventory/useVariantTypeCatalog'
 import {
   ADD_ITEM_TABS,
   PRODUCT_KIND,
@@ -26,10 +25,10 @@ import {
   buildAddItemApiPayload,
   buildCombinations,
   collectVariantImageUploads,
-} from '@/lib/addItem'
+} from '@/lib/products/addItem'
 import { BRAND } from '@/lib/constants'
 import { PATHS } from '@/router/paths'
-import { resolveInitialApplyDefaultTax } from '@/lib/imTaxProfitPolicy'
+import { resolveInitialApplyDefaultTax } from '@/lib/products/imTaxProfitPolicy'
 import { toastError, toastSuccess, toastInfo } from '@/lib/toast'
 import { focusFieldById } from '@/lib/validation/fieldErrors'
 import { cn } from '@/lib/utils'
@@ -76,9 +75,14 @@ export function AddItemPage() {
     if (error) focusFieldById('add-item-form-error')
   }, [error])
   const [saving, setSaving] = useState(false)
-  const [variantsLoading, setVariantsLoading] = useState(true)
 
-  const [variantTypes, setVariantTypes] = useState([])
+  const onVariantCatalogError = useCallback(
+    (message) => toastError(message || 'Failed to load variant types'),
+    [],
+  )
+  const { variantTypes, setVariantTypes, variantsLoading } = useVariantTypeCatalog({
+    onError: onVariantCatalogError,
+  })
   const [selectedTypeIds, setSelectedTypeIds] = useState([])
   const [selectedValuesByType, setSelectedValuesByType] = useState({})
   const [combinations, setCombinations] = useState([])
@@ -110,41 +114,6 @@ export function AddItemPage() {
     () => variantTypes.filter((t) => selectedTypeIds.includes(t.id)),
     [variantTypes, selectedTypeIds],
   )
-
-  // Load BM variant catalog (IM has resources:read)
-  useEffect(() => {
-    let cancelled = false
-    async function loadVariantTypes() {
-      setVariantsLoading(true)
-      const res = await apiClient.get(endpoints.branch.resources.variantTypes.list, {
-        active: 'active',
-        includeValues: true,
-      })
-      if (cancelled) return
-      if (!res.success) {
-        toastError(res.error || 'Failed to load variant types')
-        setVariantTypes([])
-        setVariantsLoading(false)
-        return
-      }
-      const rows = Array.isArray(res.data) ? res.data : []
-      setVariantTypes(
-        rows.map((t) => ({
-          id: t.id,
-          name: t.name,
-          isCustom: false,
-          values: (t.values || [])
-            .filter((v) => v.isActive !== false)
-            .map((v) => ({ id: v.id, name: v.name, isCustom: false })),
-        })),
-      )
-      setVariantsLoading(false)
-    }
-    void loadVariantTypes()
-    return () => {
-      cancelled = true
-    }
-  }, [])
 
   useEffect(() => {
     setSelectedValuesByType((prev) => {

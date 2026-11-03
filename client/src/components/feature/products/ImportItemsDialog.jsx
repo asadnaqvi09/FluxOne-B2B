@@ -12,9 +12,9 @@ import { Button } from '@/components/ui/button'
 import { Textarea } from '@/components/ui/textarea'
 import { Label } from '@/components/ui/label'
 import { BRAND } from '@/lib/constants'
-import { downloadTextFile, productCsvTemplate } from '@/lib/productCsv'
-import { parseProductsImport } from '@/lib/productImport'
-import { useFormBaseline } from '@/hooks/useFormBaseline'
+import { downloadTextFile, productCsvTemplate } from '@/lib/products/productCsv'
+import { parseProductsImport } from '@/lib/products/productImport'
+import { useFormBaseline } from '@/hooks/shared/useFormBaseline'
 
 function isExcelFile(file) {
   const name = String(file?.name || '').toLowerCase()

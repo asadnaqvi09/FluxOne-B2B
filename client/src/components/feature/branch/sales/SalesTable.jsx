@@ -24,7 +24,7 @@ import {
 } from '@/components/ui/table'
 import { TableRowsSkeleton } from '@/components/ui/skeleton'
 import { displaySaleRef } from '@/lib/formatDisplayId'
-import { useCurrency } from '@/hooks/useCurrency'
+import { useCurrency } from '@/hooks/shared/useCurrency'
 import { cn } from '@/lib/utils'
 import {
   formatFilterDateRange,

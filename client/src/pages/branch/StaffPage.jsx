@@ -15,13 +15,12 @@ import { StaffHolidaysTab } from '@/components/feature/branch/staff/StaffHoliday
 import { StaffPerformanceTab } from '@/components/feature/branch/staff/StaffPerformanceTab'
 import { LeavesPanel } from '@/components/feature/branch/staff/LeavesPanel'
 import { Button } from '@/components/ui/button'
-import { useBranchStaff } from '@/hooks/useBranchStaff'
-import { useDebouncedSearch } from '@/hooks/useDebouncedSearch'
+import { useBranchStaff } from '@/hooks/branch/useBranchStaff'
+import { useDebouncedSearch } from '@/hooks/shared/useDebouncedSearch'
 import { BRAND } from '@/lib/constants'
 import { toastError, toastSuccess } from '@/lib/toast'
-import { apiClient } from '@/api/api'
-import { endpoints } from '@/api/endpoints'
 import { cn } from '@/lib/utils'
+import { useBranchDesignations } from '@/hooks/branch/useBranchDesignations'
 
 export function StaffPage() {
   const {
@@ -50,7 +49,7 @@ export function StaffPage() {
   const [deleteTarget, setDeleteTarget] = useState(null)
   const [statusTarget, setStatusTarget] = useState(null)
   const [statusUpdatingId, setStatusUpdatingId] = useState(null)
-  const [designations, setDesignations] = useState([])
+  const { designations } = useBranchDesignations({ active: 'active', limit: 100 })
 
   // URL ?tab=performance restores Performance after View Details back
   const tabFromUrl = searchParams.get('tab')
@@ -83,20 +82,6 @@ export function StaffPage() {
       { replace: true },
     )
   }
-
-  async function loadDesignations() {
-    const res = await apiClient.get(endpoints.branch.designations.list, {
-      active: 'active',
-      limit: 100,
-    })
-    if (res.success && res.data) {
-      setDesignations(res.data.items || res.data || [])
-    }
-  }
-
-  useEffect(() => {
-    void loadDesignations()
-  }, [])
 
   // Sync tab when landing with ?tab=performance (e.g. Back to roster)
   useEffect(() => {

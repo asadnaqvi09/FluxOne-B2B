@@ -1,6 +1,6 @@
 // Branch Manager form validators (Resources, Discounts, shared field rules).
 
-import { localDateInputValue } from '@/lib/adminLogs'
+import { localDateInputValue } from '@/lib/admin/adminLogs'
 import { validatePercentage } from '@/lib/validation/formValidators'
 import { firstValidationMessage } from '@/lib/validation/fieldErrors'
 

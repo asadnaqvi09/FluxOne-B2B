@@ -12,14 +12,14 @@ import { StaffPerformanceTable } from '@/components/feature/branch/dashboard/Sta
 import { MotionHeader, MotionReveal } from '@/components/shared/MotionReveal'
 import { PageHeader } from '@/components/shared/PageHeader'
 import { Button } from '@/components/ui/button'
-import { useBranchDashboard } from '@/hooks/useBranchDashboard'
-import { useAuthSession } from '@/hooks/useAuthSession'
+import { useBranchDashboard } from '@/hooks/branch/useBranchDashboard'
+import { useAuthSession } from '@/hooks/shared/useAuthSession'
 import { BRAND } from '@/lib/constants'
-import { formatPct } from '@/lib/mapBranchDashboard'
-import { downloadBranchDashboardPdf } from '@/lib/pdfDownload'
+import { formatPct } from '@/lib/branch/mapBranchDashboard'
+import { downloadBranchDashboardPdf } from '@/lib/export/pdfDownload'
 import { toastError, toastSuccess } from '@/lib/toast'
 import { cn } from '@/lib/utils'
-import { useCurrency } from '@/hooks/useCurrency'
+import { useCurrency } from '@/hooks/shared/useCurrency'
 
 export function DashboardPage() {
   const { data, date, from, to, setRange, loading } = useBranchDashboard()

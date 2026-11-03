@@ -15,7 +15,7 @@ import {
   emptyOrderFilters,
   newCompanyBlockKey,
   summarizeBlocks,
-} from '@/lib/orderGenerate'
+} from '@/lib/orders/orderGenerate'
 import { useAppDispatch, useAppSelector } from '@/rtk/hooks'
 import { asResult, catalogActiveOnly } from '@/rtk/asResult'
 import { loadControlCatalog } from '@/rtk/features/control/controlSlice'
@@ -24,7 +24,7 @@ import {
   updatePendingOrder as updatePendingOrderThunk,
   approveOrder as approveOrderThunk,
 } from '@/rtk/features/orders/ordersSlice'
-import { fetchControlSuppliers } from '@/hooks/useInventoryControl'
+import { fetchControlSuppliers } from '@/hooks/inventory/useInventoryControl'
 import { PATHS } from '@/router/paths'
 import { toastError, toastSuccess } from '@/lib/toast'
 

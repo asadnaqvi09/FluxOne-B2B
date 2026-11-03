@@ -30,7 +30,7 @@ import { apiClient } from '@/api/api'
 import { toastError, toastSuccess } from '@/lib/toast'
 import { formatDateLine, formatDateTime } from '@/lib/formatDateTime'
 import { DateTimeLines } from '@/components/shared/DateTimeLines'
-import { useClientPagination } from '@/hooks/useClientPagination'
+import { useClientPagination } from '@/hooks/shared/useClientPagination'
 
 function formatRange(start, end) {
   return `${formatDateLine(start)} — ${formatDateLine(end)}`

@@ -9,7 +9,7 @@ import {
 } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
 import { BRAND } from '@/lib/constants'
-import { downloadBarcodePdf } from '@/lib/pdfDownload'
+import { downloadBarcodePdf } from '@/lib/export/pdfDownload'
 import { toastError, toastSuccess } from '@/lib/toast'
 
 export function PrintBarcodeDialog({

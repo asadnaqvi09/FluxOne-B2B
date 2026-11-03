@@ -17,11 +17,11 @@ import { Button } from '@/components/ui/button'
 import { useAppDispatch } from '@/rtk/hooks'
 import { asResult } from '@/rtk/asResult'
 import { createMovement as createMovementThunk } from '@/rtk/features/control/controlSlice'
-import { useDebouncedSearch } from '@/hooks/useDebouncedSearch'
-import { useProducts } from '@/hooks/useProducts'
+import { useDebouncedSearch } from '@/hooks/shared/useDebouncedSearch'
+import { useProducts } from '@/hooks/inventory/useProducts'
 import { BRAND } from '@/lib/constants'
-import { PRODUCT_STATUS, PRODUCT_TYPES } from '@/lib/mapProduct'
-import { MOVEMENT_TYPES } from '@/lib/mapStockMovement'
+import { PRODUCT_STATUS, PRODUCT_TYPES } from '@/lib/products/mapProduct'
+import { MOVEMENT_TYPES } from '@/lib/control/mapStockMovement'
 import { PATHS } from '@/router/paths'
 import { toastError, toastSuccess } from '@/lib/toast'
 
@@ -356,38 +356,31 @@ export function ProductsPage() {
                 <Plus className="size-4" />
                 Bundle
               </Button>
-              <Button
+                            <Button
                 type="button"
                 variant="outline"
-                className="h-10 cursor-pointer rounded-lg"
-                style={{ color: BRAND.deep }}
+                className="h-10 cursor-pointer rounded-lg text-slate-900 border-slate-200 hover:bg-slate-100 hover:text-slate-900 dark:text-slate-100 dark:border-slate-700 dark:hover:bg-slate-800 dark:hover:text-white"
                 onClick={() => setImportOpen(true)}
               >
                 <ArrowUpFromLine className="size-4" />
                 Import
               </Button>
-              {/* <ExportCsvButton
-                onClick={handleExport}
-                disabled={mutating}
-                label="Export"
-                title="Export products to Excel"
-              /> */}
+              
               <Button
                 type="button"
                 variant="outline"
-                className="cursor-pointer"
-                style={{ color: BRAND.deep }}
+                className="cursor-pointer text-slate-900 border-slate-200 hover:bg-slate-100 hover:text-slate-900 dark:text-slate-100 dark:border-slate-700 dark:hover:bg-slate-800 dark:hover:text-white"
                 loading={mutating}
                 onClick={handleExport}
               >
                 <Download className="size-4" />
                 Export
               </Button>
+              
               <Button
                 type="button"
                 variant="outline"
-                className="h-10 cursor-pointer rounded-lg"
-                style={{ color: BRAND.deep }}
+                className="h-10 cursor-pointer rounded-lg text-slate-900 border-slate-200 hover:bg-slate-100 hover:text-slate-900 dark:text-slate-100 dark:border-slate-700 dark:hover:bg-slate-800 dark:hover:text-white"
                 onClick={() => setScanOpen(true)}
               >
                 <Camera className="size-4" />

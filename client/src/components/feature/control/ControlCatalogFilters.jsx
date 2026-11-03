@@ -3,12 +3,12 @@ import { Search } from 'lucide-react'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { NativeSelect } from '@/components/ui/select'
-import { PRODUCT_TYPES } from '@/lib/mapProduct'
-import { deriveVariantAxes } from '@/lib/variantAxes'
+import { PRODUCT_TYPES } from '@/lib/products/mapProduct'
+import { deriveVariantAxes } from '@/lib/products/variantAxes'
 import {
   fetchControlProductDetail,
   fetchControlProductOptions,
-} from '@/hooks/useInventoryControl'
+} from '@/hooks/inventory/useInventoryControl'
 import { cn } from '@/lib/utils'
 
 function FilterSelect({

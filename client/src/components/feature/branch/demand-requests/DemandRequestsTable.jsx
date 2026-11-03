@@ -16,7 +16,7 @@ import {
 } from '@/components/ui/table'
 import { TableRowsSkeleton } from '@/components/ui/skeleton'
 import { displayOrderRef } from '@/lib/formatDisplayId'
-import { OrderStatusBadge } from '@/lib/orderStatus'
+import { OrderStatusBadge } from '@/components/feature/orders/OrderStatusBadge'
 import { cn } from '@/lib/utils'
 
 // Child: View · Edit · Approve · Reject (Approve is one-click — no edit required)

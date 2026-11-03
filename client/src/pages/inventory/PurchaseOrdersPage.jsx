@@ -7,7 +7,7 @@ import { PurchaseHistoryList } from '@/components/feature/orders/PurchaseHistory
 import { MotionHeader, MotionReveal } from '@/components/shared/MotionReveal'
 import { PageHeader } from '@/components/shared/PageHeader'
 import { Button } from '@/components/ui/button'
-import { usePurchaseOrders } from '@/hooks/usePurchaseOrders'
+import { usePurchaseOrders } from '@/hooks/inventory/usePurchaseOrders'
 import { PATHS } from '@/router/paths'
 import { toastError, toastSuccess } from '@/lib/toast'
 

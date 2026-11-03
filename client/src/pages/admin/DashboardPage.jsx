@@ -8,10 +8,10 @@ import { AdminKpiCards } from '@/components/feature/admin/dashboard/AdminKpiCard
 import { BranchProfitOverviewChart } from '@/components/feature/admin/dashboard/BranchProfitOverviewChart'
 import { BranchInventoryStatusChart } from '@/components/feature/admin/dashboard/BranchInventoryStatusChart'
 import { AiBusinessInsights } from '@/components/feature/admin/dashboard/AiBusinessInsights'
-import { useAdminDashboard } from '@/hooks/useAdminDashboard'
+import { useAdminDashboard } from '@/hooks/admin/useAdminDashboard'
 import { BRAND } from '@/lib/constants'
 import { NativeSelect } from '@/components/ui/select'
-import { useAuthSession } from '@/hooks/useAuthSession'
+import { useAuthSession } from '@/hooks/shared/useAuthSession'
 
 export function DashboardPage() {
   const { user } = useAuthSession()

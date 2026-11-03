@@ -7,7 +7,7 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
-import { money } from '@/lib/mapProduct'
+import { money } from '@/lib/products/mapProduct'
 
 // Price history for an order (last vs current unit cost).
 // QA Bug 2 — "same" is not in TL; only show ↑/↓ when price actually changed.

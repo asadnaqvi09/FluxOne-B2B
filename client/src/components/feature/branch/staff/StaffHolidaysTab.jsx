@@ -28,7 +28,7 @@ import { apiClient } from '@/api/api'
 import { endpoints } from '@/api/endpoints'
 import { toastError, toastSuccess } from '@/lib/toast'
 import { formatDateLine } from '@/lib/formatDateTime'
-import { useClientPagination } from '@/hooks/useClientPagination'
+import { useClientPagination } from '@/hooks/shared/useClientPagination'
 
 function formatDateRange(startDate, endDate) {
   if (!startDate) return '—'

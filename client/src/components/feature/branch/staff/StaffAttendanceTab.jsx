@@ -19,7 +19,7 @@ import { apiClient } from '@/api/api'
 import { BRAND } from '@/lib/constants'
 import { formatDateLine } from '@/lib/formatDateTime'
 import { toastError, toastSuccess } from '@/lib/toast'
-import { useClientPagination } from '@/hooks/useClientPagination'
+import { useClientPagination } from '@/hooks/shared/useClientPagination'
 import { cn } from '@/lib/utils'
 
 function todayIso() {

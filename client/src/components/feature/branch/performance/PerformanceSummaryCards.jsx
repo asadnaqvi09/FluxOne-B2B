@@ -1,10 +1,10 @@
 import { Badge } from '@/components/ui/badge'
-import { formatScorePercent } from '@/lib/performanceScales'
+import { formatScorePercent } from '@/lib/branch/performanceScales'
 import {
   formatRelativeScored,
   ratingBadgeClass,
   trendDisplay,
-} from '@/lib/performanceRatings'
+} from '@/lib/branch/performanceRatings'
 import { formatDateLine, formatDateTimeInline } from '@/lib/formatDateTime'
 
 function CardShell({ title, children }) {

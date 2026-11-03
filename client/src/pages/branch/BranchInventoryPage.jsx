@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { ClipboardList, Settings2 } from 'lucide-react'
 import { PageHeader } from '@/components/shared/PageHeader'
@@ -16,16 +16,14 @@ import {
   TableCell,
   TablePagination,
 } from '@/components/ui/table'
-import { apiClient } from '@/api/api'
-import { useDebouncedValue } from '@/hooks/useDebouncedValue'
-import { useClientPagination } from '@/hooks/useClientPagination'
+import { useDebouncedValue } from '@/hooks/shared/useDebouncedValue'
+import { useBranchInventoryCatalog } from '@/hooks/branch/useBranchInventoryCatalog'
+import { useClientPagination } from '@/hooks/shared/useClientPagination'
 import { displayItemCode } from '@/lib/formatDisplayId'
 import { CategoryLines } from '@/components/shared/CategoryLines'
 import { TruncatedText } from '@/components/shared/TruncatedText'
-import { CATEGORY_ACTIVE_QUERY } from '@/lib/productCatalogCache'
 import { TableRowsSkeleton } from '@/components/ui/skeleton'
-import { filterActiveCategories } from '@/lib/mapProduct'
-import { getShelfStockStatus } from '@/lib/shelfStockStatus'
+import { getShelfStockStatus } from '@/lib/products/shelfStockStatus'
 import { BRAND } from '@/lib/constants'
 import { cn } from '@/lib/utils'
 import { StockControlPriceDialog } from '@/components/feature/branch/inventory/StockControlPriceDialog'
@@ -45,9 +43,8 @@ export function BranchInventoryPage() {
   const [searchParams, setSearchParams] = useSearchParams()
   const tabFromUrl = searchParams.get('tab') === 'demand' ? 'demand' : 'stock'
   const [activeTab, setActiveTab] = useState(tabFromUrl)
-  const [products, setProducts] = useState([])
-  const [categories, setCategories] = useState([])
-  const [loading, setLoading] = useState(false)
+  const { products, categories, loading, fetchInventory, fetchCategories } =
+    useBranchInventoryCatalog()
   const {
     page,
     setPage,
@@ -65,17 +62,12 @@ export function BranchInventoryPage() {
   const [filterProduct, setFilterProduct] = useState('')
   const [filterVariantType, setFilterVariantType] = useState('')
   const [filterVariantValue, setFilterVariantValue] = useState('')
-  const fetchSeq = useRef(0)
-
   const subcategories = categories.filter((c) => !!c.parentId)
 
   const [priceRuleOpen, setPriceRuleOpen] = useState(false)
   const [variantsTarget, setVariantsTarget] = useState(null)
 
-  const fetchInventory = async () => {
-    const seq = ++fetchSeq.current
-    setLoading(true)
-
+  useEffect(() => {
     const params = { limit: 100, status: 'active' }
     if (debouncedQ.trim()) params.q = debouncedQ.trim()
     if (filterCategory) params.categoryId = filterCategory
@@ -83,26 +75,9 @@ export function BranchInventoryPage() {
     if (filterProduct) params.productId = filterProduct
     if (filterVariantType) params.variantTypeId = filterVariantType
     if (filterVariantValue) params.variantValueId = filterVariantValue
-
-    const res = await apiClient.get('/inventory/products', params)
-    if (seq !== fetchSeq.current) return
-
-    setLoading(false)
-    if (res.success && res.data) {
-      setProducts(res.data.items || res.data || [])
-    }
-  }
-
-  const fetchCategories = async () => {
-    const res = await apiClient.get('/inventory/products/categories', CATEGORY_ACTIVE_QUERY)
-    if (res.success && res.data) {
-      setCategories(filterActiveCategories(res.data || []))
-    }
-  }
-
-  useEffect(() => {
-    void fetchInventory()
+    void fetchInventory(params)
   }, [
+    fetchInventory,
     debouncedQ,
     filterCategory,
     filterSubcategory,
@@ -113,7 +88,7 @@ export function BranchInventoryPage() {
 
   useEffect(() => {
     void fetchCategories()
-  }, [])
+  }, [fetchCategories])
 
   // Notification deep-link: ?tab=demand&highlight=…
   useEffect(() => {

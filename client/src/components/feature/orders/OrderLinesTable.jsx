@@ -9,7 +9,7 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table'
-import { money } from '@/lib/mapProduct'
+import { money } from '@/lib/products/mapProduct'
 import { cn } from '@/lib/utils'
 
 function QtyStepper({ value, onChange, disabled }) {

@@ -2,7 +2,7 @@
 import { createAsyncThunk, createSlice } from '@reduxjs/toolkit'
 import { apiClient } from '@/api/api'
 import { endpoints } from '@/api/endpoints'
-import { exportStaffRosterCsv } from '@/lib/staffExport'
+import { exportStaffRosterCsv } from '@/lib/export/staffExport'
 
 export const STAFF_PAGE_SIZE = 8
 

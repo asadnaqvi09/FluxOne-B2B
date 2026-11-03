@@ -9,7 +9,7 @@ import {
 } from '@/components/ui/dropdown-menu'
 import { BranchRoleCapsules } from '@/components/shared/BranchRoleCapsules'
 import { UserAvatar } from '@/components/shared/UserAvatar'
-import { useAuthSession } from '@/hooks/useAuthSession'
+import { useAuthSession } from '@/hooks/shared/useAuthSession'
 import { useTheme } from '@/context/ThemeContext'
 import { ROLES } from '@/lib/constants'
 import { roleDisplayName } from '@/lib/nav'

@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useState } from 'react'
 import { AlertTriangle } from 'lucide-react'
 import { PageHeader } from '@/components/shared/PageHeader'
 import { MotionHeader, MotionReveal } from '@/components/shared/MotionReveal'
@@ -14,22 +14,17 @@ import {
   DialogTitle,
   DialogCancelButton,
 } from '@/components/ui/dialog'
-import { apiClient } from '@/api/api'
-import { endpoints } from '@/api/endpoints'
-import { useDebouncedValue } from '@/hooks/useDebouncedValue'
-import { useClientPagination } from '@/hooks/useClientPagination'
+import { useDebouncedValue } from '@/hooks/shared/useDebouncedValue'
+import { useClientPagination } from '@/hooks/shared/useClientPagination'
 import { BRAND } from '@/lib/constants'
 import { formatDateTime } from '@/lib/formatDateTime'
 import { toastError, toastSuccess } from '@/lib/toast'
-import { CATEGORY_ACTIVE_QUERY } from '@/lib/productCatalogCache'
-import { filterActiveCategories } from '@/lib/mapProduct'
-import { useCurrency } from '@/hooks/useCurrency'
+import { useCurrency } from '@/hooks/shared/useCurrency'
+import { useBranchSales } from '@/hooks/branch/useBranchSales'
 
 export function SalesPage() {
   const { format, currency: tenantCurrency } = useCurrency()
-  const [sales, setSales] = useState([])
-  const [loading, setLoading] = useState(false)
-  const [categories, setCategories] = useState([])
+  const { sales, categories, loading, fetchSales, fetchCategories, refundSale } = useBranchSales()
   const {
     page,
     setPage,
@@ -50,15 +45,11 @@ export function SalesPage() {
   const [filterProduct, setFilterProduct] = useState('')
   const [filterVariantType, setFilterVariantType] = useState('')
   const [filterVariantValue, setFilterVariantValue] = useState('')
-  const fetchSeq = useRef(0)
-
   const [refundTarget, setRefundTarget] = useState(null)
   const [refunding, setRefunding] = useState(false)
   const [invoiceTarget, setInvoiceTarget] = useState(null)
 
-  const fetchSales = async () => {
-    const seq = ++fetchSeq.current
-    setLoading(true)
+  useEffect(() => {
     const params = {}
     if (debouncedQ.trim()) params.q = debouncedQ.trim()
     if (filterFrom) params.from = filterFrom
@@ -66,44 +57,11 @@ export function SalesPage() {
     if (filterCategory) params.categoryId = filterCategory
     if (filterSubcategory) params.subcategoryId = filterSubcategory
     if (filterProduct) params.productId = filterProduct
-    // Sales list may ignore axes; cascade still scopes productId above.
     if (filterVariantType) params.variantTypeId = filterVariantType
     if (filterVariantValue) params.variantValueId = filterVariantValue
-
-    const res = await apiClient.get(endpoints.branch.sales.list, params)
-    if (seq !== fetchSeq.current) return
-
-    setLoading(false)
-    if (res.success && res.data) {
-      let items = res.data.items || []
-      // Client-side axis filter when API has no variant type/value support.
-      if (filterVariantType || filterVariantValue) {
-        items = items.filter((sale) => {
-          const parts = sale.parts || sale.variantParts || []
-          if (!parts.length) return !filterVariantType && !filterVariantValue
-          const typeOk =
-            !filterVariantType ||
-            parts.some((p) => (p.variantTypeId || p.typeId) === filterVariantType)
-          const valueOk =
-            !filterVariantValue ||
-            parts.some((p) => (p.variantValueId || p.valueId) === filterVariantValue)
-          return typeOk && valueOk
-        })
-      }
-      setSales(items)
-    }
-  }
-
-  const fetchCategories = async () => {
-    const res = await apiClient.get('/inventory/products/categories', CATEGORY_ACTIVE_QUERY)
-    if (res.success && res.data) {
-      setCategories(filterActiveCategories(res.data || []))
-    }
-  }
-
-  useEffect(() => {
-    void fetchSales()
+    void fetchSales(params, { filterVariantType, filterVariantValue })
   }, [
+    fetchSales,
     debouncedQ,
     filterFrom,
     filterTo,
@@ -116,7 +74,7 @@ export function SalesPage() {
 
   useEffect(() => {
     void fetchCategories()
-  }, [])
+  }, [fetchCategories])
 
   useEffect(() => {
     setPage(1)
@@ -155,12 +113,21 @@ export function SalesPage() {
   const handleRefund = async () => {
     if (!refundTarget) return
     setRefunding(true)
-    const res = await apiClient.post(endpoints.branch.sales.refund(refundTarget.id))
+    const res = await refundSale(refundTarget.id)
     setRefunding(false)
     if (res.success) {
       toastSuccess('Sale refunded successfully')
       setRefundTarget(null)
-      void fetchSales()
+      const params = {}
+      if (debouncedQ.trim()) params.q = debouncedQ.trim()
+      if (filterFrom) params.from = filterFrom
+      if (filterTo) params.to = filterTo
+      if (filterCategory) params.categoryId = filterCategory
+      if (filterSubcategory) params.subcategoryId = filterSubcategory
+      if (filterProduct) params.productId = filterProduct
+      if (filterVariantType) params.variantTypeId = filterVariantType
+      if (filterVariantValue) params.variantValueId = filterVariantValue
+      void fetchSales(params, { filterVariantType, filterVariantValue })
     } else {
       toastError(res.error || 'Failed to refund sale')
     }

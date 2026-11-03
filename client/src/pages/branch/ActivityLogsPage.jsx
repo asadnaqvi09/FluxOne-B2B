@@ -3,7 +3,7 @@ import { MotionHeader, MotionReveal } from '@/components/shared/MotionReveal'
 import { SurfaceCard } from '@/components/shared/SurfaceCard'
 import { ActivityLogsFilters } from '@/components/feature/branch/logs/ActivityLogsFilters'
 import { ActivityLogsList } from '@/components/feature/branch/logs/ActivityLogsList'
-import { useActivityLogs } from '@/hooks/useActivityLogs'
+import { useActivityLogs } from '@/hooks/branch/useActivityLogs'
 
 export function ActivityLogsPage() {
   const { items, pagination, filters, loading, error, updateFilters, setPage } = useActivityLogs()

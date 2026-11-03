@@ -10,6 +10,10 @@ import {
 } from '../control/control.model.js'
 import { notifyBranchManagersOfCustomVariants } from '../../notifications/notifications.service.js'
 import {
+  applyBundleAssembleDelta,
+  loadBundleRecipe,
+} from './bundleAssemble.js'
+import {
   assertSellingGtePurchase,
   branchClause,
   httpError,
@@ -474,124 +478,6 @@ async function attachBundleItems(client, tenantId, bundleId, bundleItems = [], b
   )
 }
 
-// Recipe map: itemId → units required per 1 finished bundle
-function recipeQtyMap(bundleItems = []) {
-  const map = new Map()
-  for (const row of bundleItems) {
-    if (!row?.itemId) continue
-    map.set(String(row.itemId), Number(row.quantity) || 0)
-  }
-  return map
-}
-
-// Apply assemble / disassemble deltas via Control ledger (Stock Out / Stock In).
-// locked units for a component = finishedBundleQty × recipeQty
-async function applyBundleAssembleDelta(
-  client,
-  tenantId,
-  {
-    bundleId,
-    bundleName,
-    bundleScale = 'unit',
-    oldBundleQty = 0,
-    newBundleQty = 0,
-    oldItems = [],
-    newItems = [],
-    createdBy = null,
-    scopeBranchId = null,
-  },
-) {
-  const oldMap = recipeQtyMap(oldItems)
-  const newMap = recipeQtyMap(newItems)
-  const allIds = [...new Set([...oldMap.keys(), ...newMap.keys()])]
-  const oldFinished = Math.max(0, Number(oldBundleQty) || 0)
-  const newFinished = Math.max(0, Number(newBundleQty) || 0)
-
-  if (allIds.length) {
-    const { rows: componentRows } = await tenantClientQuery(
-      client,
-      tenantId,
-      `
-        SELECT id, name, scale, quantity
-        FROM products
-        WHERE tenant_id = $1 AND id = ANY($2::uuid[])
-        FOR UPDATE
-      `,
-      [allIds],
-    )
-    const byId = new Map(componentRows.map((row) => [String(row.id), row]))
-
-    for (const itemId of allIds) {
-      const component = byId.get(itemId)
-      if (!component) throw httpError(404, 'Bundle component product not found')
-
-      const oldLocked = oldFinished * (oldMap.get(itemId) || 0)
-      const newLocked = newFinished * (newMap.get(itemId) || 0)
-      const delta = newLocked - oldLocked
-      if (delta === 0) continue
-
-      if (delta > 0) {
-        await insertLedgerEventInTx(client, tenantId, {
-          productId: itemId,
-          movementType: MOVEMENT_TYPES.OUT,
-          quantity: delta,
-          scale: component.scale || 'unit',
-          reason: `Assembled into bundle: ${bundleName}`,
-          createdBy,
-          scopeBranchId,
-        })
-      } else {
-        await insertLedgerEventInTx(client, tenantId, {
-          productId: itemId,
-          movementType: MOVEMENT_TYPES.IN,
-          quantity: Math.abs(delta),
-          scale: component.scale || 'unit',
-          reason: `Returned from bundle: ${bundleName}`,
-          createdBy,
-          scopeBranchId,
-        })
-      }
-    }
-  }
-
-  const finishedDelta = newFinished - oldFinished
-  if (finishedDelta > 0) {
-    await insertLedgerEventInTx(client, tenantId, {
-      productId: bundleId,
-      movementType: MOVEMENT_TYPES.IN,
-      quantity: finishedDelta,
-      scale: bundleScale || 'unit',
-      reason: `Bundle assembled: ${bundleName}`,
-      createdBy,
-      scopeBranchId,
-    })
-  } else if (finishedDelta < 0) {
-    await insertLedgerEventInTx(client, tenantId, {
-      productId: bundleId,
-      movementType: MOVEMENT_TYPES.OUT,
-      quantity: Math.abs(finishedDelta),
-      scale: bundleScale || 'unit',
-      reason: `Bundle disassembled: ${bundleName}`,
-      createdBy,
-      scopeBranchId,
-    })
-  }
-}
-
-async function loadBundleRecipe(client, tenantId, bundleId) {
-  const { rows } = await tenantClientQuery(
-    client,
-    tenantId,
-    `
-      SELECT item_id AS "itemId", quantity
-      FROM bundle_items
-      WHERE tenant_id = $1 AND bundle_id = $2
-    `,
-    [bundleId],
-  )
-  return rows
-}
-
 // Return remaining finished bundles to component items (deactivate / delete).
 async function disassembleBundleFully(
   client,
@@ -604,17 +490,24 @@ async function disassembleBundleFully(
   if (qty <= 0) return
   const items = await loadBundleRecipe(client, tenantId, product.id)
   if (!items.length) return
-  await applyBundleAssembleDelta(client, tenantId, {
-    bundleId: product.id,
-    bundleName: product.name,
-    bundleScale: product.scale || 'unit',
-    oldBundleQty: qty,
-    newBundleQty: 0,
-    oldItems: items,
-    newItems: items,
-    createdBy,
-    scopeBranchId,
-  })
+  // Shared assemble engine (same as Control Stock In top-up)
+  await applyBundleAssembleDelta(
+    client,
+    tenantId,
+    {
+      bundleId: product.id,
+      bundleName: product.name,
+      bundleScale: product.scale || 'unit',
+      oldBundleQty: qty,
+      newBundleQty: 0,
+      oldItems: items,
+      newItems: items,
+      createdBy,
+      scopeBranchId,
+      branchId: scopeBranchId,
+    },
+    insertLedgerEventInTx,
+  )
 }
 
 async function validateProductCategories(client, tenantId, { categoryId, subcategoryId, branchId }) {
@@ -1416,17 +1309,23 @@ export async function createProduct(tenantId, payload) {
         await attachBundleItems(client, tenantId, product.id, bundleItems, payload.branchId)
         const finishedQty = Math.max(0, Number(payload.quantity) || 0)
         if (finishedQty > 0 || bundleItems.length) {
-          await applyBundleAssembleDelta(client, tenantId, {
-            bundleId: product.id,
-            bundleName: product.name,
-            bundleScale: payload.scale || 'unit',
-            oldBundleQty: 0,
-            newBundleQty: finishedQty,
-            oldItems: [],
-            newItems: bundleItems,
-            createdBy: payload.createdBy || null,
-            scopeBranchId: payload.branchId || null,
-          })
+          await applyBundleAssembleDelta(
+            client,
+            tenantId,
+            {
+              bundleId: product.id,
+              bundleName: product.name,
+              bundleScale: payload.scale || 'unit',
+              oldBundleQty: 0,
+              newBundleQty: finishedQty,
+              oldItems: [],
+              newItems: bundleItems,
+              createdBy: payload.createdBy || null,
+              scopeBranchId: payload.branchId || null,
+              branchId: payload.branchId || null,
+            },
+            insertLedgerEventInTx,
+          )
         }
       } else {
         await applyOpeningStockInTx(client, tenantId, {
@@ -2017,17 +1916,23 @@ export async function updateProduct(tenantId, id, payload, { branchId = null } =
         const bundleName = payload.name || existing.name
         const bundleScale = payload.scale || existing.scale || 'unit'
 
-        await applyBundleAssembleDelta(client, tenantId, {
-          bundleId: id,
-          bundleName,
-          bundleScale,
-          oldBundleQty: Number(existing.quantity) || 0,
-          newBundleQty,
-          oldItems,
-          newItems: oldItems,
-          createdBy: payload.createdBy || null,
-          scopeBranchId: product.branchId || branchId || null,
-        })
+        await applyBundleAssembleDelta(
+          client,
+          tenantId,
+          {
+            bundleId: id,
+            bundleName,
+            bundleScale,
+            oldBundleQty: Number(existing.quantity) || 0,
+            newBundleQty,
+            oldItems,
+            newItems: oldItems,
+            createdBy: payload.createdBy || null,
+            scopeBranchId: product.branchId || branchId || null,
+            branchId: product.branchId || branchId || null,
+          },
+          insertLedgerEventInTx,
+        )
       }
 
       let syncedVariants = null

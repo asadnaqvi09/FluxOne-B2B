@@ -21,8 +21,8 @@ import {
   validateSupplierFormFields,
 } from '@/lib/validation/supplierForm'
 import { fieldErrorClass } from '@/lib/validation/fieldErrors'
-import { useFieldErrors } from '@/hooks/useFieldErrors'
-import { useFormBaseline } from '@/hooks/useFormBaseline'
+import { useFieldErrors } from '@/hooks/shared/useFieldErrors'
+import { useFormBaseline } from '@/hooks/shared/useFormBaseline'
 
 const EMPTY = {
   companyName: '',

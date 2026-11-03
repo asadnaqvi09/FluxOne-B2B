@@ -1,6 +1,6 @@
 import { Clock3, Package, ShoppingBag } from 'lucide-react'
 import { SurfaceCard } from '@/components/shared/SurfaceCard'
-import { useCurrency } from '@/hooks/useCurrency'
+import { useCurrency } from '@/hooks/shared/useCurrency'
 import { BRAND } from '@/lib/constants'
 import { formatClockTime } from '@/lib/formatDateTime'
 

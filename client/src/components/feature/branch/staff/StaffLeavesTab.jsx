@@ -34,7 +34,7 @@ import { TableRowsSkeleton } from '@/components/ui/skeleton'
 import { apiClient } from '@/api/api'
 import { toastError, toastSuccess } from '@/lib/toast'
 import { formatDateLine } from '@/lib/formatDateTime'
-import { useClientPagination } from '@/hooks/useClientPagination'
+import { useClientPagination } from '@/hooks/shared/useClientPagination'
 
 function formatRange(start, end) {
   return `${formatDateLine(start)} — ${formatDateLine(end)}`

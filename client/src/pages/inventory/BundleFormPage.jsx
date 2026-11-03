@@ -23,26 +23,25 @@ import {
   TableRow,
 } from '@/components/ui/table'
 import { FormPageSkeleton } from '@/components/ui/skeleton'
-import { apiClient } from '@/api/api'
-import { endpoints } from '@/api/endpoints'
-import { useProducts } from '@/hooks/useProducts'
+import { fetchProductDetail, useProducts } from '@/hooks/inventory/useProducts'
 import {
   PRODUCT_STATUS,
   PRODUCT_TYPES,
   mapProduct,
   money,
-} from '@/lib/mapProduct'
+} from '@/lib/products/mapProduct'
 import {
   buildImTaxPayload,
   normalizeDefaultTaxPercent,
   resolveApplyDefaultTaxFromProduct,
   resolveInitialApplyDefaultTax,
-} from '@/lib/imTaxProfitPolicy'
+} from '@/lib/products/imTaxProfitPolicy'
 import { ApplyDefaultTaxField } from '@/components/feature/products/ApplyDefaultTaxField'
 import { PATHS } from '@/router/paths'
 import { toastError, toastSuccess } from '@/lib/toast'
 import { fieldErrorClass } from '@/lib/validation/fieldErrors'
-import { useFieldErrors } from '@/hooks/useFieldErrors'
+import { finalPriceFromSelling } from '@/lib/products/pricing'
+import { useFieldErrors } from '@/hooks/shared/useFieldErrors'
 import { cn } from '@/lib/utils'
 
 const BUNDLE_FIELD_IDS = {
@@ -194,7 +193,7 @@ export function BundleFormPage({ mode = 'create', initialBundle = null, loadingD
       const next = {}
       await Promise.all(
         missing.map(async (id) => {
-          const res = await apiClient.get(endpoints.products.detail(id))
+          const res = await fetchProductDetail(id)
           if (res.success && res.data) next[id] = mapProduct(res.data)
         }),
       )
@@ -251,7 +250,7 @@ export function BundleFormPage({ mode = 'create', initialBundle = null, loadingD
     }
     let cancelled = false
     setVariantsLoading(true)
-    void apiClient.get(endpoints.products.detail(productId)).then((res) => {
+    void fetchProductDetail(productId).then((res) => {
       if (cancelled) return
       setVariantsLoading(false)
       if (!res.success || !res.data) {
@@ -351,9 +350,9 @@ export function BundleFormPage({ mode = 'create', initialBundle = null, loadingD
     selectedOffer?.percent != null ? Number(selectedOffer.percent) : 0
   const priceNum = Number(bundlePrice) || 0
   const finalAfterOffer = Math.round(priceNum * (1 - offerPercent / 100))
-  // Preview only — save uses buildImTaxPayload (Admin default rate when checked)
   const taxRate = applyDefaultTax ? defaultTaxPercent : 0
   const taxAmount = Math.round(finalAfterOffer * (taxRate / 100))
+  const finalBundlePrice = finalPriceFromSelling(priceNum, offerPercent, taxRate)
 
   function resetPicker() {
     setProductId('')
@@ -925,18 +924,6 @@ export function BundleFormPage({ mode = 'create', initialBundle = null, loadingD
             <FieldError message={fieldErrors.sellingPrice} />
           </div>
           <div className="space-y-1.5">
-            <Label>Final bundle price</Label>
-            <Input
-              value={bundlePrice ? money(finalAfterOffer) : '—'}
-              disabled
-              className="bg-slate-50"
-            />
-            <p className="text-[11px] text-slate-400">
-              Bundle price − offer %
-              {offerPercent ? ` (${offerPercent}%)` : ''}.
-            </p>
-          </div>
-          <div className="space-y-1.5">
             <Label>Tax amount</Label>
             <Input
               value={applyDefaultTax && taxRate ? money(taxAmount) : money(0)}
@@ -945,8 +932,20 @@ export function BundleFormPage({ mode = 'create', initialBundle = null, loadingD
             />
             <p className="text-[11px] text-slate-400">
               {applyDefaultTax && taxRate
-                ? `${taxRate}% of final price (invoice line).`
+                ? `${taxRate}% of price after offer (invoice line).`
                 : 'Tax not applied.'}
+            </p>
+          </div>
+          <div className="space-y-1.5">
+            <Label>Final bundle price</Label>
+            <Input
+              value={bundlePrice ? money(finalBundlePrice) : '—'}
+              disabled
+              className="bg-slate-50"
+            />
+            <p className="text-[11px] text-slate-400">
+              Bundle price − offer %{offerPercent ? ` (${offerPercent}%)` : ''}
+              {applyDefaultTax && taxRate ? ` + tax (${taxRate}%)` : ''}.
             </p>
           </div>
         </div>

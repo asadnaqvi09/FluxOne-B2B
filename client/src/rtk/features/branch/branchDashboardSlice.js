@@ -2,7 +2,7 @@
 import { createAsyncThunk, createSlice } from '@reduxjs/toolkit'
 import { apiClient } from '@/api/api'
 import { endpoints } from '@/api/endpoints'
-import { emptyBranchDashboard, mergeBranchDashboard } from '@/lib/mapBranchDashboard'
+import { emptyBranchDashboard, mergeBranchDashboard } from '@/lib/branch/mapBranchDashboard'
 
 function todayIso() {
   return new Date().toISOString().slice(0, 10)

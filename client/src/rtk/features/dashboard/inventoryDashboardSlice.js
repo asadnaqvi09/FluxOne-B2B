@@ -7,7 +7,7 @@ import {
   normalizeAlertsPayload,
   normalizeKpis,
   normalizeStockGraphRows,
-} from '@/lib/mapInventoryDashboard'
+} from '@/lib/inventory/mapInventoryDashboard'
 
 export const ALERTS_PAGE_SIZE = 8
 

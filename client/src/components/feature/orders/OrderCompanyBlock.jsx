@@ -8,19 +8,19 @@ import { SearchableSelect } from '@/components/shared/SearchableSelect'
 import { Button } from '@/components/ui/button'
 import { Label } from '@/components/ui/label'
 import { BRAND } from '@/lib/constants'
-import { PRODUCT_TYPES } from '@/lib/mapProduct'
+import { PRODUCT_TYPES } from '@/lib/products/mapProduct'
 import {
   buildOrderLineFromProduct,
   emptyOrderFilters,
   isNormalProduct,
   isOrderableSku,
   isVariantChild,
-} from '@/lib/orderGenerate'
-import { deriveVariantAxes } from '@/lib/variantAxes'
+} from '@/lib/orders/orderGenerate'
+import { deriveVariantAxes } from '@/lib/products/variantAxes'
 import {
   fetchControlProductDetail,
   fetchControlProductOptions,
-} from '@/hooks/useInventoryControl'
+} from '@/hooks/inventory/useInventoryControl'
 import { cn } from '@/lib/utils'
 
 // Parent: one supplier company block — filters, catalogue, lines

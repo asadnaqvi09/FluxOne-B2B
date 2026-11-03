@@ -1,7 +1,7 @@
 import {
   emptyCatalog,
   emptyCatalogDefaults,
-} from '@/lib/productCatalogCache'
+} from '@/lib/products/productCatalogCache'
 
 // Shared helper — normalize RTK thunk results for hooks / UI
 export function asResult(promise) {

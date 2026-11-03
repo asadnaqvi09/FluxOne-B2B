@@ -1,70 +1,49 @@
-import { useCallback, useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { PageHeader } from '@/components/shared/PageHeader'
 import { MotionHeader, MotionReveal } from '@/components/shared/MotionReveal'
 import { SurfaceCard } from '@/components/shared/SurfaceCard'
 import { Button } from '@/components/ui/button'
-import { apiClient } from '@/api/api'
-import { endpoints } from '@/api/endpoints'
 import { toastError, toastSuccess } from '@/lib/toast'
 import { BranchCapsule } from '@/components/shared/BranchRoleCapsules'
 import { displayNotification } from '@/lib/notificationDisplay'
 import { DateTimeLines } from '@/components/shared/DateTimeLines'
 import { cn } from '@/lib/utils'
 import { TableRowsSkeleton } from '@/components/ui/skeleton'
+import { useCallback, useState } from 'react'
+import { useNotificationsInbox } from '@/hooks/shared/useNotifications'
 
 // Full notification inbox — mark as read only (no wipe / delete from inbox)
 export function NotificationsPage() {
   const navigate = useNavigate()
-  const [items, setItems] = useState([])
-  const [unreadCount, setUnreadCount] = useState(0)
-  const [loading, setLoading] = useState(false)
   const [filter, setFilter] = useState('all') // all | unread
-  const [mutating, setMutating] = useState(false)
+  const onLoadError = useCallback(
+    (message) => toastError(message || 'Failed to load notifications'),
+    [],
+  )
+  const { items, unreadCount, loading, mutating, markRead, markAll } = useNotificationsInbox({
+    filter,
+    onLoadError,
+  })
 
-  const refresh = useCallback(async () => {
-    setLoading(true)
-    const res = await apiClient.get(endpoints.notifications.list, {
-      limit: 100,
-      unreadOnly: filter === 'unread' ? 'true' : undefined,
-    })
-    setLoading(false)
-    if (res.success && res.data) {
-      setItems(res.data.items || [])
-      setUnreadCount(res.data.unreadCount || 0)
-    } else {
-      toastError(res.error || 'Failed to load notifications')
-    }
-  }, [filter])
-
-  useEffect(() => {
-    void refresh()
-  }, [refresh])
-
-  const markRead = async (id) => {
-    const res = await apiClient.patch(endpoints.notifications.read(id))
+  const handleMarkRead = async (id) => {
+    const res = await markRead(id)
     if (!res.success) {
       toastError(res.error || 'Failed to mark as read')
-      return
     }
-    void refresh()
   }
 
   // Production pattern — mark all read, never delete the inbox
-  const markAll = async () => {
-    setMutating(true)
-    const res = await apiClient.patch(endpoints.notifications.readAll)
-    setMutating(false)
+  const handleMarkAll = async () => {
+    const res = await markAll()
     if (!res.success) {
       toastError(res.error || 'Failed to mark all as read')
       return
     }
     toastSuccess('All notifications marked as read')
-    void refresh()
   }
 
   const openItem = async (n) => {
-    if (!n.isRead) await markRead(n.id)
+    if (!n.isRead) await handleMarkRead(n.id)
     if (n.linkPath) navigate(n.linkPath)
   }
 
@@ -77,7 +56,7 @@ export function NotificationsPage() {
           description="All alerts for your account — mark as read to clear the unread badge"
           actions={
             unreadCount > 0 ? (
-              <Button type="button" variant="outline" disabled={mutating} onClick={markAll}>
+              <Button type="button" variant="outline" disabled={mutating} onClick={handleMarkAll}>
                 Mark all as read
               </Button>
             ) : null
@@ -159,7 +138,7 @@ export function NotificationsPage() {
                           size="sm"
                           variant="ghost"
                           className="h-8 text-xs"
-                          onClick={() => markRead(n.id)}
+                          onClick={() => handleMarkRead(n.id)}
                         >
                           Mark read
                         </Button>

@@ -5,8 +5,8 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
-import { CONTROL_UI_TAB } from '@/lib/controlTabs'
-import { MOVEMENT_TYPES } from '@/lib/mapStockMovement'
+import { CONTROL_UI_TAB } from '@/lib/control/controlTabs'
+import { MOVEMENT_TYPES } from '@/lib/control/mapStockMovement'
 import { cn } from '@/lib/utils'
 
 // Row ⋯ menu — tab-aware actions for Control history tables.

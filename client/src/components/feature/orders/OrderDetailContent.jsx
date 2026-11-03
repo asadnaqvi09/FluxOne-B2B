@@ -15,8 +15,8 @@ import { DateTimeLines } from '@/components/shared/DateTimeLines'
 import { OrderTimeline } from '@/components/feature/orders/OrderTimeline'
 import { OrderInvoicesSection } from '@/components/feature/orders/OrderInvoicesSection'
 import { displayItemCode } from '@/lib/formatDisplayId'
-import { money } from '@/lib/mapProduct'
-import { OrderStatusBadge } from '@/lib/orderStatus'
+import { money } from '@/lib/products/mapProduct'
+import { OrderStatusBadge } from '@/components/feature/orders/OrderStatusBadge'
 
 // QA TC-ORDER-003A — rejected orders must show "Rejected" per line, not "Not received"
 function lineReceivedLabel(line, orderStatus) {

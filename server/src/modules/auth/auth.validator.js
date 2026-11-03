@@ -84,3 +84,29 @@ export const updateProfileSchema = z
       })
     }
   })
+export const forgotPasswordSchema = z.object({
+  body: z.object({
+    id: z.string().trim().min(1, 'User ID is required'),
+  }),
+})
+
+export const verifyOtpSchema = z.object({
+  body: z.object({
+    id: z.string().trim().min(1, 'User ID is required'),
+    otp: z.string().trim().regex(/^\d{6}$/, 'OTP must be 6 digits'),
+  }),
+})
+
+export const resetPasswordSchema = z.object({
+  body: z
+    .object({
+      resetToken: z.string().min(1, 'Reset session is missing'),
+      // ⚠ newPassword: yahan changePassword wala rule copy karo (min 8 sirf placeholder hai)
+      newPassword: z.string().min(8, 'Password must be at least 8 characters'),
+      confirmPassword: z.string().min(1, 'Please confirm your password'),
+    })
+    .refine((d) => d.newPassword === d.confirmPassword, {
+      message: 'Passwords do not match',
+      path: ['confirmPassword'],
+    }),
+})

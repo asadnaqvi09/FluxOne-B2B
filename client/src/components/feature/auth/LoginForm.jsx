@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 import { ChevronDown, Eye, EyeOff } from 'lucide-react'
 import { BrandLogo } from '@/components/shared/BrandLogo'
 import { Button } from '@/components/ui/button'
@@ -14,7 +14,8 @@ import { homePathForRole } from '@/router/paths'
 import { clearAdminSession } from '@/config/adminAuth.config'
 import { toastSuccess } from '@/lib/toast'
 import { cn } from '@/lib/utils'
-
+import { PATHS } from '@/router/paths'
+const LOGIN_PATH = '/login' 
 // Pull retry seconds from API payload or from backend message text
 function resolveRetrySec(err) {
   const fromPayload = Number(err?.retryAfterSec || err?.payload?.retryAfterSec || 0)
@@ -222,6 +223,12 @@ export function LoginForm() {
           <Label htmlFor="login-password" className="font-semibold">
             Password
           </Label>
+
+          <div className="flex justify-end">
+  <Link to={PATHS.forgotPassword} className="text-sm font-medium hover:underline">
+    Forgot Password?
+  </Link>
+</div>
           <div className="relative">
             <Input
               id="login-password"

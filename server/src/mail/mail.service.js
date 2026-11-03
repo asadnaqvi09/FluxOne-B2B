@@ -1,5 +1,6 @@
 import nodemailer from 'nodemailer'
 import { buildLoginCredentialsEmail } from './templates/login.email.js'
+import { buildPasswordResetOtpEmail } from './templates/password-reset-otp.email.js'
 import {
   buildPurchaseOrderInvoiceEmail,
   buildPurchaseOrderInvoiceSentBmEmail,
@@ -117,5 +118,11 @@ export async function sendPurchaseOrderInvoiceEmail(payload) {
 // Confirm to BM that supplier invoice email was attempted / sent
 export async function sendPurchaseOrderInvoiceSentBmEmail(payload) {
   const { subject, text, html } = buildPurchaseOrderInvoiceSentBmEmail(payload)
+  return sendMail({ to: payload.toEmail, subject, text, html })
+}
+
+// Password reset OTP (non-blocking; SMTP na ho to stub)
+export async function sendPasswordResetOtpEmail(payload) {
+  const { subject, text, html } = buildPasswordResetOtpEmail(payload)
   return sendMail({ to: payload.toEmail, subject, text, html })
 }

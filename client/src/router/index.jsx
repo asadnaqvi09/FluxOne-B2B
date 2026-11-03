@@ -13,6 +13,7 @@ import { BranchManagerLayout } from '@/layouts/BranchManagerLayout'
 import { WorkspaceLayout } from '@/layouts/WorkspaceLayout'
 import { SplashPage } from '@/pages/splash/SplashPage'
 import { LoginPage } from '@/pages/auth/LoginPage'
+import { ForgotPasswordPage } from '@/pages/auth/ForgotPasswordPage'
 import { ProfilePage } from '@/pages/shared/ProfilePage'
 import { ComingSoonPage } from '@/pages/workspace/ComingSoonPage'
 import { DashboardPage as InventoryDashboardPage } from '@/pages/inventory/DashboardPage'
@@ -74,6 +75,7 @@ function ProfileRedirect() {
 const router = createBrowserRouter([
   { path: PATHS.splash, element: <SplashPage />, errorElement: <RouteErrorPage /> },
   { path: PATHS.login, element: <LoginPage />, errorElement: <RouteErrorPage /> },
+  { path: PATHS.forgotPassword, element: <ForgotPasswordPage />, errorElement: <RouteErrorPage /> },
   {
     path: PATHS.admin.root,
     element: <AdminAuthGate />,

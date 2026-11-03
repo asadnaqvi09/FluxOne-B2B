@@ -1,6 +1,7 @@
 export const PATHS = {
   splash: '/',
   login: '/login',
+  forgotPassword: '/forgot-password',
   profile: '/profile',
   inventory: {
     root: '/inventory',

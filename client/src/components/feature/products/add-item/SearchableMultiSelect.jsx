@@ -1,27 +1,22 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { Check, ChevronsUpDown, Plus, Search, X } from 'lucide-react'
-import { Button } from '@/components/ui/button'
+import { Check, ChevronsUpDown, Search, X } from 'lucide-react'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { BRAND } from '@/lib/constants'
 import { cn } from '@/lib/utils'
 
-// Input that filters a checkbox list (dropdown + search). Supports inline Custom add.
+// Input that filters a checkbox list (dropdown + search).
 export function SearchableMultiSelect({
   label,
   hint,
   options = [],
   value = [],
   onChange,
-  customLabel = 'Custom',
-  onAddCustom,
   placeholder = 'Search or select…',
   emptyText = 'No options match',
 }) {
   const [open, setOpen] = useState(false)
   const [query, setQuery] = useState('')
-  const [customName, setCustomName] = useState('')
-  const [addingCustom, setAddingCustom] = useState(false)
   const rootRef = useRef(null)
 
   const selectedSet = useMemo(() => new Set(value), [value])
@@ -36,7 +31,6 @@ export function SearchableMultiSelect({
     function onDocClick(event) {
       if (!rootRef.current?.contains(event.target)) {
         setOpen(false)
-        setAddingCustom(false)
       }
     }
     document.addEventListener('mousedown', onDocClick)
@@ -50,18 +44,6 @@ export function SearchableMultiSelect({
 
   function removeChip(id) {
     onChange?.(value.filter((x) => x !== id))
-  }
-
-  function submitCustom() {
-    const name = customName.trim()
-    if (!name) return
-    const id = onAddCustom?.(name)
-    if (id) {
-      if (!selectedSet.has(id)) onChange?.([...value, id])
-      setCustomName('')
-      setAddingCustom(false)
-      setQuery('')
-    }
   }
 
   const selectedOptions = options.filter((opt) => selectedSet.has(opt.id))
@@ -155,47 +137,6 @@ export function SearchableMultiSelect({
               })
             )}
           </ul>
-
-          <div className="border-t border-border bg-slate-50/80 p-2">
-            {addingCustom ? (
-              <div className="flex gap-2">
-                <Input
-                  value={customName}
-                  onChange={(e) => setCustomName(e.target.value)}
-                  placeholder="Custom name"
-                  className="h-9"
-                  autoFocus
-                  onKeyDown={(e) => {
-                    if (e.key === 'Enter') {
-                      e.preventDefault()
-                      submitCustom()
-                    }
-                  }}
-                />
-                <Button
-                  type="button"
-                  size="sm"
-                  className="cursor-pointer text-white"
-                  style={{ background: BRAND.purple }}
-                  onClick={submitCustom}
-                >
-                  Add
-                </Button>
-              </div>
-            ) : (
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                className="w-full cursor-pointer"
-                style={{ color: BRAND.deep }}
-                onClick={() => setAddingCustom(true)}
-              >
-                <Plus className="size-4" />
-                {customLabel}
-              </Button>
-            )}
-          </div>
         </div>
       ) : null}
     </div>

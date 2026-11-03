@@ -159,3 +159,83 @@ export async function updateAuthProfile(userId, tenantId, { fullName, email, ima
 
   return rows[0]
 }
+// Cooldown (60 sec) aur din ki limit ke liye
+export async function getResetCounts(userId, tenantId) {
+  const { rows } = await query(
+    `
+      SELECT
+        COUNT(*) FILTER (WHERE created_at > NOW() - INTERVAL '60 seconds')::int AS recent,
+        COUNT(*) FILTER (WHERE created_at > NOW() - INTERVAL '15 minutes')::int AS "windowCount"
+      FROM password_resets
+      WHERE user_id = $1 AND tenant_id = $2
+    `,
+    [userId, tenantId],
+  )
+  return rows[0]
+}
+
+export async function createPasswordReset({ userId, tenantId, otpHash, ttlMinutes }) {
+  // purane unused OTP/tokens invalid
+  await query(
+    `UPDATE password_resets SET used_at = NOW()
+     WHERE user_id = $1 AND tenant_id = $2 AND used_at IS NULL`,
+    [userId, tenantId],
+  )
+  await query(
+    `
+      INSERT INTO password_resets (user_id, tenant_id, otp_hash, expires_at)
+      VALUES ($1, $2, $3, NOW() + ($4 || ' minutes')::interval)
+    `,
+    [userId, tenantId, otpHash, String(ttlMinutes)],
+  )
+}
+
+export async function findActiveOtpReset(userId, tenantId) {
+  const { rows } = await query(
+    `
+      SELECT id, otp_hash AS "otpHash", attempts
+      FROM password_resets
+      WHERE user_id = $1 AND tenant_id = $2
+        AND used_at IS NULL
+        AND token_hash IS NULL
+        AND otp_hash IS NOT NULL
+        AND expires_at > NOW()
+      ORDER BY created_at DESC
+      LIMIT 1
+    `,
+    [userId, tenantId],
+  )
+  return rows[0] || null
+}
+
+export async function bumpResetAttempts(id) {
+  await query(`UPDATE password_resets SET attempts = attempts + 1 WHERE id = $1`, [id])
+}
+
+// OTP sahi nikla: reset token set karo, OTP hata do (dobara use na ho)
+export async function markOtpVerified(id, tokenHash, ttlMinutes) {
+  await query(
+    `
+      UPDATE password_resets
+      SET token_hash = $2,
+          otp_hash = NULL,
+          expires_at = NOW() + ($3 || ' minutes')::interval
+      WHERE id = $1
+    `,
+    [id, tokenHash, String(ttlMinutes)],
+  )
+}
+
+// Check + use ek hi query mein: token sirf ek baar chalega
+export async function consumeResetToken(tokenHash) {
+  const { rows } = await query(
+    `
+      UPDATE password_resets
+      SET used_at = NOW()
+      WHERE token_hash = $1 AND used_at IS NULL AND expires_at > NOW()
+      RETURNING user_id AS "userId", tenant_id AS "tenantId"
+    `,
+    [tokenHash],
+  )
+  return rows[0] || null
+}

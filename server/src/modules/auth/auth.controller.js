@@ -1,8 +1,16 @@
 import bcrypt from 'bcryptjs'
+import crypto from 'node:crypto'
+import { sendPasswordResetOtpEmail } from '../../mail/mail.service.js'
 import {
+  bumpResetAttempts,
+  consumeResetToken,
+  createPasswordReset,
+  findActiveOtpReset,
   findAuthUserById,
   findAuthUsersByLoginId,
   findAuthUsersByLoginIdIncludingInactive,
+  getResetCounts,
+  markOtpVerified,
   updateAuthProfile,
   updatePasswordHash,
 } from './auth.model.js'
@@ -304,4 +312,128 @@ export async function logout(req, res) {
 export async function logoutAll(req, res) {
   await revokeAllForUser(req.user.id, req.tenantId)
   return success(res, { loggedOutAll: true })
+}
+
+// ---------------------------------------------------------------------------
+// Forgot password (email OTP)
+// ---------------------------------------------------------------------------
+const OTP_TTL_MIN = 10
+const RESET_TOKEN_TTL_MIN = 10
+const MAX_OTP_ATTEMPTS = 5
+const MAX_OTPS_PER_WINDOW = 5
+const OTP_WINDOW_MIN = 15 // auth.model.js ke INTERVAL '15 minutes' se match hona chahiye
+
+const otpHash = (userId, otp) =>
+  crypto.createHash('sha256').update(`${userId}:${otp}`).digest('hex')
+
+// API 1: OTP email karo
+export async function forgotPassword(req, res) {
+  const loginId = req.validated.body.id.trim()
+
+  try {
+    const users = await findAuthUsersByLoginId(loginId)
+
+    if (users.length === 0) {
+      // active user nahi mila: check karo account band ya branch blocked to nahi
+      const inactive = await findAuthUsersByLoginIdIncludingInactive(loginId)
+      if (inactive.length > 0) {
+        return fail(
+          res,
+          'This account is deactivated or its branch is blocked. Contact your administrator.',
+          403,
+        )
+      }
+      return fail(res, 'This User ID is not registered', 404)
+    }
+
+    if (users.length > 1) {
+      return fail(
+        res,
+        'This User ID exists in more than one company. Contact your administrator.',
+        409,
+      )
+    }
+
+    const user = users[0]
+    const counts = await getResetCounts(user.id, user.tenantId)
+
+    if (counts.recent > 0) {
+      return fail(res, 'Please wait 60 seconds before requesting another OTP.', 429)
+    }
+    if (counts.windowCount >= MAX_OTPS_PER_WINDOW) {
+      return fail(
+        res,
+        `Too many OTP requests. Please try again after ${OTP_WINDOW_MIN} minutes.`,
+        429,
+      )
+    }
+
+    const otp = String(crypto.randomInt(100000, 1000000))
+    await createPasswordReset({
+      userId: user.id,
+      tenantId: user.tenantId,
+      otpHash: otpHash(user.id, otp),
+      ttlMinutes: OTP_TTL_MIN,
+    })
+    if (process.env.NODE_ENV !== 'production') {
+      console.info('[auth] DEV ONLY reset OTP:', { loginId, otp }) // production mein kabhi nahi
+    }
+    void sendPasswordResetOtpEmail({
+      toEmail: user.email,
+      otp,
+      expiresInMinutes: OTP_TTL_MIN,
+    })
+
+    return success(res, { message: 'An OTP has been sent to your registered email.' })
+  } catch (err) {
+    console.error('[auth] forgotPassword failed:', err?.message || err)
+    return failFromError(res, err)
+  }
+}
+
+// API 2: OTP verify
+export async function verifyOtp(req, res) {
+  const loginId = req.validated.body.id.trim()
+  const { otp } = req.validated.body
+  const invalid = () => fail(res, 'Invalid or expired OTP', 400)
+
+  const users = await findAuthUsersByLoginId(loginId)
+  if (users.length !== 1) return invalid()
+  const user = users[0]
+
+  const reset = await findActiveOtpReset(user.id, user.tenantId)
+  if (!reset || reset.attempts >= MAX_OTP_ATTEMPTS) return invalid()
+
+  if (otpHash(user.id, otp) !== reset.otpHash) {
+    await bumpResetAttempts(reset.id)
+    return invalid()
+  }
+
+  const resetToken = generateOpaqueToken()
+  await markOtpVerified(reset.id, hashToken(resetToken), RESET_TOKEN_TTL_MIN)
+  return success(res, { resetToken })
+}
+
+// API 3: naya password
+export async function resetPassword(req, res) {
+  const { resetToken, newPassword } = req.validated.body
+
+  const reset = await consumeResetToken(hashToken(resetToken)) // yahin token use ho jata hai
+  if (!reset) return fail(res, 'Session expired. Please request a new OTP.', 400)
+
+  try {
+    const nextHash = await bcrypt.hash(newPassword, BCRYPT_COST)
+    await updatePasswordHash(reset.userId, reset.tenantId, nextHash)
+    await revokeAllForUser(reset.userId, reset.tenantId) // sab devices logout
+
+    const user = await findAuthUserById(reset.userId, reset.tenantId)
+    if (user) {
+      const ip = req.ip || req.socket?.remoteAddress || 'unknown'
+      await clearLoginFailures(user.email, ip)
+    }
+  } catch (err) {
+    return failFromError(res, err)
+  }
+
+  return success(res, { reset: true })
 }

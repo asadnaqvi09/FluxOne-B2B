@@ -1,6 +1,5 @@
 import nodemailer from 'nodemailer'
 import { buildLoginCredentialsEmail } from './templates/login.email.js'
-import { buildLeaveDecisionEmail } from './templates/leave-decision.email.js'
 import {
   buildPurchaseOrderInvoiceEmail,
   buildPurchaseOrderInvoiceSentBmEmail,
@@ -81,12 +80,6 @@ export async function sendLoginCredentialsEmail(payload) {
     })
   }
   return result
-}
-
-// Notify BM by email when Admin approves/rejects their leave (non-blocking).
-export async function sendLeaveDecisionEmail(payload) {
-  const { subject, text, html } = buildLeaveDecisionEmail(payload)
-  return sendMail({ to: payload.toEmail, subject, text, html })
 }
 
 // TL §10.3 — send invoice PDF to supplier representative (non-blocking / SMTP stub)
